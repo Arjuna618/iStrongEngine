@@ -1,0 +1,38 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Jewel",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:jewel",
+    "name": "Jewel",
+    "sides": 6,
+    "color": "#fdf380",
+    "colorMap": 3,
+    "rarity": "normal",
+    "labyLevel": 0,
+    "size": 16,
+    "hp": 1844.4096,
+    "bodyDamage": 1,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 100000,
+    "pushability": 0.25,
+    "driftSpeed": 182.32,
+    "centerBias": 0,
+    "resist": 2,
+    "penetration": 2,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "jewel",
+    "hitOnRounds": 0.25,
+    "pathTurn": 130.88,
+    "sizeRandomization": 0,
+    "ramHealthScale": 36.8882,
+    "arras": {
+      "xpBefore": 100000
+    }
+  }
+}

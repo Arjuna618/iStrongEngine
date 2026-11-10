@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "type": "Other",
+  "name": "Mysterious Egg",
+  "timestamp": 1793491200000,
+  "category": "Game Objects",
+  "data": {
+    "_designVersion": 1,
+    "otherId": "other:mysterious-egg",
+    "name": "Mysterious Egg",
+    "size": 60.36,
+    "body": {
+      "kind": "polygon",
+      "sides": 7,
+      "radius": 1.071481,
+      "x": 0,
+      "y": 0,
+      "angle": 0,
+      "turn": 0,
+      "above": true,
+      "color": "#726f6f",
+      "colorMap": 17,
+      "arras": {
+        "designId": "45e4b77d4b3f9749",
+        "name": "Mysterious Egg",
+        "colour": 17
+      }
+    },
+    "arras": {
+      "designId": "45e4b77d4b3f9749",
+      "name": "Mysterious Egg",
+      "baseSize": 30.18000030517578
+    }
+  }
+}

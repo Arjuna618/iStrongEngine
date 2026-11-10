@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Gem",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:gem",
+    "name": "Gem",
+    "sides": 6,
+    "color": "#7adbba",
+    "colorMap": 4,
+    "rarity": "normal",
+    "labyLevel": 0,
+    "size": 11.2838,
+    "hp": 399.1824,
+    "bodyDamage": 1,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 1000,
+    "pushability": 0.25,
+    "driftSpeed": 182.32,
+    "centerBias": 0,
+    "resist": 2,
+    "penetration": 2,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "gem",
+    "hitOnRounds": 0.25,
+    "pathTurn": 130.88,
+    "sizeRandomization": 15,
+    "ramHealthScale": 39.9182,
+    "arras": {
+      "name": "Gem",
+      "designId": "44c9e56c53389acb",
+      "baseSize": 5,
+      "colorSlot": 4,
+      "xpBefore": 2000
+    }
+  }
+}

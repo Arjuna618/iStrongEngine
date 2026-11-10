@@ -1,0 +1,38 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Trans Gamma Square",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:trans-gamma-square",
+    "name": "Trans Gamma Square",
+    "sides": 4,
+    "color": "#efc74b",
+    "colorMap": 13,
+    "rarity": "trans",
+    "labyLevel": 4,
+    "size": 114.8954,
+    "hp": 278755.002,
+    "bodyDamage": 25,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 80000000,
+    "pushability": 0.15000000000000002,
+    "driftSpeed": 52.5,
+    "centerBias": 55,
+    "resist": 1,
+    "penetration": 2,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "transGammaSquare",
+    "hitOnRounds": 0.5367,
+    "pathTurn": 40.78,
+    "sizeRandomization": 0,
+    "ramHealthScale": 4.6459,
+    "arras": {
+      "xpBefore": 46667788.130163714
+    }
+  }
+}

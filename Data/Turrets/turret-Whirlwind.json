@@ -1,0 +1,37 @@
+{
+  "version": "1.0.0",
+  "type": "CustomTurret",
+  "name": "Whirlwind",
+  "timestamp": 1793491200000,
+  "data": {
+    "name": "Whirlwind",
+    "layers": [
+      {
+        "type": "polygon",
+        "size": 5,
+        "width": 0,
+        "aspect": 1,
+        "xOffset": 0,
+        "yOffset": 0,
+        "color": "#a7a7af",
+        "strokeColor": "#6d6d72",
+        "customStroke": false,
+        "rotation": "withTank",
+        "sides": 5,
+        "layer": 0,
+        "shootAnim": 0
+      }
+    ],
+    "guns": [],
+    "turretType": "auto",
+    "independent": true,
+    "fov": 360,
+    "maxTurnSpeed": 4.5,
+    "autoFireDelay": 0,
+    "autoTargetPriority": "nearest",
+    "baseSize": 22,
+    "baseColor": "#a7a7af",
+    "baseShape": 0,
+    "spinSpeed": 0
+  }
+}

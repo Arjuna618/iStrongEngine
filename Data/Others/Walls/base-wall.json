@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "type": "Other",
+  "name": "Base Wall",
+  "timestamp": 1793491200000,
+  "category": "Walls",
+  "data": {
+    "_designVersion": 1,
+    "otherId": "other:base-wall",
+    "name": "Base Wall",
+    "size": 100,
+    "body": {
+      "kind": "polygon",
+      "sides": 4,
+      "radius": 1.253314,
+      "x": 0,
+      "y": 0,
+      "angle": 0,
+      "turn": 0.785398,
+      "above": true,
+      "color": "#e03e41",
+      "colorMap": 12,
+      "arras": {
+        "designId": "5a6173d379301fcb",
+        "name": "Base Wall",
+        "colour": 12
+      }
+    },
+    "arras": {
+      "designId": "5a6173d379301fcb",
+      "name": "Base Wall",
+      "baseSize": 50
+    }
+  }
+}

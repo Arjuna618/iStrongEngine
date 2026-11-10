@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Trans OD Septagon (Scaled)",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:trans-od-septagon-scaled",
+    "name": "Trans OD Septagon (Scaled)",
+    "sides": 7,
+    "color": "#8abc3f",
+    "colorMap": 11,
+    "rarity": "trans",
+    "labyLevel": 0,
+    "size": 203.1083,
+    "hp": 806473.474,
+    "bodyDamage": 50,
+    "shield": 396.879,
+    "shieldRegen": 0,
+    "xpValue": 70000000,
+    "pushability": 0.035,
+    "driftSpeed": 65.19,
+    "centerBias": 95,
+    "resist": 1.953125,
+    "penetration": 1.1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "transOdSeptagon",
+    "hitOnRounds": 2,
+    "pathTurn": 50.14,
+    "sizeRandomization": 15,
+    "ramHealthScale": 133.367,
+    "arras": {
+      "name": "Septagon",
+      "designId": "689f237fb8f1973a",
+      "baseSize": 90,
+      "colorSlot": 11,
+      "xpBefore": 140000000
+    }
+  }
+}

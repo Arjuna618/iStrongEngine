@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Trans Beta Pentagon",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:trans-beta-pentagon",
+    "name": "Trans Beta Pentagon",
+    "sides": 5,
+    "color": "#8d6adf",
+    "colorMap": 14,
+    "rarity": "trans",
+    "labyLevel": 1,
+    "size": 53.1744,
+    "hp": 58271.865,
+    "bodyDamage": 25,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 6250000,
+    "pushability": 0.12135254915624212,
+    "driftSpeed": 86.22,
+    "centerBias": 90,
+    "resist": 1.25,
+    "penetration": 1.1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "transLabyBetaPentagon",
+    "hitOnRounds": 1.482,
+    "pathTurn": 66.4,
+    "sizeRandomization": 0,
+    "ramHealthScale": 7.7696,
+    "arras": {
+      "name": "Trans Beta Pentagon",
+      "designId": "23a06d80f59542e3",
+      "baseSize": 23.5623,
+      "colorSlot": 37,
+      "xpBefore": 7163958.538739961
+    }
+  }
+}

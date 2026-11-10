@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Trans Omega Square",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:trans-omega-square",
+    "name": "Trans Omega Square",
+    "sides": 4,
+    "color": "#efc74b",
+    "colorMap": 13,
+    "rarity": "trans",
+    "labyLevel": 3,
+    "size": 81.2433,
+    "hp": 36899.559,
+    "bodyDamage": 25,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 10000000,
+    "pushability": 0.2121320343559643,
+    "driftSpeed": 52.5,
+    "centerBias": 45,
+    "resist": 1,
+    "penetration": 2,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "transOmegaSquare",
+    "hitOnRounds": 0.7481,
+    "pathTurn": 40.78,
+    "sizeRandomization": 0,
+    "ramHealthScale": 3.69,
+    "arras": {
+      "name": "Trans Omega Square",
+      "designId": "a343575fd9c232a4",
+      "baseSize": 36,
+      "colorSlot": 37,
+      "xpBefore": 7163958.538739962
+    }
+  }
+}

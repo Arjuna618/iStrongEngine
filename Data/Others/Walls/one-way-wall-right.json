@@ -1,0 +1,58 @@
+{
+  "version": "1.0.0",
+  "type": "Other",
+  "name": "One-Way Wall (Right)",
+  "timestamp": 1793491200000,
+  "category": "Walls",
+  "data": {
+    "_designVersion": 1,
+    "otherId": "other:one-way-wall-right",
+    "name": "One-Way Wall (Right)",
+    "size": 100,
+    "body": {
+      "kind": "polygon",
+      "sides": 4,
+      "radius": 1.253314,
+      "x": 0,
+      "y": 0,
+      "angle": 0,
+      "turn": 0.785398,
+      "above": true,
+      "color": "#726f6f",
+      "colorMap": 17,
+      "arras": {
+        "designId": "8c33862053863f02",
+        "name": "One-Way Wall (Right)",
+        "colour": 17
+      },
+      "parts": [
+        {
+          "kind": "polygon",
+          "sides": 3,
+          "radius": 0.544292,
+          "x": -0.05,
+          "y": 0,
+          "angle": 0,
+          "turn": 0,
+          "above": true,
+          "color": "#a7a7af",
+          "colorMap": 16,
+          "arras": {
+            "designId": "e43abfa4ec5172fc",
+            "name": "Unknown Entity",
+            "colour": 16,
+            "scale": 0.35,
+            "offset": 0.05,
+            "direction": 3.141593,
+            "mountAngle": 0
+          }
+        }
+      ]
+    },
+    "arras": {
+      "designId": "8c33862053863f02",
+      "name": "One-Way Wall (Right)",
+      "baseSize": 50
+    }
+  }
+}

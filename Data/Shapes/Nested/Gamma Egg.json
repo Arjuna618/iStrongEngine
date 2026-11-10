@@ -1,0 +1,39 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Gamma Egg",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:gamma-egg",
+    "name": "Gamma Egg",
+    "sides": 0,
+    "color": "#e8ebf7",
+    "colorMap": 6,
+    "isIntangible": true,
+    "rarity": "normal",
+    "labyLevel": 4,
+    "size": 144,
+    "hp": 244137.0997,
+    "bodyDamage": 0,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 8000,
+    "pushability": 0.09375000000000008,
+    "driftSpeed": 52.5,
+    "centerBias": 40,
+    "resist": 1,
+    "penetration": 1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "gammaEgg",
+    "hitOnRounds": 0,
+    "pathTurn": 40.78,
+    "sizeRandomization": 0,
+    "ramHealthScale": 1627.5807,
+    "arras": {
+      "xpBefore": 9732
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Legendary Alpha Hexagon",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:legendary-alpha-hexagon",
+    "name": "Legendary Alpha Hexagon",
+    "sides": 6,
+    "color": "#7adbba",
+    "colorMap": 4,
+    "rarity": "legendary",
+    "labyLevel": 2,
+    "size": 70.3588,
+    "hp": 235572.81,
+    "bodyDamage": 15,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 25000000,
+    "pushability": 0.07500000000000002,
+    "driftSpeed": 65.19,
+    "centerBias": 100,
+    "resist": 1.3,
+    "penetration": 1.1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "legendaryAlphaHexagon",
+    "hitOnRounds": 1.8278,
+    "pathTurn": 50.14,
+    "sizeRandomization": 0,
+    "ramHealthScale": 7.8524,
+    "arras": {
+      "name": "Alpha Hexagon",
+      "designId": "dbfb5d0931e889c9",
+      "baseSize": 31.1769,
+      "colorSlot": 4,
+      "xpBefore": 7163958.538739962
+    }
+  }
+}

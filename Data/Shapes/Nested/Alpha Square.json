@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Alpha Square",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:alpha-square",
+    "name": "Alpha Square",
+    "sides": 4,
+    "color": "#efc74b",
+    "colorMap": 13,
+    "rarity": "normal",
+    "labyLevel": 2,
+    "size": 57.4477,
+    "hp": 1158.0596,
+    "bodyDamage": 10,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 500,
+    "pushability": 0.30000000000000004,
+    "driftSpeed": 65.19,
+    "centerBias": 35,
+    "resist": 1,
+    "penetration": 2,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "alphaSquare",
+    "hitOnRounds": 0.5076,
+    "pathTurn": 50.14,
+    "sizeRandomization": 0,
+    "ramHealthScale": 4.6322,
+    "arras": {
+      "name": "Alpha Square",
+      "designId": "acb3e8004516822d",
+      "baseSize": 25.4558,
+      "colorSlot": 13,
+      "xpBefore": 1125
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Gamma Triangle",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:gamma-triangle",
+    "name": "Gamma Triangle",
+    "sides": 3,
+    "color": "#e7896d",
+    "colorMap": 2,
+    "rarity": "normal",
+    "labyLevel": 4,
+    "size": 162.4866,
+    "hp": 157266.996,
+    "bodyDamage": 10,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 160000,
+    "pushability": 0.050000000000000044,
+    "driftSpeed": 52.5,
+    "centerBias": 80,
+    "resist": 1.15,
+    "penetration": 1.5,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "gammaTriangle",
+    "hitOnRounds": 1,
+    "pathTurn": 40.78,
+    "sizeRandomization": 0,
+    "ramHealthScale": 13.1056,
+    "arras": {
+      "xpBefore": 383843.796348485
+    }
+  }
+}

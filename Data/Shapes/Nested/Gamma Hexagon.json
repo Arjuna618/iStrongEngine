@@ -1,0 +1,38 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Gamma Hexagon",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:gamma-hexagon",
+    "name": "Gamma Hexagon",
+    "sides": 6,
+    "color": "#7adbba",
+    "colorMap": 4,
+    "rarity": "normal",
+    "labyLevel": 4,
+    "size": 93.8117,
+    "hp": 1416928.5,
+    "bodyDamage": 15,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 4000000,
+    "pushability": 0.056250000000000015,
+    "driftSpeed": 52.5,
+    "centerBias": 100,
+    "resist": 1.3,
+    "penetration": 1.1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "gammaHexagon",
+    "hitOnRounds": 1.8278,
+    "pathTurn": 40.78,
+    "sizeRandomization": 0,
+    "ramHealthScale": 7.8718,
+    "arras": {
+      "xpBefore": 20907811.35786771
+    }
+  }
+}

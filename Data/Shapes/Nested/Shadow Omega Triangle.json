@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Shadow Omega Triangle",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:shadow-omega-triangle",
+    "name": "Shadow Omega Triangle",
+    "sides": 3,
+    "color": "#e7896d",
+    "colorMap": 2,
+    "rarity": "shadow",
+    "labyLevel": 3,
+    "size": 81.2433,
+    "hp": 158930.064,
+    "bodyDamage": 20,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 10000000,
+    "pushability": 0.10000000000000007,
+    "driftSpeed": 52.5,
+    "centerBias": 70,
+    "resist": 1.15,
+    "penetration": 1.5,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "shadowOmegaTriangle",
+    "hitOnRounds": 1,
+    "pathTurn": 40.78,
+    "sizeRandomization": 0,
+    "ramHealthScale": 13.2442,
+    "arras": {
+      "name": "Omega Triangle",
+      "designId": "10236cecfa32afc0",
+      "baseSize": 36,
+      "colorSlot": 2,
+      "xpBefore": 5502664.651269776
+    }
+  }
+}

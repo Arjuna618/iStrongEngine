@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "type": "Other",
+  "name": "Breaker Wall",
+  "timestamp": 1793491200000,
+  "category": "Walls",
+  "data": {
+    "_designVersion": 1,
+    "otherId": "other:breaker-wall",
+    "name": "Breaker Wall",
+    "size": 100,
+    "body": {
+      "kind": "polygon",
+      "sides": 4,
+      "radius": 1.253314,
+      "x": 0,
+      "y": 0,
+      "angle": 0,
+      "turn": 0.785398,
+      "above": true,
+      "color": "#ef99c3",
+      "colorMap": 5,
+      "arras": {
+        "designId": "97cc844ba4d04062",
+        "name": "Breaker Wall",
+        "colour": 5
+      }
+    },
+    "arras": {
+      "designId": "97cc844ba4d04062",
+      "name": "Breaker Wall",
+      "baseSize": 50
+    }
+  }
+}

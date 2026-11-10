@@ -1,0 +1,38 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Legendary Gamma Hexagon",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:legendary-gamma-hexagon",
+    "name": "Legendary Gamma Hexagon",
+    "sides": 6,
+    "color": "#7adbba",
+    "colorMap": 4,
+    "rarity": "legendary",
+    "labyLevel": 4,
+    "size": 93.8117,
+    "hp": 5667714,
+    "bodyDamage": 15,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 1600000000,
+    "pushability": 0.056250000000000015,
+    "driftSpeed": 52.5,
+    "centerBias": 100,
+    "resist": 1.3,
+    "penetration": 1.1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "legendaryGammaHexagon",
+    "hitOnRounds": 1.8278,
+    "pathTurn": 40.78,
+    "sizeRandomization": 0,
+    "ramHealthScale": 7.8718,
+    "arras": {
+      "xpBefore": 50281560.00190241
+    }
+  }
+}

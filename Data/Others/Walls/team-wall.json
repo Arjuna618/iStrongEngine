@@ -1,0 +1,59 @@
+{
+  "version": "1.0.0",
+  "type": "Other",
+  "name": "Team Wall",
+  "timestamp": 1793491200000,
+  "category": "Walls",
+  "data": {
+    "_designVersion": 1,
+    "otherId": "other:team-wall",
+    "name": "Team Wall",
+    "size": 100,
+    "body": {
+      "kind": "polygon",
+      "sides": 4,
+      "radius": 1.253314,
+      "x": 0,
+      "y": 0,
+      "angle": 0,
+      "turn": 0.785398,
+      "above": true,
+      "color": "#e03e41",
+      "colorMap": 12,
+      "arras": {
+        "designId": "a97cf38c6aa0e252",
+        "name": "Team Wall",
+        "colour": 12
+      },
+      "parts": [
+        {
+          "kind": "polygon",
+          "sides": 4,
+          "radius": 0.626657,
+          "x": 0,
+          "y": 0,
+          "angle": 0,
+          "turn": 0.785398,
+          "above": true,
+          "color": "#e03e41",
+          "colorMap": 12,
+          "wearsCarrier": true,
+          "arras": {
+            "designId": "d4640e726feb79fa",
+            "name": "Unknown Entity",
+            "colour": 0,
+            "scale": 0.5,
+            "offset": 0,
+            "direction": 0,
+            "mountAngle": 0
+          }
+        }
+      ]
+    },
+    "arras": {
+      "designId": "a97cf38c6aa0e252",
+      "name": "Team Wall",
+      "baseSize": 50
+    }
+  }
+}

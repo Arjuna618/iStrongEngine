@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "OD Septagon (Scaled)",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:od-septagon-scaled",
+    "name": "OD Septagon (Scaled)",
+    "sides": 7,
+    "color": "#8abc3f",
+    "colorMap": 11,
+    "rarity": "normal",
+    "labyLevel": 0,
+    "size": 203.1083,
+    "hp": 20293.7462,
+    "bodyDamage": 20,
+    "shield": 396.879,
+    "shieldRegen": 0,
+    "xpValue": 28000,
+    "pushability": 0.035,
+    "driftSpeed": 65.19,
+    "centerBias": 95,
+    "resist": 1.953125,
+    "penetration": 1.1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "odSeptagon",
+    "hitOnRounds": 2,
+    "pathTurn": 50.14,
+    "sizeRandomization": 15,
+    "ramHealthScale": 25.8633,
+    "arras": {
+      "name": "Septagon",
+      "designId": "689f237fb8f1973a",
+      "baseSize": 90,
+      "colorSlot": 11,
+      "xpBefore": 28000
+    }
+  }
+}

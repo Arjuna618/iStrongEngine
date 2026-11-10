@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Pentagon",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:pentagon",
+    "name": "Pentagon",
+    "sides": 5,
+    "color": "#8d6adf",
+    "colorMap": 14,
+    "rarity": "normal",
+    "labyLevel": 0,
+    "size": 43.019,
+    "hp": 1192.427,
+    "bodyDamage": 10,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 500,
+    "pushability": 0.15,
+    "driftSpeed": 131.14,
+    "centerBias": 80,
+    "resist": 1.25,
+    "penetration": 1.1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "pentagon",
+    "hitOnRounds": 1.4757,
+    "pathTurn": 98.25,
+    "sizeRandomization": 0,
+    "ramHealthScale": 23.8485,
+    "arras": {
+      "name": "Pentagon",
+      "designId": "71420bbf66f17c33",
+      "baseSize": 19.0623,
+      "colorSlot": 14,
+      "xpBefore": 400
+    }
+  }
+}

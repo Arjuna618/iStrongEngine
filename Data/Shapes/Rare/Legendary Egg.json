@@ -1,0 +1,43 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Legendary Egg",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:legendary-egg",
+    "name": "Legendary Egg",
+    "sides": 0,
+    "color": "#e8ebf7",
+    "colorMap": 6,
+    "isIntangible": true,
+    "rarity": "legendary",
+    "labyLevel": 0,
+    "size": 9,
+    "hp": 271.9744,
+    "bodyDamage": 0,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 2000,
+    "pushability": 1.5,
+    "driftSpeed": 131.14,
+    "centerBias": 0,
+    "resist": 1,
+    "penetration": 1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "legendaryEgg",
+    "hitOnRounds": 0,
+    "pathTurn": 98.25,
+    "sizeRandomization": 0,
+    "ramHealthScale": 13.5987,
+    "arras": {
+      "name": "Legendary Egg",
+      "designId": "7fd9d8428dbd291b",
+      "baseSize": 4.5,
+      "colorSlot": 0,
+      "xpBefore": 2500
+    }
+  }
+}

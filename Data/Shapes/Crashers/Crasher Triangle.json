@@ -1,0 +1,43 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Crasher Triangle",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:crasher-triangle",
+    "name": "Crasher Triangle",
+    "sides": 3,
+    "color": "#ef99c3",
+    "colorMap": 5,
+    "crasherFacingOffset": 1.5707963267948966,
+    "rarity": "normal",
+    "labyLevel": 0,
+    "size": 20.3108,
+    "hp": 254.2964,
+    "bodyDamage": 10,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 100,
+    "pushability": 0.3,
+    "driftSpeed": 105.88,
+    "centerBias": 50,
+    "resist": 1,
+    "penetration": 1,
+    "isCrasher": true,
+    "crasherSpeed": 3.5,
+    "correspondsTo": "crasherTriangle",
+    "hitOnRounds": 0.68,
+    "pathTurn": 100,
+    "sizeRandomization": 0,
+    "ramHealthScale": 16.9531,
+    "arras": {
+      "name": "Crasher Triangle",
+      "designId": "d8f6901ee787eb73",
+      "baseSize": 9,
+      "colorSlot": 5,
+      "xpBefore": 50
+    }
+  }
+}

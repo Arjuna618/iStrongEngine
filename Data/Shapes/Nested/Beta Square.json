@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Beta Square",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:beta-square",
+    "name": "Beta Square",
+    "sides": 4,
+    "color": "#efc74b",
+    "colorMap": 13,
+    "rarity": "normal",
+    "labyLevel": 1,
+    "size": 40.6217,
+    "hp": 240.0597,
+    "bodyDamage": 10,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 100,
+    "pushability": 0.4242640687119285,
+    "driftSpeed": 86.22,
+    "centerBias": 25,
+    "resist": 1,
+    "penetration": 2,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "betaSquare",
+    "hitOnRounds": 0.5035,
+    "pathTurn": 66.4,
+    "sizeRandomization": 0,
+    "ramHealthScale": 4.8012,
+    "arras": {
+      "name": "Beta Square",
+      "designId": "80de0b0140e63642",
+      "baseSize": 18,
+      "colorSlot": 13,
+      "xpBefore": 225
+    }
+  }
+}

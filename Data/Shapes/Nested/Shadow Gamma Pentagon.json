@@ -1,0 +1,38 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Shadow Gamma Pentagon",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:shadow-gamma-pentagon",
+    "name": "Shadow Gamma Pentagon",
+    "sides": 5,
+    "color": "#8d6adf",
+    "colorMap": 14,
+    "rarity": "shadow",
+    "labyLevel": 4,
+    "size": 100.4222,
+    "hp": 4127781.6,
+    "bodyDamage": 20,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 400000000,
+    "pushability": 0.0642572059335908,
+    "driftSpeed": 52.5,
+    "centerBias": 100,
+    "resist": 1.25,
+    "penetration": 1.1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "shadowGammaPentagon",
+    "hitOnRounds": 1.4757,
+    "pathTurn": 40.78,
+    "sizeRandomization": 0,
+    "ramHealthScale": 7.644,
+    "arras": {
+      "xpBefore": 50281560.00190241
+    }
+  }
+}

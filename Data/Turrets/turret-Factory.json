@@ -1,0 +1,67 @@
+{
+  "version": "1.0.0",
+  "type": "CustomTurret",
+  "name": "Factory",
+  "timestamp": 1793491200000,
+  "data": {
+    "name": "Factory",
+    "layers": [
+      {
+        "type": "barrel",
+        "size": 9,
+        "width": 25,
+        "aspect": 1,
+        "xOffset": 0,
+        "yOffset": 0,
+        "color": "#a7a7af",
+        "strokeColor": "#6d6d72",
+        "customStroke": false,
+        "rotation": "independent",
+        "sides": 0,
+        "layer": 0,
+        "shootAnim": 9
+      },
+      {
+        "type": "barrel",
+        "size": 2,
+        "width": 35,
+        "aspect": 1,
+        "xOffset": 1.55,
+        "yOffset": 0,
+        "color": "#a7a7af",
+        "strokeColor": "#6d6d72",
+        "customStroke": false,
+        "rotation": "independent",
+        "sides": 0,
+        "layer": 1,
+        "shootAnim": 16
+      },
+      {
+        "type": "barrel",
+        "size": 6.8,
+        "width": 35,
+        "aspect": 1,
+        "xOffset": -0.05,
+        "yOffset": 0,
+        "color": "#a7a7af",
+        "strokeColor": "#6d6d72",
+        "customStroke": false,
+        "rotation": "independent",
+        "sides": 0,
+        "layer": 1,
+        "shootAnim": 0
+      }
+    ],
+    "guns": [],
+    "turretType": "auto",
+    "independent": true,
+    "fov": 360,
+    "maxTurnSpeed": 4.5,
+    "autoFireDelay": 0,
+    "autoTargetPriority": "nearest",
+    "baseSize": 22,
+    "baseColor": "#a7a7af",
+    "baseShape": 0,
+    "spinSpeed": 0
+  }
+}

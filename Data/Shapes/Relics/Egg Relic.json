@@ -1,0 +1,603 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Egg Relic",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:egg-relic",
+    "name": "Egg Relic",
+    "sides": 0,
+    "color": "#dbdbdb",
+    "colorMap": 18,
+    "rarity": "normal",
+    "labyLevel": 0,
+    "size": 14,
+    "hp": 67.9936,
+    "bodyDamage": 0,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 70833,
+    "pushability": 1.5,
+    "driftSpeed": 0,
+    "centerBias": 0,
+    "resist": 1,
+    "penetration": 1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "hitOnRounds": 0,
+    "pathTurn": 0,
+    "sizeRandomization": 15,
+    "ramHealthScale": 13.5987,
+    "isIntangible": true,
+    "look": {
+      "body": {
+        "kind": "circle",
+        "radius": 1,
+        "turn": 0,
+        "x": 0,
+        "y": 0,
+        "angle": 0,
+        "above": true,
+        "color": "#dbdbdb",
+        "colorMap": 18,
+        "parts": [
+          {
+            "kind": "circle",
+            "radius": 1.625,
+            "turn": 0,
+            "x": 0,
+            "y": 0,
+            "angle": 0,
+            "above": false,
+            "color": "#e8ebf7",
+            "colorMap": 6,
+            "arras": {
+              "name": "Relic Mantle",
+              "colour": 6
+            }
+          },
+          {
+            "kind": "outline",
+            "points": [
+              [
+                -0.2,
+                -0.15
+              ],
+              [
+                0.2,
+                -0.375
+              ],
+              [
+                0.2,
+                0.375
+              ],
+              [
+                -0.2,
+                0.15
+              ]
+            ],
+            "radius": 1,
+            "x": 1.4,
+            "y": 0,
+            "angle": 0,
+            "turn": 0,
+            "above": false,
+            "color": "#a7a7af",
+            "colorMap": 16,
+            "arras": {
+              "name": "Barrel",
+              "colour": 16
+            }
+          },
+          {
+            "kind": "outline",
+            "points": [
+              [
+                -0.2,
+                -0.15
+              ],
+              [
+                0.2,
+                -0.375
+              ],
+              [
+                0.2,
+                0.375
+              ],
+              [
+                -0.2,
+                0.15
+              ]
+            ],
+            "radius": 1,
+            "x": 0.989949,
+            "y": 0.989949,
+            "angle": 0.785398,
+            "turn": 0,
+            "above": false,
+            "color": "#a7a7af",
+            "colorMap": 16,
+            "arras": {
+              "name": "Barrel",
+              "colour": 16
+            }
+          },
+          {
+            "kind": "outline",
+            "points": [
+              [
+                -0.2,
+                -0.15
+              ],
+              [
+                0.2,
+                -0.375
+              ],
+              [
+                0.2,
+                0.375
+              ],
+              [
+                -0.2,
+                0.15
+              ]
+            ],
+            "radius": 1,
+            "x": 0,
+            "y": 1.4,
+            "angle": 1.570796,
+            "turn": 0,
+            "above": false,
+            "color": "#a7a7af",
+            "colorMap": 16,
+            "arras": {
+              "name": "Barrel",
+              "colour": 16
+            }
+          },
+          {
+            "kind": "outline",
+            "points": [
+              [
+                -0.2,
+                -0.15
+              ],
+              [
+                0.2,
+                -0.375
+              ],
+              [
+                0.2,
+                0.375
+              ],
+              [
+                -0.2,
+                0.15
+              ]
+            ],
+            "radius": 1,
+            "x": -0.989949,
+            "y": 0.989949,
+            "angle": 2.356194,
+            "turn": 0,
+            "above": false,
+            "color": "#a7a7af",
+            "colorMap": 16,
+            "arras": {
+              "name": "Barrel",
+              "colour": 16
+            }
+          },
+          {
+            "kind": "outline",
+            "points": [
+              [
+                -0.2,
+                -0.15
+              ],
+              [
+                0.2,
+                -0.375
+              ],
+              [
+                0.2,
+                0.375
+              ],
+              [
+                -0.2,
+                0.15
+              ]
+            ],
+            "radius": 1,
+            "x": -1.4,
+            "y": 0,
+            "angle": 3.141593,
+            "turn": 0,
+            "above": false,
+            "color": "#a7a7af",
+            "colorMap": 16,
+            "arras": {
+              "name": "Barrel",
+              "colour": 16
+            }
+          },
+          {
+            "kind": "outline",
+            "points": [
+              [
+                -0.2,
+                -0.15
+              ],
+              [
+                0.2,
+                -0.375
+              ],
+              [
+                0.2,
+                0.375
+              ],
+              [
+                -0.2,
+                0.15
+              ]
+            ],
+            "radius": 1,
+            "x": -0.989949,
+            "y": -0.989949,
+            "angle": 3.926991,
+            "turn": 0,
+            "above": false,
+            "color": "#a7a7af",
+            "colorMap": 16,
+            "arras": {
+              "name": "Barrel",
+              "colour": 16
+            }
+          },
+          {
+            "kind": "outline",
+            "points": [
+              [
+                -0.2,
+                -0.15
+              ],
+              [
+                0.2,
+                -0.375
+              ],
+              [
+                0.2,
+                0.375
+              ],
+              [
+                -0.2,
+                0.15
+              ]
+            ],
+            "radius": 1,
+            "x": 0,
+            "y": -1.4,
+            "angle": 4.712389,
+            "turn": 0,
+            "above": false,
+            "color": "#a7a7af",
+            "colorMap": 16,
+            "arras": {
+              "name": "Barrel",
+              "colour": 16
+            }
+          },
+          {
+            "kind": "outline",
+            "points": [
+              [
+                -0.2,
+                -0.15
+              ],
+              [
+                0.2,
+                -0.375
+              ],
+              [
+                0.2,
+                0.375
+              ],
+              [
+                -0.2,
+                0.15
+              ]
+            ],
+            "radius": 1,
+            "x": 0.989949,
+            "y": -0.989949,
+            "angle": 5.497787,
+            "turn": 0,
+            "above": false,
+            "color": "#a7a7af",
+            "colorMap": 16,
+            "arras": {
+              "name": "Barrel",
+              "colour": 16
+            }
+          },
+          {
+            "kind": "outline",
+            "points": [
+              [
+                -0.2,
+                -0.5
+              ],
+              [
+                0.2,
+                -0.125
+              ],
+              [
+                0.2,
+                0.125
+              ],
+              [
+                -0.2,
+                0.5
+              ]
+            ],
+            "radius": 0.4,
+            "x": -1.5,
+            "y": 0,
+            "angle": 0,
+            "turn": 0,
+            "above": true,
+            "color": "#e8ebf7",
+            "colorMap": 6,
+            "arras": {
+              "name": "Relic Casing",
+              "colour": 6
+            }
+          },
+          {
+            "kind": "outline",
+            "points": [
+              [
+                -0.2,
+                -0.5
+              ],
+              [
+                0.2,
+                -0.125
+              ],
+              [
+                0.2,
+                0.125
+              ],
+              [
+                -0.2,
+                0.5
+              ]
+            ],
+            "radius": 0.4,
+            "x": -1.06066,
+            "y": -1.06066,
+            "angle": 0.785398,
+            "turn": 0,
+            "above": true,
+            "color": "#e8ebf7",
+            "colorMap": 6,
+            "arras": {
+              "name": "Relic Casing",
+              "colour": 6
+            }
+          },
+          {
+            "kind": "outline",
+            "points": [
+              [
+                -0.2,
+                -0.5
+              ],
+              [
+                0.2,
+                -0.125
+              ],
+              [
+                0.2,
+                0.125
+              ],
+              [
+                -0.2,
+                0.5
+              ]
+            ],
+            "radius": 0.4,
+            "x": 0,
+            "y": -1.5,
+            "angle": 1.570796,
+            "turn": 0,
+            "above": true,
+            "color": "#e8ebf7",
+            "colorMap": 6,
+            "arras": {
+              "name": "Relic Casing",
+              "colour": 6
+            }
+          },
+          {
+            "kind": "outline",
+            "points": [
+              [
+                -0.2,
+                -0.5
+              ],
+              [
+                0.2,
+                -0.125
+              ],
+              [
+                0.2,
+                0.125
+              ],
+              [
+                -0.2,
+                0.5
+              ]
+            ],
+            "radius": 0.4,
+            "x": 1.06066,
+            "y": -1.06066,
+            "angle": 2.356194,
+            "turn": 0,
+            "above": true,
+            "color": "#e8ebf7",
+            "colorMap": 6,
+            "arras": {
+              "name": "Relic Casing",
+              "colour": 6
+            }
+          },
+          {
+            "kind": "outline",
+            "points": [
+              [
+                -0.2,
+                -0.5
+              ],
+              [
+                0.2,
+                -0.125
+              ],
+              [
+                0.2,
+                0.125
+              ],
+              [
+                -0.2,
+                0.5
+              ]
+            ],
+            "radius": 0.4,
+            "x": 1.5,
+            "y": 0,
+            "angle": 3.141593,
+            "turn": 0,
+            "above": true,
+            "color": "#e8ebf7",
+            "colorMap": 6,
+            "arras": {
+              "name": "Relic Casing",
+              "colour": 6
+            }
+          },
+          {
+            "kind": "outline",
+            "points": [
+              [
+                -0.2,
+                -0.5
+              ],
+              [
+                0.2,
+                -0.125
+              ],
+              [
+                0.2,
+                0.125
+              ],
+              [
+                -0.2,
+                0.5
+              ]
+            ],
+            "radius": 0.4,
+            "x": 1.06066,
+            "y": 1.06066,
+            "angle": 3.926991,
+            "turn": 0,
+            "above": true,
+            "color": "#e8ebf7",
+            "colorMap": 6,
+            "arras": {
+              "name": "Relic Casing",
+              "colour": 6
+            }
+          },
+          {
+            "kind": "outline",
+            "points": [
+              [
+                -0.2,
+                -0.5
+              ],
+              [
+                0.2,
+                -0.125
+              ],
+              [
+                0.2,
+                0.125
+              ],
+              [
+                -0.2,
+                0.5
+              ]
+            ],
+            "radius": 0.4,
+            "x": 0,
+            "y": 1.5,
+            "angle": 4.712389,
+            "turn": 0,
+            "above": true,
+            "color": "#e8ebf7",
+            "colorMap": 6,
+            "arras": {
+              "name": "Relic Casing",
+              "colour": 6
+            }
+          },
+          {
+            "kind": "outline",
+            "points": [
+              [
+                -0.2,
+                -0.5
+              ],
+              [
+                0.2,
+                -0.125
+              ],
+              [
+                0.2,
+                0.125
+              ],
+              [
+                -0.2,
+                0.5
+              ]
+            ],
+            "radius": 0.4,
+            "x": -1.06066,
+            "y": 1.06066,
+            "angle": 5.497787,
+            "turn": 0,
+            "above": true,
+            "color": "#e8ebf7",
+            "colorMap": 6,
+            "arras": {
+              "name": "Relic Casing",
+              "colour": 6
+            }
+          }
+        ],
+        "arras": {
+          "name": "Relic",
+          "colour": 18
+        }
+      }
+    },
+    "arras": {
+      "name": "Relic",
+      "key": "relic|egg|none",
+      "baseSize": 7,
+      "colorSlot": 18
+    }
+  }
+}

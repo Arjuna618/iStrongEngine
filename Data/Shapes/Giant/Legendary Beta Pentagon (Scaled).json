@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Legendary Beta Pentagon (Scaled)",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:legendary-beta-pentagon-scaled",
+    "name": "Legendary Beta Pentagon (Scaled)",
+    "sides": 5,
+    "color": "#8d6adf",
+    "colorMap": 14,
+    "rarity": "legendary",
+    "labyLevel": 0,
+    "size": 112.8379,
+    "hp": 18837.36,
+    "bodyDamage": 20,
+    "shield": 383.3568,
+    "shieldRegen": 0,
+    "xpValue": 1000000,
+    "pushability": 0.05,
+    "driftSpeed": 74.15,
+    "centerBias": 95,
+    "resist": 1.5625,
+    "penetration": 1.1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "legendaryBetaPentagon",
+    "hitOnRounds": 2,
+    "pathTurn": 57.41,
+    "sizeRandomization": 15,
+    "ramHealthScale": 6.3645,
+    "arras": {
+      "name": "Beta Pentagon",
+      "designId": "9b534b841ad170cf",
+      "baseSize": 50,
+      "colorSlot": 14,
+      "xpBefore": 1250000
+    }
+  }
+}

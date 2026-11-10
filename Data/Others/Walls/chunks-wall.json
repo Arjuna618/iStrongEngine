@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "type": "Other",
+  "name": "Chunks Wall",
+  "timestamp": 1793491200000,
+  "category": "Walls",
+  "data": {
+    "_designVersion": 1,
+    "otherId": "other:chunks-wall",
+    "name": "Chunks Wall",
+    "size": 100,
+    "body": {
+      "kind": "polygon",
+      "sides": 4,
+      "radius": 1.253314,
+      "x": 0,
+      "y": 0,
+      "angle": 0,
+      "turn": 0.785398,
+      "above": true,
+      "color": "#7adbba",
+      "colorMap": 4,
+      "arras": {
+        "designId": "56996147018432b1",
+        "name": "Chunks Wall",
+        "colour": 4
+      }
+    },
+    "arras": {
+      "designId": "56996147018432b1",
+      "name": "Chunks Wall",
+      "baseSize": 50
+    }
+  }
+}

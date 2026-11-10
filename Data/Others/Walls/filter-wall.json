@@ -1,0 +1,59 @@
+{
+  "version": "1.0.0",
+  "type": "Other",
+  "name": "Filter Wall",
+  "timestamp": 1793491200000,
+  "category": "Walls",
+  "data": {
+    "_designVersion": 1,
+    "otherId": "other:filter-wall",
+    "name": "Filter Wall",
+    "size": 100,
+    "body": {
+      "kind": "polygon",
+      "sides": 4,
+      "radius": 1.253314,
+      "x": 0,
+      "y": 0,
+      "angle": 0,
+      "turn": 0.785398,
+      "above": true,
+      "color": "#e8ebf7",
+      "colorMap": 6,
+      "arras": {
+        "designId": "341ced8067e0066d",
+        "name": "Filter Wall",
+        "colour": 6
+      },
+      "parts": [
+        {
+          "kind": "polygon",
+          "sides": 4,
+          "radius": 0.886227,
+          "x": 0,
+          "y": 0,
+          "angle": 0.785398,
+          "turn": 0.785398,
+          "above": true,
+          "color": "#e8ebf7",
+          "colorMap": 6,
+          "wearsCarrier": true,
+          "arras": {
+            "designId": "d4640e726feb79fa",
+            "name": "Unknown Entity",
+            "colour": 0,
+            "scale": 0.707107,
+            "offset": 0,
+            "direction": 0,
+            "mountAngle": 0.785398
+          }
+        }
+      ]
+    },
+    "arras": {
+      "designId": "341ced8067e0066d",
+      "name": "Filter Wall",
+      "baseSize": 50
+    }
+  }
+}

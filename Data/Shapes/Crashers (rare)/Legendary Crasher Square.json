@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Legendary Crasher Square",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:legendary-crasher-square",
+    "name": "Legendary Crasher Square",
+    "sides": 4,
+    "color": "#ef99c3",
+    "colorMap": 5,
+    "crasherFacingOffset": 0,
+    "rarity": "legendary",
+    "labyLevel": 0,
+    "size": 28.7238,
+    "hp": 178.7096,
+    "bodyDamage": 10,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 8000,
+    "pushability": 0.3,
+    "driftSpeed": 100,
+    "centerBias": 50,
+    "resist": 1,
+    "penetration": 1,
+    "isCrasher": true,
+    "crasherSpeed": 3,
+    "hitOnRounds": 0.365,
+    "pathTurn": 100,
+    "sizeRandomization": 0,
+    "ramHealthScale": 5.5847,
+    "arras": {
+      "name": "Legendary Crasher Square",
+      "designId": "8a985c0b05f69cfa",
+      "baseSize": 12.7279,
+      "colorSlot": 0,
+      "xpBefore": 37500
+    }
+  }
+}

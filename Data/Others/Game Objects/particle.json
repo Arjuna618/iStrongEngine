@@ -1,0 +1,34 @@
+{
+  "version": "1.0.0",
+  "type": "Other",
+  "name": "Particle",
+  "timestamp": 1793491200000,
+  "category": "Game Objects",
+  "data": {
+    "_designVersion": 1,
+    "otherId": "other:particle",
+    "name": "Particle",
+    "size": 16,
+    "body": {
+      "kind": "circle",
+      "radius": 1,
+      "x": 0,
+      "y": 0,
+      "angle": 0,
+      "turn": 0,
+      "above": true,
+      "color": "#a7a7af",
+      "colorMap": 16,
+      "arras": {
+        "designId": "489a64651e738861",
+        "name": "Particle",
+        "colour": 16
+      }
+    },
+    "arras": {
+      "designId": "489a64651e738861",
+      "name": "Particle",
+      "baseSize": 8
+    }
+  }
+}

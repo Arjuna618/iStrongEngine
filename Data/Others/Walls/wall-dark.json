@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "type": "Other",
+  "name": "Wall (dark)",
+  "timestamp": 1793491200000,
+  "category": "Walls",
+  "data": {
+    "_designVersion": 1,
+    "otherId": "other:wall-dark",
+    "name": "Wall (dark)",
+    "size": 100,
+    "body": {
+      "kind": "polygon",
+      "sides": 4,
+      "radius": 1.253314,
+      "x": 0,
+      "y": 0,
+      "angle": 0,
+      "turn": 0.785398,
+      "above": true,
+      "color": "#484848",
+      "colorMap": 9,
+      "arras": {
+        "designId": "f4c0f750aefc0e13",
+        "name": "Wall",
+        "colour": 9
+      }
+    },
+    "arras": {
+      "designId": "f4c0f750aefc0e13",
+      "name": "Wall",
+      "baseSize": 50
+    }
+  }
+}

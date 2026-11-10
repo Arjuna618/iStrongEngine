@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Rainbow Alpha Pentagon",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:rainbow-alpha-pentagon",
+    "name": "Rainbow Alpha Pentagon",
+    "sides": 5,
+    "color": "#8d6adf",
+    "colorMap": 14,
+    "rarity": "rainbow",
+    "labyLevel": 2,
+    "size": 65.7272,
+    "hp": 241771.26,
+    "bodyDamage": 25,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 25000000,
+    "pushability": 0.09817627457812106,
+    "driftSpeed": 65.19,
+    "centerBias": 100,
+    "resist": 1.25,
+    "penetration": 1.1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "rainbowLabyAlphaPentagon",
+    "hitOnRounds": 1.5267,
+    "pathTurn": 50.14,
+    "sizeRandomization": 0,
+    "ramHealthScale": 8.059,
+    "arras": {
+      "name": "Alpha Pentagon",
+      "designId": "10cb9cca1d3ffd61",
+      "baseSize": 29.1246,
+      "colorSlot": 14,
+      "xpBefore": 16128914.924571482
+    }
+  }
+}

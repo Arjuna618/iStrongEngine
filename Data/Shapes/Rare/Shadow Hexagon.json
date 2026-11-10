@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Shadow Hexagon",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:shadow-hexagon",
+    "name": "Shadow Hexagon",
+    "sides": 6,
+    "color": "#7adbba",
+    "colorMap": 4,
+    "rarity": "shadow",
+    "labyLevel": 0,
+    "size": 52.7691,
+    "hp": 14311.3356,
+    "bodyDamage": 30,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 1250000,
+    "pushability": 0.1,
+    "driftSpeed": 131.14,
+    "centerBias": 90,
+    "resist": 1.3,
+    "penetration": 1.1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "shadowHexagon",
+    "hitOnRounds": 1.8278,
+    "pathTurn": 98.25,
+    "sizeRandomization": 0,
+    "ramHealthScale": 35.7783,
+    "arras": {
+      "name": "Hexagon",
+      "designId": "26311bf75af4e810",
+      "baseSize": 23.3827,
+      "colorSlot": 4,
+      "xpBefore": 1000000
+    }
+  }
+}

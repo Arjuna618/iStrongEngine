@@ -1,0 +1,43 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Trans Alpha Egg",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:trans-alpha-egg",
+    "name": "Trans Alpha Egg",
+    "sides": 0,
+    "color": "#e8ebf7",
+    "colorMap": 6,
+    "isIntangible": true,
+    "rarity": "trans",
+    "labyLevel": 2,
+    "size": 36,
+    "hp": 33997.2773,
+    "bodyDamage": 0,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 312500,
+    "pushability": 0.37500000000000017,
+    "driftSpeed": 65.19,
+    "centerBias": 20,
+    "resist": 1,
+    "penetration": 1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "transAlphaEgg",
+    "hitOnRounds": 0,
+    "pathTurn": 50.14,
+    "sizeRandomization": 0,
+    "ramHealthScale": 543.9564,
+    "arras": {
+      "name": "Trans Alpha Egg",
+      "designId": "c3cd90ea4811bf57",
+      "baseSize": 18,
+      "colorSlot": 37,
+      "xpBefore": 118210.66265412551
+    }
+  }
+}

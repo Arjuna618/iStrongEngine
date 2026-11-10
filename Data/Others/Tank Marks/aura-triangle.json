@@ -1,0 +1,60 @@
+{
+  "version": "1.0.0",
+  "type": "Other",
+  "name": "Aura Triangle",
+  "timestamp": 1793491200000,
+  "category": "Tank Marks",
+  "data": {
+    "_designVersion": 1,
+    "otherId": "other:aura-triangle",
+    "name": "Aura Triangle",
+    "size": 2,
+    "body": {
+      "kind": "outline",
+      "points": [
+        [
+          0.949999988079071,
+          1.25
+        ],
+        [
+          0.949999988079071,
+          -1.25
+        ],
+        [
+          0.607531726360321,
+          -1.4477241039276123
+        ],
+        [
+          -1.557531714439392,
+          -0.1977241337299347
+        ],
+        [
+          -1.557531714439392,
+          0.1977241337299347
+        ],
+        [
+          0.607531726360321,
+          1.4477241039276123
+        ]
+      ],
+      "radius": 1,
+      "x": 0,
+      "y": 0,
+      "angle": 0,
+      "turn": 0,
+      "above": true,
+      "color": "#7ad3db",
+      "colorMap": 0,
+      "arras": {
+        "designId": "6887d21b5a098137",
+        "name": "Unknown Entity",
+        "colour": 0
+      }
+    },
+    "arras": {
+      "designId": "6887d21b5a098137",
+      "name": "Unknown Entity",
+      "baseSize": 1
+    }
+  }
+}

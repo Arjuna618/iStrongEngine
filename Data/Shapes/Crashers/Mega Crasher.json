@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Mega Crasher",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:mega-crasher",
+    "name": "Mega Crasher",
+    "sides": 3,
+    "color": "#ef99c3",
+    "colorMap": 5,
+    "crasherFacingOffset": 1.5707963267948966,
+    "rarity": "normal",
+    "labyLevel": 0,
+    "size": 22.5676,
+    "hp": 22.15,
+    "bodyDamage": 4.685,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 121,
+    "pushability": 0.3,
+    "driftSpeed": 105.88,
+    "centerBias": 50,
+    "resist": 1,
+    "penetration": 1,
+    "isCrasher": true,
+    "crasherSpeed": 3.5,
+    "correspondsTo": "megaCrasher",
+    "hitOnRounds": 0.68,
+    "pathTurn": 100,
+    "sizeRandomization": 15,
+    "ramHealthScale": 18.5265,
+    "arras": {
+      "name": "Mega Crasher",
+      "designId": "d763f489fe6f8a28",
+      "baseSize": 10,
+      "colorSlot": 5
+    }
+  }
+}

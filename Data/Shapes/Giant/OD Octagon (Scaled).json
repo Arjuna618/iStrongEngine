@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "OD Octagon (Scaled)",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:od-octagon-scaled",
+    "name": "OD Octagon (Scaled)",
+    "sides": 8,
+    "color": "#7adbba",
+    "colorMap": 4,
+    "rarity": "normal",
+    "labyLevel": 0,
+    "size": 225.6758,
+    "hp": 31016.7456,
+    "bodyDamage": 20,
+    "shield": 396.972,
+    "shieldRegen": 0,
+    "xpValue": 35000,
+    "pushability": 0.03,
+    "driftSpeed": 65.19,
+    "centerBias": 98,
+    "resist": 1.953125,
+    "penetration": 1.1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "odOctagon",
+    "hitOnRounds": 2,
+    "pathTurn": 50.14,
+    "sizeRandomization": 15,
+    "ramHealthScale": 32.7226,
+    "arras": {
+      "name": "Octogon",
+      "designId": "1429921c395b24d0",
+      "baseSize": 100,
+      "colorSlot": 4,
+      "xpBefore": 35000
+    }
+  }
+}

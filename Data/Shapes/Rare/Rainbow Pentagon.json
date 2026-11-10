@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Rainbow Pentagon",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:rainbow-pentagon",
+    "name": "Rainbow Pentagon",
+    "sides": 5,
+    "color": "#8d6adf",
+    "colorMap": 14,
+    "rarity": "rainbow",
+    "labyLevel": 0,
+    "size": 43.019,
+    "hp": 9297.816,
+    "bodyDamage": 25,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 1000000,
+    "pushability": 0.15,
+    "driftSpeed": 131.14,
+    "centerBias": 80,
+    "resist": 1.25,
+    "penetration": 1.1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "rainbowPentagon",
+    "hitOnRounds": 1.4757,
+    "pathTurn": 98.25,
+    "sizeRandomization": 0,
+    "ramHealthScale": 30.9927,
+    "arras": {
+      "name": "Rainbow Pentagon",
+      "designId": "5a3302feaad108d8",
+      "baseSize": 19.0623,
+      "colorSlot": 36,
+      "xpBefore": 1600000
+    }
+  }
+}

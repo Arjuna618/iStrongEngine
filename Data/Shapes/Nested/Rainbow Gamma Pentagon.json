@@ -1,0 +1,38 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Rainbow Gamma Pentagon",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:rainbow-gamma-pentagon",
+    "name": "Rainbow Gamma Pentagon",
+    "sides": 5,
+    "color": "#8d6adf",
+    "colorMap": 14,
+    "rarity": "rainbow",
+    "labyLevel": 4,
+    "size": 100.4222,
+    "hp": 5503708.8,
+    "bodyDamage": 25,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 1600000000,
+    "pushability": 0.0642572059335908,
+    "driftSpeed": 52.5,
+    "centerBias": 100,
+    "resist": 1.25,
+    "penetration": 1.1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "rainbowGammaPentagon",
+    "hitOnRounds": 1.4757,
+    "pathTurn": 40.78,
+    "sizeRandomization": 0,
+    "ramHealthScale": 7.644,
+    "arras": {
+      "xpBefore": 50281560.00190241
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Trans Omega Triangle",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:trans-omega-triangle",
+    "name": "Trans Omega Triangle",
+    "sides": 3,
+    "color": "#e7896d",
+    "colorMap": 2,
+    "rarity": "trans",
+    "labyLevel": 3,
+    "size": 81.2433,
+    "hp": 264883.44,
+    "bodyDamage": 25,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 50000000,
+    "pushability": 0.10000000000000007,
+    "driftSpeed": 52.5,
+    "centerBias": 70,
+    "resist": 1.15,
+    "penetration": 1.5,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "transOmegaTriangle",
+    "hitOnRounds": 1,
+    "pathTurn": 40.78,
+    "sizeRandomization": 0,
+    "ramHealthScale": 13.2442,
+    "arras": {
+      "name": "Trans Omega Triangle",
+      "designId": "cbe0bc9b35630014",
+      "baseSize": 36,
+      "colorSlot": 37,
+      "xpBefore": 46667788.130163714
+    }
+  }
+}

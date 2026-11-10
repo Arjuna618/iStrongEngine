@@ -1,0 +1,43 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Shadow Beta Egg",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:shadow-beta-egg",
+    "name": "Shadow Beta Egg",
+    "sides": 0,
+    "color": "#e8ebf7",
+    "colorMap": 6,
+    "isIntangible": true,
+    "rarity": "shadow",
+    "labyLevel": 1,
+    "size": 18,
+    "hp": 2657.1188,
+    "bodyDamage": 0,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 12500,
+    "pushability": 0.7500000000000002,
+    "driftSpeed": 86.22,
+    "centerBias": 10,
+    "resist": 1,
+    "penetration": 1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "shadowBetaEgg",
+    "hitOnRounds": 0,
+    "pathTurn": 66.4,
+    "sizeRandomization": 0,
+    "ramHealthScale": 354.2825,
+    "arras": {
+      "name": "Shadow Beta Egg",
+      "designId": "5567530a8ae815ed",
+      "baseSize": 9,
+      "colorSlot": 17,
+      "xpBefore": 2280
+    }
+  }
+}

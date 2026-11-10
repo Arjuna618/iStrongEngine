@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Trans Alpha Square",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:trans-alpha-square",
+    "name": "Trans Alpha Square",
+    "sides": 4,
+    "color": "#efc74b",
+    "colorMap": 13,
+    "rarity": "trans",
+    "labyLevel": 2,
+    "size": 57.4477,
+    "hp": 11796.9145,
+    "bodyDamage": 25,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 1250000,
+    "pushability": 0.30000000000000004,
+    "driftSpeed": 65.19,
+    "centerBias": 35,
+    "resist": 1,
+    "penetration": 2,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "transAlphaSquare",
+    "hitOnRounds": 0.5076,
+    "pathTurn": 50.14,
+    "sizeRandomization": 0,
+    "ramHealthScale": 4.7188,
+    "arras": {
+      "name": "Trans Alpha Square",
+      "designId": "a1d21751d1c51129",
+      "baseSize": 25.4558,
+      "colorSlot": 37,
+      "xpBefore": 1000100.0513018556
+    }
+  }
+}

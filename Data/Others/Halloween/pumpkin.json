@@ -1,0 +1,280 @@
+{
+  "version": "1.0.0",
+  "type": "Other",
+  "name": "Pumpkin",
+  "timestamp": 1793491200000,
+  "category": "Halloween",
+  "data": {
+    "_designVersion": 1,
+    "otherId": "other:pumpkin",
+    "name": "Pumpkin",
+    "size": 120,
+    "body": {
+      "kind": "polygon",
+      "sides": 9,
+      "radius": 1.042161,
+      "x": 0,
+      "y": 0,
+      "angle": 0,
+      "turn": 0,
+      "above": true,
+      "color": "#ff9000",
+      "colorMap": -1,
+      "colorCode": 33,
+      "arras": {
+        "designId": "752b685e4481ef7f",
+        "name": "Pumpkin",
+        "colour": 33
+      },
+      "parts": [
+        {
+          "kind": "line",
+          "sides": 2,
+          "radius": 0.65,
+          "x": -0.2,
+          "y": 0.34641,
+          "angle": 0.523599,
+          "turn": 1.570796,
+          "above": true,
+          "color": "#e58100",
+          "colorMap": -1,
+          "colorCode": 40,
+          "arras": {
+            "designId": "8670242c8d198ff2",
+            "name": "Unknown Entity",
+            "colour": 40,
+            "scale": 0.65,
+            "offset": 0.4,
+            "direction": 1.570796,
+            "mountAngle": 0.523599
+          }
+        },
+        {
+          "kind": "line",
+          "sides": 2,
+          "radius": 0.65,
+          "x": -0.375877,
+          "y": 0.136808,
+          "angle": 1.22173,
+          "turn": 1.570796,
+          "above": true,
+          "color": "#e58100",
+          "colorMap": -1,
+          "colorCode": 40,
+          "arras": {
+            "designId": "8670242c8d198ff2",
+            "name": "Unknown Entity",
+            "colour": 40,
+            "scale": 0.65,
+            "offset": 0.4,
+            "direction": 1.570796,
+            "mountAngle": 1.22173
+          }
+        },
+        {
+          "kind": "line",
+          "sides": 2,
+          "radius": 0.65,
+          "x": -0.375877,
+          "y": -0.136808,
+          "angle": 1.919862,
+          "turn": 1.570796,
+          "above": true,
+          "color": "#e58100",
+          "colorMap": -1,
+          "colorCode": 40,
+          "arras": {
+            "designId": "8670242c8d198ff2",
+            "name": "Unknown Entity",
+            "colour": 40,
+            "scale": 0.65,
+            "offset": 0.4,
+            "direction": 1.570796,
+            "mountAngle": 1.919862
+          }
+        },
+        {
+          "kind": "line",
+          "sides": 2,
+          "radius": 0.65,
+          "x": -0.2,
+          "y": -0.34641,
+          "angle": 2.617994,
+          "turn": 1.570796,
+          "above": true,
+          "color": "#e58100",
+          "colorMap": -1,
+          "colorCode": 40,
+          "arras": {
+            "designId": "8670242c8d198ff2",
+            "name": "Unknown Entity",
+            "colour": 40,
+            "scale": 0.65,
+            "offset": 0.4,
+            "direction": 1.570796,
+            "mountAngle": 2.617994
+          }
+        },
+        {
+          "kind": "line",
+          "sides": 2,
+          "radius": 0.65,
+          "x": 0.069459,
+          "y": -0.393923,
+          "angle": 3.316126,
+          "turn": 1.570796,
+          "above": true,
+          "color": "#e58100",
+          "colorMap": -1,
+          "colorCode": 40,
+          "arras": {
+            "designId": "8670242c8d198ff2",
+            "name": "Unknown Entity",
+            "colour": 40,
+            "scale": 0.65,
+            "offset": 0.4,
+            "direction": 1.570796,
+            "mountAngle": 3.316126
+          }
+        },
+        {
+          "kind": "line",
+          "sides": 2,
+          "radius": 0.65,
+          "x": 0.306418,
+          "y": -0.257115,
+          "angle": 4.014257,
+          "turn": 1.570796,
+          "above": true,
+          "color": "#e58100",
+          "colorMap": -1,
+          "colorCode": 40,
+          "arras": {
+            "designId": "8670242c8d198ff2",
+            "name": "Unknown Entity",
+            "colour": 40,
+            "scale": 0.65,
+            "offset": 0.4,
+            "direction": 1.570796,
+            "mountAngle": 4.014257
+          }
+        },
+        {
+          "kind": "line",
+          "sides": 2,
+          "radius": 0.65,
+          "x": 0.4,
+          "y": 0,
+          "angle": 4.712389,
+          "turn": 1.570796,
+          "above": true,
+          "color": "#e58100",
+          "colorMap": -1,
+          "colorCode": 40,
+          "arras": {
+            "designId": "8670242c8d198ff2",
+            "name": "Unknown Entity",
+            "colour": 40,
+            "scale": 0.65,
+            "offset": 0.4,
+            "direction": 1.570796,
+            "mountAngle": 4.712389
+          }
+        },
+        {
+          "kind": "line",
+          "sides": 2,
+          "radius": 0.65,
+          "x": 0.306418,
+          "y": 0.257115,
+          "angle": 5.410521,
+          "turn": 1.570796,
+          "above": true,
+          "color": "#e58100",
+          "colorMap": -1,
+          "colorCode": 40,
+          "arras": {
+            "designId": "8670242c8d198ff2",
+            "name": "Unknown Entity",
+            "colour": 40,
+            "scale": 0.65,
+            "offset": 0.4,
+            "direction": 1.570796,
+            "mountAngle": 5.410521
+          }
+        },
+        {
+          "kind": "line",
+          "sides": 2,
+          "radius": 0.65,
+          "x": 0.069459,
+          "y": 0.393923,
+          "angle": 6.108653,
+          "turn": 1.570796,
+          "above": true,
+          "color": "#e58100",
+          "colorMap": -1,
+          "colorCode": 40,
+          "arras": {
+            "designId": "8670242c8d198ff2",
+            "name": "Unknown Entity",
+            "colour": 40,
+            "scale": 0.65,
+            "offset": 0.4,
+            "direction": 1.570796,
+            "mountAngle": 6.108653
+          }
+        },
+        {
+          "kind": "circle",
+          "radius": 0.275,
+          "x": 0,
+          "y": 0,
+          "angle": 0,
+          "turn": 0,
+          "above": true,
+          "color": "#654321",
+          "colorMap": -1,
+          "colorCode": 39,
+          "arras": {
+            "designId": "88dc7e97f6d1e701",
+            "name": "Unknown Entity",
+            "colour": 39,
+            "scale": 0.275,
+            "offset": 0,
+            "direction": 0,
+            "mountAngle": 0
+          }
+        },
+        {
+          "kind": "star",
+          "sides": 6,
+          "inner": 0.833333,
+          "radius": 0.192436,
+          "x": 0,
+          "y": 0,
+          "angle": 0,
+          "turn": 0.523599,
+          "above": true,
+          "color": "#267524",
+          "colorMap": -1,
+          "colorCode": 41,
+          "arras": {
+            "designId": "1677ddaf8c243b99",
+            "name": "Unknown Entity",
+            "colour": 41,
+            "scale": 0.175,
+            "offset": 0,
+            "direction": 0,
+            "mountAngle": 0
+          }
+        }
+      ]
+    },
+    "arras": {
+      "designId": "752b685e4481ef7f",
+      "name": "Pumpkin",
+      "baseSize": 60
+    }
+  }
+}

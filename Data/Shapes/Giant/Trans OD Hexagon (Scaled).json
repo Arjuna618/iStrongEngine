@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Trans OD Hexagon (Scaled)",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:trans-od-hexagon-scaled",
+    "name": "Trans OD Hexagon (Scaled)",
+    "sides": 6,
+    "color": "#cc669c",
+    "colorMap": 15,
+    "rarity": "trans",
+    "labyLevel": 0,
+    "size": 169.2569,
+    "hp": 644396.8645,
+    "bodyDamage": 50,
+    "shield": 423.2384,
+    "shieldRegen": 0,
+    "xpValue": 52500000,
+    "pushability": 0.04,
+    "driftSpeed": 65.19,
+    "centerBias": 90,
+    "resist": 1.953125,
+    "penetration": 1.1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "transOdHexagon",
+    "hitOnRounds": 2,
+    "pathTurn": 50.14,
+    "sizeRandomization": 15,
+    "ramHealthScale": 133.2273,
+    "arras": {
+      "name": "Hexagon",
+      "designId": "3495a517fc831f9c",
+      "baseSize": 75,
+      "colorSlot": 15,
+      "xpBefore": 105000000
+    }
+  }
+}

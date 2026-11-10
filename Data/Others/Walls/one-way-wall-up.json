@@ -1,0 +1,58 @@
+{
+  "version": "1.0.0",
+  "type": "Other",
+  "name": "One-Way Wall (Up)",
+  "timestamp": 1793491200000,
+  "category": "Walls",
+  "data": {
+    "_designVersion": 1,
+    "otherId": "other:one-way-wall-up",
+    "name": "One-Way Wall (Up)",
+    "size": 100,
+    "body": {
+      "kind": "polygon",
+      "sides": 4,
+      "radius": 1.253314,
+      "x": 0,
+      "y": 0,
+      "angle": 0,
+      "turn": 0.785398,
+      "above": true,
+      "color": "#726f6f",
+      "colorMap": 17,
+      "arras": {
+        "designId": "f480f02350592487",
+        "name": "One-Way Wall (Up)",
+        "colour": 17
+      },
+      "parts": [
+        {
+          "kind": "polygon",
+          "sides": 3,
+          "radius": 0.544292,
+          "x": 0,
+          "y": 0.05,
+          "angle": 4.712389,
+          "turn": 0,
+          "above": true,
+          "color": "#a7a7af",
+          "colorMap": 16,
+          "arras": {
+            "designId": "e43abfa4ec5172fc",
+            "name": "Unknown Entity",
+            "colour": 16,
+            "scale": 0.35,
+            "offset": 0.05,
+            "direction": 3.141593,
+            "mountAngle": 4.712389
+          }
+        }
+      ]
+    },
+    "arras": {
+      "designId": "f480f02350592487",
+      "name": "One-Way Wall (Up)",
+      "baseSize": 50
+    }
+  }
+}

@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.vite/
+*.local
+.env
+.env.*
+
+public/data/
+public/data-manifest.json
+public/data-packs/
+public/data-packs.json

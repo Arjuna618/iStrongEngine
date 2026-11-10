@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "type": "Other",
+  "name": "Drive Square",
+  "timestamp": 1793491200000,
+  "category": "Tank Marks",
+  "data": {
+    "_designVersion": 1,
+    "otherId": "other:drive-square",
+    "name": "Drive Square",
+    "size": 20,
+    "body": {
+      "kind": "polygon",
+      "sides": 4,
+      "radius": 1.253314,
+      "x": 0,
+      "y": 0,
+      "angle": 0,
+      "turn": 0.785398,
+      "above": true,
+      "color": "#a7a7af",
+      "colorMap": 16,
+      "arras": {
+        "designId": "579d119c5f934fc2",
+        "name": "Drive Square",
+        "colour": 16
+      }
+    },
+    "arras": {
+      "designId": "579d119c5f934fc2",
+      "name": "Drive Square",
+      "baseSize": 10
+    }
+  }
+}

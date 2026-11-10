@@ -1,0 +1,43 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Trans Egg",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:trans-egg",
+    "name": "Trans Egg",
+    "sides": 0,
+    "color": "#e8ebf7",
+    "colorMap": 6,
+    "isIntangible": true,
+    "rarity": "trans",
+    "labyLevel": 0,
+    "size": 9,
+    "hp": 679.936,
+    "bodyDamage": 0,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 12500,
+    "pushability": 1.5,
+    "driftSpeed": 131.14,
+    "centerBias": 0,
+    "resist": 1,
+    "penetration": 1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "transEgg",
+    "hitOnRounds": 0,
+    "pathTurn": 98.25,
+    "sizeRandomization": 0,
+    "ramHealthScale": 16.9984,
+    "arras": {
+      "name": "Trans Egg",
+      "designId": "da2f989b2cda3c94",
+      "baseSize": 4.5,
+      "colorSlot": 37,
+      "xpBefore": 25000
+    }
+  }
+}

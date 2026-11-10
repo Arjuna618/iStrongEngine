@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Rainbow Omega Square",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:rainbow-omega-square",
+    "name": "Rainbow Omega Square",
+    "sides": 4,
+    "color": "#efc74b",
+    "colorMap": 13,
+    "rarity": "rainbow",
+    "labyLevel": 3,
+    "size": 81.2433,
+    "hp": 29519.6472,
+    "bodyDamage": 25,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 8000000,
+    "pushability": 0.2121320343559643,
+    "driftSpeed": 52.5,
+    "centerBias": 45,
+    "resist": 1,
+    "penetration": 2,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "rainbowOmegaSquare",
+    "hitOnRounds": 0.7481,
+    "pathTurn": 40.78,
+    "sizeRandomization": 0,
+    "ramHealthScale": 3.69,
+    "arras": {
+      "name": "Rainbow Omega Square",
+      "designId": "7bef738adf907972",
+      "baseSize": 36,
+      "colorSlot": 36,
+      "xpBefore": 2391237.890369964
+    }
+  }
+}

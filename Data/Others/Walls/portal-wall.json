@@ -1,0 +1,80 @@
+{
+  "version": "1.0.0",
+  "type": "Other",
+  "name": "Portal Wall",
+  "timestamp": 1793491200000,
+  "category": "Walls",
+  "data": {
+    "_designVersion": 1,
+    "otherId": "other:portal-wall",
+    "name": "Portal Wall",
+    "size": 100,
+    "body": {
+      "kind": "polygon",
+      "sides": 4,
+      "radius": 1.253314,
+      "x": 0,
+      "y": 0,
+      "angle": 0,
+      "turn": 0.785398,
+      "above": true,
+      "color": "#3ca4cb",
+      "colorMap": 10,
+      "arras": {
+        "designId": "e49d25d0c309d1fa",
+        "name": "Portal Wall",
+        "colour": 10
+      },
+      "parts": [
+        {
+          "kind": "polygon",
+          "sides": 4,
+          "radius": 0.939986,
+          "x": 0,
+          "y": 0,
+          "angle": 0,
+          "turn": 0.785398,
+          "above": true,
+          "color": "#3ca4cb",
+          "colorMap": 10,
+          "wearsCarrier": true,
+          "arras": {
+            "designId": "d4640e726feb79fa",
+            "name": "Unknown Entity",
+            "colour": 0,
+            "scale": 0.75,
+            "offset": 0,
+            "direction": 0,
+            "mountAngle": 0
+          }
+        },
+        {
+          "kind": "polygon",
+          "sides": 4,
+          "radius": 0.626657,
+          "x": 0,
+          "y": 0,
+          "angle": 0,
+          "turn": 0.785398,
+          "above": true,
+          "color": "#000000",
+          "colorMap": 19,
+          "arras": {
+            "designId": "97331239e6c2c299",
+            "name": "Unknown Entity",
+            "colour": 19,
+            "scale": 0.5,
+            "offset": 0,
+            "direction": 0,
+            "mountAngle": 0
+          }
+        }
+      ]
+    },
+    "arras": {
+      "designId": "e49d25d0c309d1fa",
+      "name": "Portal Wall",
+      "baseSize": 50
+    }
+  }
+}

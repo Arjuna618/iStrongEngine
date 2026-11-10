@@ -1,0 +1,43 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Crasher Egg",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:crasher-egg",
+    "name": "Crasher Egg",
+    "sides": 0,
+    "color": "#ef99c3",
+    "colorMap": 5,
+    "crasherFacingOffset": 0,
+    "rarity": "normal",
+    "labyLevel": 0,
+    "size": 9,
+    "hp": 67.9936,
+    "bodyDamage": 0,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 5,
+    "pushability": 0.3,
+    "driftSpeed": 105.88,
+    "centerBias": 50,
+    "resist": 1,
+    "penetration": 1,
+    "isCrasher": true,
+    "crasherSpeed": 4.5,
+    "correspondsTo": "crasherEgg",
+    "hitOnRounds": 0,
+    "pathTurn": 100,
+    "sizeRandomization": 0,
+    "ramHealthScale": 13.5987,
+    "arras": {
+      "name": "Crasher Egg",
+      "designId": "1c6c86564268733b",
+      "baseSize": 4.5,
+      "colorSlot": 5,
+      "xpBefore": 15
+    }
+  }
+}

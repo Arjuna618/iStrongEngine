@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Rainbow Crasher Square",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:rainbow-crasher-square",
+    "name": "Rainbow Crasher Square",
+    "sides": 4,
+    "color": "#ef99c3",
+    "colorMap": 5,
+    "crasherFacingOffset": 0,
+    "rarity": "rainbow",
+    "labyLevel": 0,
+    "size": 28.7238,
+    "hp": 357.4192,
+    "bodyDamage": 10,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 40000,
+    "pushability": 0.3,
+    "driftSpeed": 100,
+    "centerBias": 50,
+    "resist": 1,
+    "penetration": 1,
+    "isCrasher": true,
+    "crasherSpeed": 3,
+    "hitOnRounds": 0.365,
+    "pathTurn": 100,
+    "sizeRandomization": 0,
+    "ramHealthScale": 5.5847,
+    "arras": {
+      "name": "Rainbow Crasher Square",
+      "designId": "6ba79bb787f750bd",
+      "baseSize": 12.7279,
+      "colorSlot": 36,
+      "xpBefore": 300000
+    }
+  }
+}

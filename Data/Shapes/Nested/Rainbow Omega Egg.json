@@ -1,0 +1,43 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Rainbow Omega Egg",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:rainbow-omega-egg",
+    "name": "Rainbow Omega Egg",
+    "sides": 0,
+    "color": "#e8ebf7",
+    "colorMap": 6,
+    "isIntangible": true,
+    "rarity": "rainbow",
+    "labyLevel": 3,
+    "size": 72,
+    "hp": 178691.1648,
+    "bodyDamage": 0,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 2000000,
+    "pushability": 0.18750000000000014,
+    "driftSpeed": 52.5,
+    "centerBias": 30,
+    "resist": 1,
+    "penetration": 1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "rainbowOmegaEgg",
+    "hitOnRounds": 0,
+    "pathTurn": 40.78,
+    "sizeRandomization": 0,
+    "ramHealthScale": 893.4558,
+    "arras": {
+      "name": "Rainbow Omega Egg",
+      "designId": "e894944c28915a65",
+      "baseSize": 36,
+      "colorSlot": 36,
+      "xpBefore": 477035.7867719531
+    }
+  }
+}

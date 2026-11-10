@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "type": "Other",
+  "name": "Sticky Wall",
+  "timestamp": 1793491200000,
+  "category": "Walls",
+  "data": {
+    "_designVersion": 1,
+    "otherId": "other:sticky-wall",
+    "name": "Sticky Wall",
+    "size": 100,
+    "body": {
+      "kind": "polygon",
+      "sides": 4,
+      "radius": 1.253314,
+      "x": 0,
+      "y": 0,
+      "angle": 0,
+      "turn": 0.785398,
+      "above": true,
+      "color": "#e8ebf7",
+      "colorMap": 6,
+      "arras": {
+        "designId": "1238f8496fe56ab5",
+        "name": "Sticky Wall",
+        "colour": 6
+      }
+    },
+    "arras": {
+      "designId": "1238f8496fe56ab5",
+      "name": "Sticky Wall",
+      "baseSize": 50
+    }
+  }
+}

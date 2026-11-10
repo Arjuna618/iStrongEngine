@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "type": "Other",
+  "name": "Healing Wall",
+  "timestamp": 1793491200000,
+  "category": "Walls",
+  "data": {
+    "_designVersion": 1,
+    "otherId": "other:healing-wall",
+    "name": "Healing Wall",
+    "size": 100,
+    "body": {
+      "kind": "polygon",
+      "sides": 4,
+      "radius": 1.253314,
+      "x": 0,
+      "y": 0,
+      "angle": 0,
+      "turn": 0.785398,
+      "above": true,
+      "color": "#8abc3f",
+      "colorMap": 11,
+      "arras": {
+        "designId": "1c48be80bf826ab2",
+        "name": "Healing Wall",
+        "colour": 11
+      }
+    },
+    "arras": {
+      "designId": "1c48be80bf826ab2",
+      "name": "Healing Wall",
+      "baseSize": 50
+    }
+  }
+}

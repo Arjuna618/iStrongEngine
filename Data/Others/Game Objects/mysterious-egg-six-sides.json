@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "type": "Other",
+  "name": "Mysterious Egg (six sides)",
+  "timestamp": 1793491200000,
+  "category": "Game Objects",
+  "data": {
+    "_designVersion": 1,
+    "otherId": "other:mysterious-egg-six-sides",
+    "name": "Mysterious Egg (six sides)",
+    "size": 60.36,
+    "body": {
+      "kind": "polygon",
+      "sides": 6,
+      "radius": 1.099636,
+      "x": 0,
+      "y": 0,
+      "angle": 0,
+      "turn": 0.523599,
+      "above": true,
+      "color": "#726f6f",
+      "colorMap": 17,
+      "arras": {
+        "designId": "06d47ab4b6b0e33f",
+        "name": "Mysterious Egg",
+        "colour": 17
+      }
+    },
+    "arras": {
+      "designId": "06d47ab4b6b0e33f",
+      "name": "Mysterious Egg",
+      "baseSize": 30.18000030517578
+    }
+  }
+}

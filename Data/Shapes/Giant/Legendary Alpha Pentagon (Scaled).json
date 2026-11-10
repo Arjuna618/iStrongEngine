@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Legendary Alpha Pentagon (Scaled)",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:legendary-alpha-pentagon-scaled",
+    "name": "Legendary Alpha Pentagon (Scaled)",
+    "sides": 5,
+    "color": "#8d6adf",
+    "colorMap": 14,
+    "rarity": "legendary",
+    "labyLevel": 0,
+    "size": 180.5407,
+    "hp": 151658.0131,
+    "bodyDamage": 20,
+    "shield": 1043.8033,
+    "shieldRegen": 0,
+    "xpValue": 6000000,
+    "pushability": 0.02,
+    "driftSpeed": 65.19,
+    "centerBias": 100,
+    "resist": 1.953125,
+    "penetration": 1.1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "legendaryAlphaPentagon",
+    "hitOnRounds": 2,
+    "pathTurn": 50.14,
+    "sizeRandomization": 15,
+    "ramHealthScale": 6.7747,
+    "arras": {
+      "name": "Alpha Pentagon",
+      "designId": "26dd0c58df3e6006",
+      "baseSize": 80,
+      "colorSlot": 14,
+      "xpBefore": 7500000
+    }
+  }
+}

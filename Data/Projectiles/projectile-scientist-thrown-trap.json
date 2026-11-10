@@ -1,0 +1,229 @@
+{
+  "version": "1.0.0",
+  "type": "CustomProjectile",
+  "name": "Scientist Thrown Trap",
+  "timestamp": 1793491200000,
+  "category": "Traps",
+  "data": {
+    "name": "Scientist Thrown Trap",
+    "visual": "trap",
+    "shape": 3,
+    "size": 0.679284,
+    "useMuzzleSize": true,
+    "color": "inherit",
+    "useTankColor": true,
+    "motionType": "glide",
+    "facingType": "turnWithSpeed",
+    "growRate": 1,
+    "turrets": [
+      {
+        "id": "991f70c7c7b3118c__g2_t0",
+        "length": 1,
+        "width": 0,
+        "aspect": 1,
+        "xOffset": 0,
+        "yOffset": 0,
+        "angle": 0,
+        "bps": 0,
+        "speed": 0,
+        "delay": 0,
+        "knockback": 0,
+        "spread": 0,
+        "bulletDamage": 0,
+        "bulletHealthBase": 0,
+        "bulletPenetration": 0,
+        "bulletLifetime": 0,
+        "isCustom": false,
+        "animProgress": 0,
+        "turretType": "auto",
+        "alwaysAbove": false,
+        "alwaysShoot": false,
+        "independent": true,
+        "fov": 360,
+        "fovSize": 0,
+        "autoTargetPriority": "nearest",
+        "maxTurnSpeed": 40,
+        "autoFireDelay": 0,
+        "manualControl": false,
+        "autoCircleSize": 1,
+        "autoCircleBaseSides": 0,
+        "autoCircleHidden": false,
+        "autoCircleFixed": false,
+        "autoCircleColorMatch": false,
+        "autoCircleHealer": false,
+        "autoCircleSpin": false,
+        "autoCircleSpinMode": "fixed",
+        "autoCircleSpinSpeed": 50,
+        "autoCircleSpinDirection": 1,
+        "autoTurretLength": 1,
+        "autoTurretWidth": 0,
+        "projectileType": {
+          "visual": "bullet",
+          "shape": 0,
+          "size": 1,
+          "useMuzzleSize": true,
+          "color": "inherit",
+          "useTankColor": true,
+          "maxAlive": 0,
+          "lifetime": 0,
+          "dieAtRange": false,
+          "motionType": "glide",
+          "facingType": "smoothWithMotion",
+          "growRate": 1,
+          "subTurrets": [],
+          "persistsAfterDeath": false,
+          "trapDepth": 0,
+          "trapCurved": false,
+          "friction": 0,
+          "hitsOwnType": "none",
+          "density": 1,
+          "bounciness": 0.9,
+          "bouncy": true,
+          "statCalculatorType": "bullet"
+        },
+        "projectileBehaviors": [],
+        "visualLayers": [],
+        "autoCurrentAngle": 0,
+        "autoTargetId": null,
+        "autoShapeLockId": null,
+        "aboveTankBody": true,
+        "renderLayer": 1,
+        "autoFire": false,
+        "wifiRange": false,
+        "wifiRangeValue": 50,
+        "recoilPosition": 0,
+        "recoilVelocity": 0,
+        "physRecoilPos": 0,
+        "physRecoilVel": 0,
+        "physRecoilDirX": 0,
+        "physRecoilDirY": 0,
+        "autoSubTurrets": [
+          {
+            "id": "991f70c7c7b3118c__g2_t0-t0",
+            "turretType": "decorative",
+            "look": {
+              "kind": "other",
+              "name": "Healer Hat",
+              "design": {
+                "_designVersion": 1,
+                "otherId": "other:healer-hat",
+                "name": "Healer Hat",
+                "size": 20,
+                "body": {
+                  "kind": "outline",
+                  "points": [
+                    [
+                      0.30000001192092896,
+                      -0.30000001192092896
+                    ],
+                    [
+                      1,
+                      -0.30000001192092896
+                    ],
+                    [
+                      1,
+                      0.30000001192092896
+                    ],
+                    [
+                      0.30000001192092896,
+                      0.30000001192092896
+                    ],
+                    [
+                      0.30000001192092896,
+                      1
+                    ],
+                    [
+                      -0.30000001192092896,
+                      1
+                    ],
+                    [
+                      -0.30000001192092896,
+                      0.30000001192092896
+                    ],
+                    [
+                      -1,
+                      0.30000001192092896
+                    ],
+                    [
+                      -1,
+                      -0.30000001192092896
+                    ],
+                    [
+                      -0.30000001192092896,
+                      -0.30000001192092896
+                    ],
+                    [
+                      -0.30000001192092896,
+                      -1
+                    ],
+                    [
+                      0.30000001192092896,
+                      -1
+                    ]
+                  ],
+                  "radius": 1,
+                  "x": 0,
+                  "y": 0,
+                  "angle": 0,
+                  "turn": 0,
+                  "above": true,
+                  "color": "#e03e41",
+                  "colorMap": 12,
+                  "arras": {
+                    "designId": "9268700c1754c414",
+                    "name": "Healer Hat",
+                    "colour": 12
+                  }
+                }
+              },
+              "size": 25.386709
+            },
+            "aboveBase": true,
+            "xOffset": 0,
+            "yOffset": 0,
+            "angle": 0,
+            "length": 1,
+            "width": 0,
+            "aspect": 1,
+            "bps": 0,
+            "speed": 0,
+            "delay": 0,
+            "knockback": 0,
+            "spread": 0,
+            "bulletDamage": 0,
+            "bulletHealthBase": 0,
+            "bulletPenetration": 0,
+            "bulletLifetime": 0,
+            "alwaysShoot": false,
+            "alwaysAbove": false,
+            "independent": true,
+            "manualControl": false,
+            "aboveTankBody": true,
+            "renderLayer": 1,
+            "autoSubTurrets": [],
+            "primarySubTurretId": null,
+            "projectileBehaviors": [],
+            "visualLayers": []
+          }
+        ],
+        "primarySubTurretId": null,
+        "altFire": false,
+        "syncsSkills": false,
+        "necro": false,
+        "healer": false,
+        "gunStatScale": 1,
+        "color": "#e03e41",
+        "colorMap": 12
+      }
+    ],
+    "mountedTurret": null,
+    "trapDepth": 0.6666666666666666,
+    "trapCurved": false,
+    "friction": 0.05,
+    "hitsOwnType": "push",
+    "density": 2.5,
+    "bounciness": 0.9,
+    "bouncy": true
+  },
+  "source": "arras-migration"
+}

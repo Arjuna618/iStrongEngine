@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Shadow Square",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:shadow-square",
+    "name": "Shadow Square",
+    "sides": 4,
+    "color": "#efc74b",
+    "colorMap": 13,
+    "rarity": "shadow",
+    "labyLevel": 0,
+    "size": 28.7238,
+    "hp": 281.5433,
+    "bodyDamage": 20,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 10000,
+    "pushability": 0.6,
+    "driftSpeed": 131.14,
+    "centerBias": 15,
+    "resist": 1,
+    "penetration": 2,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "shadowSquare",
+    "hitOnRounds": 0.5367,
+    "pathTurn": 98.25,
+    "sizeRandomization": 0,
+    "ramHealthScale": 3.5193,
+    "arras": {
+      "name": "Square",
+      "designId": "0ad3676974ee82bc",
+      "baseSize": 12.7279,
+      "colorSlot": 13,
+      "xpBefore": 60000
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Shiny Omega Egg",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:shiny-omega-egg",
+    "name": "Shiny Omega Egg",
+    "sides": 0,
+    "color": "#e8ebf7",
+    "colorMap": 6,
+    "isIntangible": true,
+    "rarity": "shiny",
+    "labyLevel": 3,
+    "size": 72,
+    "hp": 45220.2791,
+    "bodyDamage": 0,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 100000,
+    "pushability": 0.18750000000000014,
+    "driftSpeed": 52.5,
+    "centerBias": 30,
+    "resist": 1,
+    "penetration": 1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "shinyOmegaEgg",
+    "hitOnRounds": 0,
+    "pathTurn": 40.78,
+    "sizeRandomization": 0,
+    "ramHealthScale": 904.4056,
+    "arras": {
+      "name": "Shiny Omega Egg",
+      "designId": "994470be1d74f88b",
+      "baseSize": 36,
+      "colorSlot": 1,
+      "xpBefore": 8160
+    }
+  }
+}

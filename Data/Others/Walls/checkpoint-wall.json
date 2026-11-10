@@ -1,0 +1,58 @@
+{
+  "version": "1.0.0",
+  "type": "Other",
+  "name": "Checkpoint Wall",
+  "timestamp": 1793491200000,
+  "category": "Walls",
+  "data": {
+    "_designVersion": 1,
+    "otherId": "other:checkpoint-wall",
+    "name": "Checkpoint Wall",
+    "size": 100,
+    "body": {
+      "kind": "polygon",
+      "sides": 4,
+      "radius": 1.253314,
+      "x": 0,
+      "y": 0,
+      "angle": 0,
+      "turn": 0.785398,
+      "above": true,
+      "color": "#8abc3f",
+      "colorMap": 11,
+      "arras": {
+        "designId": "b6865584ed4f4820",
+        "name": "Checkpoint Wall",
+        "colour": 11
+      },
+      "parts": [
+        {
+          "kind": "polygon",
+          "sides": 4,
+          "radius": 0.87732,
+          "x": 0,
+          "y": 0,
+          "angle": 0,
+          "turn": 0.785398,
+          "above": true,
+          "color": "#e8ebf7",
+          "colorMap": 6,
+          "arras": {
+            "designId": "0bee15f377b9cbd5",
+            "name": "Unknown Entity",
+            "colour": 6,
+            "scale": 0.7,
+            "offset": 0,
+            "direction": 0,
+            "mountAngle": 0
+          }
+        }
+      ]
+    },
+    "arras": {
+      "designId": "b6865584ed4f4820",
+      "name": "Checkpoint Wall",
+      "baseSize": 50
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Crasher",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:crasher",
+    "name": "Crasher",
+    "sides": 3,
+    "color": "#ef99c3",
+    "colorMap": 5,
+    "crasherFacingOffset": 1.5707963267948966,
+    "rarity": "normal",
+    "labyLevel": 0,
+    "size": 11.2838,
+    "hp": 21.1914,
+    "bodyDamage": 2.342,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 57,
+    "pushability": 0.3,
+    "driftSpeed": 105.88,
+    "centerBias": 50,
+    "resist": 1,
+    "penetration": 1,
+    "isCrasher": true,
+    "crasherSpeed": 3.5,
+    "correspondsTo": "crasher",
+    "hitOnRounds": 0.68,
+    "pathTurn": 100,
+    "sizeRandomization": 15,
+    "ramHealthScale": 18.5265,
+    "arras": {
+      "name": "Crasher",
+      "designId": "7a6955f3a489ace0",
+      "baseSize": 5,
+      "colorSlot": 5
+    }
+  }
+}

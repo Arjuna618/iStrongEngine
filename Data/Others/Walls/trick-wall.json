@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "type": "Other",
+  "name": "Trick Wall",
+  "timestamp": 1793491200000,
+  "category": "Walls",
+  "data": {
+    "_designVersion": 1,
+    "otherId": "other:trick-wall",
+    "name": "Trick Wall",
+    "size": 100,
+    "body": {
+      "kind": "polygon",
+      "sides": 4,
+      "radius": 1.253314,
+      "x": 0,
+      "y": 0,
+      "angle": 0,
+      "turn": 0.785398,
+      "above": true,
+      "color": "#a4a4ad",
+      "colorMap": 7,
+      "arras": {
+        "designId": "a3812a28a739856a",
+        "name": "Trick Wall",
+        "colour": 7
+      }
+    },
+    "arras": {
+      "designId": "a3812a28a739856a",
+      "name": "Trick Wall",
+      "baseSize": 50
+    }
+  }
+}

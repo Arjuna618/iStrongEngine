@@ -1,0 +1,52 @@
+{
+  "version": "1.0.0",
+  "type": "CustomTurret",
+  "name": "Trapper",
+  "timestamp": 1793491200000,
+  "data": {
+    "name": "Trapper",
+    "layers": [
+      {
+        "type": "barrel",
+        "size": 10,
+        "width": 25,
+        "aspect": 1,
+        "xOffset": 0,
+        "yOffset": 0,
+        "color": "#a7a7af",
+        "strokeColor": "#6d6d72",
+        "customStroke": false,
+        "rotation": "independent",
+        "sides": 0,
+        "layer": 0,
+        "shootAnim": 33
+      },
+      {
+        "type": "barrel",
+        "size": 2.8,
+        "width": 25,
+        "aspect": 1.7,
+        "xOffset": 1.6,
+        "yOffset": 0,
+        "color": "#a7a7af",
+        "strokeColor": "#6d6d72",
+        "customStroke": false,
+        "rotation": "independent",
+        "sides": 0,
+        "layer": 1,
+        "shootAnim": 33
+      }
+    ],
+    "guns": [],
+    "turretType": "auto",
+    "independent": true,
+    "fov": 360,
+    "maxTurnSpeed": 4.5,
+    "autoFireDelay": 0,
+    "autoTargetPriority": "nearest",
+    "baseSize": 22,
+    "baseColor": "#a7a7af",
+    "baseShape": 0,
+    "spinSpeed": 0
+  }
+}

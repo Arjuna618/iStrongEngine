@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Alpha Pentagon (Scaled)",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:alpha-pentagon-scaled",
+    "name": "Alpha Pentagon (Scaled)",
+    "sides": 5,
+    "color": "#8d6adf",
+    "colorMap": 14,
+    "rarity": "normal",
+    "labyLevel": 0,
+    "size": 180.5407,
+    "hp": 7663.366,
+    "bodyDamage": 20,
+    "shield": 1043.8033,
+    "shieldRegen": 0,
+    "xpValue": 15000,
+    "pushability": 0.02,
+    "driftSpeed": 65.19,
+    "centerBias": 100,
+    "resist": 1.953125,
+    "penetration": 1.1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "alphaPentagon",
+    "hitOnRounds": 2,
+    "pathTurn": 50.14,
+    "sizeRandomization": 15,
+    "ramHealthScale": 1.537,
+    "arras": {
+      "name": "Alpha Pentagon",
+      "designId": "26dd0c58df3e6006",
+      "baseSize": 80,
+      "colorSlot": 14,
+      "xpBefore": 15000
+    }
+  }
+}

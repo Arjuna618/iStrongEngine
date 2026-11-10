@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "type": "Other",
+  "name": "Wall",
+  "timestamp": 1793491200000,
+  "category": "Walls",
+  "data": {
+    "_designVersion": 1,
+    "otherId": "other:wall",
+    "name": "Wall",
+    "size": 100,
+    "body": {
+      "kind": "polygon",
+      "sides": 4,
+      "radius": 1.253314,
+      "x": 0,
+      "y": 0,
+      "angle": 0,
+      "turn": 0.785398,
+      "above": true,
+      "color": "#a4a4ad",
+      "colorMap": 7,
+      "arras": {
+        "designId": "2e9f9352790672e6",
+        "name": "Wall",
+        "colour": 7
+      }
+    },
+    "arras": {
+      "designId": "2e9f9352790672e6",
+      "name": "Wall",
+      "baseSize": 50
+    }
+  }
+}

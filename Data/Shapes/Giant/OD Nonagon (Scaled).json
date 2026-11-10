@@ -1,0 +1,41 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "OD Nonagon (Scaled)",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:od-nonagon-scaled",
+    "name": "OD Nonagon (Scaled)",
+    "sides": 9,
+    "color": "#ffffff",
+    "rarity": "normal",
+    "labyLevel": 0,
+    "size": 338.5138,
+    "hp": 41972.6475,
+    "bodyDamage": 20,
+    "shield": 437.6295,
+    "shieldRegen": 0,
+    "xpValue": 42000,
+    "pushability": 0.025,
+    "driftSpeed": 65.19,
+    "centerBias": 100,
+    "resist": 1.953125,
+    "penetration": 1.1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "odNonagon",
+    "hitOnRounds": 2,
+    "pathTurn": 50.14,
+    "sizeRandomization": 15,
+    "ramHealthScale": 37.8663,
+    "arras": {
+      "name": "Nonagon",
+      "designId": "0394def4eecda639",
+      "baseSize": 150,
+      "colorSlot": 18,
+      "xpBefore": 42000
+    }
+  }
+}

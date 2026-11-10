@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Rainbow Crasher Egg",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:rainbow-crasher-egg",
+    "name": "Rainbow Crasher Egg",
+    "sides": 0,
+    "color": "#ef99c3",
+    "colorMap": 5,
+    "crasherFacingOffset": 0,
+    "rarity": "rainbow",
+    "labyLevel": 0,
+    "size": 9,
+    "hp": 355.8664,
+    "bodyDamage": 0,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 10000,
+    "pushability": 0.3,
+    "driftSpeed": 100,
+    "centerBias": 50,
+    "resist": 1,
+    "penetration": 1,
+    "isCrasher": true,
+    "crasherSpeed": 4.5,
+    "hitOnRounds": 0,
+    "pathTurn": 100,
+    "sizeRandomization": 0,
+    "ramHealthScale": 8.8967,
+    "arras": {
+      "name": "Rainbow Crasher Egg",
+      "designId": "44bc23d611dfcf1f",
+      "baseSize": 4.5,
+      "colorSlot": 36,
+      "xpBefore": 60000
+    }
+  }
+}

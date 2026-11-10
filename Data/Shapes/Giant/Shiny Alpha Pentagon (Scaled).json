@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Shiny Alpha Pentagon (Scaled)",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:shiny-alpha-pentagon-scaled",
+    "name": "Shiny Alpha Pentagon (Scaled)",
+    "sides": 5,
+    "color": "#8d6adf",
+    "colorMap": 14,
+    "rarity": "shiny",
+    "labyLevel": 0,
+    "size": 180.5407,
+    "hp": 75254.2541,
+    "bodyDamage": 20,
+    "shield": 1043.8033,
+    "shieldRegen": 0,
+    "xpValue": 1500000,
+    "pushability": 0.02,
+    "driftSpeed": 65.19,
+    "centerBias": 100,
+    "resist": 1.953125,
+    "penetration": 1.1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "shinyAlphaPentagon",
+    "hitOnRounds": 2,
+    "pathTurn": 50.14,
+    "sizeRandomization": 15,
+    "ramHealthScale": 6.758,
+    "arras": {
+      "name": "Alpha Pentagon",
+      "designId": "26dd0c58df3e6006",
+      "baseSize": 80,
+      "colorSlot": 14,
+      "xpBefore": 1500000
+    }
+  }
+}

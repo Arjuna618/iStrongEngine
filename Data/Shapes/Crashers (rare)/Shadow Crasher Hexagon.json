@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Shadow Crasher Hexagon",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:shadow-crasher-hexagon",
+    "name": "Shadow Crasher Hexagon",
+    "sides": 6,
+    "color": "#ef99c3",
+    "colorMap": 5,
+    "crasherFacingOffset": 1.5707963267948966,
+    "rarity": "shadow",
+    "labyLevel": 0,
+    "size": 52.7691,
+    "hp": 16448.1659,
+    "bodyDamage": 15,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 1250000,
+    "pushability": 0.3,
+    "driftSpeed": 100,
+    "centerBias": 50,
+    "resist": 1,
+    "penetration": 1,
+    "isCrasher": true,
+    "crasherSpeed": 2,
+    "hitOnRounds": 1.2429,
+    "pathTurn": 100,
+    "sizeRandomization": 0,
+    "ramHealthScale": 45.6893,
+    "arras": {
+      "name": "Shadow Crasher Hexagon",
+      "designId": "2f573ba03e6335ab",
+      "baseSize": 23.3827,
+      "colorSlot": 17,
+      "xpBefore": 400000
+    }
+  }
+}

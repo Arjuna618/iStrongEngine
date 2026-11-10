@@ -1,0 +1,39 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Rainbow Delta Egg",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:rainbow-delta-egg",
+    "name": "Rainbow Delta Egg",
+    "sides": 0,
+    "color": "#e8ebf7",
+    "colorMap": 6,
+    "isIntangible": true,
+    "rarity": "rainbow",
+    "labyLevel": 5,
+    "size": 288,
+    "hp": 19168170.728,
+    "bodyDamage": 0,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 128000000,
+    "pushability": 0.046875000000000056,
+    "driftSpeed": 52.5,
+    "centerBias": 50,
+    "resist": 1,
+    "penetration": 1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "rainbowDeltaEgg",
+    "hitOnRounds": 0,
+    "pathTurn": 40.78,
+    "sizeRandomization": 0,
+    "ramHealthScale": 3091.6404,
+    "arras": {
+      "xpBefore": 37601280.70949012
+    }
+  }
+}

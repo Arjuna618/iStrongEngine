@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Trans Square",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:trans-square",
+    "name": "Trans Square",
+    "sides": 4,
+    "color": "#efc74b",
+    "colorMap": 13,
+    "rarity": "trans",
+    "labyLevel": 0,
+    "size": 28.7238,
+    "hp": 469.4339,
+    "bodyDamage": 25,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 50000,
+    "pushability": 0.6,
+    "driftSpeed": 131.14,
+    "centerBias": 15,
+    "resist": 1,
+    "penetration": 2,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "transSquare",
+    "hitOnRounds": 0.5367,
+    "pathTurn": 98.25,
+    "sizeRandomization": 0,
+    "ramHealthScale": 2.934,
+    "arras": {
+      "name": "Trans Square",
+      "designId": "3462b27248bcdc48",
+      "baseSize": 12.7279,
+      "colorSlot": 37,
+      "xpBefore": 150000
+    }
+  }
+}

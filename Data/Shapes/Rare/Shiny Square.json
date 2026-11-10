@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Shiny Square",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:shiny-square",
+    "name": "Shiny Square",
+    "sides": 4,
+    "color": "#efc74b",
+    "colorMap": 13,
+    "rarity": "shiny",
+    "labyLevel": 0,
+    "size": 28.7238,
+    "hp": 93.8478,
+    "bodyDamage": 10,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 2000,
+    "pushability": 0.6,
+    "driftSpeed": 131.14,
+    "centerBias": 15,
+    "resist": 1,
+    "penetration": 2,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "shinySquare",
+    "hitOnRounds": 0.5367,
+    "pathTurn": 98.25,
+    "sizeRandomization": 0,
+    "ramHealthScale": 2.3462,
+    "arras": {
+      "name": "Shiny Square",
+      "designId": "3559aec685ef1d95",
+      "baseSize": 12.7279,
+      "colorSlot": 1,
+      "xpBefore": 3000
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Gamma Pentagon",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:gamma-pentagon",
+    "name": "Gamma Pentagon",
+    "sides": 5,
+    "color": "#8d6adf",
+    "colorMap": 14,
+    "rarity": "normal",
+    "labyLevel": 4,
+    "size": 100.4222,
+    "hp": 687963.6,
+    "bodyDamage": 10,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 800000,
+    "pushability": 0.0642572059335908,
+    "driftSpeed": 52.5,
+    "centerBias": 100,
+    "resist": 1.25,
+    "penetration": 1.1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "gammaPentagon",
+    "hitOnRounds": 1.4757,
+    "pathTurn": 40.78,
+    "sizeRandomization": 0,
+    "ramHealthScale": 7.644,
+    "arras": {
+      "xpBefore": 3136181.4177878797
+    }
+  }
+}

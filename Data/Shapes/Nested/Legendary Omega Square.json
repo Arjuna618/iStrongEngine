@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Legendary Omega Square",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:legendary-omega-square",
+    "name": "Legendary Omega Square",
+    "sides": 4,
+    "color": "#efc74b",
+    "colorMap": 13,
+    "rarity": "legendary",
+    "labyLevel": 3,
+    "size": 81.2433,
+    "hp": 14759.8236,
+    "bodyDamage": 10,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 1600000,
+    "pushability": 0.2121320343559643,
+    "driftSpeed": 52.5,
+    "centerBias": 45,
+    "resist": 1,
+    "penetration": 2,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "legendaryOmegaSquare",
+    "hitOnRounds": 0.7481,
+    "pathTurn": 40.78,
+    "sizeRandomization": 0,
+    "ramHealthScale": 3.69,
+    "arras": {
+      "name": "Legendary Omega Square",
+      "designId": "933c6d20bea61a85",
+      "baseSize": 36,
+      "colorSlot": 0,
+      "xpBefore": 56250
+    }
+  }
+}

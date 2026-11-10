@@ -1,0 +1,38 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Gamma Square",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:gamma-square",
+    "name": "Gamma Square",
+    "sides": 4,
+    "color": "#efc74b",
+    "colorMap": 13,
+    "rarity": "normal",
+    "labyLevel": 4,
+    "size": 114.8954,
+    "hp": 27875.5002,
+    "bodyDamage": 10,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 32000,
+    "pushability": 0.15000000000000002,
+    "driftSpeed": 52.5,
+    "centerBias": 55,
+    "resist": 1,
+    "penetration": 2,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "gammaSquare",
+    "hitOnRounds": 0.5367,
+    "pathTurn": 40.78,
+    "sizeRandomization": 0,
+    "ramHealthScale": 4.6459,
+    "arras": {
+      "xpBefore": 28125
+    }
+  }
+}

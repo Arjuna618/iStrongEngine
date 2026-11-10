@@ -1,0 +1,43 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Rainbow Beta Egg",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:rainbow-beta-egg",
+    "name": "Rainbow Beta Egg",
+    "sides": 0,
+    "color": "#e8ebf7",
+    "colorMap": 6,
+    "isIntangible": true,
+    "rarity": "rainbow",
+    "labyLevel": 1,
+    "size": 18,
+    "hp": 3545.8656,
+    "bodyDamage": 0,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 50000,
+    "pushability": 0.7500000000000002,
+    "driftSpeed": 86.22,
+    "centerBias": 10,
+    "resist": 1,
+    "penetration": 1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "rainbowBetaEgg",
+    "hitOnRounds": 0,
+    "pathTurn": 66.4,
+    "sizeRandomization": 0,
+    "ramHealthScale": 354.5866,
+    "arras": {
+      "name": "Rainbow Beta Egg",
+      "designId": "3b68598e1b5e7f30",
+      "baseSize": 9,
+      "colorSlot": 36,
+      "xpBefore": 5700
+    }
+  }
+}

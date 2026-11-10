@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Icosahedron",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:icosahedron",
+    "name": "Icosahedron",
+    "sides": 0,
+    "polyhedronType": "icosahedron",
+    "color": "#e8ebf7",
+    "colorMap": 6,
+    "rarity": "normal",
+    "labyLevel": 0,
+    "size": 40,
+    "hp": 400,
+    "bodyDamage": 45,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 8000000,
+    "pushability": 0.02,
+    "driftSpeed": 30,
+    "centerBias": 100,
+    "resist": 1.25,
+    "penetration": 35,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "icosahedron",
+    "arras": {
+      "xpBefore": 100000000
+    }
+  }
+}

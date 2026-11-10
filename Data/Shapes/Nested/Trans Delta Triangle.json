@@ -1,0 +1,38 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Trans Delta Triangle",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:trans-delta-triangle",
+    "name": "Trans Delta Triangle",
+    "sides": 3,
+    "color": "#e7896d",
+    "colorMap": 2,
+    "rarity": "trans",
+    "labyLevel": 5,
+    "size": 324.9732,
+    "hp": 8474040.96,
+    "bodyDamage": 25,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 3200000000,
+    "pushability": 0.02500000000000003,
+    "driftSpeed": 52.5,
+    "centerBias": 90,
+    "resist": 1.15,
+    "penetration": 1.5,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "transDeltaTriangle",
+    "hitOnRounds": 1,
+    "pathTurn": 40.78,
+    "sizeRandomization": 0,
+    "ramHealthScale": 13.6678,
+    "arras": {
+      "xpBefore": 50281560.00190241
+    }
+  }
+}

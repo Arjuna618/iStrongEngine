@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Omega Pentagon",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:omega-pentagon",
+    "name": "Omega Pentagon",
+    "sides": 5,
+    "color": "#8d6adf",
+    "colorMap": 14,
+    "rarity": "normal",
+    "labyLevel": 3,
+    "size": 81.2433,
+    "hp": 114291.6,
+    "bodyDamage": 10,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 100000,
+    "pushability": 0.07942627457812106,
+    "driftSpeed": 52.5,
+    "centerBias": 100,
+    "resist": 1.25,
+    "penetration": 1.1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "omegaPentagon",
+    "hitOnRounds": 1.4757,
+    "pathTurn": 40.78,
+    "sizeRandomization": 0,
+    "ramHealthScale": 7.6194,
+    "arras": {
+      "name": "Omega Pentagon",
+      "designId": "bf4c9695dfdd9cc8",
+      "baseSize": 36,
+      "colorSlot": 14,
+      "xpBefore": 383843.796348485
+    }
+  }
+}

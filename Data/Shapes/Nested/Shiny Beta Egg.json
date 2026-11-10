@@ -1,0 +1,43 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Shiny Beta Egg",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:shiny-beta-egg",
+    "name": "Shiny Beta Egg",
+    "sides": 0,
+    "color": "#e8ebf7",
+    "colorMap": 6,
+    "isIntangible": true,
+    "rarity": "shiny",
+    "labyLevel": 1,
+    "size": 18,
+    "hp": 885.7063,
+    "bodyDamage": 0,
+    "shield": 0,
+    "shieldRegen": 0,
+    "xpValue": 2500,
+    "pushability": 0.7500000000000002,
+    "driftSpeed": 86.22,
+    "centerBias": 10,
+    "resist": 1,
+    "penetration": 1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "shinyBetaEgg",
+    "hitOnRounds": 0,
+    "pathTurn": 66.4,
+    "sizeRandomization": 0,
+    "ramHealthScale": 354.2825,
+    "arras": {
+      "name": "Shiny Beta Egg",
+      "designId": "385b5435fc9bc9c0",
+      "baseSize": 9,
+      "colorSlot": 1,
+      "xpBefore": 285
+    }
+  }
+}

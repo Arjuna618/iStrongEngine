@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "type": "FoodShape",
+  "name": "Legendary OD Octagon (Scaled)",
+  "timestamp": 1793491200000,
+  "category": "Food Shapes",
+  "data": {
+    "_designVersion": 1,
+    "shapeId": "user:legendary-od-octagon-scaled",
+    "name": "Legendary OD Octagon (Scaled)",
+    "sides": 8,
+    "color": "#7adbba",
+    "colorMap": 4,
+    "rarity": "legendary",
+    "labyLevel": 0,
+    "size": 225.6758,
+    "hp": 613821.3954,
+    "bodyDamage": 20,
+    "shield": 396.972,
+    "shieldRegen": 0,
+    "xpValue": 14000000,
+    "pushability": 0.03,
+    "driftSpeed": 65.19,
+    "centerBias": 98,
+    "resist": 1.953125,
+    "penetration": 1.1,
+    "isCrasher": false,
+    "crasherSpeed": 0,
+    "correspondsTo": "legendaryOdOctagon",
+    "hitOnRounds": 2,
+    "pathTurn": 50.14,
+    "sizeRandomization": 15,
+    "ramHealthScale": 167.8192,
+    "arras": {
+      "name": "Octogon",
+      "designId": "1429921c395b24d0",
+      "baseSize": 100,
+      "colorSlot": 4,
+      "xpBefore": 17500000
+    }
+  }
+}

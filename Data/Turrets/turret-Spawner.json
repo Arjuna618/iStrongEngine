@@ -1,0 +1,67 @@
+{
+  "version": "1.0.0",
+  "type": "CustomTurret",
+  "name": "Spawner",
+  "timestamp": 1793491200000,
+  "data": {
+    "name": "Spawner",
+    "layers": [
+      {
+        "type": "barrel",
+        "size": 10.5,
+        "width": 31,
+        "aspect": 1,
+        "xOffset": -0.4,
+        "yOffset": 0,
+        "color": "#c8c8c8",
+        "strokeColor": "#757575",
+        "customStroke": false,
+        "rotation": "independent",
+        "sides": 0,
+        "layer": 0,
+        "shootAnim": 23
+      },
+      {
+        "type": "barrel",
+        "size": 1.9,
+        "width": 38,
+        "aspect": 1,
+        "xOffset": 1.6,
+        "yOffset": 0,
+        "color": "#c8c8c8",
+        "strokeColor": "rgb(116,116,116)",
+        "customStroke": false,
+        "rotation": "independent",
+        "sides": 0,
+        "layer": 1,
+        "shootAnim": 30
+      },
+      {
+        "type": "barrel",
+        "size": 7.7,
+        "width": 38,
+        "aspect": 1,
+        "xOffset": -0.2,
+        "yOffset": 0,
+        "color": "#c8c8c8",
+        "strokeColor": "#757575",
+        "customStroke": false,
+        "rotation": "independent",
+        "sides": 0,
+        "layer": 1,
+        "shootAnim": 0
+      }
+    ],
+    "guns": [],
+    "turretType": "auto",
+    "independent": true,
+    "fov": 360,
+    "maxTurnSpeed": 4.5,
+    "autoFireDelay": 0,
+    "autoTargetPriority": "nearest",
+    "baseSize": 22,
+    "baseColor": "#c8c8c8",
+    "baseShape": 0,
+    "spinSpeed": 0
+  }
+}
