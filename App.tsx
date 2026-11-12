@@ -97,7 +97,7 @@ import { hubWindow } from './components/project/hubWindow';
 import { AppMenuBar } from './components/shell/AppMenuBar';
 import { KeyboardShortcutsPopup, AboutPopup } from './components/shell/HelpPopups';
 import { LegalWindow, LEGAL_HASH, legalPageOfHash, type LegalPage } from './components/legal/LegalWindow';
-import { termsAgreed, agreeToTerms } from './components/legal/termsConsent';
+import { termsAgreed, agreeToTerms, useTermsAgreed } from './components/legal/termsConsent';
 import { ProjectHubSlot } from './components/project/ProjectHub';
 import { dragWatch } from './components/kit/dragWatch';
 
@@ -412,7 +412,7 @@ export default function App() {
   const openMenuConfirm = useCallback(() => setShowMenuConfirm(true), []);
   const openHub = useCallback(() => hubWindow.set(true), []);
   const openDocs = useCallback(() => setShowDocs(true), []);
-  const openUpdates = useCallback(() => setShowUpdates(true), []);
+  const openUpdates = useCallback(() => afterTerms(() => setShowUpdates(true)), []);
   const openShortcuts = useCallback(() => setShowShortcuts(true), []);
   const openAbout = useCallback(() => setShowAbout(true), []);
   const [legal, setLegal] = useState<{ page: LegalPage; ask: boolean; then?: () => void } | null>(null);
@@ -422,6 +422,7 @@ export default function App() {
     if (termsAgreed()) { then(); return; }
     setLegal({ page: 'terms', ask: true, then });
   }, []);
+  const agreedNow = useTermsAgreed();
 
   const curtainGo = useRef<(switchScreen: () => void) => void>((f) => f());
   const launchPlayMode = useCallback((config: GameModeConfig) => {
@@ -727,8 +728,8 @@ export default function App() {
           onPlay={() => afterTerms(() => curtain.go(() => setScreen('play')))}
           onEngine={() => afterTerms(() => { if (isPhoneDevice()) { setShowPhoneEngineNotice(true); return; } curtain.go(() => setScreen('engine')); })}
           isDark={isDark}
-          onOpenUpdates={() => setShowUpdates(true)}
-          onOpenSource={SOURCE_CODE_ON ? () => setShowSource(true) : undefined}
+          onOpenUpdates={() => afterTerms(() => setShowUpdates(true))}
+          onOpenSource={SOURCE_CODE_ON ? () => afterTerms(() => setShowSource(true)) : undefined}
           onOpenTerms={() => openLegal('terms')}
           onOpenSettings={() => setShowMenuSettings(true)}
           updatesUnseen={updatesUnseen}
@@ -771,7 +772,7 @@ export default function App() {
 
       {showDocs && <DocsPopup onClose={() => setShowDocs(false)} />}
 
-      {showSource && SourceCodeWindow && (
+      {showSource && agreedNow && SourceCodeWindow && (
         <React.Suspense fallback={null}><SourceCodeWindow onClose={() => setShowSource(false)} /></React.Suspense>
       )}
 
@@ -807,7 +808,7 @@ export default function App() {
         </Modal>
       )}
 
-      {showUpdates && <UpdateLogPopup onClose={closeUpdates} />}
+      {showUpdates && agreedNow && <UpdateLogPopup onClose={closeUpdates} />}
 
       <header ref={engineHeadRef} inert={sizeGate || screen !== 'engine' || isTestMode || undefined} style={sizeGate ? { zoom: chromeScale, visibility: 'hidden' } : { zoom: chromeScale }} className={`k-bar k-chrome h-[55px] bg-[var(--k-chrome)] grid grid-cols-[1fr_auto_1fr] items-center gap-4 z-30 relative transition-transform duration-300 ${isTestMode ? '-translate-y-full -mt-[55px]' : 'translate-y-0 mt-0'}`}>
         <div className="flex items-center min-w-0">
@@ -828,7 +829,7 @@ export default function App() {
               version={CURRENT_VERSION}
               icon={<Megaphone size={13} />}
               unseen={updatesUnseen}
-              onClick={() => setShowUpdates(true)}
+              onClick={() => afterTerms(() => setShowUpdates(true))}
               title="Beta version: view the update log"
             />
           </span>
@@ -841,7 +842,7 @@ export default function App() {
             <BookText size={18} strokeWidth={1.5} absoluteStrokeWidth />
           </IconButton>
           {SOURCE_CODE_ON && (
-            <IconButton label="Source Code" onClick={() => setShowSource(true)}>
+            <IconButton label="Source Code" onClick={() => afterTerms(() => setShowSource(true))}>
               <SourceCode size={18} strokeWidth={1.5} absoluteStrokeWidth />
             </IconButton>
           )}

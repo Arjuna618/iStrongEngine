@@ -1,6 +1,6 @@
 # iStrongEngine Terms of Use
 
-Version 1.0, 9 November 2026
+Version 1.1, 12 November 2026
 
 These Terms of Use are an agreement between you and the creator of iStrongEngine, Arjuna (the creator). Please read them. If you do not agree, do not use iStrongEngine.
 
@@ -64,7 +64,7 @@ If you believe something in iStrongEngine uses your work without permission, tel
 
 ## 10. Your privacy
 
-The app keeps your work in your own browser and sends nothing about you anywhere. The beta site and the Discord bot keep some information, such as IP addresses and Discord names, to protect access tokens and run early access. The Privacy Notice explains all of it.
+The app keeps your work in your own browser and never sends it to the creator. The official website may count its visits, without cookies and without anything that identifies you. The beta site and the Discord bot keep some information, such as IP addresses and Discord names, to protect access tokens and run early access. The Privacy Notice explains all of it.
 
 ## 11. No promises
 

@@ -14,7 +14,14 @@ function localAutomation(): boolean {
   } catch { return false; }
 }
 
-let agreed = stored() === TERMS_VERSION || localAutomation();
+function answerOf(version: string): string {
+  const s = KEY + '|' + version;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return 'a1.' + h.toString(36);
+}
+
+let agreed = stored() === answerOf(TERMS_VERSION) || localAutomation();
 const listeners = new Set<() => void>();
 
 export function termsAgreed(): boolean { return agreed; }
@@ -22,7 +29,7 @@ export function termsAgreed(): boolean { return agreed; }
 export function agreeToTerms(): void {
   if (agreed) return;
   agreed = true;
-  try { localStorage.setItem(KEY, TERMS_VERSION); } catch { }
+  try { localStorage.setItem(KEY, answerOf(TERMS_VERSION)); } catch { }
   listeners.forEach(f => f());
 }
 
