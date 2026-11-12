@@ -1,14 +1,16 @@
 # iStrongEngine Privacy Notice
 
-Version 1.0, 9 November 2026
+Version 1.1, 12 November 2026
 
 This notice says what information iStrongEngine and its official services keep about you, why, for how long, and who can see it. It is written by the creator of iStrongEngine, Arjuna (the creator). To ask anything about it, or to ask for your information, write to the creator on the official Discord.
 
 ## 1. The app keeps nothing about you
 
-iStrongEngine runs in your browser, on your own computer. Your projects, settings, designs and files stay in your browser's storage or in the files you save. They are never sent to the creator or to anyone else. The app has no accounts, no ads, no cookies, and no tracking or analytics. Your I Agree answer is kept in your browser only.
+iStrongEngine runs in your browser, on your own computer. Your projects, settings, designs and files stay in your browser's storage or in the files you save. They are never sent to the creator or to anyone else. The app has no accounts, no ads, no cookies, and no tracking. Your I Agree answer is kept in your browser only.
 
 To load its fonts, the app asks Google Fonts for them. Like any website, Google can see your IP address and your browser when it sends them. Google's own privacy policy covers that.
+
+The official iStrongEngine websites may count their visitors with Cloudflare Web Analytics. It uses no cookies and nothing in it identifies you. It only counts which page was opened, the site you came from, your country, your browser and device kind, and how fast the page loaded. Cloudflare's own privacy policy covers that.
 
 ## 2. The beta site
 
