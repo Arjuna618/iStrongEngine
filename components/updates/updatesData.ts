@@ -49,6 +49,7 @@ export const UPDATES: UpdateEntry[] = [
       "Changed the Add Bosses window of a boss group to open on all the bosses, not on one boss group.",
       "Fixed boss turrets showing under Launcher Turrets and other groups: every turret only bosses carry is now under Boss Turrets.",
       "Fixed the Count box over the canvas coming apart in the Classic theme when its name is long, as on a five sided body.",
+      "Fixed the main menu's new updates dot showing as a square in the Classic theme, and the Update Log's New tag now shows only its word.",
       "Updated the guides for Outbreak, Map Events, the Canvas Tool, the Spawn Tool and The Bots Group."
     ]
   },
