@@ -2,7 +2,7 @@ import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { SMALL_FIX } from '../game/smallFixSwitch';
 import { GameLogic, GRID_SPACING } from '../game/GameLogic';
 import { DEFAULT_PROJECTILE_TYPE, ProjectileTypeConfig, Turret, BehaviorConfig, MotionType } from '../types';
-import { Shapes, ArrowLeft, HdRectangleCircle, HdDashboardSquareSetting, HdArrowAllDirection, HdPaintBoard, HdAsteroid02, HdAiElements, HdAiDrawing, HdMouseRightClick04, HdTarget01, HdDashboardSpeed01, HdCaduceus, HdEye, HdJoker } from './ui/icons';
+import { Shapes, ArrowLeft, HdRectangleCircle, HdDashboardSquareSetting, HdArrowAllDirection, HdPaintBoard, HdAsteroid02, BulletCardIcon, DrawOrderIcon, HdMouseRightClick04, HdTarget01, HdDashboardSpeed01, HdCaduceus, HdEye, HdJoker } from './ui/icons';
 import { Group, Button, SelectRow, Crumbs, headerIcon } from './kit/kit';
 import { Reveal, PageSwap, SwapBox } from './kit/Collapse';
 
@@ -462,7 +462,7 @@ export const TurretManagerUI: React.FC<Props> = ({ logic, onUpdate, className, p
             {subTypeEd('firing')}
           </Group>
         </Reveal>
-        <Reveal when={subShows('bullet') && !subPreviewing}><Group title="Bullet" icon={headerIcon(HdAiElements)}>{subProps('bullet')}</Group></Reveal>
+        <Reveal when={subShows('bullet') && !subPreviewing}><Group title="Projectile Stats" icon={headerIcon(BulletCardIcon)}>{subProps('bullet')}</Group></Reveal>
 
         <Reveal when={subFires}>
               <BehaviorEditor
@@ -487,13 +487,14 @@ export const TurretManagerUI: React.FC<Props> = ({ logic, onUpdate, className, p
                 onEditFragment={(i) => setFragDrill({ owner: subOwnerKey, path: [i] })}
                 explodeLevel={1}
                 bombTurret={subRoot}
+                logic={logic}
                 tankLibrary={s.tankLibrary || []}
                 roundLayer={TANK_GUN_ROUND_LAYER}
               />
         </Reveal>
 
         <Reveal when={!subPreviewing}>
-        <Group title="Draw Order" icon={headerIcon(HdAiDrawing)} collapsible defaultOpen={false}>
+        <Group title="Draw Order" icon={headerIcon(DrawOrderIcon)} collapsible defaultOpen={false}>
           {subProps('aboveBase')}
           {subProps('drawOrder')}
           {subTypeEd('drawOrder')}
@@ -845,7 +846,7 @@ export const TurretManagerUI: React.FC<Props> = ({ logic, onUpdate, className, p
           </SwapBox>
         </Group>
       </Reveal>
-      <Reveal when={mainShows('bullet') && !previewing}><Group title="Bullet" icon={headerIcon(HdAiElements)}>{mainProps('bullet')}</Group></Reveal>
+      <Reveal when={mainShows('bullet') && !previewing}><Group title="Projectile Stats" icon={headerIcon(BulletCardIcon)}>{mainProps('bullet')}</Group></Reveal>
 
       <Reveal when={typeShows('targeting') && !previewing}><Group title="Targeting" icon={headerIcon(HdTarget01)}>{mainTypeEd('targeting')}</Group></Reveal>
       <Reveal when={barShows('baseMotion') && !previewing}>
@@ -882,12 +883,13 @@ export const TurretManagerUI: React.FC<Props> = ({ logic, onUpdate, className, p
           onEditFragment={(i) => setFragDrill({ owner: mainOwnerKey, path: [i] })}
           explodeLevel={1}
           bombTurret={mainRoot}
+          logic={logic}
           tankLibrary={s.tankLibrary || []}
           roundLayer={TANK_GUN_ROUND_LAYER}
         />
       </Reveal>
 
-      <Group title="Draw Order" icon={headerIcon(HdAiDrawing)} collapsible defaultOpen={false}>
+      <Group title="Draw Order" icon={headerIcon(DrawOrderIcon)} collapsible defaultOpen={false}>
         {mainProps('drawOrder')}
         <Reveal when={!previewing}><div className="space-y-3">
           <TurretActionBar {...mainBar} part="above" />

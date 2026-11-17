@@ -56,6 +56,7 @@ export function exactBucketOf(R: number): number {
 }
 
 let _nowMs = 0;
+export function exactPumpNowMs(): number { return _nowMs; }
 
 export function getExactGrid(host: ExactGridHost, R: number): ExactNavGrid | null {
   if (host.exactOff === true) return null;

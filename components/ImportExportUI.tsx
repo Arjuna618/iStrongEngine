@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { TEXT_LIMITS } from './kit/textLimits';
 import { GameLogic } from '../game/GameLogic';
 import { DataRegistry } from '../game/DataRegistry';
 import { importChangedNotice } from './shared/labels';
-import { Download, ExternalLink, HdArtificialIntelligence07, HdFileAttachment, HdAiSwap } from './ui/icons';
+import { Download, ExternalLink, ExportConfigIcon, HdFileAttachment, HdAiSwap } from './ui/icons';
 import { useToast } from './ui/Toast';
 import { ExportFile, TurretPreset, CustomProjectileDesign, LibraryItem, FoodShapeDesign } from '../types';
 import { makeUserShapeId } from '../game/ShapeRegistry';
@@ -15,6 +16,7 @@ import { fireTip } from '../utils/tips';
 import { keepExportCopy, routeProjectFiles, isProjectFileName, APP_FILE_ACCEPT } from './project/projectActions';
 import { usePanelMemory, isText, isOneOf } from './kit/panelMemory';
 import { exportKindDoor, whenToolShown, type ExportKind } from './shell/doors';
+import { gameModeExportFile } from './shared/gameModeFile';
 
 interface Props {
   logic: GameLogic | null;
@@ -22,12 +24,13 @@ interface Props {
   className?: string;
 }
 
-type ExportMode = ExportKind;
+type ExportMode = ExportKind | 'game-mode';
 
 const EXPORT_TYPE_OPTIONS: SelectOption[] = [
   { value: 'tank',          label: 'Tank' },
   { value: 'turret-preset', label: 'Turret' },
   { value: 'projectile',    label: 'Projectile' },
+  { value: 'game-mode',     label: 'Game Mode' },
   { value: 'food-shape',    label: 'Food Shape' },
 ];
 
@@ -38,6 +41,7 @@ const DEFAULT_EXPORT_NAME: Record<ExportMode, string> = {
   'turret-preset': 'MyTurret',
   projectile: 'MyProjectile',
   'food-shape': 'MyShape',
+  'game-mode': 'MyMode',
 };
 
 function rejectMessage(): string {
@@ -50,7 +54,7 @@ function rejectMessage(): string {
 export const ImportExportUI: React.FC<Props> = ({ logic, dataRegistry, className }) => {
   const [exportName, setExportName] = usePanelMemory<string>('importExport.name', DEFAULT_EXPORT_NAME.tank, isText(200));
   const nameBeforeShapeRef = useRef<{ mode: ExportMode; name: string } | null>(null);
-  const [exportMode, setExportMode] = usePanelMemory<ExportMode>('importExport.mode', 'tank', isOneOf(['tank', 'turret-preset', 'projectile', 'food-shape']));
+  const [exportMode, setExportMode] = usePanelMemory<ExportMode>('importExport.mode', 'tank', isOneOf(['tank', 'turret-preset', 'projectile', 'game-mode', 'food-shape']));
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
 
@@ -98,7 +102,7 @@ export const ImportExportUI: React.FC<Props> = ({ logic, dataRegistry, className
 
   if (!logic) return null;
 
-  const filePrefix = exportMode === 'projectile' ? 'projectile' : exportMode === 'turret-preset' ? 'turret' : exportMode === 'food-shape' ? 'shape' : 'tank';
+  const filePrefix = exportMode === 'projectile' ? 'projectile' : exportMode === 'turret-preset' ? 'turret' : exportMode === 'food-shape' ? 'shape' : exportMode === 'game-mode' ? 'mode' : 'tank';
   const fullFileName = `${filePrefix}-${exportName.replace(/[^a-zA-Z0-9-_]/g, '')}.json`;
   const canExportPreset = logic.state.turrets.length > 0;
   const hasEditingShape = !logic.state.isTestMode && logic.state.editingShape !== null;
@@ -151,6 +155,12 @@ export const ImportExportUI: React.FC<Props> = ({ logic, dataRegistry, className
         timestamp: Date.now(),
         data: design,
       };
+    } else if (exportMode === 'game-mode') {
+      if (exportName.trim() === '') {
+        showToast('error', 'Give the mode a name first.');
+        return;
+      }
+      fileContent = gameModeExportFile(logic, exportName.trim());
     } else if (exportMode === 'turret-preset') {
       const preset = logic.exportTurretPreset(exportName);
       fileContent = {
@@ -269,6 +279,7 @@ export const ImportExportUI: React.FC<Props> = ({ logic, dataRegistry, className
       case 'projectile': return 'Projectile Name';
       case 'turret-preset': return 'Preset Name';
       case 'food-shape': return 'Shape Name';
+      case 'game-mode': return 'Mode Name';
       default: return 'Configuration Name';
     }
   };
@@ -278,6 +289,7 @@ export const ImportExportUI: React.FC<Props> = ({ logic, dataRegistry, className
       case 'projectile': return 'e.g. Hive Drone';
       case 'turret-preset': return 'e.g. Penta Shot';
       case 'food-shape': return 'e.g. Golden Pentagon';
+      case 'game-mode': return 'e.g. My Mode';
       default: return 'e.g. Minigun';
     }
   };
@@ -296,17 +308,17 @@ export const ImportExportUI: React.FC<Props> = ({ logic, dataRegistry, className
   return (
     <ScrollArea className={className} contentClassName="p-4 space-y-3 overflow-x-hidden">
 
-        <Group title="Export Configuration" icon={headerIcon(HdArtificialIntelligence07)} handle={exportCard}>
-            <SelectRow label="Export Type" help="What the file holds. Tank: the whole tank. Turret: only the placed turrets, as a preset. Projectile: the whole tank as a projectile design other tanks can fire. Food Shape: the shape on the canvas, offered only while one is loaded." value={exportMode} onChange={handleExportModeChange} options={exportTypeOptions} disabled={shapeLoaded}
+        <Group title="Export Configuration" icon={headerIcon(ExportConfigIcon)} handle={exportCard}>
+            <SelectRow label="Export Type" help="What the file holds. Tank: the whole tank. Turret: only the placed turrets, as a preset. Projectile: the whole tank as a projectile design other tanks can fire. Game Mode: this whole mode, its rules, its map and its Map Events, as Save Mode As File saves it. Food Shape: the shape on the canvas, offered only while one is loaded." value={exportMode} onChange={handleExportModeChange} options={exportTypeOptions} disabled={shapeLoaded}
               why="Locked while a food shape is on the canvas." />
 
             <FieldRow label={<SwapText>{getNameLabel()}</SwapText>} stacked help="The name saved in the file. The file is named after it too, as the Output line shows.">
-                <TextField value={exportName} onChange={setExportName} placeholder={getNamePlaceholder()} />
+                <TextField maxLength={TEXT_LIMITS.NAME} value={exportName} onChange={setExportName} placeholder={getNamePlaceholder()} />
             </FieldRow>
 
             <SwapInPlace swapKey={exportMode} hold={false}><p className="k-hint font-mono text-center">Output: {fullFileName}</p></SwapInPlace>
 
-            <Button variant="primary" block icon={<Download size={16} />} onClick={handleExport} disabled={isExportDisabled}>
+            <Button variant="primary" block icon={<Download size={16} />} onClick={handleExport} disabled={isExportDisabled} className="k-btn-door">
                 Export to File
             </Button>
             <Reveal when={exportMode === 'turret-preset' && !canExportPreset}>
@@ -343,7 +355,7 @@ export const ImportExportUI: React.FC<Props> = ({ logic, dataRegistry, className
                 href="https://istrongnexum.pages.dev/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="k-btn k-btn-primary k-btn-md w-full no-underline"
+                className="k-btn k-btn-primary k-btn-md w-full no-underline k-btn-door"
             >
                 <span className="k-btn-icon"><ExternalLink size={16} /></span>
                 <span className="truncate">Open Nexum Converter</span>

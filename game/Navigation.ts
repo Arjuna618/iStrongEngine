@@ -1,7 +1,7 @@
 import type { MapState, WallEntity } from '@/types';
 import { TileType, AI_CONSTANTS } from '@/types';
 import type { ExactNavGrid } from './NavExact';
-import { getExactGrid, exactCompNear } from './NavExact';
+import { getExactGrid, exactCompNear, exactPumpNowMs, EXACT_IDLE_EVICT_MS } from './NavExact';
 import { SMALL_FIX } from './smallFixSwitch';
 import { wallSkips, wallSteerPad } from './wallTypes';
 import { MAGIC_MAZE } from './magicMaze';
@@ -1601,6 +1601,30 @@ function _buildDistField(
 }
 
 const _exactViews = new WeakMap<ExactNavGrid, NavigationState>();
+
+export function trimIdleExactViews(host: NavigationState): number {
+  let freed = 0;
+  const now = exactPumpNowMs();
+  for (const g of host.exactGrids.values()) {
+    if (!g.ready || now - g.lastUseMs < EXACT_IDLE_EVICT_MS) continue;
+    const v = _exactViews.get(g);
+    if (!v) continue;
+    if (v.auxFields.length > 0) { freed += v.auxFields.length; v.auxFields.length = 0; }
+    for (let i = 0; i < v.weaveGate.length; i++) v.weaveGate[i] = null;
+  }
+  return freed;
+}
+export function exactViewCensus(host: NavigationState): { views: number; slots: number; idleViews: number; idleSlots: number } {
+  const out = { views: 0, slots: 0, idleViews: 0, idleSlots: 0 };
+  const now = exactPumpNowMs();
+  for (const g of host.exactGrids.values()) {
+    const v = _exactViews.get(g);
+    if (!v) continue;
+    out.views++; out.slots += v.auxFields.length;
+    if (g.ready && now - g.lastUseMs >= EXACT_IDLE_EVICT_MS) { out.idleViews++; out.idleSlots += v.auxFields.length; }
+  }
+  return out;
+}
 
 export function exactFieldView(nav: NavigationState, bodyR: number): NavigationState | null {
   if (bodyR <= 0 || nav.isExactView) return null;

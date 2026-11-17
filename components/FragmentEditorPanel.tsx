@@ -52,6 +52,12 @@ interface Props {
   hostLayer: number;
 }
 
+function bombAncestorsOf(root: Turret | null | undefined, path: readonly number[]): Turret[] {
+  const out: Turret[] = [];
+  for (let k = 0; k < path.length; k++) { const t = getFragmentAt(root, path.slice(0, k)); if (t) out.push(t); }
+  return out;
+}
+
 export const FragmentEditorPanel: React.FC<Props> = ({
   root, getRoot, path, onPathChange, onRootExplodeChange, crumbsBefore, logic,
   projectileDesigns, tankLibrary, getSectionState, onSectionChange, deriveMotionType, escapeEnabled,
@@ -138,6 +144,8 @@ export const FragmentEditorPanel: React.FC<Props> = ({
           onEditFragment={(i) => onPathChange([...path, i])}
           explodeLevel={path.length + 1}
           bombTurret={frag}
+          bombAncestors={bombAncestorsOf(root, path)}
+          logic={logic}
           tankLibrary={tankLibrary}
           roundLayer={layer}
         />

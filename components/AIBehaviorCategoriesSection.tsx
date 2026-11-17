@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { TEXT_LIMITS } from './kit/textLimits';
 import { useEscapeOwner } from './shared/escapeStack';
 import { Plus, SlidersHorizontal, Trash2, Bot, Pencil, HdBrainCircuit } from './ui/icons';
 import { openContextMenu } from './shell/ContextMenu';
@@ -103,6 +104,7 @@ export const AIBehaviorCategoriesSection: React.FC<Props> = ({ logic }) => {
                     <input
                       type="text"
                       value={draftName}
+                      maxLength={TEXT_LIMITS.NAME}
                       onChange={e => setDraftName(e.target.value)}
                       onBlur={() => handleCommitRename(cat.id)}
                       onKeyDown={e => {

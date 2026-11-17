@@ -34,9 +34,10 @@ function accMax(): number {
 
 export interface HandState { handAngle: number; handRate: number; handAccel: number }
 
-export function handStep(s: HandState, target: number, targetRate: number, dt: number): void {
+export function handStep(s: HandState, target: number, targetRate: number, dt: number, tScale: number = 1): void {
   if (!(dt > 0)) return;
-  const top = BOT_HAND.TOP_DPS * DEG, cap = accMax();
+  const inv = 1 / tScale, inv2 = inv * inv;
+  const top = BOT_HAND.TOP_DPS * DEG * Math.sqrt(inv), cap = accMax() * inv2;
   const ff = targetRate > top ? top : targetRate < -top ? -top : targetRate;
   let n = Math.ceil(dt / BOT_HAND.SUBSTEP_S - 1e-9); if (n < 1) n = 1;
   const h = dt / n;
@@ -51,10 +52,10 @@ export function handStep(s: HandState, target: number, targetRate: number, dt: n
     if (ae < SETTLE_RAD && at < SETTLE_RATE) { a = target; r = ff; acc = 0; continue; }
     if (ae < RELEASE_RAD && at < RELEASE_RATE) acc = 0;
     let need: number;
-    if (toward >= 0) need = swingAccel(ae);
+    if (toward >= 0) need = swingAccel(ae) * inv2;
     else {
-      need = swingAccel(ae + toward * toward / (2 * cap));
-      const catchUp = at / (BOT_HAND.SWING_MS_A / 1000);
+      need = swingAccel(ae + toward * toward / (2 * cap)) * inv2;
+      const catchUp = at / (BOT_HAND.SWING_MS_A / 1000) * inv;
       if (catchUp > need) need = catchUp;
     }
     if (need > cap) need = cap;

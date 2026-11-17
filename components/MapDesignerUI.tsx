@@ -1,4 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { pushUndoAction } from './shell/undoActions';
+import { TEXT_LIMITS } from './kit/textLimits';
 import { usePanelMemory, isOneOf } from './kit/panelMemory';
 import { GameLogic, GRID_SPACING } from '../game/GameLogic';
 import { SMALL_FIX } from '../game/smallFixSwitch';
@@ -288,7 +290,7 @@ export const MapDesignerUI: React.FC<Props> = ({ logic, dataRegistry, className 
         : logic.state.mapConfig;
       const dropEdits = handEditsDropFor(live, partial);
       if (dropEdits !== null) partial = { ...partial, ...dropEdits };
-      logic.clearMapEditHistory();
+      logic.pushMapWorldUndo();
       cancelMapEditInteraction(logic.mapEditor);
       clearMapEditSelection(logic.mapEditor);
       const held = logic.mapEditor.tool;
@@ -361,17 +363,6 @@ export const MapDesignerUI: React.FC<Props> = ({ logic, dataRegistry, className 
     }
   }, [logic, scheduleRegen]);
 
-  const restoreWorld = useCallback((mac: MultiAreaMapConfig, map: MapConfig) => {
-    if (logic.state.isTestMode) return;
-    logic.clearMapEditHistory();
-    cancelMapEditInteraction(logic.mapEditor);
-    clearMapEditSelection(logic.mapEditor);
-    logic.updateState({ multiAreaConfig: mac, mapConfig: map });
-    forceRender(n => n + 1);
-    if (regenTimerRef.current !== null) clearTimeout(regenTimerRef.current);
-    regenTimerRef.current = setTimeout(() => { regenTimerRef.current = null; scheduleRegen(); }, 50);
-  }, [logic, scheduleRegen]);
-
   const addArea = useCallback(() => {
     const areas = [...multiArea.areas];
     const newArea = createDefaultArea(SMALL_FIX.R802 ? firstFreeName('Area', areas.map(a => a.name)) : `Area ${areas.length + 1}`);
@@ -412,16 +403,9 @@ export const MapDesignerUI: React.FC<Props> = ({ logic, dataRegistry, className 
       newActiveId = '';
     }
     const newMAC = { ...multiArea, areas, activeAreaId: newActiveId };
-    const beforeMac = multiArea, beforeMap = logic.state.mapConfig, gone = multiArea.areas[oldIdx];
-    if (SMALL_FIX.R811 && gone) showToast('success', `Removed "${gone.name || `Area ${oldIdx + 1}`}".`, { label: 'Undo', run: sameProjectUndo(logic, showToast, () => {
-      const now = logic.state.multiAreaConfig;
-      if (now === newMAC) { restoreWorld(beforeMac, beforeMap); return; }
-      if (now.areas.some(a => a.id === gone.id)) return;
-      const at = Math.min(oldIdx, now.areas.length);
-      const back = [...now.areas.slice(0, at), gone, ...now.areas.slice(at)];
-      restoreWorld({ ...now, areas: back, activeAreaId: gone.id }, back[0].mapConfig);
-    }) });
-    logic.clearMapEditHistory();
+    const gone = multiArea.areas[oldIdx];
+    if (SMALL_FIX.R811 && gone) showToast('success', `Removed "${gone.name || `Area ${oldIdx + 1}`}". Ctrl Z brings it back.`);
+    logic.pushMapWorldUndo();
     cancelMapEditInteraction(logic.mapEditor);
     clearMapEditSelection(logic.mapEditor);
     logic.updateState({
@@ -586,7 +570,7 @@ export const MapDesignerUI: React.FC<Props> = ({ logic, dataRegistry, className 
     const undoMac = logic.state.multiAreaConfig, undoMap = logic.state.mapConfig;
     const replacesWork = isMapFile && (undoMac.areas.length >= 2 || undoMac.areas.some(a => mapHasHandWork(a.mapConfig)) || mapHasHandWork(undoMap));
     if (isMapFile) {
-      logic.clearMapEditHistory();
+      logic.pushMapWorldUndo();
       cancelMapEditInteraction(logic.mapEditor);
       clearMapEditSelection(logic.mapEditor);
     }
@@ -634,7 +618,7 @@ export const MapDesignerUI: React.FC<Props> = ({ logic, dataRegistry, className 
       }
     }
 
-    if (SMALL_FIX.R811 && replacesWork) showToast('success', `Loaded "${parsed.name || 'the map'}".`, { label: 'Undo', run: sameProjectUndo(logic, showToast, () => restoreWorld(undoMac, undoMap)) });
+    if (SMALL_FIX.R811 && replacesWork) showToast('success', `Loaded "${parsed.name || 'the map'}". Ctrl Z takes it back.`);
     if (!recordInLibrary) return;
     const newItem: LibraryItem = {
       id: DataRegistry.libraryIdFor(parsed),
@@ -1180,7 +1164,7 @@ count={multiArea.areas.length > 0 ? multiArea.areas.length : undefined}>
               newMAC.areas = [{ ...only, mapConfig: { ...logic.state.mapConfig } }];
               newMAC.activeAreaId = only.id;
             }
-            logic.clearMapEditHistory();
+            logic.pushMapWorldUndo();
             cancelMapEditInteraction(logic.mapEditor);
             logic.updateState({ multiAreaConfig: newMAC });
             forceRender(n => n + 1);
@@ -1214,14 +1198,15 @@ count={multiArea.areas.length > 0 ? multiArea.areas.length : undefined}>
                   }}
                   className={`k-list-row cursor-pointer${multiArea.activeAreaId === area.id ? ' k-list-row-on' : ''}`}
                 >
-                  <Layers size={13} className={`shrink-0 ${multiArea.activeAreaId === area.id ? 'text-[var(--text-primary)]' : 'text-[var(--text-tertiary)]'}`} />
+                  <Layers size={13} className={`k-area-ico shrink-0 ${multiArea.activeAreaId === area.id ? 'text-[var(--text-primary)]' : 'text-[var(--text-tertiary)]'}`} />
                   <input
                     type="text"
                     value={area.name}
+                    maxLength={TEXT_LIMITS.NAME}
                     onChange={e => { e.stopPropagation(); renameArea(area.id, e.target.value); }}
                     onClick={e => e.stopPropagation()}
                     {...(SMALL_FIX.R806 ? {
-                      maxLength: 32,
+                      maxLength: TEXT_LIMITS.NAME,
                       onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
                         const clean = e.target.value.replace(/\s+/g, ' ').trim();
                         const nm = clean || firstFreeName('Area', multiArea.areas.filter(a => a.id !== area.id).map(a => a.name));
@@ -1308,13 +1293,14 @@ count={multiArea.areas.length > 0 ? multiArea.areas.length : undefined}>
           <input
             type="text"
             value={config.name}
+            maxLength={TEXT_LIMITS.NAME}
             onChange={e => updateConfig({ name: e.target.value })}
             className="k-field flex-1"
             placeholder="Untitled Map"
           />
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 k-md-io">
           <button
             onClick={handleExport}
             className="k-btn k-btn-secondary k-btn-md k-btn-compact flex-1"
@@ -1361,7 +1347,7 @@ count={multiArea.areas.length > 0 ? multiArea.areas.length : undefined}>
         onRemove={item => {
           const at = logic.state.tankLibrary.indexOf(item);
           logic.removeFromLibrary(item.id);
-          if (SMALL_FIX.R811 && at >= 0) showToast('success', `Removed "${item.name}" from the library.`, { label: 'Undo', run: sameProjectUndo(logic, showToast, () => logic.restoreToLibrary(item, at)) });
+          if (SMALL_FIX.R811 && at >= 0) { showToast('success', `Removed "${item.name}" from the library. Ctrl Z brings it back.`); pushUndoAction(logic, sameProjectUndo(logic, showToast, () => logic.restoreToLibrary(item, at)), 'map-designer'); }
         }}
         onImport={() => { void handleImport(); }}
         onFolderImported={() => forceRender(n => n + 1)}

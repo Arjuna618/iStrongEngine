@@ -2,9 +2,12 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useSwapStage, useGlideSize, FoldMemoryContext } from './motion';
 import { glide, flowChange, motionOff, scrollGlide, noteMotion, leaveStarts, onScrollGlideStart, scrollGlideRuns } from './presence';
 import { usePanelsVersion } from './panelMemory';
+import { uiThemeId } from '../../utils/uiTheme';
 
 export const FOLD_MS = 140;
 export const FOLD_FADE_MS = 105;
+export const FOLD_Q_MS = 700;
+const foldQ = () => uiThemeId() === 'classic' && !motionOff();
 
 type Phase = 'open' | 'closed' | 'grow' | 'fadeIn' | 'fadeOut' | 'shrink';
 
@@ -13,10 +16,10 @@ let lastFadeOutAt = -1e9;
 const reducedMotion = motionOff;
 
 const CENTRE_SLACK = 0.1;
-export function bringIntoView(top: HTMLElement, bottom: HTMLElement = top): void {
+export function bringIntoView(top: HTMLElement, bottom: HTMLElement = top, grow = 0, follow = 0): void {
   const MARGIN = 12;
   let t = Math.min(top.getBoundingClientRect().top, bottom.getBoundingClientRect().top);
-  let b = bottom.getBoundingClientRect().bottom;
+  let b = bottom.getBoundingClientRect().bottom + grow;
   if (!(b > t)) return;
   for (let sc = bottom.parentElement; sc && sc !== document.body && sc !== document.documentElement; sc = sc.parentElement) {
     if (!/(auto|scroll)/.test(getComputedStyle(sc).overflowY) || sc.scrollHeight <= sc.clientHeight + 1) continue;
@@ -30,8 +33,8 @@ export function bringIntoView(top: HTMLElement, bottom: HTMLElement = top): void
       by = (t + b) / 2 - (v.top + v.height / 2);
       if (t >= v.top + m && b <= v.bottom - m && Math.abs(by) < v.height * CENTRE_SLACK) by = 0;
     }
-    by = Math.max(-sc.scrollTop * k, Math.min((sc.scrollHeight - sc.clientHeight - sc.scrollTop) * k, by));
-    if (Math.abs(by) > 0.5) scrollGlide(sc, sc.scrollTop + by / k);
+    by = Math.max(-sc.scrollTop * k, Math.min((sc.scrollHeight - sc.clientHeight - sc.scrollTop) * k + grow, by));
+    if (Math.abs(by) > 0.5) scrollGlide(sc, sc.scrollTop + by / k, follow > 0 ? { follow } : {});
     t = Math.max(t - by, v.top); b = Math.min(b - by, v.bottom);
     if (!(b > t)) return;
   }
@@ -85,7 +88,7 @@ export async function revealFold(h: FoldHandle): Promise<void> {
   await scrollRest(el);
   if (h.isOpen()) return;
   h.open();
-  await new Promise(r => window.setTimeout(r, FOLD_MS + 20));
+  await new Promise(r => window.setTimeout(r, (foldQ() ? FOLD_Q_MS : FOLD_MS) + 20));
   const now = h.el;
   if (now && now.isConnected) bringIntoView(now);
 }
@@ -120,6 +123,7 @@ export const Collapse: React.FC<{
   const inner = useRef<HTMLDivElement>(null);
   const phase = useRef<Phase>(open ? 'open' : 'closed');
   const timer = useRef(0);
+  const startRaf = useRef(0);
   const first = useRef(true);
   const pendingGrow = useRef(false);
   const gapDone = useRef(false);
@@ -148,7 +152,7 @@ export const Collapse: React.FC<{
     phase.current = p;
     setBusy(false);
     const o = outer.current, i = inner.current;
-    if (o) { o.style.height = ''; o.style.overflow = ''; o.classList.remove('k-fold-moving'); if (p === 'open') o.inert = false; }
+    if (o) { o.style.height = ''; o.style.overflow = ''; o.classList.remove('k-fold-moving', 'k-fold-q'); if (p === 'open') o.inert = false; }
     if (i) i.style.opacity = '';
     if (p === 'closed') { gapDone.current = false; setMounted(false); closedCb.current?.(); }
   };
@@ -159,39 +163,53 @@ export const Collapse: React.FC<{
     applyGap();
     window.clearTimeout(timer.current);
     const fresh = phase.current !== 'fadeOut' && phase.current !== 'shrink';
-    noteMotion(FOLD_MS + FOLD_FADE_MS);
+    const q = foldQ();
+    noteMotion((q ? FOLD_Q_MS : FOLD_MS + FOLD_FADE_MS) + 20);
     phase.current = 'grow';
     o.inert = false;
     setBusy(true);
     const from = o.style.height ? o.offsetHeight : 0;
-    if (fresh) { i.style.transition = 'none'; i.style.opacity = '0'; void i.offsetWidth; i.style.transition = ''; }
+    if (q) { i.style.transition = 'none'; i.style.opacity = '1'; void i.offsetWidth; i.style.transition = ''; }
+    else if (fresh) { i.style.transition = 'none'; i.style.opacity = '0'; void i.offsetWidth; i.style.transition = ''; }
     else i.style.opacity = '0';
     o.style.overflow = 'hidden';
     o.classList.add('k-fold-moving');
+    if (q) o.classList.add('k-fold-q');
     o.style.height = `${from}px`;
     void o.offsetHeight;
-    o.style.height = `${i.offsetHeight}px`;
-    timer.current = window.setTimeout(() => {
-      phase.current = 'fadeIn';
-      o.style.height = '';
-      o.style.overflow = '';
-      o.classList.remove('k-fold-moving');
-      i.style.opacity = '1';
-      const rv = revealRef.current;
-      if (rv !== 'none') {
+    window.cancelAnimationFrame(startRaf.current);
+    startRaf.current = window.requestAnimationFrame(() => { startRaf.current = 0; if (phase.current === 'grow') run(); });
+    const run = () => {
+      const full = i.offsetHeight;
+      o.style.height = `${full}px`;
+      const reveal = (grow: number) => {
+        const rv = revealRef.current;
+        if (rv === 'none') return;
         const par = o.parentElement ?? o;
         let prev: Element | null = o.previousElementSibling;
         while (prev && prev.getClientRects().length === 0) prev = prev.previousElementSibling;
         if (!(prev instanceof HTMLElement)) prev = o;
-        if (ownActRef.current || openedByHim(o, rv === 'parent' ? par : prev)) bringIntoView(rv === 'parent' ? par : rv === 'prev' ? (prev as HTMLElement) : o, rv === 'parent' ? par : o);
-      }
-      timer.current = window.setTimeout(() => settle('open'), FOLD_FADE_MS);
-    }, FOLD_MS);
+        if (!(ownActRef.current || openedByHim(o, rv === 'parent' ? par : prev))) return;
+        const k = i.offsetHeight > 0 ? i.getBoundingClientRect().height / i.offsetHeight : 1;
+        bringIntoView(rv === 'parent' ? par : rv === 'prev' ? (prev as HTMLElement) : o, rv === 'parent' ? par : o, grow * k, grow > 0 ? 90 : 0);
+      };
+      if (q) reveal(full - from);
+      timer.current = window.setTimeout(() => {
+        phase.current = 'fadeIn';
+        o.style.height = '';
+        o.style.overflow = '';
+        o.classList.remove('k-fold-moving', 'k-fold-q');
+        i.style.opacity = '1';
+        if (!q) reveal(0);
+        timer.current = window.setTimeout(() => settle('open'), q ? 0 : FOLD_FADE_MS);
+      }, q ? FOLD_Q_MS : FOLD_MS);
+    };
   };
 
   useLayoutEffect(() => {
     if (first.current) { first.current = false; return; }
     window.clearTimeout(timer.current);
+    window.cancelAnimationFrame(startRaf.current); startRaf.current = 0;
     if (reducedMotion()) {
       if (open) { setMounted(true); settle('open'); } else settle('closed');
       return;
@@ -205,22 +223,38 @@ export const Collapse: React.FC<{
     if (phase.current === 'closed' || phase.current === 'shrink' || phase.current === 'fadeOut') return;
     const o = outer.current, i = inner.current;
     if (!o || !i) { pendingGrow.current = false; settle('closed'); return; }
-    noteMotion(FOLD_FADE_MS + FOLD_MS);
-    phase.current = 'fadeOut';
-    lastFadeOutAt = performance.now();
+    const q = foldQ();
+    noteMotion((q ? FOLD_Q_MS : FOLD_FADE_MS + FOLD_MS) + 20);
+    phase.current = q ? 'shrink' : 'fadeOut';
+    if (!q) lastFadeOutAt = performance.now();
     setBusy(true);
     o.style.height = `${o.offsetHeight}px`;
     o.style.overflow = 'hidden';
     o.classList.add('k-fold-moving');
+    if (q) o.classList.add('k-fold-q');
     o.inert = true;
     leaveStarts(o);
-    i.style.opacity = '0';
-    timer.current = window.setTimeout(() => {
-      phase.current = 'shrink';
-      void o.offsetHeight;
-      o.style.height = '0px';
-      timer.current = window.setTimeout(() => settle('closed'), FOLD_MS);
-    }, FOLD_FADE_MS);
+    void o.offsetHeight;
+    if (q) {
+      startRaf.current = window.requestAnimationFrame(() => {
+        startRaf.current = 0;
+        if (phase.current !== 'shrink') return;
+        o.style.height = '0px';
+        timer.current = window.setTimeout(() => settle('closed'), FOLD_Q_MS);
+      });
+      return;
+    }
+    startRaf.current = window.requestAnimationFrame(() => {
+      startRaf.current = 0;
+      if (phase.current !== 'fadeOut') return;
+      i.style.opacity = '0';
+      timer.current = window.setTimeout(() => {
+        phase.current = 'shrink';
+        void o.offsetHeight;
+        o.style.height = '0px';
+        timer.current = window.setTimeout(() => settle('closed'), FOLD_MS);
+      }, FOLD_FADE_MS);
+    });
   }, [open]);
 
   useLayoutEffect(() => {
@@ -241,7 +275,7 @@ export const Collapse: React.FC<{
     }
   }, [mounted]);
 
-  useEffect(() => () => { window.clearTimeout(timer.current); if (busyNow.current) busyCb.current?.(false); }, []);
+  useEffect(() => () => { window.clearTimeout(timer.current); window.cancelAnimationFrame(startRaf.current); if (busyNow.current) busyCb.current?.(false); }, []);
 
   if (!mounted) return null;
   return (
@@ -352,10 +386,10 @@ function holdScrollThrough(el: HTMLElement | null, ms: number): void {
   requestAnimationFrame(tick);
 }
 
-const SwapStage: React.FC<{ swapKey: unknown; className?: string; children?: React.ReactNode; hold?: boolean }> = ({ swapKey, className, children, hold = true }) => {
+const SwapStage: React.FC<{ swapKey: unknown; className?: string; children?: React.ReactNode; hold?: boolean; widthGlide?: boolean }> = ({ swapKey, className, children, hold = true, widthGlide = true }) => {
   const box = useRef<HTMLDivElement>(null);
   const stage = useSwapStage(swapKey, { glide: true, box });
-  const captureSize = useGlideSize(box, stage.shown, true, true);
+  const captureSize = useGlideSize(box, stage.shown, widthGlide, true);
   const lastKey = useRef(swapKey);
   useLayoutEffect(() => {
     if (Object.is(lastKey.current, swapKey)) return;
@@ -370,9 +404,9 @@ const SwapStage: React.FC<{ swapKey: unknown; className?: string; children?: Rea
   return <div ref={box} inert={stage.inert} className={[className, stage.swapClass].filter(Boolean).join(' ') || undefined}>{live ? children : kept.current}</div>;
 };
 
-export const SwapBox: React.FC<{ swapKey: unknown; className?: string; children?: React.ReactNode }> = ({ swapKey, className, children }) => (
+export const SwapBox: React.FC<{ swapKey: unknown; className?: string; children?: React.ReactNode; widthGlide?: boolean }> = ({ swapKey, className, children, widthGlide }) => (
   <Collapse open={React.Children.toArray(children).length > 0} gapInside reveal="none">
-    <SwapStage swapKey={swapKey} className={className}>{children}</SwapStage>
+    <SwapStage swapKey={swapKey} className={className} widthGlide={widthGlide}>{children}</SwapStage>
   </Collapse>
 );
 

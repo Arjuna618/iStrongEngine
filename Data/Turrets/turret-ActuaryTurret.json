@@ -134,11 +134,11 @@
         "knockback": 24,
         "spread": 3,
         "shudder": 0.102,
-        "bulletDamage": -1.20179,
+        "bulletDamage": -0.96143,
         "bulletHealthBase": 2.08141,
-        "bulletPenetration": 1,
+        "bulletPenetration": 1.1,
         "bulletLifetime": 4.866666666666666,
-        "shootResist": 1,
+        "shootResist": 1.15,
         "shootDensity": 1.5,
         "isCustom": false,
         "animProgress": 0,
@@ -248,11 +248,11 @@
         "knockback": 24,
         "spread": 15,
         "shudder": 0.096,
-        "bulletDamage": -1.20179,
+        "bulletDamage": -0.96143,
         "bulletHealthBase": 2.08141,
-        "bulletPenetration": 1,
+        "bulletPenetration": 1.1,
         "bulletLifetime": 4.866666666666666,
-        "shootResist": 1,
+        "shootResist": 1.15,
         "isCustom": false,
         "animProgress": 0,
         "turretType": "regular",
@@ -345,7 +345,8 @@
         "gunStatScale": 1,
         "color": "#a7a7af",
         "colorMap": 16,
-        "fightResist": 1
+        "shootDensity": 1.5,
+        "fightResist": 1.15
       },
       {
         "id": "456d4d5b88f9293f__g5",
@@ -361,11 +362,11 @@
         "knockback": 24,
         "spread": 15,
         "shudder": 0.107,
-        "bulletDamage": -1.20179,
+        "bulletDamage": -0.96143,
         "bulletHealthBase": 2.08141,
-        "bulletPenetration": 1,
+        "bulletPenetration": 1.1,
         "bulletLifetime": 4.866666666666666,
-        "shootResist": 1,
+        "shootResist": 1.15,
         "isCustom": false,
         "animProgress": 0,
         "turretType": "regular",
@@ -458,7 +459,8 @@
         "gunStatScale": 1,
         "color": "#a7a7af",
         "colorMap": 16,
-        "fightResist": 1
+        "shootDensity": 1.5,
+        "fightResist": 1.15
       }
     ]
   }

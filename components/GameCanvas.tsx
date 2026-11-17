@@ -81,8 +81,11 @@ import { CM, CM_USE, CM_FREE, cmHex, cmRgb } from '../utils/colorMap';
 import { AURA_RING_SLOT } from '../utils/aura';
 import { lookList, lookUnit, lookReach, CROSS_LOOK_ID } from '../utils/placedLook';
 import { drawOtherDesign, drawOtherList, otherDrawList, type OtherDrawList } from '../utils/otherDraw';
-import { layerOutlineOf, traceLayerOutline, strokeFillLayerOutline } from '../utils/layerOutline';
+import { layerOutlineOf, traceLayerOutline, strokeFillLayerOutline, layerOutlineReach } from '../utils/layerOutline';
 import { makeShapeLook, type ShapeLook } from '../utils/shapeLook';
+import { SPAWN_GHOST_ALPHA } from '../game/spawnTool';
+import { guardNoteFrame } from '../game/crashGuard';
+import { pumpkinRocksOf } from '../utils/halloween';
 import { pushEyes, pushEyeVeils, pushOtherList, pumpkinTurn, rockTurn, eyeRowToDraw, rockWearsPumpkin, eyeAlpha, eyeAimOf, placeEye, EYE_LINE, EYE_STRIDE, E_UNIT, E_X, E_Y, E_TURN, HW_VEIL, type EyeTable, type GeomPusher } from '../utils/halloween';
 import { halloweenLook, hwBeginEyes, hwEyeTable, hwEyeTargets, hwEyeRgb, hwWallRgb, hwPumpkinRgb, hwQueuePumpkin, hwFlushPumpkins, hwQueueEye, hwFlushEyes, EYE_MIN_PX, PUMPKIN_FULL_PX } from './shared/halloweenLook';
 import { updateAnimatedColors, getAnimatedColor, updateWorldAnimatedColors, getWorldAnimatedColor, labyDownscale, RARITY_MULTIPLIERS, effectiveShapeColor, effectiveShapeColorMap, polyhedronExtent } from '../game/ShapeRegistry';
@@ -2910,11 +2913,12 @@ function playerBodyRadiusPx(logic: GameLogic): number {
 const SPAWN_FADE_IN: boolean = false;
 
 function _playerShownAlpha(logic: GameLogic): number {
-  if (!logic.state.invisibleEnabled) return 1.0;
+  const sp = logic.playerSpectateShown();
+  if (!logic.state.invisibleEnabled) return sp;
   const a = logic.state.tankInvisAlpha, m = logic as unknown as CarryMarked;
-  if (m._carryKey === undefined) return a;
+  if (m._carryKey === undefined) return a * sp;
   const f = carryFloor(m, CARRY_PLAYER_KEY, logic.gameNow());
-  return f > a ? f : a;
+  return (f > a ? f : a) * sp;
 }
 function _carryNow(o: object, logic: GameLogic): number {
   return (o as CarryMarked)._carryKey !== undefined ? logic.gameNow() : NaN;
@@ -3059,8 +3063,8 @@ function fillEnemyRenderData(enemy: EnemyTank, logic: GameLogic) {
   const _eGhost = enemy.ghostMode
     || (logic.state.ghostMode && AI_CONSTANTS.GHOST_FAMILY !== 0
         && enemy._tapRootId === logic.state.playerId);
-  _rd.alpha = drawnOpacity(enemy, _carryNow(enemy, logic)) * (_eGhost ? 0.3 : 1.0) * (_eBirthMs >= 0 ? foodBirthOpacity(_eBirthMs) : 1);
-  _rd.canFade = _eGhost || !!enemy.invisEnabled || (enemy._mevF & 32768) !== 0;
+  _rd.alpha = drawnOpacity(enemy, _carryNow(enemy, logic)) * (enemy.spawnHeld ? SPAWN_GHOST_ALPHA : _eGhost ? 0.3 : 1.0) * (_eBirthMs >= 0 ? foodBirthOpacity(_eBirthMs) : 1);
+  _rd.canFade = _eGhost || !!enemy.invisEnabled || enemy.spawnHeld || (enemy._mevF & 32768) !== 0;
   _rd.selectedTurretId = null;
   _rd.selectedAutoParentId = null;
   _rd.pickedBody = '';
@@ -3267,6 +3271,7 @@ export const GameCanvas: React.FC<Props> = React.memo(({ gameState, onInit, acti
         currentLogic.handleMouseUp(true);
     };
     const onWheel = (e: WheelEvent) => {
+        if (currentLogic.state.isTestMode && currentLogic.spawnerHolding()) { e.preventDefault(); currentLogic.spawnerTurn(e.deltaY > 0 ? 1 : -1); return; }
         if (!currentLogic.isMapDesignerActive) return;
         e.preventDefault();
         const rect = canvas.getBoundingClientRect();
@@ -3332,6 +3337,13 @@ export const GameCanvas: React.FC<Props> = React.memo(({ gameState, onInit, acti
         return;
       }
       if (_pendingSize !== null) { const ps = _pendingSize; _pendingSize = null; applyCanvasSize(ps.width, ps.height); }
+      if (logicRef.current.crashGuardOn) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        previousTimeRef.current = time;
+        requestRef.current = requestAnimationFrame(animate);
+        return;
+      }
 
       try {
         if (previousTimeRef.current !== null) {
@@ -3367,6 +3379,7 @@ export const GameCanvas: React.FC<Props> = React.memo(({ gameState, onInit, acti
           }
           const _ft2 = performance.now();
           const _frameDt = _ft2 - _ft0;
+          guardNoteFrame(_lg, _frameDt, _ft2);
           _ftSamples++;
           _ftSum += _frameDt;
           _ftSumSq += _frameDt * _frameDt;
@@ -3637,7 +3650,7 @@ const InGameHUD: React.FC<{ logic: GameLogic }> = ({ logic }) => {
 
     return (
         <div
-            className="absolute inset-0 pointer-events-none"
+            className="k-hud absolute inset-0 pointer-events-none"
             style={{ ['--hud-s' as any]: hs, left: SAFE_L, top: SAFE_T, right: SAFE_R, bottom: SAFE_B }}
         >
 
@@ -4831,8 +4844,10 @@ function _drawWorldDebugLabels(
                 const reach = tagReachWorld(enemy, _tagNames, _tagScores, logic.shownScoreStartOf(enemy));
                 if (reach > 0 && enemy.position.y - reach - 4 * invZoom < anchorY) anchorY = enemy.position.y - reach - 4 * invZoom;
             }
+            const _peace = logic.isAskingPeace(enemy);
             const label = logic.isHealEngagement(enemy)
                 ? 'HEALING'
+                : _peace ? 'ASKING FOR PEACE'
                 : (_AI_STATE_LABEL[enemy.aiState] || enemy.aiState);
             const labelColor = _aiStateColor(enemy.aiState);
 
@@ -5294,7 +5309,7 @@ function _gunReachOf(t: Turret): number {
 }
 function _layersRatio(layers: BodyLayer[] | null): number {
     let m = 1;
-    if (layers !== null) for (let i = 0; i < layers.length; i++) { const r = Math.abs(layers[i].sizeRatio); if (r > m) m = r; }
+    if (layers !== null) for (let i = 0; i < layers.length; i++) { const r = Math.abs(layers[i].sizeRatio) * (SMALL_FIX.G766 !== 0 ? layerOutlineReach(layers[i]) : 1); if (r > m) m = r; }
     return m;
 }
 const _cullKByTurrets = new WeakMap<Turret[], { layers: BodyLayer[]; k: number }>();
@@ -5506,6 +5521,7 @@ function _drawPanelWalls(ctx: CanvasRenderingContext2D, logic: GameLogic, webgl:
     }
     const rocks = ad.dyingRocks;
     const pk = hw !== null ? hw.pumpkinList : null;
+    const _pkAll = pumpkinRocksOf(logic.state.gameModeConfig);
     for (let i = 0; i < rocks.length; i++) {
         const r = rocks[i];
         const c = deathC((now - r.at) / 1000);
@@ -5513,7 +5529,7 @@ function _drawPanelWalls(ctx: CanvasRenderingContext2D, logic: GameLogic, webgl:
         const k = deathScale(c);
         webgl.setDepthTestEnabled(false);
         webgl.beginFrame();
-        if (pk !== null && rockWearsPumpkin(r.shape)) {
+        if (pk !== null && (r.pumpkin === true || (_pkAll && rockWearsPumpkin(r.shape)))) {
             const pt = rockTurn(r);
             pushOtherList(webgl, pk, hw!.pumpkinKeys, hwPumpkinRgb(hw!), r.x, r.y, r.size * k, pt, pt, 1.0);
         } else {
@@ -5525,6 +5541,23 @@ function _drawPanelWalls(ctx: CanvasRenderingContext2D, logic: GameLogic, webgl:
         const has = webgl.hasGeomContent();
         webgl.flushGeom();
         if (has) _pastePanelFrame(ctx, logic, webgl, width, height, c);
+    }
+    const sg = logic.spawnerGhost;
+    if (sg.on) {
+        webgl.beginFrame();
+        if (sg.rock) {
+            if (pk !== null) pushOtherList(webgl, pk, hw!.pumpkinKeys, hwPumpkinRgb(hw!), sg.x, sg.y, sg.half, sg.angle, sg.angle, 1.0);
+            else webgl.pushGeomInstance(webgl.getOrCreateStarBatch(9, 6 / 81, false), sg.x, sg.y, sg.angle, sg.half, sg.half, wr, wg, wb, 0, 0.0, 1.0, 1.0);
+        } else {
+            const lk = sg.type > 0 ? ad.wallLookOf(sg.type) : null;
+            webgl.setDepthTestEnabled(lk !== null);
+            if (lk !== null) _pushWallLook(webgl, lk, sg.x, sg.y, sg.half - 1.5, _LOOK_DEPTH_START, -1);
+            else webgl.pushGeomInstance('rect', sg.x, sg.y, 0, (sg.half - 1.5) * 2, (sg.half - 1.5) * 2, wr, wg, wb, 0, 0.0, 1.0, 1.0);
+        }
+        const has = webgl.hasGeomContent();
+        webgl.flushGeom();
+        webgl.setDepthTestEnabled(false);
+        if (has) _pastePanelFrame(ctx, logic, webgl, width, height, SPAWN_GHOST_ALPHA);
     }
 }
 
@@ -5944,6 +5977,7 @@ function _doorHex(open: boolean): string {
     return open ? _doorOpen : _doorShut;
 }
 
+let _pkAllOfFrame = true;
 function _glPushRocks(
     webgl: GeomSink, rocks: NonNullable<typeof GameLogic.prototype.mapState>['rocks'], hw: ReturnType<typeof halloweenLook>,
     rvLeft: number, rvRight: number, rvTop: number, rvBottom: number, hide: ReturnType<typeof dragHideInfo>,
@@ -5953,6 +5987,7 @@ function _glPushRocks(
     _hexToRGB(rockColor, _gColor, 0);
     const rr = _gColor[0], rg = _gColor[1], rb = _gColor[2];
     const _hwPk = hw !== null ? hw.pumpkinList : null;
+    const _pkAllR = _pkAllOfFrame;
     const _hwPkRgb = (hw !== null && _hwPk !== null) ? hwPumpkinRgb(hw) : null;
     const _hwPkReach = (hw !== null && _hwPk !== null) ? hw.pumpkinReach : 1;
 
@@ -5961,7 +5996,7 @@ function _glPushRocks(
         if (!rock.active) continue;
         if (hide !== null && hide.kind === 'rock'
             && Math.abs(rock.x - hide.x) < 1 && Math.abs(rock.y - hide.y) < 1) continue;
-        const _pkHere = _hwPk !== null && rockWearsPumpkin(rock.shape);
+        const _pkHere = _hwPk !== null && (rock.pumpkin === true || (_pkAllR && rockWearsPumpkin(rock.shape)));
         const rHalf = _pkHere ? rock.size * _hwPkReach + EYE_LINE : rock.size;
         if (rock.x + rHalf < rvLeft || rock.x - rHalf > rvRight ||
             rock.y + rHalf < rvTop || rock.y - rHalf > rvBottom) continue;
@@ -6134,7 +6169,7 @@ function _drawEditorMapGL(
         }
     }
     if (ms.rocks.length > 0) {
-        if (stale) { _keepRocks.begin(webgl); _seeThruPushed = false; _glPushRocks(_keepRocks, ms.rocks, hw, -Infinity, Infinity, -Infinity, Infinity, hide, null); _keepRocksSeeThru = _seeThruPushed; ok = _keepRocks.upload(webgl) && ok; }
+        if (stale) { _keepRocks.begin(webgl); _seeThruPushed = false; _pkAllOfFrame = true; _glPushRocks(_keepRocks, ms.rocks, hw, -Infinity, Infinity, -Infinity, Infinity, hide, null); _keepRocksSeeThru = _seeThruPushed; ok = _keepRocks.upload(webgl) && ok; }
         if (_keepRocksSeeThru) webgl.setSampleAlphaToCoverage(false);
         ok = _keepRocks.draw(webgl) && ok;
         if (_keepRocksSeeThru) webgl.setSampleAlphaToCoverage(true);
@@ -6831,7 +6866,7 @@ function _drawWallsRocks2D(
         if (!rock.active) continue;
         if (_dragHide !== null && _dragHide.kind === 'rock'
             && Math.abs(rock.x - _dragHide.x) < 1 && Math.abs(rock.y - _dragHide.y) < 1) continue;
-        const _pkHere3 = _hwPk3 !== null && rockWearsPumpkin(rock.shape);
+        const _pkHere3 = _hwPk3 !== null && (rock.pumpkin === true || (pumpkinRocksOf(logic.state.gameModeConfig) && rockWearsPumpkin(rock.shape)));
         const rHalf = _pkHere3 ? rock.size * _hwPk3!.pumpkinReach + EYE_LINE : rock.size;
         if (rock.x + rHalf < rvLeft || rock.x - rHalf > rvRight ||
             rock.y + rHalf < rvTop || rock.y - rHalf > rvBottom) continue;
@@ -8073,7 +8108,8 @@ function render(ctx: CanvasRenderingContext2D, logic: GameLogic, dt: number, act
 
     if (!isMapDesigner && !PHOTO_MODE && !logic.controlling) {
         const invisAlpha = _playerShownAlpha(logic);
-        const ghostModeAlpha = (logic.state.ghostMode ? 0.3 : 1.0) * invisAlpha;
+        const _specFading = logic.playerSpectateShown() < 1;
+        const ghostModeAlpha = (logic.playerGhostLook ? 0.3 : 1.0) * invisAlpha;
 
         fillPlayerRenderData(logic);
 
@@ -8130,14 +8166,14 @@ function render(ctx: CanvasRenderingContext2D, logic: GameLogic, dt: number, act
                 if (!(_edTankOnGL && _drawEditorShapeGL(ctx, logic, webgl!, width, height))) _drawEditorShapePreview(ctx, logic);
             } else if (_edTankOnGL) {
                 _drawEditorTankGL(ctx, logic, webgl!, width, height, logic.state.ghostMode ? ghostModeAlpha : 1);
-            } else if (logic.state.ghostMode) {
+            } else if (logic.state.ghostMode || _specFading) {
                 if (_playerAllLen > 0) {
                     _renderBulletBatch(ctx, logic, webgl, useWebGL,
                         _playerAllIdx, _playerAllLen, _bulletsArr,
                         viewportBounds, bulletStrokeWidth,
                         width, height, _camOffX, _camOffY);
                 }
-                drawTankWithScratch(ctx, 1.0, ghostModeAlpha);
+                if (ghostModeAlpha > 0) drawTankWithScratch(ctx, 1.0, ghostModeAlpha);
             } else if (_wglUnifiedPassActive && webgl && logic.state.isTestMode) {
                 const _pHasLayers = _rd.bodyLayers !== null && _rd.bodyLayers.length > 0;
                 const _pFillLayers = _pHasLayers ? _rd.bodyLayers!.length : 0;
@@ -8375,12 +8411,12 @@ function render(ctx: CanvasRenderingContext2D, logic: GameLogic, dt: number, act
         _worldColorsOfFrame(logic, _shapeCacheFrame);
 
         let _shapePolyhedronCount = 0;
-        const _polys = logic.floatingPolygons, _puffs = logic.shapePuffs;
-        const _nPolys = _polys.length, _nShapes = _nPolys + _puffs.length;
+        const _polys = logic.floatingPolygons, _puffs = logic.shapePuffs, _props = logic.spawnerProps;
+        const _nPolys = _polys.length, _nPuffEnd = _nPolys + _puffs.length, _nShapes = _nPuffEnd + _props.length;
         const _admShapeTeam = logic.admin.shapeTeamOn;
         const _admMyFill = _admShapeTeam ? _adminPlayerFill(logic) : '';
         for (let i = 0; i < _nShapes; i++) {
-            const poly = i < _nPolys ? _polys[i] : _puffs[i - _nPolys];
+            const poly = i < _nPolys ? _polys[i] : i < _nPuffEnd ? _puffs[i - _nPolys] : _props[i - _nPuffEnd];
             if (!poly.active || poly.opacity <= 0) continue;
             if (poly.isPolyhedron) { _shapePolyhedronCount++; continue; }
             const polyRadius = poly.look !== null ? Math.max(poly.size, poly.size * poly.look.reach / 2) * poly.growth : poly.size * poly.growth;
@@ -8601,7 +8637,7 @@ function render(ctx: CanvasRenderingContext2D, logic: GameLogic, dt: number, act
 
         if (_shapePolyhedronCount > 0) {
             for (let i = 0; i < _nShapes; i++) {
-                const poly = i < _nPolys ? _polys[i] : _puffs[i - _nPolys];
+                const poly = i < _nPolys ? _polys[i] : i < _nPuffEnd ? _puffs[i - _nPolys] : _props[i - _nPuffEnd];
                 if (!poly.isPolyhedron || !poly.active || poly.opacity <= 0) continue;
                 if (!isInViewport(poly.position.x, poly.position.y, poly.size * poly.growth * 1.1, viewportBounds)) continue;
                 const pAlpha = poly.opacity / 255;
@@ -8647,6 +8683,7 @@ function render(ctx: CanvasRenderingContext2D, logic: GameLogic, dt: number, act
             const rvRight = vpCx + vpHalfW;
             const rvTop = vpCy - vpHalfH;
             const rvBottom = vpCy + vpHalfH;
+            _pkAllOfFrame = pumpkinRocksOf(logic.state.gameModeConfig);
             _glPushRocks(webgl, ms.rocks, _hw, rvLeft, rvRight, rvTop, rvBottom, null, logic.admin.wallSlotsOn ? logic.admin.wallSlots : null);
         }
 
@@ -8671,7 +8708,7 @@ function render(ctx: CanvasRenderingContext2D, logic: GameLogic, dt: number, act
             _restoreCameraTransform(ctx, logic, width, height);
         }
 
-        if (showMapFeatures && (logic.admin.lookWalls.length > 0 || logic.admin.dying.length > 0 || logic.admin.dyingRocks.length > 0)) {
+        if (showMapFeatures && (logic.admin.lookWalls.length > 0 || logic.admin.dying.length > 0 || logic.admin.dyingRocks.length > 0 || logic.spawnerGhost.on)) {
             _drawPanelWalls(ctx, logic, webgl, width, height, _hw);
         }
         if (logic.admin.dotUntil[0] >= 0 || logic.admin.dotUntil[1] >= 0) _drawPanelDots(ctx, logic, webgl, width, height);
@@ -8692,10 +8729,10 @@ function render(ctx: CanvasRenderingContext2D, logic: GameLogic, dt: number, act
 
         _worldColorsOfFrame(logic, _shapeCacheFrame);
 
-        const _polys = logic.floatingPolygons, _puffs = logic.shapePuffs;
-        const _nPolys = _polys.length, _nShapes = _nPolys + _puffs.length;
+        const _polys = logic.floatingPolygons, _puffs = logic.shapePuffs, _props = logic.spawnerProps;
+        const _nPolys = _polys.length, _nPuffEnd = _nPolys + _puffs.length, _nShapes = _nPuffEnd + _props.length;
         for (let i = 0; i < _nShapes; i++) {
-            const poly = i < _nPolys ? _polys[i] : _puffs[i - _nPolys];
+            const poly = i < _nPolys ? _polys[i] : i < _nPuffEnd ? _puffs[i - _nPolys] : _props[i - _nPuffEnd];
 
             if (!poly.active || poly.opacity <= 0) continue;
             const polyRadius = poly.look !== null ? Math.max(poly.size, poly.size * poly.look.reach / 2) * poly.growth : poly.size * poly.growth;
@@ -13112,4 +13149,5 @@ export function renderSceneFrame(ctx: CanvasRenderingContext2D, logic: GameLogic
 export function renderSceneDone(): void {
   clearEnemyDeathCanvasCache();
   if (SMALL_FIX.G660 !== 0) { _layerBulletRender.logic = null; _layerBulletRender.bulletsArr = null; _layerBulletRender.viewportBounds = null; }
+  if (SMALL_FIX.G723 !== 0) { _fog.reset(); _fogMatch = -1; }
 }

@@ -1,10 +1,13 @@
-import React, { useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { useClassicUi } from '../shared/useClassicUi';
 import { isTouchScreen } from '../../utils/device';
+import { TEXT_LIMITS } from './textLimits';
 import { EditableValue } from '../shared/EditableValue';
 import { HelpTooltip } from '../shared/HelpTooltip';
 import { Collapse, Fade, SwapText, SwapInPlace, useFoldHandle, type FoldHandle } from './Collapse';
 import { FoldMemoryContext } from './motion';
 import { TagTitle, InlineMotion, type TagItem } from './TagLine';
+import { TabSlide } from './TabSlide';
 import { panelMemory, usePanelScope, usePanelsVersion } from './panelMemory';
 import { cardStartsOpen } from './panelFolds';
 import { CustomSelect, type SelectOption, type SelectGroup } from '../shared/CustomSelect';
@@ -37,6 +40,14 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
     </button>
   );
 });
+
+export const WidestWords: React.FC<{ shown: string; all: readonly string[] }> = ({ shown, all }) => (
+  <span className="k-widest">
+    {(all.indexOf(shown) >= 0 ? all : [shown, ...all]).map(w => (
+      <span key={w} className={w === shown ? 'k-widest-on' : 'k-widest-ghost'} aria-hidden={w === shown ? undefined : true}>{w}</span>
+    ))}
+  </span>
+);
 
 interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   label: string;
@@ -244,13 +255,17 @@ interface SliderRowProps extends RowTextProps {
   disabled?: boolean; unit?: string; display?: string; minLabel?: string; maxLabel?: string;
   onCommit?: (v: number) => void;
   deferred?: boolean;
+  onLive?: (v: number | null) => void;
   format?: (v: number) => string;
   inputMin?: number;
   inputMax?: number;
   action?: React.ReactNode;
   logScale?: boolean;
 }
-export const SliderRow: React.FC<SliderRowProps> = ({ value, onChange, min, max, keepFraction, step = 1, disabled: off, unit, display, minLabel, maxLabel, onCommit, deferred, format, inputMin, inputMax, action, hidden, logScale, ...text }: SliderRowProps) => {
+export const SliderRow: React.FC<SliderRowProps> = ({ value, onChange, min, max, keepFraction, step = 1, disabled: off, unit, display, minLabel, maxLabel, onCommit, deferred, onLive, format, inputMin, inputMax, action, hidden, logScale, ...textIn }: SliderRowProps) => {
+  const classicUi = useClassicUi();
+  const unitInLabel = classicUi && !!unit && typeof textIn.label === 'string';
+  const text = unitInLabel ? { ...textIn, label: labelWithUnit(textIn.label as string, unit as string) } : textIn;
   const disabled = off || text.locked;
   const [drag, setDrag] = useState<number | null>(null);
   const dragging = useRef(false);
@@ -266,6 +281,7 @@ export const SliderRow: React.FC<SliderRowProps> = ({ value, onChange, min, max,
     const final = latest.current;
     setDrag(null);
     if (final !== value) onChange(final);
+    onLive?.(null);
   };
   const shownText = format ? format(shown) : display;
   return (
@@ -274,14 +290,14 @@ export const SliderRow: React.FC<SliderRowProps> = ({ value, onChange, min, max,
         <RowText {...text} off={off} />
         <span className="k-value">
           <EditableValue value={shown} onChange={onCommit ? (v) => { onChange(v); onCommit(v); } : onChange} min={inputMin ?? lo} max={inputMax ?? hi} step={step} keepFraction={keepFraction} disabled={disabled} displayValue={shownText} className="k-value-field" />
-          {unit && <span className="k-unit">{unit}</span>}
+          {unit && !unitInLabel && <span className="k-unit">{unit}</span>}
           {action}
         </span>
       </div>
       {deferred ? (
         <input type="range" min={tr(lo)} max={tr(hi)} step={tStep} value={tr(shown)} disabled={disabled}
           onPointerDown={() => { dragging.current = true; latest.current = value; setDrag(value); }}
-          onChange={e => { const v = un(parseFloat(e.target.value)); if (dragging.current) { latest.current = v; setDrag(v); } else onChange(v); }}
+          onChange={e => { const v = un(parseFloat(e.target.value)); if (dragging.current) { latest.current = v; setDrag(v); onLive?.(v); } else onChange(v); }}
           onPointerUp={endDrag} onLostPointerCapture={endDrag}
           style={sliderFillStyle(tr(shown), tr(lo), tr(hi))} className="w-full" />
       ) : (
@@ -323,12 +339,29 @@ export function Segmented<T extends string>({ value, onChange, options, disabled
   );
 }
 
+const RowUnitContext = React.createContext<((u: string | null) => void) | null>(null);
+export function labelWithUnit(label: string, unit: string): string {
+  const u = unit.trim();
+  if (u === '%') return `% ${label}`;
+  if (/^[a-z]/i.test(u)) return `${label} ${u.charAt(0).toUpperCase()}${u.slice(1)}`;
+  return `${label} (${u})`;
+}
+export const RowUnit: React.FC<{ unit: string; className?: string }> = ({ unit, className }) => {
+  const set = useContext(RowUnitContext);
+  const classic = useClassicUi();
+  const lift = classic && !!set;
+  useLayoutEffect(() => { if (!lift || !set) return; set(unit); return () => set(null); }, [lift, unit, set]);
+  return lift ? null : <span className={className ? `k-unit ${className}` : 'k-unit'}>{unit}</span>;
+};
+
 interface FieldRowProps extends RowTextProps { children: React.ReactNode; stacked?: boolean }
 export const FieldRow: React.FC<FieldRowProps> = ({ children, stacked, hidden, ...text }: FieldRowProps) => {
+  const [unit, setUnit] = useState<string | null>(null);
+  const worded = typeof text.label === 'string';
   return (
     <div className={cx(stacked ? 'k-row-stack' : 'k-row', hidden && 'hidden')} hidden={hidden || undefined}>
-      <RowText {...text} />
-      {children}
+      <RowText {...text} label={worded && unit ? labelWithUnit(text.label as string, unit) : text.label} />
+      <RowUnitContext.Provider value={worded ? setUnit : null}>{children}</RowUnitContext.Provider>
     </div>
   );
 };
@@ -386,17 +419,17 @@ export function Crumbs({ items }: { items: { label: string; onClick?: () => void
 }
 
 interface TextFieldProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> { value: string; onChange: (v: string) => void }
-export function TextField({ value, onChange, className, ...rest }: TextFieldProps) {
-  return <input type="text" value={value} onChange={e => onChange(e.target.value)} className={cx('k-field', className)} {...rest} />;
+export function TextField({ value, onChange, className, maxLength, ...rest }: TextFieldProps) {
+  return <input type="text" value={value} onChange={e => onChange(e.target.value)} className={cx('k-field', className)} {...rest} maxLength={maxLength ?? TEXT_LIMITS.LINE} />;
 }
 
-interface SearchFieldProps { value: string; onChange: (v: string) => void; placeholder?: string; className?: string; autoFocus?: boolean }
-export function SearchField({ value, onChange, placeholder = 'Search', className, autoFocus }: SearchFieldProps) {
+interface SearchFieldProps { value: string; onChange: (v: string) => void; placeholder?: string; className?: string; autoFocus?: boolean; maxLength?: number }
+export function SearchField({ value, onChange, placeholder = 'Search', className, autoFocus, maxLength }: SearchFieldProps) {
   const id = useId();
   return (
     <div className={cx('k-search', className)}>
       <Search size={14} className="k-search-icon" />
-      <input id={id} type="search" value={value} placeholder={placeholder} autoFocus={autoFocus && !isTouchScreen()} onChange={e => onChange(e.target.value)} className="k-field k-search-input" />
+      <input id={id} type="search" value={value} placeholder={placeholder} autoFocus={autoFocus && !isTouchScreen()} onChange={e => onChange(e.target.value)} maxLength={maxLength ?? TEXT_LIMITS.SEARCH} className="k-field k-search-input" />
       <Fade when={value !== ''}><button type="button" className="k-search-clear" aria-label="Clear search" onClick={() => onChange('')}><X size={12} /></button></Fade>
     </div>
   );
@@ -446,6 +479,7 @@ interface TabsProps<T extends string> { value: T; onChange: (v: T) => void; tabs
 export function Tabs<T extends string>({ value, onChange, tabs }: TabsProps<T>) {
   return (
     <div role="tablist" className="k-tabs">
+      <TabSlide pick=".k-tab-on" />
       {tabs.map(t => (
         <button key={t.value} type="button" role="tab" aria-selected={t.value === value} onClick={() => onChange(t.value)} className={cx('k-tab', t.value === value && 'k-tab-on')}>
           {t.label}{t.count != null && <span className="k-count">{t.count}</span>}

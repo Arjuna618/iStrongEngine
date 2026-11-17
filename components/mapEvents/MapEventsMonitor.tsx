@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { TEXT_LIMITS } from '../kit/textLimits';
 import type { GameLogic } from '../../game/GameLogic';
 import { Modal, useModalClose } from '../kit/Modal';
 import { Button, SearchField, Tabs } from '../kit/kit';
@@ -64,9 +65,9 @@ export const MapEventsMonitor: React.FC<{ logic: GameLogic; onClose: () => void;
   return (
     <Modal title="Map Events Monitor" icon={<Activity size={18} />} size="lg" onClose={onClose} fit surface="content" waitHeight={bodyH} phoneFull
       bodyClassName={phone ? 'k-modal-body-flush flex flex-col' : undefined}
-      headerRight={narrowMon ? undefined : <div className="k-ev-search"><SearchField value={q} onChange={setQ} placeholder="Search" /></div>}>
+      headerRight={narrowMon ? undefined : <div className="k-ev-search"><SearchField value={q} onChange={setQ} placeholder="Search" maxLength={TEXT_LIMITS.SEARCH_SMALL} /></div>}>
       <div className={phone ? 'k-ev-mon k-ev-mon-narrow k-ev-mon-phone' : narrowMon ? 'k-ev-mon k-ev-mon-narrow' : 'k-ev-mon'} style={phone ? undefined : { height: bodyH }}>
-        {narrowMon ? <div className="k-ev-mon-search"><SearchField value={q} onChange={setQ} placeholder="Search" /></div> : null}
+        {narrowMon ? <div className="k-ev-mon-search"><SearchField value={q} onChange={setQ} placeholder="Search" maxLength={TEXT_LIMITS.SEARCH_SMALL} /></div> : null}
         <Tabs<Tab> value={tab} onChange={setTab} tabs={[{ value: 'waves', label: 'Waves', count: plans.length }, { value: 'events', label: 'Map Events', count: rules.length }, { value: 'objects', label: 'Map Entities', count: placed.length }, { value: 'made', label: 'Made In The Match', count: made.length }, { value: 'log', label: 'Log' }]} />
         <div className="k-ev-mon-body popup-scrollbar">
           {tab === 'waves' ? (

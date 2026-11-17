@@ -1,4 +1,5 @@
 import { SMALL_FIX } from '../../game/smallFixSwitch';
+import { TEXT_LIMITS } from '../kit/textLimits';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import type { GameLogic } from '../../game/GameLogic';
@@ -24,7 +25,7 @@ import { importFiles, filesOfDrop, filesOfInput, type PickedFile } from '../libr
 import { importSummaryLine } from '../shared/ImportButton';
 import { useGameDark } from '../../utils/useGameTheme';
 import { ThemeSwitch } from '../kit/ThemeSwitch';
-import { IconButton, emptyArt, SearchEnd } from '../kit/kit';
+import { IconButton, emptyArt, SearchEnd, WidestWords } from '../kit/kit';
 import { DropZone } from '../kit/DropZone';
 import { useWindowFrame } from '../kit/focusScope';
 import { SwapInPlace } from '../kit/Collapse';
@@ -37,6 +38,7 @@ import { mapLoadDoor } from '../shell/doors';
 import type { Tool } from '../shell/engineTools';
 import { useEscapeOwner } from '../shared/escapeStack';
 import { useBackdropClose } from '../shared/useBackdropClose';
+import { TabSlide } from '../kit/TabSlide';
 import { usePortalMenuScale, useFitScale } from '../../utils/useMenuScale';
 import { getEffectiveDPR, getZoomCompensation } from '../../utils/zoomCompensation';
 import {
@@ -110,6 +112,9 @@ function entryOf(it: HubItem, file: ExportFile | undefined, openId: string | nul
 
 const noSub = () => () => {};
 const NO_ITEMS: readonly HubItem[] = [];
+
+const hubRemoved: string[] = [];
+const HUB_UNDO_LIMIT = 40;
 
 export const ProjectHubSlot: React.FC<{ logic: GameLogic | null; setTool: (t: Tool) => void }> = ({ logic, setTool }) => {
   const shown = useHubShown();
@@ -309,7 +314,17 @@ const ProjectHubWindow: React.FC<{ logic: GameLogic; setTool: (t: Tool) => void;
   const remove = async (it: HubItem) => {
     if (!hub) return;
     try { await hub.remove(it.id); } catch (e) { hubFailed(e); return; }
-    toast('success', `Moved "${it.name}" to Recently Deleted.`, { label: 'Undo', run: () => { hub.restore(it.id).catch(hubFailed); } });
+    hubRemoved.push(it.id);
+    if (hubRemoved.length > HUB_UNDO_LIMIT) hubRemoved.shift();
+    toast('success', `Moved "${it.name}" to Recently Deleted. Ctrl Z brings it back.`);
+  };
+  const undoRemove = () => {
+    if (!hub) return;
+    while (hubRemoved.length) {
+      const id = hubRemoved.pop()!;
+      const it = hub.get(id);
+      if (it && it.deletedAt !== null) { hub.restore(id).then(() => toast('success', `"${it.name}" is back.`)).catch(hubFailed); return; }
+    }
   };
   const removeForGood = async (it: HubItem) => {
     if (!hub) return;
@@ -360,6 +375,7 @@ const ProjectHubWindow: React.FC<{ logic: GameLogic; setTool: (t: Tool) => void;
   };
   const hubHost: HubHost = {
     renamingKey,
+    onRename: (e) => { const it = itemOf(e); if (it && it.deletedAt === null) { setSelectedKey(e.key); setFocusKey(e.key); setRenamingKey(e.key); } },
     onMenu: (e, ev) => { setSelectedKey(e.key); setFocusKey(e.key); openContextMenu(ev, menuOf(e)); },
     onRenameDone: (e, name) => {
       setRenamingKey(null);
@@ -393,6 +409,7 @@ const ProjectHubWindow: React.FC<{ logic: GameLogic; setTool: (t: Tool) => void;
     const t = ev.target as HTMLElement;
     const inField = t.tagName === 'INPUT' || t.tagName === 'TEXTAREA';
     if ((ev.key === 'k' && (ev.ctrlKey || ev.metaKey)) || (ev.key === '/' && !inField)) { ev.preventDefault(); searchRef.current?.focus(); searchRef.current?.select(); return; }
+    if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && !ev.altKey && ev.key.toLowerCase() === 'z' && !inField) { ev.preventDefault(); undoRemove(); return; }
     if (inField && t !== searchRef.current) return;
     if ((t.tagName === 'BUTTON' || t.tagName === 'A') && (ev.key === 'Enter' || ev.key === ' ')) return;
     if (inField && ev.key !== 'ArrowDown' && ev.key !== 'Enter') return;
@@ -448,9 +465,9 @@ const ProjectHubWindow: React.FC<{ logic: GameLogic; setTool: (t: Tool) => void;
                 <HdFileBox size={20} absoluteStrokeWidth className="text-[var(--text-primary)] shrink-0" />
                 <h2 className="k-modal-title min-w-0 truncate">Project Hub</h2>
               </div>
-              <div className="relative flex-1 max-w-[520px] mx-auto">
+              <div className="k-search-host relative flex-1 max-w-[520px] mx-auto">
                 <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--k-search-icon)] pointer-events-none" />
-                <input ref={searchRef} type="text" value={query} onChange={e => setQuery(e.target.value)} dir="auto"
+                <input ref={searchRef} type="text" value={query} maxLength={TEXT_LIMITS.SEARCH} onChange={e => setQuery(e.target.value)} dir="auto"
                   onKeyDown={e => { if (e.key === 'Escape' && query) { e.preventDefault(); e.stopPropagation(); setQuery(''); } }}
                   placeholder="Search projects and files"
                   className="k-text-in k-search-bar w-full h-9 pl-9 pr-16 rounded-lg text-[13px] bg-[var(--k-search-bg)] border border-[var(--alpha-card-border)] shadow-[var(--shadow-input)] text-[var(--text-primary)] placeholder:text-[var(--k-placeholder)] outline-none" />
@@ -491,6 +508,7 @@ const ProjectHubWindow: React.FC<{ logic: GameLogic; setTool: (t: Tool) => void;
                   <span className="k-btn-icon"><FileNew size={14} /></span><span className="truncate">New Project</span>
                 </button>
                 <div className="k-lib-tabs k-lib-tabs-sm" role="radiogroup" aria-label="Card size">
+                  <TabSlide pick=".k-lib-tab-on" />
                   {(['s', 'm', 'l'] as CardSize[]).map(sz => (
                     <button key={sz} type="button" role="radio" aria-checked={view.size === sz} onClick={() => { if (view.size !== sz) sizeSwap.run(() => setViewKept({ size: sz })); }}
                       title={sz === 's' ? 'Small cards' : sz === 'm' ? 'Medium cards' : 'Large cards'} aria-label={sz === 's' ? 'Small cards' : sz === 'm' ? 'Medium cards' : 'Large cards'}
@@ -507,20 +525,20 @@ const ProjectHubWindow: React.FC<{ logic: GameLogic; setTool: (t: Tool) => void;
             </div>
 
             {!empty && (
-              <div className="shrink-0 flex items-center gap-2 px-[18px] min-h-[52px] py-2 border-b border-[var(--alpha-divider)]">
+              <div className="k-lib-results shrink-0 flex items-center gap-2 px-[18px] min-h-[52px] py-2 border-b border-[var(--alpha-divider)]">
                 <span className="flex-1 text-[12px] text-[var(--text-secondary)] tabular-nums">{dq ? `${shownCount} found` : `${nProjects} project${nProjects === 1 ? '' : 's'}, ${nFiles} file${nFiles === 1 ? '' : 's'}`}</span>
                 <div className="relative shrink-0">
                   <button type="button" ref={sortMenu.triggerRef as React.RefObject<HTMLButtonElement>} onClick={e => sortMenu.toggle(e.currentTarget.getBoundingClientRect())}
                     aria-haspopup="menu" aria-expanded={menuOpen(sortMenu)} className="k-btn k-btn-secondary k-btn-md">
                     <span className="k-btn-icon"><ArrowUpDown size={13} /></span>
-                    <span className="truncate">{SORT_LABEL[view.sort]}</span>
+                    <WidestWords shown={SORT_LABEL[view.sort]} all={(Object.keys(SORT_LABEL) as HubSort[]).map(s => SORT_LABEL[s])} />
                     <span className="k-btn-icon"><ChevronDown size={14} className="text-[var(--text-tertiary)]" /></span>
                   </button>
                   <DropMenu menu={sortMenu} className="k-lib-menu w-[184px]">
                     {(Object.keys(SORT_LABEL) as HubSort[]).map(s => (
                       <button key={s} type="button" role="menuitemradio" aria-checked={s === view.sort} onClick={() => { setViewKept({ sort: s }); sortMenu.close(); }}
                         className={`k-lib-menu-item${s === view.sort ? ' k-lib-menu-item-on' : ''}`}>
-                        {SORT_LABEL[s]} {s === view.sort && <Check size={14} className="shrink-0 text-[var(--accent)]" />}
+                        {SORT_LABEL[s]} <Check size={14} className={s === view.sort ? 'shrink-0 text-[var(--accent)]' : 'shrink-0 text-[var(--accent)] invisible'} />
                       </button>
                     ))}
                   </DropMenu>

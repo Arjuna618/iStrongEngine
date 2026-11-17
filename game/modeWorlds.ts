@@ -68,9 +68,11 @@ export type WorldId = 'ffa' | 'rock-ffa' | 'maze' | 'duos' | 'squads' | 'maze-du
   | 'open-3-tag' | 'open-4-tag' | 'open-maze-3-tag' | 'open-maze-4-tag'
   | 'clan-wars' | 'maze-clan-wars'
   | 'assault-bunker' | 'assault-trenches' | 'assault-line' | 'assault-branches' | 'assault-eye' | 'assault-yinyang' | 'assault-bastion' | 'assault-stronghold' | 'assault-acropolis' | 'assault-booster'
-  | 'capture-the-flag' | 'labyrinth' | 'nexus' | 'forge';
+  | 'capture-the-flag' | 'labyrinth' | 'nexus' | 'forge'
+  | 'sandbox-arena';
+export const SANDBOX_WORLD = 'sandbox-arena' as const;
 
-const P = { maze: 21, team2: 22, team4: 23, loose: 24, vampirism: 28, soccer: 29, magic: 30 } as const;
+const P ={ maze: 21, team2: 22, team4: 23, loose: 24, vampirism: 28, soccer: 29, magic: 30 } as const;
 
 function MISSING_WORLDS(): Partial<Record<WorldId, ModeWorld>> {
   const DOM_ABOUT = 'Dominators stand on the yellow tiles. Kill a neutral one and it joins your team; kill a taken one and it turns neutral again.';
@@ -152,8 +154,10 @@ export const MODE_WORLDS: Readonly<Record<WorldId, ModeWorld>> = {
   'vampirism': { mode: 'maze', title: 'Vampirism', short: 'Free For All where your score is your health', about: 'Free For All in a wide maze with empty rooms.', goal: 'Drain the others and guard your score.', tags: ['Solo', 'Maze', 'Vampirism'], gridCells: 65, mapScale: 5, maze: P.vampirism, eventOnly: true },
   'magic-maze': { mode: 'maze', title: 'Magic Maze', short: 'Free For All in a maze whose walls move', about: 'Free For All in a maze of special walls that slide to new places all the time.', goal: 'Find your way, use the walls and outlast everyone.', tags: ['Solo', 'Maze', 'Magic Maze'], gridCells: 35, mapScale: 7, maze: P.magic, eventOnly: true, bosses: false },
   ...(MISSING_MODES.ON !== 0 ? MISSING_WORLDS() : {}),
+  [SANDBOX_WORLD]: { mode: 'sandbox', title: 'Sandbox', short: 'An empty arena to spawn and build in', about: 'An empty arena where you are an operator from the start.', goal: 'Spawn tanks and walls, build, and play around.', tags: ['Sandbox', 'Operator'], gridCells: 30, mapScale: 5, noCard: true, fixedBots: true, bosses: false },
 } as Record<WorldId, ModeWorld>;
 export const WORLD_IDS = Object.keys(MODE_WORLDS) as WorldId[];
+export function isPlaySandbox(gm: { mode: GameModeType; world?: string }): boolean { return gm.mode === 'sandbox' && gm.world === SANDBOX_WORLD; }
 
 export function worldWritesMap(id: WorldId): boolean {
   return id !== 'manhunt-rock' && id !== 'portal-2tdm' && id !== 'portal-4tdm' && id !== 'portal-maze-4tdm' && id !== 'portal-mothership';

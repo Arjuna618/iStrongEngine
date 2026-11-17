@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { textBoxToStart } from '../shell/textFade';
+import { TEXT_LIMITS } from './textLimits';
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ');
 
@@ -70,7 +71,7 @@ export interface NumberBoxProps extends Omit<React.InputHTMLAttributes<HTMLInput
 }
 
 export const NumberBox = React.forwardRef<HTMLInputElement, NumberBoxProps>(function NumberBox(
-  { className, step, min, max, arrows = true, disabled, onKeyDown, inputMode, ...rest }, ref,
+  { className, step, min, max, arrows = true, disabled, onKeyDown, inputMode, maxLength, ...rest }, ref,
 ) {
   const own = useRef<HTMLInputElement | null>(null);
   const setRef = useCallback((el: HTMLInputElement | null) => {
@@ -103,6 +104,7 @@ export const NumberBox = React.forwardRef<HTMLInputElement, NumberBoxProps>(func
       inputMode={inputMode ?? 'decimal'}
       autoComplete="off"
       spellCheck={false}
+      maxLength={maxLength ?? TEXT_LIMITS.NUMBER}
       disabled={disabled}
       onKeyDown={keyDown}
       className={cls}

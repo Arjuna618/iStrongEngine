@@ -195,6 +195,7 @@ export class FixedStepInterp {
     this.capSkipped = skipped;
     this.capShapes(g.floatingPolygons);
     this.capShapes(g.shapePuffs);
+    this.capShapes(g.spawnerProps);
     const rings = g.auraRings, rn = g.auraRingCount;
     this.ringOff = this.n; this.ringN = rn;
     for (let i = 0; i < rn; i++) {
@@ -546,6 +547,7 @@ export class FixedStepInterp {
     }
     this.beginShapes(g.floatingPolygons, stamp);
     this.beginShapes(g.shapePuffs, stamp);
+    this.beginShapes(g.spawnerProps, stamp);
     for (let k = 0; k < this.tN; k++) {
       if (this.tKind[k] !== KIND_ROUND) continue;
       const b = this.tObj[k];

@@ -1,6 +1,7 @@
 import { canonicalBytes, canonicalStringify, safeParse, textOf, bytesOf, ProjectDataError, type ParseLimits, DEFAULT_PARSE_LIMITS } from './canonical';
 import { sha256Hex } from './hash';
 import { readZip, writeZip, ZipError, ZIP_LIMITS, zipNameOk, type ZipLimits, type ZipEntryIn } from './zip';
+import { SMALL_FIX } from '../smallFixSwitch';
 
 export const PROJECT_MIME = 'application/x-istrong-project';
 export const BACKUP_MIME = 'application/x-istrong-backup';
@@ -115,9 +116,10 @@ export async function relabelProject(bytes: Uint8Array, as: { projectId: string;
   const files = await readZip(bytes, limits);
   const raw = files.get('project.json');
   if (!raw) throw new ProjectDataError('The file has no label');
-  const label = readLabel(JSON.parse(new TextDecoder().decode(raw)));
+  const rawLabel = JSON.parse(new TextDecoder().decode(raw)) as Record<string, unknown>;
+  const label = readLabel(rawLabel);
   if (label.projectId === as.projectId && label.name === as.name) return bytes;
-  const next: ProjectLabel = { ...label, projectId: as.projectId, name: as.name };
+  const next: ProjectLabel = SMALL_FIX.G789 !== 0 ? { ...rawLabel, ...label, projectId: as.projectId, name: as.name } as ProjectLabel : { ...label, projectId: as.projectId, name: as.name };
   const entries: ZipEntryIn[] = [
     { name: 'mimetype', data: bytesOf(PROJECT_MIME), store: true },
     { name: 'project.json', data: canonicalBytes(next) },

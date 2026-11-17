@@ -120,7 +120,8 @@
         "gunStatScale": 1,
         "color": "#a7a7af",
         "colorMap": 16,
-        "fightResist": 1
+        "fightResist": 1,
+        "releaseDepth": 30.1
       }
     ]
   }

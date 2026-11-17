@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react';
+import { TEXT_LIMITS } from './textLimits';
 import { createPortal } from 'react-dom';
 import { Button } from './kit';
 import { useEscapeOwner } from '../shared/escapeStack';
@@ -101,7 +102,7 @@ export const TypeSheet: React.FC = () => {
         onMouseDown={e => { if (!(e.target instanceof HTMLInputElement)) e.preventDefault(); }}>
         <label htmlFor="k-type-sheet-field" className="k-type-sheet-label k-fade">{shown?.label ?? ''}</label>
         <span className="k-type-sheet-line">
-          <input id="k-type-sheet-field" ref={fieldRef} type="text" className="k-field k-type-sheet-field" tabIndex={open ? 0 : -1}
+          <input id="k-type-sheet-field" ref={fieldRef} type="text" maxLength={TEXT_LIMITS.LINE} className="k-field k-type-sheet-field" tabIndex={open ? 0 : -1}
             autoComplete="off" spellCheck={false}
             onInput={e => sheetTyped(e.currentTarget.value)}
             onFocus={e => { if (typeSheetJob() === null) e.currentTarget.blur(); }}

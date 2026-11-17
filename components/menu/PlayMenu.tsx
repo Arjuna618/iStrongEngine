@@ -6,9 +6,10 @@ import {
   PLAY_CATEGORIES, PLAY_MODE_ENTRIES, getPlayEntry, getPlaySettingSpec,
   resolvePlayConfig, getModeDisplayStats, isTeamModeId, supportsTeamCountChoice, entryTeamCountFixed, entryTeams, entryBotsFixed,
   cardWearsTeamTwoGreen,
+  SANDBOX_ENTRY_KEY,
 } from '../../game/gameModeRegistry';
 import { cardMapKeyOf, PLAY_ALL, inAllCategory } from '../../game/gameModeRegistry';
-import { topPickRanks } from '../../game/topPicks';
+import { topPickRanks, TOP_PICK_LEADS } from '../../game/topPicks';
 import { shownModeTitle } from '../../game/modeWorlds';
 import type { PlayCategoryId, PlayModeEntry } from '../../game/gameModeRegistry';
 import { useMenuScale, useModalMaxHeight, useModalMaxWidth } from '../../utils/useMenuScale';
@@ -82,7 +83,7 @@ const RANKS = topPickRanks(PLAY_MODE_ENTRIES.map(e => e.key));
 const PLAY_ITEMS: readonly ModeItem[] = PLAY_MODE_ENTRIES.map(e => ({
   key: e.key, title: shownModeTitle(e.title), category: e.category, alsoIn: e.alsoIn, mapKey: cardMapKeyOf(e.key), info: e.info, tags: tagsOf(e),
   search: modeSearchWords(e.title, e.info, tagsOf(e)),
-  rank: RANKS.get(e.key) ?? Number.MAX_SAFE_INTEGER, inAll: inAllCategory(e),
+  rank: RANKS.get(e.key) ?? Number.MAX_SAFE_INTEGER, inAll: inAllCategory(e), leadIn: TOP_PICK_LEADS[e.key],
 }));
 const SIDE_CATEGORIES = CATEGORY_ORDER.map(c => ({ id: c, title: CATEGORY_INFO.get(c)?.title ?? c, count: MODE_COUNTS[c] ?? 0 }));
 
@@ -262,9 +263,15 @@ export const PlayMenu: React.FC<Props> = ({
 
   const openSandbox = useCallback(() => {
     if (launching) return;
-    if (isPhoneDevice()) { onSandbox(); return; }
+    if (isPhoneDevice()) {
+      const sb = getPlayEntry(SANDBOX_ENTRY_KEY);
+      if (!sb) { onSandbox(); return; }
+      if (fullscreenNoticeDue()) { askFullscreenFirst(); return; }
+      onPlayMode(resolvePlayConfig(sb));
+      return;
+    }
     setShowEngineConfirm(true);
-  }, [launching, onSandbox]);
+  }, [launching, onSandbox, onPlayMode]);
 
   const goBack = useCallback(() => {
     if (narrow && detailsPage) { setDetailsPage(false); return; }
@@ -447,7 +454,7 @@ export const PlayMenu: React.FC<Props> = ({
                       onChange={v => setSettingValue(selectedEntry.key + PLAYER_TEAM_SUFFIX, Number(v))}
                       options={Array.from({ length: teamCount }, (_, i) => i + 1).map(n => ({
                         value: String(n), title: `${TEAM_NAMES[teamAt(n - 1)]} Team`,
-                        label: <span className="k-play-team"><span className="k-play-team-dot" style={{ backgroundColor: (isDark ? TEAM_COLORS_DARK : TEAM_COLORS_LIGHT)[teamAt(n - 1)] }} />{TEAM_NAMES[teamAt(n - 1)]}</span>,
+                        label: <span className="k-play-team" style={{ ['--k-team' as string]: (isDark ? TEAM_COLORS_DARK : TEAM_COLORS_LIGHT)[teamAt(n - 1)] }}><span className="k-play-team-dot" style={{ backgroundColor: (isDark ? TEAM_COLORS_DARK : TEAM_COLORS_LIGHT)[teamAt(n - 1)] }} />{TEAM_NAMES[teamAt(n - 1)]}</span>,
                       }))} />
                   </div>
                 )}

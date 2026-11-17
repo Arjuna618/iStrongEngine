@@ -3,6 +3,7 @@ import { Turret } from '../../types';
 import { renderSlider } from './uiHelpers';
 import { NumberField, ToggleRow, Dim } from '../kit/kit';
 import { Reveal } from '../kit/Collapse';
+import { SMALL_FIX } from '../../game/smallFixSwitch';
 import { KNOCKBACK_HARD_MIN } from '@/game/ValueClamp';
 import { ColorMapControl, ColorMapSwitch } from './ColorMapField';
 import { type ColorMapValue, cmfTurretValue, cmfTurretSwitchValue, cmfTurretPatch, CMF_TURRET_DEFAULT_LABEL } from './colorMapRules';
@@ -145,6 +146,7 @@ export const TurretPropertiesEditor: React.FC<Props> = ({
           {!fragmentMode && renderSlider('Shot Delay', t.delay, (v) => updateT({ delay: v }), 0, 10, 'any', disabled, 'Delay between trigger and firing, as a share of one reload. On a barrel that rides a missile it is how long the barrel waits after the missile leaves its launcher before its first shot, counted in reloads.')}
           {renderSlider('Spread', t.spread, (v) => updateT({ spread: v }), 0, 100, 'any', disabled, 'Random angle per shot. 0 = perfect accuracy.')}
           {renderSlider('Shudder', t.shudder ?? 0, (v) => updateT({ shudder: v }), 0, 1, 'any', disabled, 'How strong the randomness of each shot is. It widens the Spread angle and gives every bullet its own speed, up to twice this share faster or slower. 0 = every bullet the same speed.')}
+          {!fragmentMode && SMALL_FIX.R966 !== 0 && renderSlider('Release Depth', t.releaseDepth ?? 0, (v) => updateT({ releaseDepth: v > 0 ? v : undefined }), 0, 100, 1, disabled, 'How far inside the barrel each shot flies free, as a percent of the barrel\'s length. At 0 it flies free at the mouth. At 20 it flies free a fifth of the barrel before the mouth, so it comes out of the barrel itself instead of from its edge.')}
           {!fragmentMode && renderSlider('Knockback', t.knockback, (v) => updateT({ knockback: v }), KNOCKBACK_HARD_MIN, 300, 'any', disabled, 'Recoil force applied to the tank on fire. On a barrel that rides a missile, each shot pushes the missile forward instead, by this many units a second (a rocket speeds up this way).')}
           {!fragmentMode && (
             <ToggleRow label="Right Click Fire" disabled={disabled}
@@ -162,18 +164,18 @@ export const TurretPropertiesEditor: React.FC<Props> = ({
           <div className="k-grid-2">
             <NumberField id={`${uid}-damage`} label="Damage" help="The damage each projectile deals when it hits." value={t.bulletDamage} min={-2000} max={2000} step={1}
               onChange={e => { const v = parseFloat(e.target.value); if (isFinite(v)) updateT({ bulletDamage: Math.max(-2000, Math.min(2000, v)) }); }} />
-            <NumberField id={`${uid}-bhealth`} label="Bullet Health" help="How much damage a projectile can take before it breaks." value={t.bulletHealthBase ?? t.bulletDamage} min={0} max={2000} step={1}
+            <NumberField id={`${uid}-bhealth`} label="Projectile Health" help="How much damage a projectile can take before it breaks." value={t.bulletHealthBase ?? t.bulletDamage} min={0} max={2000} step={1}
               onChange={e => { const v = parseFloat(e.target.value); if (isFinite(v)) updateT({ bulletHealthBase: Math.max(0, Math.min(2000, v)) }); }} />
             <NumberField id={`${uid}-pen`} label="Penetration" help="How well projectiles push through other projectiles and shapes." value={t.bulletPenetration} min={0} max={1000} step={1}
               onChange={e => { const v = parseFloat(e.target.value); if (isFinite(v)) updateT({ bulletPenetration: Math.max(0, Math.min(1000, v)) }); }} />
             <NumberField id={`${uid}-lifetime`} label="Lifetime (s)" help="Seconds before the projectile fades away on its own." value={t.bulletLifetime} min={0} max={1000} step={0.1}
               onChange={e => { const v = parseFloat(e.target.value); if (isFinite(v)) updateT({ bulletLifetime: Math.max(0, Math.min(1000, v)) }); }} />
           </div>
-          {renderSlider('Bullet Speed', t.speed, (v) => updateT({ speed: v }), -5, 30, 'any', disabled, 'Projectile velocity after leaving the barrel.')}
-          {renderSlider('Round Weight', t.shootDensity ?? 1, (v) => updateT({ shootDensity: Math.abs(v - 1) < 1e-9 ? undefined : v }), 0.1, Math.max(10, t.shootDensity ?? 1), 0.05, disabled, 'How heavy its rounds are when they push what they hit. 1 is an ordinary round; a Destroyer fires rounds of 3, a Finger of 80.')}
-          {renderSlider('Round Toughness', t.shootResist ?? 1, (v) => updateT({ shootResist: Math.abs(v - 1) < 1e-9 ? undefined : v }), 0.1, 10, 0.05, disabled, 'How much less damage its rounds take from what they hit. 1 is an ordinary round; a trap is 3.')}
-          {renderSlider('Toughness Against Rounds', t.fightResist ?? t.shootResist ?? 1, (v) => updateT({ fightResist: Math.abs(v - (t.shootResist ?? 1)) < 1e-9 ? undefined : v }), 0.1, 10, 0.05, disabled, 'How its rounds stand up in a fight with other rounds. In such a fight the tougher round both takes less and deals more. 1 is an ordinary round; a trap is 3.')}
-          {renderSlider('Top Speed', t.projectileType?.topSpeedRatio ?? 1, (v) => updateT({ projectileType: { ...t.projectileType, topSpeedRatio: v } }), 0, 6, 0.01, disabled, 'The speed the round slows down to, as a share of its launch speed. 1 keeps its launch speed. A swarm drone thrown faster slows back to it by itself. Pushes from its own barrels can carry a round above this.')}
+          {renderSlider('Projectile Speed', t.speed, (v) => updateT({ speed: v }), -5, 30, 'any', disabled, 'Projectile velocity after leaving the barrel.')}
+          {renderSlider('Projectile Weight', t.shootDensity ?? 1, (v) => updateT({ shootDensity: Math.abs(v - 1) < 1e-9 ? undefined : v }), 0.1, Math.max(10, t.shootDensity ?? 1), 0.05, disabled, 'How heavy its projectiles are when they push what they hit. 1 is an ordinary bullet; a Destroyer fires bullets of 3, a Finger of 80.')}
+          {renderSlider('Projectile Toughness', t.shootResist ?? 1, (v) => updateT({ shootResist: Math.abs(v - 1) < 1e-9 ? undefined : v }), 0.1, 10, 0.05, disabled, 'How much less damage its projectiles take from what they hit. 1 is an ordinary bullet; a trap is 3.')}
+          {renderSlider('Toughness Against Projectiles', t.fightResist ?? t.shootResist ?? 1, (v) => updateT({ fightResist: Math.abs(v - (t.shootResist ?? 1)) < 1e-9 ? undefined : v }), 0.1, 10, 0.05, disabled, 'How its projectiles stand up in a fight with other projectiles. In such a fight the tougher one both takes less and deals more. 1 is an ordinary bullet; a trap is 3.')}
+          {renderSlider('Top Speed', t.projectileType?.topSpeedRatio ?? 1, (v) => updateT({ projectileType: { ...t.projectileType, topSpeedRatio: v } }), 0, 6, 0.01, disabled, 'The speed the projectile slows down to, as a share of its launch speed. 1 keeps its launch speed. A swarm drone thrown faster slows back to it by itself. Pushes from its own barrels can carry a projectile above this.')}
         </Dim>
       )}
 

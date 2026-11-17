@@ -1,4 +1,8 @@
 import { cardMapKeyOf } from './gameModeRegistry';
+import { SANDBOX_WORLD } from './modeWorlds';
+
+export const SANDBOX_ALL_AT = 19;
+export const TOP_PICK_LEADS: Readonly<Record<string, string>> = { [SANDBOX_WORLD]: 'others' };
 
 export const HIS_TOP_PICKS: readonly string[] = [
   'halloween',
@@ -23,13 +27,14 @@ export const HIS_TOP_PICKS: readonly string[] = [
 ];
 
 const REST_ORDER: readonly string[] = [
-  'ffa', 'outbreak-squads', '2-domination', 'maze-4tdm', 'blackout-ffa', 'mothership', 'manhunt', 'capture-the-flag',
-  'old-dreadnoughts-4tdm', 'assault-bunker', 'open-4-tag', 'squads', 'siege-citadel', 'portal-maze-4tdm', 'blackout-vampirism', 'maze',
-  '4-domination', 'clan-wars', 'open-4tdm', 'outbreak-maze-squads', 'maze-mothership', 'assault-eye', 'maze-duos', 'manhunt-rock',
-  'old-dreadnoughts-open-4tdm', 'open-maze-3-domination', 'blackout-maze', '2tdm', 'open-maze-4-tag', 'assault-yinyang', 'portal-4tdm',
-  'maze-squads', '4-mothership', 'open-2tdm', 'maze-2-domination', 'assault-trenches', 'maze-clan-wars', 'old-dreadnoughts-open-3tdm',
-  'open-maze-4tdm', 'portal-mothership', 'open-3-tag', 'assault-bastion', 'open-2-domination', 'open-maze-2tdm', 'assault-acropolis',
-  'open-maze-3-tag', 'open-3-domination', 'assault-line', 'open-3tdm', 'open-maze-4-domination', 'open-maze-3tdm',
+  'ffa', 'outbreak-squads', '2-domination', 'maze-4tdm', 'blackout-ffa', 'mothership', 'outbreak-duos', 'manhunt', 'capture-the-flag',
+  'old-dreadnoughts-4tdm', 'assault-bunker', 'open-4-tag', 'squads', 'siege-citadel', 'blackout-outbreak-squads', 'portal-maze-4tdm', 'blackout-vampirism', 'maze',
+  '4-domination', 'clan-wars', 'open-4tdm', 'outbreak-maze-squads', 'maze-mothership', 'assault-eye', 'outbreak-ffa', 'maze-duos', 'manhunt-rock',
+  'old-dreadnoughts-open-4tdm', 'open-maze-3-domination', 'blackout-maze', '2tdm', 'open-maze-4-tag', 'assault-yinyang', 'portal-4tdm', 'outbreak-clan-wars',
+  'maze-squads', '4-mothership', 'open-2tdm', 'maze-2-domination', 'assault-trenches', 'blackout-outbreak-duos', 'maze-clan-wars', 'old-dreadnoughts-open-3tdm',
+  'open-maze-4tdm', 'portal-mothership', 'open-3-tag', 'blackout-outbreak-maze', 'assault-bastion', 'open-2-domination', 'open-maze-2tdm', 'assault-acropolis',
+  'blackout-outbreak-ffa', 'open-maze-3-tag', 'open-3-domination', 'assault-line', 'blackout-outbreak-maze-squads', 'open-3tdm', 'open-maze-4-domination', 'open-maze-3tdm',
+  'blackout-outbreak-clan-wars',
 ];
 
 export const MAP_ORDER: readonly string[] = Array.from(new Set([...HIS_TOP_PICKS.map(cardMapKeyOf), ...REST_ORDER]));
@@ -43,6 +48,7 @@ export function topPickRanks(keys: readonly string[]): Map<string, number> {
   const picks = HIS_TOP_PICKS.filter(k => known.has(k));
   const lines = new Map<string, string[]>();
   for (const k of keys) {
+    if (k === SANDBOX_WORLD) continue;
     const m = cardMapKeyOf(k);
     let l = lines.get(m);
     if (!l) { l = []; lines.set(m, l); }
@@ -62,5 +68,8 @@ export function topPickRanks(keys: readonly string[]): Map<string, number> {
       if (k !== undefined && !out.has(k)) out.set(k, out.size);
     }
   }
-  return out;
+  if (!known.has(SANDBOX_WORLD)) return out;
+  const order = Array.from(out.keys());
+  order.splice(Math.min(SANDBOX_ALL_AT, order.length), 0, SANDBOX_WORLD);
+  return new Map(order.map((k, i) => [k, i] as [string, number]));
 }

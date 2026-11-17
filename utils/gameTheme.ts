@@ -87,7 +87,9 @@ function changed(): void {
 
 export function gameThemeId(): GameThemeId { return _idNow; }
 export function gameDark(): boolean { return _darkNow; }
-export function borderBlend(): number { return _blendNow; }
+let _blendDrag: number | null = null;
+export function borderBlend(): number { return _blendDrag !== null ? _blendDrag : _blendNow; }
+export function previewBorderBlend(v: number | null): void { _blendDrag = v === null ? null : Math.max(0, Math.min(1, v)); }
 export function borderBlendFor(dark: boolean): number { return dark === _darkNow ? _blendNow : themeOwnBlend(dark ? 'dark' : 'light'); }
 export function gameThemeVersion(): number { return _version; }
 export function gameThemeSync(): boolean { return _sync; }
@@ -107,6 +109,7 @@ export function setGameThemePick(id: GameThemeId): void {
   changed();
 }
 export function setBorderBlend(v: number | null): void {
+  _blendDrag = null;
   _blend = v === null ? null : Math.max(0, Math.min(1, v));
   changed();
 }

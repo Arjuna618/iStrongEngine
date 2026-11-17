@@ -1,7 +1,3 @@
-<p align="center">
-  <img src=".github/media/banner.gif" width="800" alt="iStrongEngine">
-</p>
-
 <h1 align="center">iStrongEngine</h1>
 
 <p align="center">
@@ -40,10 +36,6 @@ Press Play and your tank drops into a sandbox with real physics and bots. The bo
 ## Make your own maps
 
 The Map Designer and Map Events let you build arenas, place walls, portals and bases, and decide what happens during a match.
-
-## Roadmap
-
-<p align="center"><img src=".github/media/roadmap.png" width="800" alt="Roadmap"></p>
 
 ## Run it yourself
 

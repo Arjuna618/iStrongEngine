@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { AIBehaviorCategory, AICategorySettings, LibraryItem } from '../types';
+import { aiCatNoBackBoostDefault, aiCatNoGapDistanceDefault } from '../types';
 import type { GameLogic } from '../game/GameLogic';
 import { ContentLibrary } from './library/ContentLibrary';
 import { pickManyMode } from './library/libraryPickTanks';
@@ -46,8 +47,8 @@ export const AIBehaviorCategoryTanksPopup: React.FC<Props> = ({ category, allCat
       onReturn: onClose,
       lockOf: (name) => { const owner = disabledByMap.get(name); return owner ? `Already in "${owner}". Remove it from there first to add it here.` : null; },
     }),
-    settingsPanel: { title: 'Category Settings', content: <AICategorySettingsPanel value={settings} onChange={setSettings} /> },
-  }), [category.name, selected, settings, onConfirm, onClose, disabledByMap]);
+    settingsPanel: { title: 'Category Settings', content: <AICategorySettingsPanel value={settings} onChange={setSettings} noBackBoostDefault={aiCatNoBackBoostDefault(category.id)} noGapDistanceDefault={aiCatNoGapDistanceDefault(category.id)} /> },
+  }), [category.name, category.id, selected, settings, onConfirm, onClose, disabledByMap]);
 
   return <ContentLibrary logic={logic} mode={mode} onClose={onClose} />;
 };

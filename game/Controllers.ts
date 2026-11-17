@@ -1041,6 +1041,19 @@ function controllerSpinContinuous(
   io.fire = true;
 }
 
+export function minionOrbitOf(bullet: Bullet, ownerRadiusLive: number): number {
+  const data = bullet.controllerData;
+  if (data === null) return 0;
+  for (let i = 0; i < data.behaviors.length; i++) {
+    if (data.behaviors[i] !== 'minionControl') continue;
+    const law = ARRAS_PARITY.MINION_MOTION !== 0;
+    const ownerR = law ? (ownerRadiusLive > 0 ? ownerRadiusLive : data.ownerSize * 0.5) : 0;
+    const sizeFactor = law ? _minionSizeFactor(ownerR) : (data.ownerSize > 0 ? Math.sqrt(data.ownerSize / 95) : 1);
+    return (data.settings[i].orbitRadius ?? 140) * sizeFactor * (law ? 1 / _arrasPerWorld : 1);
+  }
+  return 0;
+}
+
 function controllerMinionControl(
   bullet: Bullet, data: BulletControllerData, settings: BehaviorConfig,
   io: ControlIO, mouseWorldX: number, mouseWorldY: number,

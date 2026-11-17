@@ -3,7 +3,7 @@ import { Play, Megaphone, Discord, GameEngine, LegalTerms, Settings, SourceCode,
 import { SOURCE_CODE_ON } from '../source/sourceSwitch';
 import { Fade } from '../kit/Collapse';
 import { useTermsAgreed, agreeToTerms } from '../legal/termsConsent';
-import appLogo from '../ui/media/logo5.webp';
+import appLogo from '../ui/media/logo5-green.webp';
 import { AsciiFluidBackground } from './AsciiFluidBackground';
 import { menuScenes, menuScenesSupported, menuSceneStatus } from '../menuScene/sceneClient';
 import { ThemeSwitch } from '../kit/ThemeSwitch';
@@ -145,6 +145,38 @@ function TermsBar({ show, onRead, barRef }: { show: boolean; onRead: () => void;
   );
 }
 
+export function MenuFootLinks({ onOpenUpdates, updatesUnseen = false, onOpenSource, onOpenTerms, waiting = false, fadeIn = false }: {
+  onOpenUpdates?: () => void; updatesUnseen?: boolean; onOpenSource?: () => void; onOpenTerms?: () => void; waiting?: boolean;
+  fadeIn?: boolean;
+}) {
+  return (
+    <div className={fadeIn ? 'k-mm-foot k-mm-foot-in' : 'k-mm-foot'}>
+      <button type="button" className="k-mm-link k-mm-link-ico" onClick={onOpenUpdates} disabled={waiting} title="Update Log" aria-label="Update Log">
+        <span className="k-mm-link-icon">
+          <Megaphone size={16} />
+          {updatesUnseen && <span className="k-mm-dot" />}
+        </span>
+      </button>
+      {SOURCE_CODE_ON && (onOpenSource || waiting) && (
+        <button type="button" className="k-mm-link k-mm-link-ico" onClick={onOpenSource} disabled={waiting} title="Source Code" aria-label="Source Code">
+          <SourceCode size={16} />
+        </button>
+      )}
+      <a href="https://github.com/Arjuna618/iStrongEngine" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="GitHub"
+        className="k-mm-link k-mm-link-ico">
+        <Github size={16} />
+      </a>
+      <a href="https://discord.gg/HTE9MTsmBm" target="_blank" rel="noopener noreferrer" title="Join our Discord" aria-label="Join our Discord"
+        className="k-mm-link k-mm-link-ico">
+        <Discord size={16} />
+      </a>
+      <button type="button" className="k-mm-link k-mm-link-ico" onClick={onOpenTerms} disabled={waiting} title="Terms of Use" aria-label="Terms of Use">
+        <LegalTerms size={16} />
+      </button>
+    </div>
+  );
+}
+
 export const MainMenu: React.FC<Props> = ({ onPlay, onEngine, isDark, onOpenUpdates, updatesUnseen, ready, onOpenTerms, onOpenSettings, onOpenSource }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const agreed = useTermsAgreed();
@@ -191,30 +223,7 @@ export const MainMenu: React.FC<Props> = ({ onPlay, onEngine, isDark, onOpenUpda
             </button>
           </div>
 
-          <div className="k-mm-foot">
-            <button type="button" className="k-mm-link k-mm-link-ico" onClick={onOpenUpdates} title="Update Log" aria-label="Update Log">
-              <span className="k-mm-link-icon">
-                <Megaphone size={16} />
-                {updatesUnseen && <span className="k-mm-dot" />}
-              </span>
-            </button>
-            {SOURCE_CODE_ON && onOpenSource && (
-              <button type="button" className="k-mm-link k-mm-link-ico" onClick={onOpenSource} title="Source Code" aria-label="Source Code">
-                <SourceCode size={16} />
-              </button>
-            )}
-            <a href="https://github.com/Arjuna618/iStrongEngine" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="GitHub"
-              className="k-mm-link k-mm-link-ico">
-              <Github size={16} />
-            </a>
-            <a href="https://discord.gg/HTE9MTsmBm" target="_blank" rel="noopener noreferrer" title="Join our Discord" aria-label="Join our Discord"
-              className="k-mm-link k-mm-link-ico">
-              <Discord size={16} />
-            </a>
-            <button type="button" className="k-mm-link k-mm-link-ico" onClick={onOpenTerms} title="Terms of Use" aria-label="Terms of Use">
-              <LegalTerms size={16} />
-            </button>
-          </div>
+          <MenuFootLinks onOpenUpdates={onOpenUpdates} updatesUnseen={updatesUnseen} onOpenSource={onOpenSource} onOpenTerms={onOpenTerms} />
         </div>
       </MenuCardStage>
 

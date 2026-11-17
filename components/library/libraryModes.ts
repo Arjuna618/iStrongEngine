@@ -28,11 +28,12 @@ export interface LibMode {
   isChosen?: (e: LibEntry) => boolean;
   chosenSection?: { title: string; rank?: (e: LibEntry) => number };
   lockOf?: (e: LibEntry) => string | null;
-  footer?: React.ReactNode | ((close: (after?: () => void) => void, compact?: boolean) => React.ReactNode);
-  status?: React.ReactNode;
+  footer?: React.ReactNode | ((close: (after?: () => void) => void, compact?: boolean, kind?: LibKind) => React.ReactNode);
+  status?: React.ReactNode | ((kind: LibKind) => React.ReactNode);
   renderExtra?: (e: LibEntry) => React.ReactNode;
-  extraH?: number;
+  extraH?: number | ((kind: LibKind) => number);
   renderPanelExtra?: (e: LibEntry) => React.ReactNode;
+  panelExtraFirst?: boolean;
   allowImport?: boolean;
   settingsPanel?: { title: string; content: React.ReactNode };
 }

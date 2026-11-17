@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { pushUndoAction } from './shell/undoActions';
 import { ChevronDown, Plus, Trash2, HdAnalyticsUp } from './ui/icons';
-import { Group, FieldRow, Button, IconButton, headerIcon } from './kit/kit';
+import { Group, FieldRow, Button, IconButton, headerIcon, RowUnit } from './kit/kit';
 import { NumberBox } from './kit/NumberBox';
 import { Reveal, MotionList, Fade } from './kit/Collapse';
 import { DropMenu, useDropMenu, menuOpen } from './kit/DropMenu';
@@ -9,6 +10,10 @@ import { useToast } from './ui/Toast';
 import { sameProjectUndo } from './shared/sameProjectUndo';
 import { SMALL_FIX } from '../game/smallFixSwitch';
 import { STAT_COLORS } from '../utils/gameColors';
+import { useClassicUi } from './shared/useClassicUi';
+import { useGameDark } from '../utils/useGameTheme';
+import { gameGridLine } from './shared/GameFloor';
+import { cmHex, CM, CM_USE } from '../utils/colorMap';
 import {
   GROWTH_STATS, GROWTH_LIMITS, growthBonus, newGrowthStatRule, newPointRun, pointRunsOf,
   type GrowthRules, type GrowthStatRule, type GrowthStat, type GrowthCurveKind, type GrowthSkillPointsRule, type GrowthPointRun,
@@ -30,11 +35,11 @@ export const RuleNum: React.FC<{ value: number; min: number; max: number; step?:
       onBlur={() => setText(null)}
       onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
   );
-  return unit ? <span className="k-ev-numbox">{box}<span className="k-unit">{unit}</span></span> : box;
+  return unit ? <span className="k-ev-numbox">{box}<RowUnit unit={unit} /></span> : box;
 };
 
 const StatPick: React.FC<{ value: GrowthStat; onPick: (s: GrowthStat) => void }> = ({ value, onPick }) => {
-  const menu = useDropMenu({ align: 'start', estimatedHeight: 300 });
+  const menu = useDropMenu({ align: 'start', estimatedHeight: 300, hangs: true });
   return (
     <>
       <button type="button" aria-haspopup="listbox" aria-expanded={menuOpen(menu)} ref={menu.triggerRef as React.RefObject<HTMLButtonElement>}
@@ -69,7 +74,7 @@ const KINDS: readonly [GrowthCurveKind, string, string][] = [
 ];
 
 const CurvePick: React.FC<{ value: GrowthCurveKind; onPick: (k: GrowthCurveKind) => void }> = ({ value, onPick }) => {
-  const menu = useDropMenu({ align: 'start', estimatedHeight: 160 });
+  const menu = useDropMenu({ align: 'start', estimatedHeight: 160, hangs: true });
   const cur = KINDS.find(k => k[0] === value) ?? KINDS[0];
   return (
     <>
@@ -155,9 +160,13 @@ const GrowthGraph: React.FC<{ rules: GrowthRules; picked: string | null; onPoint
     onPoints(pickedRule.id, pts);
   };
   const atLevel = hover ?? null;
+  const classic = useClassicUi();
+  const gameDark = useGameDark();
+  const gridLine = classic ? gameGridLine(gameDark) : 'var(--alpha-divider)';
+  const clipId = 'k-gr-clip' + useId().replace(/:/g, '');
   return (
     <div className="k-stack">
-      <svg ref={svgRef} viewBox={`0 0 ${GW} ${GH}`} className="w-full select-none touch-none" role="img" aria-label="Growth by level"
+      <svg ref={svgRef} viewBox={`0 0 ${GW} ${GH}`} className="w-full select-none touch-none k-gr-graph" role="img" aria-label="Growth by level"
         onPointerMove={move} onPointerLeave={() => { if (!drag) leave(); }}
         onPointerUp={() => { setDrag(null); frozen.current = null; }}
         onDoubleClick={e => {
@@ -166,25 +175,32 @@ const GrowthGraph: React.FC<{ rules: GrowthRules; picked: string | null; onPoint
           const pts = pickedRule.points.filter(p => p[0] !== n).concat([[n, Math.round((w.k - 1) * 100)] as [number, number]]).sort((a, b) => a[0] - b[0]);
           if (pts.length <= GROWTH_LIMITS.POINTS_MAX) onPoints(pickedRule.id, pts);
         }}>
+        {classic ? <rect x={PL} y={PT} width={GW - PL - PR} height={GH - PT - PB} fill={cmHex(CM.BACKGROUND, gameDark, CM_USE.GENERAL)} className="k-gr-floor" /> : null} { }
+        {classic ? xTicks.map(l => <line key={'v' + l} x1={sx(l)} x2={sx(l)} y1={PT} y2={GH - PB} stroke={gridLine} strokeWidth={1} />) : null} { }
         {yTicks.map(k => (
           <g key={'y' + k}>
-            <line x1={PL} x2={GW - PR} y1={sy(k)} y2={sy(k)} stroke="var(--alpha-divider)" strokeWidth={1} />
+            <line x1={PL} x2={GW - PR} y1={sy(k)} y2={sy(k)} stroke={gridLine} strokeWidth={1} className="k-gr-grid" />
             <text x={PL - 4} y={sy(k) + 3} textAnchor="end" fontSize={9} fill="var(--text-tertiary)">{fmtK(k)}</text>
           </g>
         ))}
         {xTicks.map(l => <text key={'x' + l} x={sx(l)} y={GH - 6} textAnchor="middle" fontSize={9} fill="var(--text-tertiary)">{l}</text>)}
-        {atLevel !== null && <line x1={sx(atLevel)} x2={sx(atLevel)} y1={PT} y2={GH - PB} stroke="var(--text-tertiary)" strokeWidth={1} strokeDasharray="2 3" />} { }
+        {atLevel !== null && <line x1={sx(atLevel)} x2={sx(atLevel)} y1={PT} y2={GH - PB} stroke="var(--text-tertiary)" strokeWidth={1} strokeDasharray="2 3" className="k-gr-at" />} { }
+        {classic ? <defs><clipPath id={clipId}><rect x={PL} y={PT} width={GW - PL - PR} height={GH - PT - PB} /></clipPath></defs> : null} { }
+        <g clipPath={classic ? `url(#${clipId})` : undefined}>
         {shown.map(r => {
           const pts: string[] = [];
           for (let i = 0; i <= 64; i++) { const l = (i / 64) * xMax; pts.push(sx(l).toFixed(1) + ',' + sy(factorOf(r, l)).toFixed(1)); }
           const stopL = Math.min(r.stop, xMax);
           return (
             <g key={r.id}>
-              <polyline points={pts.join(' ')} fill="none" stroke={colorOf(r.stat)} strokeWidth={r.id === picked ? 2.5 : 1.5} strokeLinejoin="round" />
-              {r.stop < GROWTH_LIMITS.LEVEL_MAX && <circle cx={sx(stopL)} cy={sy(factorOf(r, stopL))} r={2.5} fill={colorOf(r.stat)} />} { }
+              <polyline points={pts.join(' ')} fill="none" className={r.id === picked ? 'k-gr-under k-gr-on' : 'k-gr-under'} strokeLinejoin="round" strokeLinecap="round" />
+              <polyline points={pts.join(' ')} fill="none" stroke={colorOf(r.stat)} strokeWidth={r.id === picked ? 2.5 : 1.5} strokeLinejoin="round" strokeLinecap="round" className={r.id === picked ? 'k-gr-line k-gr-on' : 'k-gr-line'} />
+              {r.stop < GROWTH_LIMITS.LEVEL_MAX && <circle cx={sx(stopL)} cy={sy(factorOf(r, stopL))} r={2.5} fill={colorOf(r.stat)} className="k-gr-stop" />} { }
             </g>
           );
         })}
+        </g>
+        {classic ? <rect x={PL} y={PT} width={GW - PL - PR} height={GH - PT - PB} fill="none" className="k-gr-frame" /> : null} { }
         {pickedRule && pickedRule.points.map((p, i) => (
           <circle key={i} cx={sx(pickedRule.start + p[0])} cy={sy(1 + p[1] / 100)} r={5} fill="var(--k-field)" stroke={colorOf(pickedRule.stat)} strokeWidth={2}
             className="cursor-grab"
@@ -211,7 +227,8 @@ export const GrowthRulesCard: React.FC<{ rules: GrowthRules; onChange: (rules: G
       const i = Math.min(at, cur.stats.length);
       set({ ...cur, stats: [...cur.stats.slice(0, i), r, ...cur.stats.slice(i)] });
     };
-    showToast('info', `${labelOf(r.stat)} rule removed`, { label: 'Undo', run: SMALL_FIX.R908 !== 0 ? sameProjectUndo(logic, showToast, back) : back });
+    showToast('info', `${labelOf(r.stat)} rule removed. Ctrl Z brings it back.`);
+    pushUndoAction(logic, SMALL_FIX.R908 !== 0 ? sameProjectUndo(logic, showToast, back) : back);
   };
   const add = () => {
     const used = new Set(rules.stats.map(r => r.stat));
@@ -287,7 +304,8 @@ export const SkillPointRuns: React.FC<{ rule: GrowthSkillPointsRule; onChange: (
       const i = Math.min(at, now.length);
       set({ ...cur, runs: [...now.slice(0, i), r, ...now.slice(i)] });
     };
-    showToast('info', 'Skill point run removed', { label: 'Undo', run: SMALL_FIX.R908 !== 0 ? sameProjectUndo(logic, showToast, back) : back });
+    showToast('info', 'Skill point run removed. Ctrl Z brings it back.');
+    pushUndoAction(logic, SMALL_FIX.R908 !== 0 ? sameProjectUndo(logic, showToast, back) : back);
   };
   return (
     <>

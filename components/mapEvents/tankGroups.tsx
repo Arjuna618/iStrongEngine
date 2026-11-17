@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { TEXT_LIMITS } from '../kit/textLimits';
 import type { TankGroup } from '../../game/mapEvents/doc';
 import { addTankGroup, indexOfId, setAt } from '../../game/mapEvents/docOps';
 import { TANK_KINDS, DEBUFF_RESIST_MIN, DEBUFF_HEALTH_MIN, DEBUFF_HEALTH_MAX } from '../../game/tankDebuffs';
@@ -6,7 +7,7 @@ import { ALL_MODES } from '../../game/allModesSwitch';
 import { SMALL_FIX } from '../../game/smallFixSwitch';
 import { BOT_PORTAL_DEFAULTS } from '../../types';
 import { shownNameOfWord, findByShownNameOrFileKey, pickWordOf } from '../../game/tankByName';
-import { Button, FieldRow, Group, IconButton, PickRow, SelectRow, SliderRow, TextField, ToggleRow } from '../kit/kit';
+import { Button, FieldRow, Group, IconButton, PickRow, RowUnit, SelectRow, SliderRow, TextField, ToggleRow } from '../kit/kit';
 import { Reveal } from '../kit/Collapse';
 import { LongList } from '../kit/LongList';
 import { ContentLibrary } from '../library/ContentLibrary';
@@ -119,7 +120,7 @@ export const TankGroupsPage: React.FC<{ ctx: EvCtx; focus?: number | null }> = (
               <DebuffBox value={d?.resist} min={DEBUFF_RESIST_MIN} max={kind.fileResist} step={0.1} placeholder={String(kind.fileResist)} label={`${kind.one} resist`} onChange={v => setK({ resist: v })} />
             </FieldRow>
             <FieldRow label="Health" help={`How much of its own health a ${kind.one} keeps in this mode. Empty: all of it. Measured on a server: with Resist 1 and 71 %, a full offense Annihilator kills a Dominator in about 13 shots.`}>
-              <span className="k-ev-numbox"><DebuffBox value={d?.health} min={DEBUFF_HEALTH_MIN} max={DEBUFF_HEALTH_MAX} placeholder="100" label={`${kind.one} health`} onChange={v => setK({ health: v })} /><span className="k-unit">%</span></span>
+              <span className="k-ev-numbox"><DebuffBox value={d?.health} min={DEBUFF_HEALTH_MIN} max={DEBUFF_HEALTH_MAX} placeholder="100" label={`${kind.one} health`} onChange={v => setK({ health: v })} /><RowUnit unit="%" /></span>
             </FieldRow>
           </Group>
         </div>
@@ -131,7 +132,7 @@ export const TankGroupsPage: React.FC<{ ctx: EvCtx; focus?: number | null }> = (
       <div className="k-ev-page">
         <DetailHead title={g.name} />
         <Group title="This Group">
-          <FieldRow stacked label="Name" help="What it is called in this list."><TextField value={g.name} onChange={x => put('name', x)} /></FieldRow>
+          <FieldRow stacked label="Name" help="What it is called in this list."><TextField maxLength={TEXT_LIMITS.NAME} value={g.name} onChange={x => put('name', x)} /></FieldRow>
           <Reveal when={g.tanks.length > 0}>{() => <TakeOffTags items={tankTags(ctx, g.tanks)} onRemove={w => put('tanks', g.tanks.filter(t => t !== w))} />}</Reveal>
           <Button size="sm" variant="secondary" block icon={<Plus size={13} />} onClick={() => setChoosing(true)}>Choose Tanks</Button>
         </Group>

@@ -7,7 +7,7 @@ import { addEntityType, addPlan, addRule, addTimer, insertAt, makeRow, setAt, wi
 import { buildPresetWorld } from '../../game/mapEvents/presets/index';
 import { modeCardEntries } from '../maps/modeCatalog';
 import { Modal } from '../kit/Modal';
-import { Button, FieldRow, IconButton, Tabs, TextField } from '../kit/kit';
+import { Button, FieldRow, IconButton, RowUnit, Tabs, TextField } from '../kit/kit';
 import { SwapBox } from '../kit/Collapse';
 import { ThemeSwitch } from '../kit/ThemeSwitch';
 import { useEscapeClose } from '../shared/useEscapeClose';
@@ -136,7 +136,7 @@ const InputRow: React.FC<{ input: Input; value: unknown; onChange: (v: unknown) 
     case 'tank': return <FieldRow stacked label={input.label} help={help}><TankField value={value as string} ctx={ctx} onChange={onChange} /></FieldRow>;
     case 'area': { const list = choicesOf('area', ctx);
       return <FieldRow stacked label={input.label} help={help}><EvSelect value={String(value ?? '')} placeholder={list.length ? 'Pick A Custom Area' : 'Draw A Custom Area First'} options={list.map(x => ({ value: String(x.id), label: x.name }))} onChange={onChange} /></FieldRow>; }
-    case 'number': return <FieldRow label={input.label} help={help}><span className="k-ev-numbox"><NumberBox className="k-field k-ev-num" value={value as number} min={0} onChange={e => onChange(Number(e.target.value) || 0)} />{input.unit ? <span className="k-unit">{input.unit}</span> : null}</span></FieldRow>;
+    case 'number': return <FieldRow label={input.label} help={help}><span className="k-ev-numbox"><NumberBox className="k-field k-ev-num" value={value as number} min={0} onChange={e => onChange(Number(e.target.value) || 0)} />{input.unit ? <RowUnit unit={input.unit} /> : null}</span></FieldRow>;
     default: return <FieldRow stacked label={input.label} help={help}><TextField value={String(value ?? '')} onChange={onChange} /></FieldRow>;
   }
 };
@@ -149,7 +149,7 @@ const AskInputs: React.FC<{ t: Template; ctx: EvCtx & { refresh?: () => void }; 
       <Button variant="primary" disabled={missing} onClick={() => close(() => {
         ctx.commit(d => t.write(d!, v, ctx));
         const mark = markOfLastEdit(ctx.logic);
-        toast('success', `Added ${t.title}.`, { label: 'Undo', run: () => { undoMarkedEdit(ctx.logic, mark); ctx.refresh?.(); } });
+        void mark; toast('success', `Added ${t.title}. Ctrl Z takes it back.`);
         onDone();
       })}>Add</Button>
     )}>
@@ -189,7 +189,7 @@ export const TemplatesWindow: React.FC<{ ctx: EvCtx & { refresh?: () => void }; 
     }
     ctx.commit(d => ({ ...w.events, [ZONES_KEY]: w.mapAreas.zones, nextId: Math.max(w.events.nextId, d?.nextId ?? 1) }));
     const mark = markOfLastEdit(ctx.logic);
-    toast('info', `This map now holds the rules of ${w.events.meta?.title}. Its walls stay its own.`, { label: 'Undo', run: () => { undoMarkedEdit(ctx.logic, mark); ctx.refresh?.(); } });
+    void mark; toast('info', `This map now holds the rules of ${w.events.meta?.title}. Its walls stay its own. Ctrl Z takes it back.`);
     onDone();
     close();
   };

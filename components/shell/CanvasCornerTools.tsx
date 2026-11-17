@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Collapse, Reveal, SwapInPlace, Fade, MotionRow } from '../kit/Collapse';
 import type { GameLogic } from '../../game/GameLogic';
 import { cancelMapEditInteraction, clearMapEditSelection } from '../../game/MapEditor';
@@ -10,6 +10,14 @@ import { usePlacementBar, placementBarIsSub } from './PlacementBar';
 import { useActiveTool } from './toolStore';
 import { useDesignHistory } from '../shared/HistoryPanel';
 import { flushDesignHistory } from './historyRecorder';
+import { useClassicUi } from '../shared/useClassicUi';
+import { PickGlide } from '../kit/TabSlide';
+
+let _slot: HTMLDivElement | null = null;
+const _slotSubs = new Set<() => void>();
+const setCornerSlot = (el: HTMLDivElement | null): void => { if (el === _slot) return; _slot = el; _slotSubs.forEach(f => f()); };
+export const subCornerSlot = (f: () => void): (() => void) => { _slotSubs.add(f); return () => { _slotSubs.delete(f); }; };
+export const cornerSlotNow = (): HTMLDivElement | null => _slot;
 
 interface Props {
   logic: GameLogic;
@@ -24,6 +32,36 @@ const CornerButton: React.FC<{ tip: string; on?: boolean; disabled?: boolean; on
   </ButtonTooltip>
 );
 
+const HIDE_MS = 180;
+function useCornerSlide(classic: boolean, want: string | null, laidOut = false): { key: string | null; out: boolean } {
+  const [key, setKey] = useState<string | null>(want);
+  const [out, setOut] = useState(laidOut && want !== null);
+  useEffect(() => {
+    if (!classic) return;
+    if (want === key) {
+      if (want === null || out) return;
+      let r2 = 0;
+      const r1 = requestAnimationFrame(() => { r2 = requestAnimationFrame(() => setOut(true)); });
+      return () => { cancelAnimationFrame(r1); cancelAnimationFrame(r2); };
+    }
+    if (out) { setOut(false); return; }
+    if (key === null) { setKey(want); return; }
+    const t = window.setTimeout(() => setKey(want), HIDE_MS);
+    return () => window.clearTimeout(t);
+  }, [classic, want, key, out]);
+  return classic ? { key, out } : { key: want, out: true };
+}
+
+const NoteSlide: React.FC<{ want: string | null; hold: boolean; children: React.ReactNode }> = ({ want, hold, children }) => {
+  const asked = useRef(want);
+  if (!hold) asked.current = want;
+  const s = useCornerSlide(true, asked.current, true);
+  const live = !hold && s.key === want;
+  const kept = useRef<React.ReactNode>(children);
+  if (live) kept.current = children;
+  return s.key !== null ? <div key={s.key} className={`k-corner-slide k-note-slide${s.out ? ' k-corner-out' : ''}`}>{live ? children : kept.current}</div> : null;
+};
+
 const Stepper: React.FC<{ label: string; value: number; canDown: boolean; canUp: boolean; onDown: () => void; onUp: () => void }> = ({ label, value, canDown, canUp, onDown, onUp }) => (
   <span className="k-canvas-step">
     <span className="k-canvas-step-label">{label}</span>
@@ -34,6 +72,7 @@ const Stepper: React.FC<{ label: string; value: number; canDown: boolean; canUp:
 );
 
 export const CanvasCornerTools: React.FC<Props> = ({ logic, rightInset, chromeScale }) => {
+  const classicUi = useClassicUi();
   const bar = usePlacementBar();
   useActiveTool();
   const { canUndo } = useDesignHistory(logic);
@@ -42,6 +81,11 @@ export const CanvasCornerTools: React.FC<Props> = ({ logic, rightInset, chromeSc
   const showMap = !inMatch && logic.isMapDesignerActive;
   const showTank = !inMatch && logic.isTankToolActive && logic.state.canvasEntityKind === 'tank';
   const shown = showSelect || showMap || showTank;
+  const slide = useCornerSlide(classicUi, shown ? [showMap ? 'map' : '', showSelect ? 'canvas' : '', showTank ? 'tank' : ''].filter(Boolean).join('+') : null);
+  const setNow = slide.key ?? '';
+  const dMap = classicUi ? setNow.includes('map') : showMap;
+  const dSelect = classicUi ? setNow.includes('canvas') : showSelect;
+  const dTank = classicUi ? setNow.includes('tank') : showTank;
 
   const s = logic.state;
   const selectOn = s.autoSubTurretEditMode ? s.autoSubTurretSelectMode : s.selectMode;
@@ -54,7 +98,7 @@ export const CanvasCornerTools: React.FC<Props> = ({ logic, rightInset, chromeSc
     if (logic.onStateChange) logic.onStateChange(logic.state);
   };
 
-  const place = showSelect ? bar : null;
+  const place = dSelect ? bar : null;
   const current = () => placementBarIsSub() === !!logic.state.autoSubTurretEditMode;
   const mirrorMode = place?.mirrorMode ?? false;
   const autoPlacement = place?.autoPlacement ?? false;
@@ -68,7 +112,7 @@ export const CanvasCornerTools: React.FC<Props> = ({ logic, rightInset, chromeSc
   const showDirs = !!place && snapPlacement && !isComboMode && bodySides < 3;
   const showPoints = !!place && snapPlacement && !isComboMode && bodySides >= 3;
   const showHint = !!place && (!!place.selectMode || !!place.inheritMode);
-  const showLayerHint = showTank && logic.layerPickMode;
+  const showLayerHint = dTank && logic.layerPickMode;
   const undo = () => { flushDesignHistory(); logic.undoDesign(); };
   const endSelect = () => { if (selectOn) logic.toggleSelectModeForCurrentContext(); };
   const endPlacement = () => {
@@ -78,30 +122,40 @@ export const CanvasCornerTools: React.FC<Props> = ({ logic, rightInset, chromeSc
     if (mirrorMode) place.onToggleMirror?.(false);
   };
 
-  return (
-    <div className="absolute z-30 pointer-events-none" style={{ right: rightInset + 14 * chromeScale, bottom: 14 * chromeScale }}>
-      <Fade when={shown} className="block">{() => (
-      <div className="k-canvas-corner" style={chromeScale !== 1 ? { zoom: chromeScale } : undefined}>
+  const countStep = () => (
+    <Stepper label={isComboMode ? `Count (${bodySides} face midpoints)` : 'Count'} value={count} canDown={count > 1} canUp={count < compassMax}
+      onDown={() => { if (current()) place!.onSetAutoPlacementCount?.(Math.max(1, count - 1)); }} onUp={() => { if (current()) place!.onSetAutoPlacementCount?.(Math.min(compassMax, count + 1)); }} />
+  );
+  const dirStep = () => (
+    <Stepper label="Directions" value={SNAP_COUNTS[snapIdx]} canDown={snapIdx > 0} canUp={snapIdx < SNAP_COUNTS.length - 1}
+      onDown={() => { if (current()) place!.onSetSnapCount?.(snapIdx - 1); }} onUp={() => { if (current()) place!.onSetSnapCount?.(snapIdx + 1); }} />
+  );
+  const pointsLine = () => <span className="k-canvas-step-label">Snaps to {bodySides} face midpoints</span>;
+  const anyCount = !!(showCount || showDirs || showPoints);
+  const notes = (<>
         <Collapse open={!!showHint} reveal="none">{showHint ? <div className="k-canvas-note pointer-events-auto"><SwapInPlace swapKey={place!.inheritMode ? 'inherit' : 'select'} hold={false}><TurretActionBar {...place!} part="instructions" /></SwapInPlace></div> : null}</Collapse>
         <Collapse open={showLayerHint} reveal="none">{showLayerHint ? <div className="k-canvas-note pointer-events-auto"><p className="k-hint k-hint-strong">Click a part of the tank to edit it.</p></div> : null}</Collapse>
-        <Collapse open={!!(showCount || showDirs || showPoints)} reveal="none">{(showCount || showDirs || showPoints) ? (
+        <Collapse open={anyCount} reveal="none">{anyCount ? (
           <div className="k-canvas-note pointer-events-auto">
-            <Reveal when={showCount}>{() => (
-              <Stepper label={isComboMode ? `Count (${bodySides} face midpoints)` : 'Count'} value={count} canDown={count > 1} canUp={count < compassMax}
-                onDown={() => { if (current()) place!.onSetAutoPlacementCount?.(Math.max(1, count - 1)); }} onUp={() => { if (current()) place!.onSetAutoPlacementCount?.(Math.min(compassMax, count + 1)); }} />
-            )}</Reveal>
-            <Reveal when={showDirs}>{() => (
-              <Stepper label="Directions" value={SNAP_COUNTS[snapIdx]} canDown={snapIdx > 0} canUp={snapIdx < SNAP_COUNTS.length - 1}
-                onDown={() => { if (current()) place!.onSetSnapCount?.(snapIdx - 1); }} onUp={() => { if (current()) place!.onSetSnapCount?.(snapIdx + 1); }} />
-            )}</Reveal>
-            <Reveal when={showPoints}>{() => <span className="k-canvas-step-label">Snaps to {bodySides} face midpoints</span>}</Reveal>
+            <Reveal when={showCount}>{countStep}</Reveal>
+            <Reveal when={showDirs}>{dirStep}</Reveal>
+            <Reveal when={showPoints}>{pointsLine}</Reveal>
           </div>
         ) : null}</Collapse>
+  </>);
+  const noteKey = [showHint ? (place!.inheritMode ? 'inherit' : 'select') : '', showLayerHint ? 'layer' : '',
+    showCount ? 'count' : '', showDirs ? 'dirs' : '', showPoints ? 'points' : ''].filter(Boolean).join('+') || null;
+  const classicNotes = (<>
+        {showHint ? <div className="k-canvas-note pointer-events-auto"><TurretActionBar {...place!} part="instructions" /></div> : null}
+        {showLayerHint ? <div className="k-canvas-note pointer-events-auto"><p className="k-hint k-hint-strong">Click a part of the tank to edit it.</p></div> : null}
+        {anyCount ? <div className="k-canvas-note pointer-events-auto">{showCount ? countStep() : null}{showDirs ? dirStep() : null}{showPoints ? pointsLine() : null}</div> : null}
+  </>);
+  const strip = (
         <MotionRow className="k-canvas-tools pointer-events-auto" glideWidth>
-          {showMap && (
+          {dMap && (
             <MotionRow.Item key="center"><CornerButton tip="Center Map: fit the whole map in view" onClick={() => logic.fitMapToView()}><Focus size={20} /></CornerButton></MotionRow.Item>
           )}
-          {showMap && (
+          {dMap && (
             <MotionRow.Item key="mapSelect"><CornerButton tip="Select Tool: pick, move and delete what is on the map" on={me.tool === 'select'} onClick={toggleMapSelect}><MousePointer size={20} /></CornerButton></MotionRow.Item>
           )}
           {place && (
@@ -119,18 +173,42 @@ export const CanvasCornerTools: React.FC<Props> = ({ logic, rightInset, chromeSc
           {place && (
             <MotionRow.Item key="sep"><span className="k-canvas-tools-sep" aria-hidden="true" /></MotionRow.Item>
           )}
-          {(showSelect || showTank) && (
+          {(dSelect || dTank) && (
             <MotionRow.Item key="undo"><CornerButton tip="Undo: takes back your last step (Ctrl+Z)" disabled={!canUndo} onClick={undo}><UndoStep size={20} /></CornerButton></MotionRow.Item>
           )}
-          {showSelect && (
+          {dSelect && (
             <MotionRow.Item key="select"><CornerButton tip="Select from Canvas: click a turret on the tank to edit it" on={selectOn}
               onClick={() => { if (!selectOn) endPlacement(); logic.toggleSelectModeForCurrentContext(); }}><MousePointerClick size={20} /></CornerButton></MotionRow.Item>
           )}
-          {showTank && (
+          {dTank && (
             <MotionRow.Item key="layerSelect"><CornerButton tip="Select from Canvas: click a part of the tank to edit it" on={logic.layerPickMode}
               onClick={() => logic.setLayerPickMode(!logic.layerPickMode)}><MousePointerClick size={20} /></CornerButton></MotionRow.Item>
           )}
         </MotionRow>
+  );
+
+  if (classicUi) return (
+    <div className="absolute z-30 pointer-events-none k-corner-clip" style={{ right: rightInset, bottom: 14 * chromeScale }}>
+      {slide.key !== null ? (
+        <div key={slide.key} className={`k-corner-slide${slide.out ? ' k-corner-out' : ''}`}>
+          <div className="k-canvas-corner" style={chromeScale !== 1 ? { zoom: chromeScale } : undefined}>
+            <NoteSlide want={noteKey} hold={!slide.out}>{classicNotes}</NoteSlide>
+            <div className="k-canvas-row pointer-events-auto">
+              <PickGlide pick='[aria-pressed="true"]' />
+              {dMap ? <div className="k-corner-slot" ref={setCornerSlot} /> : null} { }
+              {strip}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+  return (
+    <div className="absolute z-30 pointer-events-none" style={{ right: rightInset + 14 * chromeScale, bottom: 14 * chromeScale }}>
+      <Fade when={shown} className="block">{() => (
+      <div className="k-canvas-corner" style={chromeScale !== 1 ? { zoom: chromeScale } : undefined}>
+        {notes}
+        {strip}
       </div>
       )}</Fade>
     </div>

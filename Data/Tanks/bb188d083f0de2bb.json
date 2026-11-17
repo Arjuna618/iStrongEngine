@@ -143,11 +143,11 @@
         "knockback": 4.1143,
         "spread": 105.18,
         "shudder": 0.228,
-        "bulletDamage": 2.25748,
-        "bulletHealthBase": 1.39276,
-        "bulletPenetration": 1.53333,
+        "bulletDamage": 1.5,
+        "bulletHealthBase": 0.5102,
+        "bulletPenetration": 0.71429,
         "bulletLifetime": 9.766666666666667,
-        "shootResist": 5.55324,
+        "shootResist": 8.232,
         "isCustom": false,
         "animProgress": 0,
         "turretType": "regular",
@@ -243,7 +243,8 @@
         "gunStatScale": 1,
         "color": "#a7a7af",
         "colorMap": 16,
-        "fightResist": 3
+        "fightResist": 3,
+        "releaseDepth": 100
       }
     ],
     "maxSkillPoints": 42,

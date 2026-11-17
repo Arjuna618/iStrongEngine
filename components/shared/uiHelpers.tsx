@@ -1,4 +1,5 @@
 import React from 'react';
+import { TEXT_LIMITS } from '../kit/textLimits';
 import { ChevronDown, Search } from '../ui/icons';
 import { SliderRow, SelectRow, ToggleRow } from '../kit/kit';
 
@@ -9,6 +10,7 @@ export function LibrarySearch({ value, onChange, placeholder }: { value: string;
       <input
         type="text"
         value={value}
+        maxLength={TEXT_LIMITS.SEARCH_SMALL}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
         className="k-text-in w-full pl-7 pr-3 py-1.5 text-[11px] bg-[var(--k-search-bg)] border border-[var(--alpha-card-border)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--k-placeholder)] focus:border-[var(--border-strong)] outline-none"

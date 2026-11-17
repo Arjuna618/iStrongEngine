@@ -60,7 +60,7 @@ export function hudIconOutline(fill: HudRgb, dark: boolean): HudRgb {
 }
 
 export function hudLevelFillHex(dark: boolean): string {
-  return cmHex(CM.PENTAGONS, dark, CM_USE.GENERAL);
+  return cmHex(CM.SQUARES, dark, CM_USE.GENERAL);
 }
 
 export interface HudColors {
@@ -90,7 +90,7 @@ function buildColors(dark: boolean): HudColors {
     track: hudCss(S(HUD_SLOT.GREY)),
     levelFill: hudLevelFillHex(dark),
     scoreFill: hudCss(S(HUD_SLOT.GREEN)),
-    killFill: hudCss(S(HUD_SLOT.TEAL)),
+    killFill: hudCss(S(HUD_SLOT.PURPLE)),
     duTop: hudCss(duTop),
     duBottom: hudCss(duBottom),
     duTopHover: hudCss(hudMix(duTop, S(HUD_SLOT.TEXT), HUD_K_HOVER)),

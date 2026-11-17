@@ -1,4 +1,5 @@
 import { gameThemeUiChanged } from './gameTheme';
+import { uiPaletteSync } from './uiTheme';
 
 const THEME_KEY = 'istrong-theme';
 const SYSTEM_DARK = '(prefers-color-scheme: dark)';
@@ -36,6 +37,7 @@ export function applyTheme(theme: 'light' | 'dark', remember = true): void {
   }
 
   gameThemeUiChanged();
+  uiPaletteSync();
 
   html.offsetHeight;
   document.head.removeChild(style);

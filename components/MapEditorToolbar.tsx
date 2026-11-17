@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { BrickWall, Stone, MevAreas, BlackHole, Eraser, MevEntities, Square, AreaEllipse, AreaPolygon, AreaFree, type LucideIcon } from './ui/icons';
 import { THING_KINDS, thingWordOf } from './mapEvents/fields';
 import { ContentLibrary } from './library/ContentLibrary';
@@ -15,9 +15,12 @@ import { sliderFillStyle } from './shared/uiHelpers';
 import { GRID_SPACING } from '../game/constants';
 import { rockSizeFloor, toolRockSize, setToolRockSize } from '../game/MapEditorInput';
 import { toastPumpkinRockMin } from './shared/labels';
-import { useToast } from './ui/Toast';
+import { useToast, setToastTopRoom } from './ui/Toast';
 import { MotionRow, Fade } from './kit/Collapse';
 import { useIsActiveTool } from './shell/toolStore';
+import { subCornerSlot, cornerSlotNow } from './shell/CanvasCornerTools';
+import { useClassicUi } from './shared/useClassicUi';
+import { createPortal } from 'react-dom';
 import { PLACED_PORTALS } from '../game/placedPortalsSwitch';
 
 interface Props {
@@ -61,6 +64,11 @@ export const MapEditorToolbar: React.FC<Props> = ({ logic, leftInset, rightInset
 
   const custom = logic.isCustomMapActive();
   const shown = onMapTool && logic.isMapDesignerActive && !logic.state.isTestMode && (custom || MAP_EVENTS.ON !== 0);
+  const cornerSlot = useSyncExternalStore(subCornerSlot, cornerSlotNow, cornerSlotNow);
+  const classicUi = useClassicUi();
+  const inSlot = classicUi && !!cornerSlot && !logic.state.isTestMode && (custom || MAP_EVENTS.ON !== 0);
+  useEffect(() => { setToastTopRoom(shown && !classicUi ? 72 : 0); }, [shown, classicUi]);
+  useEffect(() => () => setToastTopRoom(0), []);
 
   const setTool = (tool: MapEditorTool) => {
     const next: MapEditorTool = me.tool === tool ? 'none' : tool;
@@ -81,8 +89,14 @@ export const MapEditorToolbar: React.FC<Props> = ({ logic, leftInset, rightInset
       className="absolute top-4 z-30 flex justify-center pointer-events-none"
       style={{ left: `${leftInset}px`, right: `${rightInset}px` }}
     >
-      <Fade when={shown} className="block">{() => (
-      <MotionRow className="flex items-center gap-2" style={chromeScale !== 1 ? { zoom: chromeScale } : undefined}>
+      {classicUi ? (inSlot && cornerSlot ? createPortal(barRow(false), cornerSlot) : null) : <Fade when={shown} className="block">{() => (barRow(true))}</Fade>} { }
+      {picking && me.tool === 'entity' ? <EntityPicker logic={logic} onClose={() => setPicking(false)} /> : null}
+    </div>
+  );
+
+  function barRow(zoomed: boolean): React.ReactElement {
+    return (
+      <MotionRow className="flex items-center gap-2 k-md-bar" style={zoomed && chromeScale !== 1 ? { zoom: chromeScale } : undefined}>
         <MotionRow.Item key="tools"><div className="pointer-events-auto flex items-center gap-0.5 rounded-xl p-1 bg-[var(--k-strip-bg)] border border-[var(--k-strip-edge)] shadow-[var(--shadow-pop)]">
           {(custom ? TERRAIN : TERRAIN.filter(t => PLACED_PORTALS.ON !== 0 && t.id === 'portal')).map(t => <ToolButton key={t.id} {...t} active={activeTool === t.id} onPick={setTool} />)}
           {custom || PLACED_PORTALS.ON !== 0 ? <span className="k-ev-tool-gap" aria-hidden="true" /> : null}
@@ -93,10 +107,8 @@ export const MapEditorToolbar: React.FC<Props> = ({ logic, leftInset, rightInset
         {me.tool === 'zone' && me.zoneAddTo < 0 && <MotionRow.Item key="area-shape"><AreaShapePill logic={logic} /></MotionRow.Item>} { }
         {me.tool === 'zone' && me.zoneAddTo < 0 && me.zoneShape === 'poly' && <MotionRow.Item key="area-sides"><SidesPill logic={logic} /></MotionRow.Item>} { }
       </MotionRow>
-      )}</Fade>
-      {picking && me.tool === 'entity' ? <EntityPicker logic={logic} onClose={() => setPicking(false)} /> : null}
-    </div>
-  );
+    );
+  }
 };
 
 const ToolButton: React.FC<{ id: MapEditorTool; label: string; Icon: LucideIcon; active: boolean; onPick: (t: MapEditorTool) => void }> = ({ id, label, Icon, active, onPick }) => (

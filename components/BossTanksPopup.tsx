@@ -25,9 +25,9 @@ export const BossTanksPopup: React.FC<Props> = ({ groupName, selectedTanks, libr
     const first = selectedTanks[0];
     const hit = first ? findByShownNameOrFileKey(library, first, false) : undefined;
     const cat = (hit?.fileData?.category as string | undefined) ?? groupName;
-    const col = hit ? collectionOfItem(hit)! : (cat === 'Celestials' ? 'celestials' : 'bosses');
+    const col = hit ? collectionOfItem(hit)! : (cat === 'Celestials' && SMALL_FIX.R968 === 0 ? 'celestials' : 'bosses');
     const picks: [string, string][] = [['collection', col]];
-    if (col === 'bosses' && BOSS_GROUP_IDS.has(cat)) picks.push(['bossGroup', cat]);
+    if (SMALL_FIX.R968 === 0 && col === 'bosses' && BOSS_GROUP_IDS.has(cat)) picks.push(['bossGroup', cat]);
     return { kind: 'tank' as const, picks };
   }, []);
   const pickedIds = useMemo(() => {

@@ -1,4 +1,5 @@
 import { isTouchScreen } from './device';
+import { TEXT_LIMITS } from '../components/kit/textLimits';
 import { getZoomCompensation } from './zoomCompensation';
 
 export const SHEET_KB_GAP = 12;
@@ -86,7 +87,7 @@ function takeKeyboard(job: SheetJob): void {
   f.value = job.start;
   f.setAttribute('inputmode', job.inputMode);
   f.setAttribute('enterkeyhint', 'done');
-  if (job.box && job.box.maxLength > 0) f.maxLength = job.box.maxLength; else f.removeAttribute('maxlength');
+  f.maxLength = job.box && job.box.maxLength > 0 ? job.box.maxLength : TEXT_LIMITS.LINE;
   f.placeholder = job.placeholder;
   f.focus({ preventScroll: true });
   const n = f.value.length;

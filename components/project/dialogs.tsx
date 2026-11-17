@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { TEXT_LIMITS } from '../kit/textLimits';
 import { Modal } from '../kit/Modal';
 import { Switch } from '../kit/kit';
 import { useHeld } from '../kit/presence';
@@ -65,7 +66,7 @@ function NameForm({ spec, handle, onDone }: { spec: Extract<Spec, { kind: 'name'
   return (
     <div className="space-y-1.5">
       <label className="k-pd-label" htmlFor="k-pd-name">{spec.label}</label>
-      <input id="k-pd-name" ref={ref} dir="auto" className="k-text-in k-pd-input" value={v} maxLength={80}
+      <input id="k-pd-name" ref={ref} dir="auto" className="k-text-in k-pd-input" value={v} maxLength={TEXT_LIMITS.NAME}
         onChange={e => { setV(e.target.value); if (err) setErr(null); }}
         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }} />
       <p className={`k-pd-error${err ? '' : ' k-pd-error-off'}`} aria-live="polite">{shownErr ?? '\u00a0'}</p>

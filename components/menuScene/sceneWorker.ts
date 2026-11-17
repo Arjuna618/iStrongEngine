@@ -91,7 +91,7 @@ let glFailed = false;
 const recentFamilies: string[] = [];
 let lastCategory: string | null = null;
 let stepMs = 0;
-const PIC_BUDGET = ((navigator as unknown as { deviceMemory?: number }).deviceMemory ?? 8) <= 4 ? 6e6 : 9.5e6;
+const PIC_BUDGET = ((navigator as unknown as { deviceMemory?: number }).deviceMemory ?? 8) <= 4 ? 6e6 : 24e6;
 
 function newLogic(view: SceneView): any {
   const g: any = new GameLogic(JSON.parse(JSON.stringify(INITIAL_GAME_STATE)));
@@ -223,7 +223,7 @@ async function run(job: Job): Promise<void> {
     }
     const m = await make(job.view, job.spare, job.only);
     if (job.spare) {
-      const [lb, db2] = await Promise.all([m.canvasLight.convertToBlob({ type: 'image/webp', quality: 0.9 }), m.canvasDark.convertToBlob({ type: 'image/webp', quality: 0.9 })]);
+      const [lb, db2] = await Promise.all([m.canvasLight.convertToBlob({ type: 'image/webp', quality: 1 }), m.canvasDark.convertToBlob({ type: 'image/webp', quality: 1 })]);
       await spareSet({ page: job.page, dpr: job.view.dpr, plan: m.plan, light: lb, dark: db2, made: Date.now() });
       post({ t: 'spareSaved', id: job.id });
       return;

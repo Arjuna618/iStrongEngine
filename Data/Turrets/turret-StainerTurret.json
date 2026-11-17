@@ -234,7 +234,8 @@
         "gunStatScale": 1,
         "color": "#a7a7af",
         "colorMap": 16,
-        "fightResist": 3
+        "fightResist": 3,
+        "releaseDepth": 58.6
       },
       {
         "id": "edd5b3f4c143b8a9__g2",
@@ -460,7 +461,8 @@
         "gunStatScale": 1,
         "color": "#a7a7af",
         "colorMap": 16,
-        "fightResist": 3
+        "fightResist": 3,
+        "releaseDepth": 58.6
       }
     ]
   }

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { TEXT_LIMITS } from '../kit/textLimits';
 import type { AreaGroup, EntityType, MapEventsDoc, Named, PlacedEntity, Rule, Sequence, StatusDef, TimerDef, VarDef, WavePlan, ZoneLike } from '../../game/mapEvents/doc';
 import { behaviorsOf } from '../../game/mapEvents/doc';
 import type { Problem } from '../../game/mapEvents/compile';
@@ -8,7 +9,7 @@ import {
   addAreaGroup, addEntityType, addNamed, addPlan, addRule, addStatus, addTag, addTimer, addVar, duplicateRule, indexOfId, insertAt, messagesOf, moveAt, namesOf,
   factsOf, overviewLines, pasteRule, removeAt, sentenceOf, setAt, tagWords, tokensToIds, tokensToNames, usedBy, withIds, pastePlan, usedByNames, copyForPaste, type NamedList, type Path } from '../../game/mapEvents/docOps';
 import { shippedFormOf } from '../../game/mapEvents/presets/index';
-import { Button, Crumbs, EmptyState, FieldRow, Group, IconButton, PickRow, RowLabel, SelectRow, Switch, TextField, ToggleRow, emptyArt } from '../kit/kit';
+import { Button, Crumbs, EmptyState, FieldRow, Group, IconButton, PickRow, RowLabel, RowUnit, SelectRow, Switch, TextField, ToggleRow, emptyArt } from '../kit/kit';
 import { Collapse, PageSwap, Reveal } from '../kit/Collapse';
 import { DropMenu, useDropMenu } from '../kit/DropMenu';
 import { LongList } from '../kit/LongList';
@@ -28,7 +29,7 @@ import { ChevronDown, Copy, MevAreas, MevEntities, MevEvents, MevProblems, MevSe
 
 const num = (s: string): number | undefined => { const v = Number(s); return s.trim() !== '' && Number.isFinite(v) ? v : undefined; };
 export const NumBox: React.FC<{ value: number | undefined | null; onChange: (v: number | undefined) => void; min?: number; max?: number; step?: number; placeholder?: string; unit?: string }> = ({ value, onChange, min, max, step, placeholder, unit }) => (
-  <span className="k-ev-numbox"><NumberBox className="k-field k-ev-num" value={value ?? ''} min={min} max={max} step={step} placeholder={placeholder} onChange={e => onChange(num(e.target.value))} />{unit ? <span className="k-unit">{unit}</span> : null}</span>
+  <span className="k-ev-numbox"><NumberBox className="k-field k-ev-num" value={value ?? ''} min={min} max={max} step={step} placeholder={placeholder} onChange={e => onChange(num(e.target.value))} />{unit ? <RowUnit unit={unit} /> : null}</span>
 );
 
 export function removeNamedThing(ctx: EvCtx, list: NamedList, id: number, word: string): void {
@@ -37,7 +38,7 @@ export function removeNamedThing(ctx: EvCtx, list: NamedList, id: number, word: 
   const thing = (ctx.doc![list] as Named[])[i];
   const used = usedBy(ctx.doc, ctx.zones, id);
   ctx.commit(d => removeAt(d, [list], i));
-  toast('info', `${word} "${thing.name}" removed.${used ? ` ${used} ${used === 1 ? 'link now finds' : 'links now find'} nothing.` : ''}`, { label: 'Undo', run: SMALL_FIX.R908 !== 0 ? sameProjectUndo(ctx.logic, toast, () => ctx.commit(d => insertAt(d, [list], i, thing))) : () => ctx.commit(d => insertAt(d, [list], i, thing)) });
+  toast('info', `${word} "${thing.name}" removed.${used ? ` ${used} ${used === 1 ? 'link now finds' : 'links now find'} nothing.` : ''} Ctrl Z brings it back.`);
 }
 
 export const Bar: React.FC<{ left?: React.ReactNode; children?: React.ReactNode }> = ({ left, children }) => (
@@ -108,7 +109,7 @@ export const OverviewPage: React.FC<{ ctx: EvCtx; problems: readonly (Problem | 
       detail={<div className="k-ev-page">
         <DetailHead title="This Map" />
         <Group title="Title And Note">
-          <FieldRow stacked label="Title" help="The name of this set of Map Events. A mode saved as a file takes it as its name."><TextField value={ctx.doc?.meta?.title ?? ''} onChange={v => ctx.commit(d => setAt(d, ['meta', 'title'], v || undefined))} /></FieldRow>
+          <FieldRow stacked label="Title" help="The name of this set of Map Events. A mode saved as a file takes it as its name."><TextField maxLength={TEXT_LIMITS.NAME} value={ctx.doc?.meta?.title ?? ''} onChange={v => ctx.commit(d => setAt(d, ['meta', 'title'], v || undefined))} /></FieldRow>
           <FieldRow stacked label="Note" help="A note for yourself. It changes nothing in play."><TextField value={ctx.doc?.meta?.note ?? ''} onChange={v => ctx.commit(d => setAt(d, ['meta', 'note'], v || undefined))} /></FieldRow>
         </Group>
         <Group title="Random Rolls">
@@ -122,7 +123,7 @@ export const OverviewPage: React.FC<{ ctx: EvCtx; problems: readonly (Problem | 
         </Group>
         <div className="k-ev-stack">
           <Button variant="secondary" block onClick={onTemplates}>{lines.length ? 'Add From A Template' : 'Start From A Template'}</Button>
-          <Reveal when={!!onRestore}><Button variant="ghost" block onClick={onRestore} title="Puts this mode's Map Events and Custom Areas back as they were shipped. The toast has an Undo.">Restore Shipped</Button></Reveal>
+          <Reveal when={!!onRestore}><Button variant="ghost" block onClick={onRestore} title="Puts this mode's Map Events and Custom Areas back as they were shipped. Ctrl Z takes it back.">Restore Shipped</Button></Reveal>
         </div>
       </div>}
     />
@@ -177,7 +178,7 @@ const RuleDetail: React.FC<{ rule: Rule; i: number; ctx: EvCtx }> = ({ rule, i, 
       <Group title="Only If"><RowList family="cond" list={rule.cond} path={[...path, 'cond']} ctx={ctx} addLabel="Add A Test" numbered={false} /></Group>
       <Group title="Do"><RowList family="step" list={rule.then} path={[...path, 'then']} ctx={ctx} addLabel="Add A Step" numbered /></Group>
       <Group title="Name And Folder" foldKey={`rule-name`} collapsible defaultOpen={false}>
-        <FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField value={rule.name} onChange={v => put('name', v)} /></FieldRow>
+        <FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField maxLength={TEXT_LIMITS.NAME} value={rule.name} onChange={v => put('name', v)} /></FieldRow>
         <FieldRow stacked label="Note" help="A note for yourself. It changes nothing in play."><TextField value={rule.note ?? ''} onChange={v => put('note', v || undefined)} /></FieldRow>
         <SelectRow label="Folder" help="Folders tidy the list. A folder turned off turns off all its events." value={rule.folder === undefined ? '' : String(rule.folder)} onChange={v => put('folder', v ? Number(v) : undefined)} options={[{ value: '', label: 'No Folder' }, ...(ctx.doc?.folders ?? []).map(f => ({ value: String(f.id), label: f.name }))]} />
       </Group>
@@ -208,7 +209,7 @@ const FolderMenu: React.FC<{ id: number; ctx: EvCtx }> = ({ id, ctx }) => {
       <IconButton ref={menu.triggerRef as React.Ref<HTMLButtonElement>} size="sm" label="This Folder" onClick={e => menu.toggle(e.currentTarget.getBoundingClientRect())}><MoreHorizontal size={14} /></IconButton>
       <DropMenu menu={menu} className="k-menu k-ev-pop popup-scrollbar" label="This Folder">
         <div className="k-ev-form">
-          <FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField value={f.name} onChange={v => ctx.commit(d => setAt(d, ['folders', at(d), 'name'], v))} /></FieldRow>
+          <FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField maxLength={TEXT_LIMITS.NAME} value={f.name} onChange={v => ctx.commit(d => setAt(d, ['folders', at(d), 'name'], v))} /></FieldRow>
           <FieldRow stacked label="Note" help="A note for yourself. It changes nothing in play."><TextField value={f.note ?? ''} onChange={v => ctx.commit(d => setAt(d, ['folders', at(d), 'note'], v || undefined))} /></FieldRow>
           <Button size="sm" variant="ghost" block icon={<Trash2 size={13} />} title="Its events stay, out of any folder" onClick={() => { menu.close(); ctx.commit(d => { let n = removeAt(d, ['folders'], at(d)); (d?.rules ?? []).forEach((r, i) => { if (r.folder === id) n = setAt(n, ['rules', i, 'folder'], undefined); }); return n; }); }}>Remove This Folder</Button>
         </div>
@@ -362,7 +363,7 @@ const EntityDetail: React.FC<{ e: PlacedEntity; i: number; ctx: EvCtx }> = ({ e,
     <div className="k-ev-page">
       <DetailHead title={e.name} right={<Switch checked={!e.off} label={e.off ? 'Off' : 'On'} onChange={v => put('off', v ? undefined : true)} />} />
       <Group title="What It Is">
-        <FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField value={e.name} onChange={v => put('name', v)} /></FieldRow>
+        <FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField maxLength={TEXT_LIMITS.NAME} value={e.name} onChange={v => put('name', v)} /></FieldRow>
         <SelectRow label="Entity Type" help="What it is: its tank, how it acts and what it becomes. Many Map Entities can share one." value={String(e.type?.id ?? '')} options={choicesOf('type', ctx).map(x => ({ value: String(x.id), label: x.name }))} onChange={v => { const hit = choicesOf('type', ctx).find(x => String(x.id) === v); if (hit) put('type', { id: hit.id, n: hit.name }); }} />
         <SelectRow label="Starts As" help="Which form of its Entity Type it stands in when the match starts." value={String(e.startForm ?? '')} options={[{ value: '', label: 'Its First Form' }, ...(type?.forms ?? []).map(f => ({ value: String(f.id), label: f.name }))]} onChange={v => put('startForm', v ? Number(v) : undefined)} />
         <SelectRow label="Home Area" help="A rule can say: the home area of this one." value={String(e.home?.id ?? '')} options={[{ value: '', label: 'None' }, ...choicesOf('area', ctx).map(x => ({ value: String(x.id), label: x.name }))]} onChange={v => { const hit = choicesOf('area', ctx).find(x => String(x.id) === v); put('home', hit ? { id: hit.id, n: hit.name } : undefined); }} />
@@ -461,7 +462,7 @@ export const AreasPage: React.FC<{ ctx: EvCtx; search: string; focus?: number | 
             <LongList estimate={130} count={groups.length} rowKey={n => String(groups[n].id)} renderRow={gi => { const g: AreaGroup = groups[gi]; return (
                 <div className="k-ev-group-row">
                   <div className="k-ev-group-head">
-                    <TextField value={g.name} onChange={v => ctx.commit(d => setAt(d, ['areaGroups', gi, 'name'], v))} />
+                    <TextField maxLength={TEXT_LIMITS.NAME} value={g.name} onChange={v => ctx.commit(d => setAt(d, ['areaGroups', gi, 'name'], v))} />
                     <IconButton size="sm" label="Remove" onClick={() => removeNamedThing(ctx, 'areaGroups', g.id, 'Area Group')}><Trash2 size={13} /></IconButton>
                   </div>
                   <ChipsField values={g.members.map(r => ({ key: String(r.id), label: r.n }))} offer={choicesOf('area', ctx).map(x => ({ key: String(x.id), label: x.name }))} addLabel="Add An Area"
@@ -476,7 +477,7 @@ export const AreasPage: React.FC<{ ctx: EvCtx; search: string; focus?: number | 
       detail={at >= 0 ? (
         <div className="k-ev-page">
           <DetailHead title={ctx.zones[at].name ?? 'Custom Area'} />
-          <Group title="This Area"><FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField value={ctx.zones[at].name ?? ''} onChange={v => ctx.commit(d => setAt(d, [ZONES_KEY, at, 'name'], v))} /></FieldRow></Group>
+          <Group title="This Area"><FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField maxLength={TEXT_LIMITS.NAME} value={ctx.zones[at].name ?? ''} onChange={v => ctx.commit(d => setAt(d, [ZONES_KEY, at, 'name'], v))} /></FieldRow></Group>
           <Group title="What It Does"><AreaBehaviors z={ctx.zones[at]} i={at} ctx={ctx} /></Group>
         </div>
       ) : null}
@@ -532,7 +533,7 @@ export const VarsPage: React.FC<{ ctx: EvCtx }> = ({ ctx }) => {
         <div className="k-ev-page">
           <DetailHead title={list[i].name} />
           <Group title="This Variable">
-            <FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField value={list[i].name} onChange={x => put('name', x)} /></FieldRow>
+            <FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField maxLength={TEXT_LIMITS.NAME} value={list[i].name} onChange={x => put('name', x)} /></FieldRow>
             <SelectRow label="Holds" help="A number, or just on and off." value={list[i].kind} onChange={x => put('kind', x)} options={[{ value: 'number', label: 'A Number' }, { value: 'onoff', label: 'On Or Off' }]} />
             <FieldRow label="Starts At" help="Its value when the match starts."><NumBox value={list[i].start} onChange={x => put('start', x ?? 0)} /></FieldRow>
             <SelectRow label="One For" help="The Match: one number for everyone. Each Side, Each Tank: a number of its own for each." value={list[i].scope} onChange={x => put('scope', x)} options={[{ value: 'match', label: 'The Match' }, { value: 'team', label: 'Each Side' }, { value: 'body', label: 'Each Tank' }]} />
@@ -561,7 +562,7 @@ export const TimersPage: React.FC<{ ctx: EvCtx }> = ({ ctx }) => {
         <div className="k-ev-page">
           <DetailHead title={list[i].name} />
           <Group title="This Timer">
-            <FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField value={list[i].name} onChange={x => put('name', x)} /></FieldRow>
+            <FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField maxLength={TEXT_LIMITS.NAME} value={list[i].name} onChange={x => put('name', x)} /></FieldRow>
             <FieldRow label="Lasts" help="How long it counts down."><NumField value={list[i].seconds} unit="s" onChange={x => put('seconds', x)} /></FieldRow>
             <FieldRow stacked label="Tells At These Seconds Left" help="A Map Event can start at each of these seconds. Numbers with commas."><TextField value={(list[i].marks ?? []).join(', ')} placeholder="30, 10, 5" onChange={x => { const l = x.split(/[^0-9.]+/).filter(Boolean).map(Number); put('marks', l.length ? l : undefined); }} /></FieldRow>
             <ToggleRow label="Starts Over" help="At zero it starts again by itself." checked={!!list[i].repeat} onChange={x => put('repeat', x || undefined)} />
@@ -580,7 +581,7 @@ const NamedList_: React.FC<{ title: string; list: 'signals' | 'tags'; word: stri
     <Group title={title} count={rows.length} right={<IconButton size="sm" label={`New ${word}`} onClick={() => ctx.commit(d => (list === 'tags' ? addTag(d, word).doc : addNamed(d, 'signals', word).doc))}><Plus size={14} /></IconButton>}>
       <LongList estimate={44} empty={<div className="k-ev-note">{hint}</div>} count={rows.length} rowKey={i => String(rows[i].id)} renderRow={i => { const t = rows[i]; return (
         <div className="k-ev-name-row">
-          <TextField value={t.name} onChange={x => ctx.commit(d => setAt(d, [list, i, 'name'], x))} />
+          <TextField maxLength={TEXT_LIMITS.NAME} value={t.name} onChange={x => ctx.commit(d => setAt(d, [list, i, 'name'], x))} />
           <span className="k-count" title={usedByNames(ctx.doc, ctx.zones, t.id).join(', ') || undefined}>{`Used By: ${usedBy(ctx.doc, ctx.zones, t.id)}`}</span>
           <IconButton size="sm" label="Remove" onClick={() => removeNamedThing(ctx, list, t.id, word)}><Trash2 size={13} /></IconButton>
         </div>
@@ -619,7 +620,7 @@ export const StatusesPage: React.FC<{ ctx: EvCtx }> = ({ ctx }) => {
         <div className="k-ev-page">
           <DetailHead title={list[i].name} />
           <Group title="This Status">
-            <FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField value={list[i].name} onChange={x => put('name', x)} /></FieldRow>
+            <FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField maxLength={TEXT_LIMITS.NAME} value={list[i].name} onChange={x => put('name', x)} /></FieldRow>
             <ToggleRow label="For Ever, Until Removed" help="It has no time of its own: it lasts until a step takes it off." checked={list[i].seconds === null} onChange={x => put('seconds', x ? null : 5)} />
             <Reveal when={list[i].seconds !== null}>{() => <FieldRow label="Lasts" help="How long it counts down."><NumField value={list[i].seconds as never} unit="s" onChange={x => put('seconds', x)} /></FieldRow>}</Reveal>
             <SelectRow label="Given Again" help="What happens when a tank that has it is given it again." value={list[i].stack ?? 'restart'} options={[{ value: 'restart', label: 'Starts Its Time Over' }, { value: 'extend', label: 'Adds To Its Time' }, { value: 'ignore', label: 'Does Nothing' }]} onChange={x => put('stack', x)} />
@@ -681,7 +682,7 @@ export const SequencesPage: React.FC<{ ctx: EvCtx }> = ({ ctx }) => {
         <div className="k-ev-page">
           <DetailHead title={s.name} />
           <Group title="This Sequence">
-            <FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField value={s.name} onChange={x => put('name', x)} /></FieldRow>
+            <FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField maxLength={TEXT_LIMITS.NAME} value={s.name} onChange={x => put('name', x)} /></FieldRow>
             <ToggleRow label="Player Cannot Act While It Plays" help="On: the player's tank cannot move or shoot until it has ended. Esc and the menus still work. With no time typed below, it ends after 2 minutes at the latest." checked={!!s.lockInput} onChange={x => put('lockInput', x || undefined)} />
             <Reveal when={!!s.lockInput}>
               <SelectRow label="While The Player Is Held" help="Protect The Player: as after a spawn, nothing can hurt it and bots ignore it, while the match goes on. Bots Stop Too: it is protected, and every bot stands and holds its fire, but one this sequence orders to walk still walks. Nothing Special: bots can shoot it and it can die." value={s.whileHeld ?? 'protect'} options={[{ value: 'protect', label: 'Protect The Player' }, { value: 'botsStop', label: 'Bots Stop Too' }, { value: 'nothing', label: 'Nothing Special' }]} onChange={x => put('whileHeld', x === 'protect' ? undefined : x)} />
@@ -691,7 +692,7 @@ export const SequencesPage: React.FC<{ ctx: EvCtx }> = ({ ctx }) => {
           </Group>
           {s.tracks.map((t, ti) => (
             <Group key={t.id} title={t.name} foldKey={`track-${t.id}`} collapsible right={<IconButton size="sm" label="Remove this track" disabled={s.tracks.length < 2} onClick={() => ctx.commit(d => removeAt(d, ['sequences', i, 'tracks'], ti))}><Trash2 size={13} /></IconButton>}>
-              <FieldRow stacked label="Name" help="Its name, for you. A track plays beside the other tracks."><TextField value={t.name} onChange={x => ctx.commit(d => setAt(d, ['sequences', i, 'tracks', ti, 'name'], x))} /></FieldRow>
+              <FieldRow stacked label="Name" help="Its name, for you. A track plays beside the other tracks."><TextField maxLength={TEXT_LIMITS.NAME} value={t.name} onChange={x => ctx.commit(d => setAt(d, ['sequences', i, 'tracks', ti, 'name'], x))} /></FieldRow>
               <div className="k-ev-list k-ev-rowlist">
                 <LongList gap={0} estimate={46} className="k-ev-rows" count={t.clips.length} rowKey={ci => String(t.clips[ci].id)} renderRow={ci => <ClipCard clip={t.clips[ci]} path={['sequences', i, 'tracks', ti, 'clips', ci]} listPath={['sequences', i, 'tracks', ti, 'clips']} index={ci} ctx={ctx} />} />
                 <EvSelect add="Add A Step" groups={groupsOfKinds('step')} onChange={k => ctx.commit(d => { const r = withIds(d, id => ({ id: id(), at: t.clips.length ? t.clips[t.clips.length - 1].at + 1 : 0, step: { id: id(), k, a: {} } })); _justAddedClip = r.value.id; return insertAt(r.doc, ['sequences', i, 'tracks', ti, 'clips'], -1, r.value); })} />

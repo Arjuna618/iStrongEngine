@@ -5,7 +5,8 @@ import { buildDominationWorld, buildAssaultWorld } from './objectives';
 import { buildMissingWorld } from './missingModes';
 import { MODE_WORLDS, isWorldId } from '../../modeWorlds';
 import { BASE_AREAS, teamBaseRow } from '../../baseAreas';
-export const OVERLAY_WORDS = ['blackout', 'outbreak', 'soccer', 'magic-maze',
+import { SMALL_FIX } from '../../smallFixSwitch';
+export const OVERLAY_WORDS = ['blackout', 'outbreak', 'blackout-outbreak', 'soccer', 'magic-maze',
   'domination', 'assault', 'mothership', 'tag', 'clan-wars', 'ctf', 'labyrinth', 'nexus', 'forge'] as const;
 export type OverlayWord = typeof OVERLAY_WORDS[number];
 export function isOverlayWord(w: unknown): w is OverlayWord { return typeof w === 'string' && (OVERLAY_WORDS as readonly string[]).includes(w); }
@@ -23,7 +24,8 @@ function blackoutDoc(): MapEventsDoc {
   } as unknown as MapEventsDoc;
 }
 
-export const OUTBREAK = { GREY_SECONDS: 3, GREY_DAMAGE_PCT: 10, ZOMBIE_SPEED_PCT: 75, ZOMBIE_PUSH_PCT: 50, END_ASK_SECONDS: 0.25 } as const;
+export const OUTBREAK = { GREY_SECONDS: 3, GREY_DAMAGE_PCT: 10, ZOMBIE_SPEED_PCT: 75, ZOMBIE_PUSH_PCT: 50, END_ASK_SECONDS: 0.25,
+  ZOMBIE_SIGHT_PCT: 400, ZOMBIE_UNITS_PCT: 400 } as const;
 const SLOT_GREY = 16, SLOT_GREEN = 11;
 
 function outbreakDoc(): MapEventsDoc {
@@ -56,6 +58,7 @@ function outbreakDoc(): MapEventsDoc {
       { id: RISEN.id, name: RISEN.name, seconds: null, effects: [
         { id: 41, k: 'colour', a: { slot: SLOT_GREEN } }, { id: 42, k: 'speedBy', a: { pct: OUTBREAK.ZOMBIE_SPEED_PCT } },
         { id: 43, k: 'pushBy', a: { pct: OUTBREAK.ZOMBIE_PUSH_PCT } }, { id: 44, k: 'mind', a: { mind: 'zombie' } },
+        ...(SMALL_FIX.R962Z !== 0 ? [{ id: 45, k: 'sightBy', a: { pct: OUTBREAK.ZOMBIE_SIGHT_PCT } }, { id: 46, k: 'unitsReach', a: { pct: OUTBREAK.ZOMBIE_UNITS_PCT, straight: true } }] : []),
       ] },
       { id: FOLLOW.id, name: FOLLOW.name, seconds: null, effects: [{ id: 51, k: 'colour', a: { slot: SLOT_GREY } }] },
       { id: TURNED.id, name: TURNED.name, seconds: null, effects: [{ id: 61, k: 'tag', a: { tag: ref(ZOMBIE) } }] },
@@ -64,7 +67,7 @@ function outbreakDoc(): MapEventsDoc {
       { id: 100, name: 'Outbreak: the dead rise', maxRuns: 600, when: [{ id: 101, k: 'body.died', a: {} }],
         cond: [{ id: 102, k: 'not', a: { list: [{ id: 103, k: 'body.is', a: { who: { w: 'subject' }, is: { tags: [ref(ZOMBIE)] } } }] } }],
         then: rise(110, { w: 'subject' }) },
-      { id: 120, name: 'Outbreak: the player rises, as a bot', when: [{ id: 121, k: 'player.died', a: {} }], cond: [],
+      { id: 120, name: 'Outbreak: the player rises, as a bot', when: [{ id: 121, k: 'player.died', a: SMALL_FIX.R962 !== 0 ? { cause: 'notSelf' } : {} }], cond: [],
         then: [{ id: 122, k: 'say', a: { to: 'subject', text: 'You died and became a Zombified {tank}!', life: 6 } }, ...rise(130, { w: 'subject' })] },
       { id: 140, name: 'Outbreak: a Necromancer raises a zombie', when: [{ id: 141, k: 'body.died', a: { who: { tags: [ref(ZOMBIE)] } } }],
         cond: [{ id: 142, k: 'killer.is', a: { is: { tanks: NECRO } } }],
@@ -72,13 +75,27 @@ function outbreakDoc(): MapEventsDoc {
       { id: 160, name: 'Outbreak: a fallen Necromancer\'s followers turn', when: [{ id: 161, k: 'body.died', a: { who: { tanks: NECRO } } }], cond: [], then: turnFollowers(170) },
       { id: 180, name: 'Outbreak: the player Necromancer\'s followers turn', when: [{ id: 181, k: 'player.died', a: {} }],
         cond: [{ id: 182, k: 'body.is', a: { who: { w: 'subject' }, is: { tanks: NECRO } } }], then: turnFollowers(190) },
-      { id: 220, name: 'Outbreak: the zombies take over', when: [{ id: 221, k: 'player.died', a: {} }], cond: [],
+      { id: 220, name: 'Outbreak: the zombies take over', when: [{ id: 221, k: 'player.died', a: SMALL_FIX.R962 !== 0 ? { cause: 'notSelf' } : {} }], cond: [],
         then: [{ id: 222, k: 'wait', a: { seconds: OUTBREAK.END_ASK_SECONDS } }, { id: 223, k: 'if', a: {
           cond: [{ id: 224, k: 'not', a: { list: [{ id: 225, k: 'living.left', a: {} }] } }],
           then: [{ id: 226, k: 'match.end', a: { result: 'lose', team: 'player', then: 'closeArena', closing: 'The zombies have taken over!', closed: 'Arena closed.', screen: 'The Zombies Have Taken Over' } }],
           else: [] } }] },
     ],
   } as unknown as MapEventsDoc;
+}
+
+function outbreakFor(dark: boolean, world: string | undefined, teams: number | undefined): MapEventsDoc {
+  const d = outbreakDoc() as unknown as { nextId: number; rules: unknown[]; match: Record<string, unknown> };
+  if (dark) {
+    d.rules.push({ id: 401, name: 'Blackout: the lights go out', when: [{ id: 402, k: 'match.started', a: {} }], cond: [], then: [{ id: 403, k: 'darkness', a: { where: 'map', on: true, fade: 0 } }] });
+    d.nextId = 410;
+  }
+  const w = isWorldId(world) ? MODE_WORLDS[world] : undefined;
+  if (w && w.overlay === 'clan-wars') {
+    const own = buildMissingWorld('clan-wars', world, w.drawing, teams ?? w.teams ?? 2)?.events as unknown as { match?: { clans?: unknown } } | undefined;
+    if (own?.match?.clans) d.match = { ...d.match, clans: own.match.clans };
+  }
+  return d as unknown as MapEventsDoc;
 }
 
 export const SOCCER = {
@@ -179,7 +196,8 @@ export function buildOverlayEvents(word: string | undefined, world?: string, tea
   const _mw = missingOf(word, world, teams); if (_mw) return _mw.events;
   switch (word) {
     case 'blackout': return blackoutDoc();
-    case 'outbreak': return outbreakDoc();
+    case 'outbreak': return SMALL_FIX.R962C !== 0 ? outbreakFor(false, world, teams) : outbreakDoc();
+    case 'blackout-outbreak': return outbreakFor(true, world, teams);
     case 'soccer': return soccerDoc();
     case 'magic-maze': return magicMazeDoc();
     default: return null;

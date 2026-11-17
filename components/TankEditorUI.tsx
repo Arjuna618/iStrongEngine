@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useSwapStage, useGlideHeight } from './kit/motion';
 import { GameLogic } from '../game/GameLogic';
-import { Plus, Trash2, Layers, SlidersHorizontal, Copy, Pencil, Tags, CanvasTool, HdPhysics, Settings2, HdPreferenceHorizontal, HdAiElements, HdProfile02, HdGeometricShapes01, HdFingerprintPattern, HdAiBrain01, HdAiSparkles } from './ui/icons';
+import { Plus, Trash2, Layers, SlidersHorizontal, Copy, Pencil, Tags, CanvasTool, HdPhysics, Settings2, HdPreferenceHorizontal, BodyLayersIcon, HdProfile02, HdGeometricShapes01, HdFingerprintPattern, HdAiBrain01, HdAiSparkles } from './ui/icons';
 import { ScrollArea } from './ui/ScrollArea';
 import { Group, ToggleRow, SliderRow, SelectRow, FieldRow, Segmented, PickRow, NumberField, IconButton, Button, EmptyState, headerIcon, emptyArt } from './kit/kit';
 import { Reveal, MotionList, PageSwap, SwapText } from './kit/Collapse';
@@ -262,7 +262,7 @@ export const TankEditorUI: React.FC<Props> = ({ logic, onUpdate, className, show
           value={s.fovMultiplier} onChange={v => handleChange('fovMultiplier', v)} min={0.5} max={2.0} step="any" display={(s.fovMultiplier ?? 1).toFixed(2)} />
       </Group>
 
-      <Group title={isProjectile ? 'Projectile Layers' : 'Tank Body Layers'} icon={headerIcon(HdAiElements)} count={`${s.bodyLayers.length} / ${MAX_BODY_LAYERS}`}>
+      <Group title={isProjectile ? 'Projectile Layers' : 'Tank Body Layers'} icon={headerIcon(BodyLayersIcon)} count={`${s.bodyLayers.length} / ${MAX_BODY_LAYERS}`}>
         <div className="max-h-56 overflow-y-auto custom-scrollbar -mx-1 px-1">
           <MotionList gap={8}>
           <PickRow key="main" title="Main Body" selected={s.activeBodyLayerId === null}
@@ -288,7 +288,7 @@ export const TankEditorUI: React.FC<Props> = ({ logic, onUpdate, className, show
                 </IconButton>
               } />
           ))}
-          {s.bodyLayers.length === 0 && <div key="none"><EmptyState icon={emptyArt(HdAiElements)} title="No extra layers" /></div>}
+          {s.bodyLayers.length === 0 && <div key="none"><EmptyState icon={emptyArt(BodyLayersIcon)} title="No extra layers" /></div>}
           </MotionList>
         </div>
         <Button block size="sm" icon={<Plus size={14} />} disabled={layersFull} onClick={addLayer}>

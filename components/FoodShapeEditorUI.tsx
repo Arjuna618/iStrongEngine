@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { TEXT_LIMITS } from './kit/textLimits';
 import { GameLogic } from '../game/GameLogic';
 import { ArrowLeft, Pentagon, HdAiElements, HdColorPicker, HdRanking, HdPendulum } from './ui/icons';
 import { ScrollArea } from './ui/ScrollArea';
@@ -86,7 +87,7 @@ export const FoodShapeEditorUI: React.FC<Props> = ({ logic, onUpdate, className 
 
       <Group title="Shape" icon={headerIcon(HdAiElements)}>
         <FieldRow label="Name" help="Display name. The shape id is made from it." stacked>
-          <TextField value={d.name} onChange={v => patch({ name: v })} placeholder="e.g. Golden Pentagon" />
+          <TextField maxLength={TEXT_LIMITS.NAME} value={d.name} onChange={v => patch({ name: v })} placeholder="e.g. Golden Pentagon" />
         </FieldRow>
         {isPoly && (
           <p className="k-row-desc">This is a polyhedron. Its look comes from the game's own model and cannot be edited here. Size and stats can.</p>
@@ -100,7 +101,7 @@ export const FoodShapeEditorUI: React.FC<Props> = ({ logic, onUpdate, className 
           <SliderRow label="Nesting" help="Nested inner layers, like the Beta to Delta shapes. 0 = none." deferred
             value={d.labyLevel} onChange={v => patch({ labyLevel: clampNum(Math.round(v), 0, 5) as LabyLevel })} min={0} max={5} step={1} format={fmtNesting} />
         </>)}
-        <SliderRow label="Size" help="Outer size in game units, the same number the Shape Spawner uses."
+        <SliderRow label="Size" help="Outer size in game units, the same number the Spawn Tool uses."
           value={d.size} onChange={v => setStat('size', v)} min={STAT_RANGE.size.min} max={STAT_RANGE.size.max} step="any" display={fmtStat(d.size)} />
         <ToggleRow label="Size Randomization" description="Spawns vary a little in size."
           help="Each spawn is a little bigger or smaller. Its health stays the same."

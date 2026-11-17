@@ -23,7 +23,7 @@ export interface SpawnReq {
   score: number; worthNothing: boolean; killLine: string;
   brain: 'full' | 'none' | 'order'; orderIdx: number; sight: number;
   birthLook: 'none' | 'food'; crashersIgnore: boolean; canBeHealed: boolean; contact: 'tank' | 'shape';
-  pushable: boolean | null; health: number; level: number; skills: Record<string, number> | null; classWord: string;
+  pushable: boolean | null; solid: boolean | null; health: number; level: number; skills: Record<string, number> | null; classWord: string;
   graceMs: number;
   refill: 'none' | 'shield' | 'all';
   placed: boolean;
@@ -111,3 +111,4 @@ export interface MapEventsHost {
 export const CAUSE_HIT = 0, CAUSE_AREA = 1, CAUSE_RULE = 2, CAUSE_OTHER = 3;
 export const ORDER_STAND = -2;
 export const CAUSE_BECOME = 4;
+export const CAUSE_SELF = 5;

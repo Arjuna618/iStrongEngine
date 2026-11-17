@@ -98,11 +98,13 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
     claimsEscape: true,
     estimatedHeight: 256,
     estimatedWidth: menuWidth,
+    hangs: true,
   });
 
   const toggleAt = (el: HTMLElement) => {
     const rect = el.getBoundingClientRect();
-    if (!isOpen) setMenuWidth(rect.width / (getVisualScale(el) || 1));
+    const dpr = window.devicePixelRatio || 1;
+    if (!isOpen) setMenuWidth((Math.round(rect.right * dpr) - Math.round(rect.left * dpr)) / dpr / (getVisualScale(el) || 1));
     toggle(rect);
   };
 
@@ -241,6 +243,8 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
         onBlur={() => { if (isOpen) close(); }}
         disabled={disabled}
         className={addLabel ? 'k-btn k-btn-secondary k-btn-sm w-full' : 'k-select-trigger'}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
         data-kfade-row=""
       >
         {addLabel ? <><span className="k-btn-icon"><Plus size={13} /></span><span className="truncate">{addLabel}</span></> : <>
@@ -262,7 +266,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
           <div className={`fixed inset-0 z-[9998]${leaving ? ' pointer-events-none' : ''}`} {...backdropProps} />
           <div
             ref={popupRef as React.RefObject<HTMLDivElement>}
-            className={`fixed z-[9999] k-drop-glass rounded-lg border border-[var(--alpha-card-border)] p-1 max-h-64 overflow-y-auto ${flatOptions.length > LONG_LIST ? 'popup-scrollbar' : 'custom-scrollbar'} ${dropClass}`}
+            className={`fixed z-[9999] k-drop-glass k-select-list${flatOptions.length > LONG_LIST ? ' k-select-long' : ''} rounded-lg border border-[var(--alpha-card-border)] p-1 max-h-64 overflow-y-auto ${flatOptions.length > LONG_LIST ? 'popup-scrollbar' : 'custom-scrollbar'} ${dropClass}`}
             style={{ ...popupStyle, width: menuWidth }}
           >
             <div className="k-drop-in">

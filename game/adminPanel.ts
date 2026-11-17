@@ -66,6 +66,9 @@ export interface AdminHost {
   playerGroupId: number;
   _adminRebuildNav(ms: MapState, nav?: boolean): void;
   _mmPanelTakes(w: WallEntity): void;
+  spawnerProps: FloatingPolygon[];
+  _spawnerDropProp(p: FloatingPolygon): boolean;
+  _spawnerIsProp(p: FloatingPolygon): boolean;
   _adminTakesPlace(from: FloatingPolygon, to: FloatingPolygon): void;
   _adminExitOf(x: number, y: number, r: number): { x: number; y: number };
   _adminPushPlayer(x: number, y: number): void;
@@ -176,7 +179,8 @@ const ROCK_SHAPE = -9, ROCK_MIN = 30, ROCK_MAX = 1500;
 
 export interface WallLook { look: ShapeLook; perHalf: number; type: number; bodyMap: number }
 export interface DyingWall { x: number; y: number; halfW: number; halfH: number; look: WallLook | null; at: number; wi: number; slot: number }
-export interface DyingRock { x: number; y: number; size: number; shape: number; rotation: number; lookDx: number; lookDy: number; at: number; slot: number }
+export interface DyingRock { x: number; y: number; size: number; shape: number; rotation: number; lookDx: number; lookDy: number; at: number; slot: number;
+  pumpkin?: boolean }
 
 export function designOf(def: ShapeDefinition | undefined): number {
   if (!def) return -1;
@@ -654,6 +658,7 @@ export class AdminPanel {
     }
     if (kind === K_SHAPE) {
       const p = ref as FloatingPolygon;
+      if (h._spawnerIsProp(p)) return h._spawnerDropProp(p);
       if (!p.active || p.fadingOut) return false;
       p.hp = 0; p.shield = 0; p.fadingOut = true;
       h.distributeShapeXp(p);
@@ -675,7 +680,7 @@ export class AdminPanel {
     const h = this.host;
     if (this.rockUndo.indexOf(r) < 0) this.rockUndo.push(r);
     r.active = false;
-    if (look) this.dyingRocks.push({ x: r.x, y: r.y, size: r.size, shape: r.shape, rotation: r.rotation, lookDx: r.lookDx || 0, lookDy: r.lookDy || 0, at: h.gameNow(), slot: this.slotOf(r) });
+    if (look) this.dyingRocks.push({ x: r.x, y: r.y, size: r.size, shape: r.shape, rotation: r.rotation, lookDx: r.lookDx || 0, lookDy: r.lookDy || 0, at: h.gameNow(), slot: this.slotOf(r), pumpkin: r.pumpkin === true });
     this._ungridRock(r);
     this._rocksChanged(r);
     this._refreshLive();
@@ -1076,7 +1081,7 @@ export class AdminPanel {
   }
 
   private _changeable(kind: number, ref: unknown): boolean {
-    if (kind === K_SHAPE) return designOf(getShapeDef((ref as FloatingPolygon).shapeId)) >= 0;
+    if (kind === K_SHAPE) return !this.host._spawnerIsProp(ref as FloatingPolygon) && designOf(getShapeDef((ref as FloatingPolygon).shapeId)) >= 0;
     return kind === K_WALL || kind === K_ROCK;
   }
 
@@ -1453,6 +1458,7 @@ export class AdminPanel {
     return this._nKind !== K_NONE;
   }
 
+  wallLookOf(t: number): WallLook | null { return this._wallLook(t); }
   private _wallLook(t: number): WallLook | null {
     if (t <= 0 || t >= WALL_IDS.length) return null;
     const had = this.wallLooks[t];
@@ -1521,6 +1527,47 @@ export class AdminPanel {
     this._track(w);
     this._mapChanged();
     return w;
+  }
+
+  wallSnap(x: number, y: number, cells: number, out: { x: number; y: number; half: number }): void {
+    const n = Math.max(1, Math.floor(cells) || 1), half = n * WALL_CELL / 2;
+    this._cornerAt(x, y);
+    out.x = this.gAx + Math.round((x - half - this.gAx) / WALL_CELL) * WALL_CELL + half;
+    out.y = this.gAy + Math.round((y - half - this.gAy) / WALL_CELL) * WALL_CELL + half;
+    out.half = half;
+  }
+  spawnerWall(x: number, y: number, t: number, cells: number): boolean {
+    const box = this._snapBox;
+    this.wallSnap(x, y, cells, box);
+    const w = this._addWall(box.x, box.y, box.half, t > 0 && t < WALL_NAMES.length ? t : 0);
+    if (w === null) return false;
+    this._pushOut(K_WALL, w);
+    this._spawned++;
+    return true;
+  }
+  private _snapBox = { x: 0, y: 0, half: 0 };
+  spawnerRock(x: number, y: number, r: number, angle: number): boolean {
+    const rock = this._addRock(x, y, Math.max(ROCK_MIN, Math.min(ROCK_MAX, r)));
+    if (rock === null) return false;
+    rock.pumpkin = true;
+    rock.rotation = angle || 1e-6;
+    this._pushOut(K_ROCK, rock);
+    this._spawned++;
+    return true;
+  }
+  private _spawned = 0;
+  spawnedCount(): number {
+    let n = 0;
+    for (let i = 0; i < this.wallsMade.length; i++) if (this.wallsMade[i].active) n++;
+    for (let i = 0; i < this.rocksMade.length; i++) if (this.rocksMade[i].active) n++;
+    return n;
+  }
+  clearSpawned(): number {
+    let n = 0;
+    for (let i = 0; i < this.wallsMade.length; i++) { const w = this.wallsMade[i]; if (w.active && this._killWall(w)) n++; }
+    for (let i = 0; i < this.rocksMade.length; i++) { const r = this.rocksMade[i]; if (r.active && this._killRock(r, false)) n++; }
+    this.dying.length = 0; this.dyingRocks.length = 0;
+    return n;
   }
 
   private _track(w: WallEntity): void {
@@ -2180,6 +2227,13 @@ export class AdminPanel {
       const r = p.size * 0.5, dx = p.position.x - x, dy = p.position.y - y;
       if (dx * dx + dy * dy < r * r) add(K_SHAPE, p);
     }
+    const pp = h.spawnerProps;
+    for (let i = 0; i < pp.length; i++) {
+      const p = pp[i];
+      if (!p.active) continue;
+      const r = p.size * 0.5, dx = p.position.x - x, dy = p.position.y - y;
+      if (dx * dx + dy * dy < r * r) add(K_SHAPE, p);
+    }
     const bs = h.bullets;
     for (let i = 0; i < bs.length; i++) {
       const b = bs[i];
@@ -2290,6 +2344,13 @@ export class AdminPanel {
   }
 
   resetRank(): void { this.conductor = false; }
+
+  grantConductor(): void {
+    if (this.conductor) return;
+    this.conductor = true;
+    this.host.updateState({ debugMode: true });
+    this.host.pushMessage(MSG_UP);
+  }
 
   photoConductor(): void { if (PHOTO_MODE && !this.conductor) this._rankFlip(); }
 

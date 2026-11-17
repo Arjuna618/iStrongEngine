@@ -422,6 +422,7 @@ export const menuScenes = {
   },
   setReady(r: boolean): void {
     _menuReady = r;
+    if (r && current && current.kind !== 'premade') current.endAt = Math.max(current.endAt, performance.now() + RESUME_MIN_MS);
     if (r) { maybeChange(); arm(); }
   },
   setScreen(screen: string): void {

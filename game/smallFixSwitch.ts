@@ -711,7 +711,64 @@ type SmallFixKeys = {
   R940: number;
   R941: number;
   R943: number;
+  R962: number;
+  R962K: number;
+  R965: number;
+  R963: number;
+  R964: number;
+  R962Z: number;
+  R962C: number;
+  R966: number;
+  R968: number;
   R945: number;
+  R173B: number;
+  R65B: number;
+  R148Q: number;
+  R427C: number;
+  R428C: number;
+  R892: number;
+  NH024: number;
+  G786: number;
+  G787: number;
+  G788: number;
+  R953: number;
+  G745: number;
+  R954: number;
+  R960: number;
+  G751: number;
+  G750: number;
+  G741: number;
+  G742: number;
+  G743: number;
+  G746: number;
+  G754: number;
+  G755: number;
+  G747: number;
+  G748: number;
+  G749: number;
+  G784: number;
+  G752: number;
+  G753: number;
+  G695: number;
+  G760: number;
+  G761: number;
+  G671: number;
+  G740: number;
+  G785: number;
+  G789: number;
+  G693: number;
+  R955: number;
+  G744: number;
+  G738: number;
+  G757: number;
+  G758: number;
+  G642: number;
+  G762: number;
+  G766: number;
+  G651: number;
+  G783: number;
+  G501: number;
+  G739: number;
 };
 
 const SMALL_FIX_DEF: SmallFixKeys = {
@@ -1423,7 +1480,64 @@ const SMALL_FIX_DEF: SmallFixKeys = {
   R940: _on('R940'),
   R941: _on('R941'),
   R943: _on('R943'),
+  R962: _on('R962'),
+  R962K: _on('R962K'),
+  R965: _on('R965'),
+  R963: _on('R963'),
+  R964: _on('R964'),
+  R962Z: _on('R962Z'),
+  R962C: _on('R962C'),
+  R966: _on('R966'),
+  R968: _on('R968'),
   R945: _on('R945'),
+  R173B: _on('R173B'),
+  R65B: _on('R65B'),
+  R148Q: _on('R148Q'),
+  R427C: _on('R427C'),
+  R428C: _on('R428C'),
+  R892: _on('R892'),
+  NH024: _on('NH024'),
+  G786: _on('G786'),
+  G787: _on('G787'),
+  G788: _on('G788'),
+  R953: _on('R953'),
+  G745: _on('G745'),
+  R954: _on('R954'),
+  R960: _on('R960'),
+  G751: _on('G751'),
+  G750: _on('G750'),
+  G741: _on('G741'),
+  G742: _on('G742'),
+  G743: _on('G743'),
+  G746: _on('G746'),
+  G754: _on('G754'),
+  G755: _on('G755'),
+  G747: _on('G747'),
+  G748: _on('G748'),
+  G749: _on('G749'),
+  G784: _on('G784'),
+  G752: _on('G752'),
+  G753: _on('G753'),
+  G695: _on('G695'),
+  G760: _on('G760'),
+  G761: _on('G761'),
+  G671: _on('G671'),
+  G740: _on('G740'),
+  G785: _on('G785'),
+  G789: _on('G789'),
+  G693: _on('G693'),
+  R955: _on('R955'),
+  G744: _on('G744'),
+  G738: _on('G738'),
+  G757: _on('G757'),
+  G758: _on('G758'),
+  G642: _on('G642'),
+  G762: _on('G762'),
+  G766: _on('G766'),
+  G651: _on('G651'),
+  G783: _on('G783'),
+  G501: _on('G501'),
+  G739: _on('G739'),
 };
 
 function SmallFixShell(this: SmallFixKeys, d: SmallFixKeys): void {
@@ -2133,7 +2247,64 @@ function SmallFixShell(this: SmallFixKeys, d: SmallFixKeys): void {
   this.R940 = d.R940;
   this.R941 = d.R941;
   this.R943 = d.R943;
+  this.R962 = d.R962;
+  this.R962K = d.R962K;
+  this.R965 = d.R965;
+  this.R963 = d.R963;
+  this.R964 = d.R964;
+  this.R962Z = d.R962Z;
+  this.R962C = d.R962C;
+  this.R966 = d.R966;
+  this.R968 = d.R968;
   this.R945 = d.R945;
+  this.R173B = d.R173B;
+  this.R65B = d.R65B;
+  this.R148Q = d.R148Q;
+  this.R427C = d.R427C;
+  this.R428C = d.R428C;
+  this.R892 = d.R892;
+  this.NH024 = d.NH024;
+  this.G786 = d.G786;
+  this.G787 = d.G787;
+  this.G788 = d.G788;
+  this.R953 = d.R953;
+  this.G745 = d.G745;
+  this.R954 = d.R954;
+  this.R960 = d.R960;
+  this.G751 = d.G751;
+  this.G750 = d.G750;
+  this.G741 = d.G741;
+  this.G742 = d.G742;
+  this.G743 = d.G743;
+  this.G746 = d.G746;
+  this.G754 = d.G754;
+  this.G755 = d.G755;
+  this.G747 = d.G747;
+  this.G748 = d.G748;
+  this.G749 = d.G749;
+  this.G784 = d.G784;
+  this.G752 = d.G752;
+  this.G753 = d.G753;
+  this.G695 = d.G695;
+  this.G760 = d.G760;
+  this.G761 = d.G761;
+  this.G671 = d.G671;
+  this.G740 = d.G740;
+  this.G785 = d.G785;
+  this.G789 = d.G789;
+  this.G693 = d.G693;
+  this.R955 = d.R955;
+  this.G744 = d.G744;
+  this.G738 = d.G738;
+  this.G757 = d.G757;
+  this.G758 = d.G758;
+  this.G642 = d.G642;
+  this.G762 = d.G762;
+  this.G766 = d.G766;
+  this.G651 = d.G651;
+  this.G783 = d.G783;
+  this.G501 = d.G501;
+  this.G739 = d.G739;
 }
 export const SMALL_FIX: SmallFixKeys = new (SmallFixShell as unknown as { new (d: SmallFixKeys): SmallFixKeys })(SMALL_FIX_DEF);
 if (Object.keys(SMALL_FIX).length !== Object.keys(SMALL_FIX_DEF).length) {

@@ -1,4 +1,4 @@
-import { PLAY_MODE_ENTRIES, type PlayModeEntry } from '../../game/gameModeRegistry';
+import { PLAY_MODE_ENTRIES, isSandboxEntry, type PlayModeEntry } from '../../game/gameModeRegistry';
 import { buildPresetWorld } from '../../game/mapEvents/presets/index';
 import { createDefaultMapConfig } from '../../types';
 import type { GameModeFile, LibraryItem, MapConfig } from '../../types';
@@ -7,7 +7,7 @@ import { writeWorldMap, worldWritesMap, type WorldId } from '../../game/modeWorl
 import { buildPortalWorld, type PortalModeId } from '../../game/portalModes';
 
 export function modeCardEntries(): readonly PlayModeEntry[] {
-  return PLAY_MODE_ENTRIES.filter(e => (e.preset || e.world) && !e.growth && !e.armsRace && !e.key.startsWith('arms-'));
+  return PLAY_MODE_ENTRIES.filter(e => (e.preset || e.world) && !e.growth && !e.armsRace && !e.key.startsWith('arms-') && !isSandboxEntry(e));
 }
 
 const _kept = new Map<string, MapConfig | null>();

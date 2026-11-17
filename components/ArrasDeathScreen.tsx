@@ -212,7 +212,7 @@ export const ArrasDeathScreen: React.FC<Props> = ({ logic, onRespawn, onExit, fr
   };
 
   return (
-    <div ref={rootRef} className="absolute inset-0 z-50" style={{ overflow: 'hidden', pointerEvents: leaving ? 'none' : 'auto' }} data-death-arras="">
+    <div ref={rootRef} className="k-hud absolute inset-0 z-50" style={{ overflow: 'hidden', pointerEvents: leaving ? 'none' : 'auto' }} data-death-arras="">
       <div className="absolute inset-0" style={{ background: dark ? DEATH_DIM_DARK : DEATH_DIM_LIGHT, opacity: DEATH_DIM_TO,
         animation: anim('k-dz-dim', DEATH_DIM_SEC, 0), ['--k-dz-from' as string]: String(DEATH_DIM_FROM), ['--k-dz-to' as string]: String(DEATH_DIM_TO) } as React.CSSProperties} />
       <div style={{ position: 'absolute', left: inL, top: inT, width: bw, height: bh, animation: anim('k-dz-drop', DEATH_DROP_SEC, 0),

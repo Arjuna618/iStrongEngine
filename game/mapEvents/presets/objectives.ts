@@ -40,8 +40,8 @@ export interface ObjectiveWorld { events: MapEventsDoc; mapAreas: { nextId: numb
 
 export const ROLES = { GUARD_RADIUS: 900, GUARD_SHARE_EVEN: 40 } as const;
 export function roleRules(M: { id: () => Id; named: (n: string) => Named; ref: (t: { id: Id; name?: string }) => Ref; row: (k: string, a: Record<string, unknown>) => Row; rule: (f: Named, n: string, w: Row[], c: Row[], t: Row[], m?: Partial<Rule>) => Rule },
-  folder: Named, guardTag: Named, attackTag: Named, sides: { guard?: string[]; attack?: string[]; guardShare?: number }): { statuses: StatusDef[]; rules: Rule[] } {
-  const guards: StatusDef = { ...M.named('Guards Its Objectives'), seconds: null, effects: [M.row('guardTag', { tag: M.ref(guardTag), radius: ROLES.GUARD_RADIUS }), M.row('teamFight', { help: true })] };
+  folder: Named, guardTag: Named, attackTag: Named, sides: { guard?: string[]; attack?: string[]; guardShare?: number; front?: number; block?: number; units?: number }): { statuses: StatusDef[]; rules: Rule[] } {
+  const guards: StatusDef = { ...M.named('Guards Its Objectives'), seconds: null, effects: [M.row('guardTag', sides.front ? { tag: M.ref(guardTag), radius: ROLES.GUARD_RADIUS, front: true, frontShare: sides.front, blockShare: sides.block ?? 0, unitShare: sides.units ?? 0 } : { tag: M.ref(guardTag), radius: ROLES.GUARD_RADIUS }), M.row('teamFight', { help: true })] };
   const attacks: StatusDef = { ...M.named('Attacks Objectives'), seconds: null, effects: [M.row('attackTag', { tag: M.ref(attackTag) }), M.row('teamFight', { help: true })] };
   const give = (s: StatusDef) => M.row('status.add', { who: { w: 'subject' }, status: M.ref(s) });
   const rules: Rule[] = [];
@@ -123,7 +123,7 @@ export function buildDominationWorld(drawingKey: string, teams: number): Objecti
   return { events, mapAreas: { nextId: M.zoneNext(), zones: M.zones } };
 }
 
-export const ASSAULT = { CLOCK: 780, COMEBACK: 540, LOCKED_START: 1 } as const;
+export const ASSAULT = { CLOCK: 780, COMEBACK: 540, LOCKED_START: 1, FRONT_SHARE: 92, BLOCK_SHARE: 85, UNIT_SHARE: 70 } as const;
 const MARKS = (from: number): number[] => {
   const m: number[] = [];
   for (let s = from - 60; s >= 60; s -= 60) m.push(s);
@@ -216,7 +216,7 @@ export function buildAssaultWorld(drawingKey: string): ObjectiveWorld | null {
         M.row('var.set', { var: M.ref(lockedVar), value: 1 }), M.row('status.add', { who: { w: 'tag', ref: M.ref(standing) }, status: M.ref(locked) }), M.say('The sanctuary has been locked!')]),
     );
   }
-  const roles = roleRules(M, folderBots, greenHolds, greenHolds, { guard: ['team2'], attack: ['team1'] });
+  const roles = roleRules(M, folderBots, greenHolds, greenHolds, { guard: ['team2'], attack: ['team1'], front: ASSAULT.FRONT_SHARE, block: ASSAULT.BLOCK_SHARE, units: ASSAULT.UNIT_SHARE });
   rules.push(...roles.rules);
   const events: MapEventsDoc = {
     v: 1, nextId: 1,

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
+import { pushUndoAction } from './shell/undoActions';
 import { GameLogic } from '../game/GameLogic';
 import { DataRegistry } from '../game/DataRegistry';
 import { importChangedNotice } from './shared/labels';
@@ -238,7 +239,7 @@ export const EnemyToolUI: React.FC<Props> = ({ logic, className }) => {
     const at = logic.state.enemyConfigs.findIndex(c => c.id === id);
     const cfg = logic.state.enemyConfigs[at];
     logic.removeEnemyConfig(id);
-    if (SMALL_FIX.R811 && cfg) showToast('success', `Deleted "${cfg.enemyName || 'the bot setting'}".`, { label: 'Undo', run: sameProjectUndo(logic, showToast, () => logic.restoreEnemyConfig(cfg, at)) });
+    if (SMALL_FIX.R811 && cfg) { showToast('success', `Deleted "${cfg.enemyName || 'the bot setting'}". Ctrl Z brings it back.`); pushUndoAction(logic, sameProjectUndo(logic, showToast, () => logic.restoreEnemyConfig(cfg, at))); }
   };
 
   const handleToggleEnabled = (id: string) => {

@@ -7,6 +7,7 @@ import { type Tool, TOOL_ORDER } from '../shell/engineTools';
 import { toolStore } from '../shell/toolStore';
 import { flushDesignHistory } from '../shell/historyRecorder';
 import { turretListMarks } from './InstalledTurretsList';
+import { undoActionIn, canUndoActionIn } from '../shell/undoActions';
 
 interface EditorShortcutDeps {
   logic: GameLogic | null;
@@ -28,8 +29,8 @@ export function editorUndo(logic: GameLogic): boolean {
     flushDesignHistory();
     return logic.undoDesign();
   }
-  if (activeTool === 'map-designer') return logic.undoMapEdit();
-  return false;
+  if (activeTool === 'map-designer') return undoActionIn(logic, activeTool) || logic.undoMapEdit();
+  return undoActionIn(logic, activeTool);
 }
 
 export function editorDelete(logic: GameLogic): boolean {
@@ -60,7 +61,7 @@ export function editorDelete(logic: GameLogic): boolean {
 export function editorEditState(logic: GameLogic): { canUndo: boolean; canRedo: boolean; canDelete: boolean } {
   const t = toolStore.get();
   const tankShown = logic.state.canvasEntityKind === 'tank';
-  const canUndo = (t === 'turret' || t === 'tank') ? tankShown && logic.designHistory.canUndo() : t === 'map-designer' ? logic.canUndoMapEdit() : false;
+  const canUndo = (t === 'turret' || t === 'tank') ? tankShown && logic.designHistory.canUndo() : t === 'map-designer' ? canUndoActionIn(logic, t) || logic.canUndoMapEdit() : canUndoActionIn(logic, t);
   const canRedo = t === 'map-designer' && logic.canRedoMapEdit();
   const s = logic.state;
   const canDelete = t === 'turret'
@@ -118,10 +119,8 @@ export function useEditorShortcuts({ logic, setTool, isTestMode, enabled, onEsca
 
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         if (typing) return;
-        if (activeTool === 'turret' || activeTool === 'tank' || activeTool === 'map-designer') {
-          e.preventDefault();
-          editorUndo(logic);
-        }
+        e.preventDefault();
+        editorUndo(logic);
         return;
       }
 

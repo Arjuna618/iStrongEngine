@@ -1,4 +1,5 @@
 import React from 'react';
+import { TEXT_LIMITS } from '../kit/textLimits';
 import type { CarryFollow, EntityForm, EntityType, Row } from '../../game/mapEvents/doc';
 import { SIDE_WORDS, CARRY_FOLLOW_DEF, CARRY_FOLLOW_RANGE } from '../../game/mapEvents/doc';
 import { addForm, setAt, setBecome, removeAt, makeRow, withIds } from '../../game/mapEvents/docOps';
@@ -14,6 +15,7 @@ import { Plus, Trash2 } from '../ui/icons';
 import { MAP_TANK_HEAD } from '../../game/mapEvents/thingWord';
 import { ShapeSettingsCard, TouchRulesCard, typeIsShapeBody } from './thingCards';
 import { SMALL_FIX } from '../../game/smallFixSwitch';
+import { isFixedMapThing } from '../../game/fixedBodies';
 
 const num = (s: string): number | undefined => { const v = Number(s); return s.trim() !== '' && Number.isFinite(v) ? v : undefined; };
 const CarryRows: React.FC<{ type: EntityType; put: (k: 'carry', v: EntityType['carry']) => void }> = ({ type, put }) => {
@@ -75,7 +77,7 @@ const FormCard: React.FC<{ type: EntityType; ti: number; fi: number; ctx: EvCtx 
   const when = () => (form.tank as { when: 'eachTime' | 'oncePerPlace' }).when;
   return (
     <Group title={form.name} foldKey={`form-${form.id}`} collapsible defaultOpen={fi === 0} right={fi > 0 ? <IconButton size="sm" label="Remove this form" onClick={() => ctx.commit(d => removeAt(d, ['types', ti, 'forms'], fi))}><Trash2 size={13} /></IconButton> : undefined}>
-      <FieldRow stacked label="Name Of This Form" help="The name of this form, in the lists of this window. Players never read it."><TextField value={form.name} onChange={v => put('name', v)} /></FieldRow>
+      <FieldRow stacked label="Name Of This Form" help="The name of this form, in the lists of this window. Players never read it."><TextField maxLength={TEXT_LIMITS.NAME} value={form.name} onChange={v => put('name', v)} /></FieldRow>
       <FieldRow stacked label="What It Is" help="Anything of the Content Library: a tank, a shape of the food or your own, a ball, a flag.">
         <Reveal when={!list}>{() => <ThingField value={tankWord(form)} ctx={ctx} onChange={w => put('tank', w)} />}</Reveal>
         <Reveal when={!!list}>{() => (
@@ -157,7 +159,7 @@ export const EntityTypePage: React.FC<{ type: EntityType; ti: number; ctx: EvCtx
     <div className="k-ev-page">
       <div className="k-ev-detail-head"><span className="k-ev-detail-title">{type.name}</span></div>
       <Group title="What It Is">
-        <FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField value={type.name} onChange={v => put('name', v)} /></FieldRow>
+        <FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField maxLength={TEXT_LIMITS.NAME} value={type.name} onChange={v => put('name', v)} /></FieldRow>
         <SelectRow label="Side" help="The side it fights for." value={type.side.team} options={TEAM_OPTIONS} onChange={v => put('side', { ...type.side, team: v })} />
         <SelectRow label="Stands With" help="With The Bosses: a side's boss class, whom others of that class never hurt." value={type.side.camp ?? 'none'} options={CAMP_OPTIONS} onChange={v => put('side', { ...type.side, camp: v })} />
         <SelectRow label="Mind" help="Thinks For Itself: as any bot. Follows Its Order: walks by How It Moves and shoots the nearest hostile in sight. None: it does nothing." value={type.brain ?? 'full'} options={[{ value: 'full', label: 'Thinks For Itself' }, { value: 'order', label: 'Follows Its Order' }, { value: 'none', label: 'None' }]} onChange={v => put('brain', v)} />
@@ -190,7 +192,8 @@ export const EntityTypePage: React.FC<{ type: EntityType; ti: number; ctx: EvCtx
         <Reveal when={type.carry !== undefined}>{() => <FieldRow stacked label="Line For Whoever Picks It Up" help="What the player reads when he picks it up. Empty: nothing."><TextField value={type.carry?.line ?? ''} onChange={v => put('carry', { ...type.carry, line: v || undefined })} /></FieldRow>}</Reveal>
         <Reveal when={SMALL_FIX.R941 !== 0 && type.carry !== undefined}>{() => <CarryRows type={type} put={put} />}</Reveal>
         </Reveal>
-        <SelectRow label="Pushed" help="As Its File: its own weight. Can Be Pushed, or Cannot." value={type.pushable === undefined ? 'file' : type.pushable ? 'yes' : 'no'} options={[{ value: 'file', label: 'As Its File' }, { value: 'yes', label: 'Can Be Pushed' }, { value: 'no', label: 'Cannot Be Pushed' }]} onChange={v => put('pushable', v === 'file' ? undefined : v === 'yes')} />
+        <SelectRow label="Pushed" help={SMALL_FIX.R965 !== 0 ? 'As Its File: its own weight (a Dominator, a Sanctuary, a Base Protector or the A.T.M.G. cannot be pushed). Can Be Pushed, or Cannot: no round and no tank moves it, only the admin tools do.' : 'As Its File: its own weight. Can Be Pushed, or Cannot.'} value={type.pushable === undefined ? 'file' : type.pushable ? 'yes' : 'no'} options={[{ value: 'file', label: 'As Its File' }, { value: 'yes', label: 'Can Be Pushed' }, { value: 'no', label: 'Cannot Be Pushed' }]} onChange={v => put('pushable', v === 'file' ? undefined : v === 'yes')} />
+        <Reveal when={SMALL_FIX.R965 !== 0}>{() => <ToggleRow label="Solid Body" help="On: no tank can sink into it, its own team's neither: touching it is like touching a wall. Off: tanks sink in a little as they touch it. A Dominator, a Sanctuary, a Base Protector and the A.T.M.G. are solid unless you turn it off." checked={type.solid ?? isFixedMapThing(first?.tank)} onChange={v => put('solid', v)} />}</Reveal>
         <SelectRow label="When A Tank Rams It" help="As A Tank: a ram hurts both as tanks do. As A Food Shape: as a shape is hit." value={type.contact ?? 'tank'} options={[{ value: 'tank', label: 'As A Tank' }, { value: 'shape', label: 'As A Food Shape' }]} onChange={v => put('contact', v)} />
         <FieldRow stacked label="How It Moves" help="A walking order. Stands Where It Is: none."><OrderField value={type.order} path={['types', ti, 'order']} ctx={ctx} /></FieldRow>
         <FieldRow label="Sight" help="How far it sees, in world units. Empty: its file's."><NumBox value={type.sight} min={0} placeholder="Its File's" onChange={v => put('sight', v)} /></FieldRow>

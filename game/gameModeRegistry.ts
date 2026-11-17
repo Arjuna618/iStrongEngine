@@ -6,7 +6,7 @@ import { VAMP_STARTING_SCORE } from './vampirism';
 import { GAME_MODE_TITLES } from './gameModeTitles';
 import { SMALL_FIX } from './smallFixSwitch';
 import { ALL_MODES } from './allModesSwitch';
-import { MODE_WORLDS, WORLD_IDS, worldIdOf, worldPool, shownModeTitle, type WorldId, type ModeWorld, OD_VARIANTS, odVariantOf, type MapPool, type MapPoolRow } from './modeWorlds';
+import { MODE_WORLDS, WORLD_IDS, worldIdOf, worldPool, shownModeTitle, type WorldId, type ModeWorld, OD_VARIANTS, odVariantOf, type MapPool, type MapPoolRow, SANDBOX_WORLD } from './modeWorlds';
 import { SERVER_DOMINATOR, clampTankDebuffs, type TankDebuffs } from './tankDebuffs';
 import { odGrowthRules, growthModeRules } from './growthRules';
 import { MODE_BLURBS } from './modeBlurbs';
@@ -402,12 +402,36 @@ function worldEntry(id: WorldId, growth: boolean, armsRace: boolean): PlayModeEn
 interface EventCard { overlay?: string; world: WorldId; title: string; short: string; about: string; goal: string; tags: readonly string[]; versions: readonly (readonly [boolean, boolean])[]; pool?: readonly Omit<MapPoolRow, 'id'>[]; halloween?: true | Readonly<HalloweenLookConfig>;
   vampirism?: true }
 const ALL_VERSIONS: readonly (readonly [boolean, boolean])[] = [[false, false], [false, true], [true, false], [true, true]];
-const OUTBREAK_ABOUT = ' Every tank that dies, yours too, rises where it fell as a zombie: grey for a moment, then green, charging at the living. Only a Necromancer turns a zombie it kills onto its own side, and they follow it. Killing a zombie pays; killing the living pays nothing.';
+const OUTBREAK_ABOUT = ' Every tank that dies, yours too, rises where it fell as a zombie: grey for a moment, then green, charging at the living. Only a Necromancer turns a zombie it kills onto its own side, and they follow it. '
+  + (SMALL_FIX.R962K !== 0 ? 'Killing a zombie pays and counts as a kill; killing the living does neither.' : 'Killing a zombie pays; killing the living pays nothing.');
+const OUTBREAK_DARK = ' And the lights are out: you see only your own light, round your tank, toward your aim and from your barrels.';
 const PLAIN_MAZE = 21, LOOSE_MAZE = 24;
 const SOCCER_ABOUT = 'Blue against Green on a walled field, a base dug into each end. Shoot, push or ram the ball into the other team\'s base: each time it gets in, a new ball comes in the middle. The first team to 10 goals wins. Ramming the ball hurts.';
 const MAGIC_ABOUT = 'Free For All in a maze of special walls. The side walls slide two cells to a free spot now and then, so the paths keep changing. Some walls hurt, some hold you, some throw you, some let you through one way, an eye wall lets you see farther and a pink wall makes you bigger. Rare relics appear inside.';
 const VAMP_ABOUT = 'Free For All in a wide maze with empty rooms. Your score is your health: while you have more than you started with, a hit takes your score instead of your health, and the tank that hit you gets half of it. Once you are back at your starting score, only your health is left.';
 const VAMP_DARK = ' And the lights are out: you see only your own light, round your tank, toward your aim and from your barrels.';
+const OUTBREAK_MORE: readonly EventCard[] = [
+  { overlay: 'outbreak', world: 'ffa', title: 'Outbreak FFA', short: 'Every tank for itself while the dead rise',
+    about: 'Free For All in an open arena.' + OUTBREAK_ABOUT, goal: 'Outlast everyone and thin the horde.', tags: ['Solo', 'Zombies'], versions: ALL_VERSIONS },
+  { overlay: 'outbreak', world: 'duos', title: 'Outbreak Duos', short: 'You and a partner while the dead rise',
+    about: 'Duos in an arena with rocks.' + OUTBREAK_ABOUT, goal: 'Keep your partner alive and thin the horde.', tags: ['Teams of 2', 'Rocks', 'Zombies'], versions: ALL_VERSIONS },
+  { overlay: 'outbreak', world: 'clan-wars', title: 'Outbreak Clan Wars', short: 'Clans fight clans while the dead rise',
+    about: 'Tanks whose names carry the same clan tag, like [ABC], fight on one side.' + OUTBREAK_ABOUT, goal: 'Grow your clan and outlast the horde.', tags: ['Clans', 'Zombies'], versions: ALL_VERSIONS },
+];
+const OUTBREAK_DARK_WORLDS: readonly [WorldId, string, string, readonly string[], EventCard['pool']?][] = [
+  ['squads', 'Squads', 'Squads of four in an arena with rocks.', ['Teams of 4', 'Rocks']],
+  ['duos', 'Duos', 'Duos in an arena with rocks.', ['Teams of 2', 'Rocks']],
+  ['ffa', 'FFA', 'Free For All in an open arena.', ['Solo']],
+  ['maze', 'Maze FFA', 'Free For All in a loose maze.', ['Solo', 'Maze'], [{ kind: 'maze', maze: 24, name: 'Loose Maze', share: 100 }]],
+  ['maze-squads', 'Maze Squads', 'Squads of four in a maze, plain or loose.', ['Teams of 4', 'Maze'], [{ kind: 'maze', maze: 21, name: 'Plain Maze', share: 50 }, { kind: 'maze', maze: 24, name: 'Loose Maze', share: 50 }]],
+  ['clan-wars', 'Clan Wars', 'Tanks whose names carry the same clan tag, like [ABC], fight on one side.', ['Clans']],
+];
+const OUTBREAK_MORE_CARDS: readonly EventCard[] = [
+  ...OUTBREAK_MORE,
+  ...OUTBREAK_DARK_WORLDS.map(([world, name, about, tags, pool]): EventCard => ({ overlay: 'blackout-outbreak', world, title: `Blackout Outbreak ${name}`,
+    short: 'The dead rise and the lights are out', about: about + OUTBREAK_ABOUT + OUTBREAK_DARK, goal: 'Find the living by your own light and thin the horde.',
+    tags: [...tags, 'Zombies', 'Darkness'], versions: ALL_VERSIONS, ...(pool ? { pool } : {}) })),
+];
 const EVENT_CARDS: readonly EventCard[] = [
   { overlay: 'blackout', world: 'ffa', title: 'Blackout FFA', short: 'Free For All with the lights out',
     about: 'Free For All in the dark. You see only your own light: round your tank, toward your aim and from your barrels, and walls block it. The bots, their turrets and their drones see the same way.',
@@ -423,6 +447,7 @@ const EVENT_CARDS: readonly EventCard[] = [
   { overlay: 'outbreak', world: 'maze-squads', title: 'Outbreak Maze Squads', short: 'Squads of four in a maze where the dead rise',
     about: 'Squads of four in a maze, plain or loose.' + OUTBREAK_ABOUT, goal: 'Hold together in the corridors and thin the horde.', tags: ['Teams of 4', 'Maze', 'Zombies'], versions: ALL_VERSIONS,
     pool: [{ kind: 'maze', maze: PLAIN_MAZE, name: 'Plain Maze', share: 50 }, { kind: 'maze', maze: LOOSE_MAZE, name: 'Loose Maze', share: 50 }] },
+  ...(SMALL_FIX.R962C !== 0 ? OUTBREAK_MORE_CARDS : []),
   { world: 'vampirism', title: 'Vampirism', short: 'Your score is your health: guard it', about: VAMP_ABOUT,
     goal: 'Drain the others and guard your score.', tags: ['Solo', 'Maze', 'Vampirism'], versions: ALL_VERSIONS, halloween: HALLOWEEN_EYES, vampirism: true },
   { overlay: 'blackout', world: 'vampirism', title: 'Blackout Vampirism', short: 'Vampirism with the lights out', about: VAMP_ABOUT + VAMP_DARK,
@@ -464,6 +489,20 @@ function halloweenEntry(): PlayModeEntry {
 }
 const HALLOWEEN_ENTRIES: readonly PlayModeEntry[] = ALL_MODES.ON === 0 ? [] : [halloweenEntry()];
 
+export const SANDBOX_ENTRY_KEY: string = SANDBOX_WORLD;
+function sandboxEntry(): PlayModeEntry {
+  const w = MODE_WORLDS[SANDBOX_WORLD];
+  return {
+    key: SANDBOX_ENTRY_KEY, baseId: 'sandbox', world: SANDBOX_WORLD, title: w.title, category: 'others', growth: false, sides: 'Every Team',
+    info: {
+      ...getGameMode('sandbox'), title: w.title, short: w.short, goal: w.goal, tags: [...w.tags],
+      description: 'An empty arena where you are an operator from the start. Open the Debug Menu from the pause menu: the Spawn Tool places tanks, bosses, map entities, walls and food. Type $ help for the commands, $ arena size to change the arena.',
+    },
+  };
+}
+const SANDBOX_ENTRIES: readonly PlayModeEntry[] = ALL_MODES.ON === 0 ? [] : [sandboxEntry()];
+export function isSandboxEntry(e: { key: string }): boolean { return e.key === SANDBOX_ENTRY_KEY; }
+
 const CARD_WORLD_IDS: readonly WorldId[] = WORLD_IDS.filter(id => !MODE_WORLDS[id].eventOnly && !MODE_WORLDS[id].noCard);
 const VERSION_WORLD_IDS: readonly WorldId[] = CARD_WORLD_IDS.filter(id => !MODE_WORLDS[id].oneCard);
 const WORLD_ENTRIES: readonly PlayModeEntry[] = ALL_MODES.ON === 0 ? [] : [
@@ -493,6 +532,7 @@ export const PLAY_MODE_ENTRIES: readonly PlayModeEntry[] = ALL_MODES.ON !== 0 ? 
   ...siegeEntries(),
   ...EVENT_ENTRIES,
   ...HALLOWEEN_ENTRIES,
+  ...SANDBOX_ENTRIES,
 ].map(withBlurb) : [
   ...VARIANT_BASE_IDS.map((id): PlayModeEntry => ({
     key: id,
@@ -709,7 +749,7 @@ export const ENGINE_MODE_GROUPS: readonly EngineModeGroup[] = (() => {
   for (const cat of PLAY_CATEGORIES) {
     if (cat.id === 'sandbox') continue;
     const options = PLAY_MODE_ENTRIES
-      .filter(e => e.category === cat.id)
+      .filter(e => e.category === cat.id && !isSandboxEntry(e))
       .map((e): EngineModeOption => ({ key: e.key, label: shownModeTitle(e.title) }));
     if (options.length) out.push({ label: ENGINE_GROUP_TITLES[cat.id], options });
   }

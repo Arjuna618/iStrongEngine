@@ -2,6 +2,193 @@ import type { UpdateEntry } from './updatesTypes';
 
 export const UPDATES: UpdateEntry[] = [
   {
+    "date": "2026-11-17",
+    "version": "v0.181",
+    "title": "Outbreak, Sandbox and the Spawn Tool",
+    "bullets": [
+      "Changed Tag bots to know the closing arena's edge, keeping their goals inside it and never steering out past it.",
+      "Fixed Siege bots leaving the bosses of a wave alone.",
+      "Changed Siege bots to go to a boss they see on the minimap, each at its own moment, and wait beside the Sanctuary it walks to.",
+      "Changed most of Green's bots in Assault to go to the point under attack and stay while enemy tanks are near it.",
+      "Added two options to the effect Guards Its Side's Objectives: a bot fires along the way the enemy comes from a free line, and a drone or minion tank sends its units around walls.",
+      "Changed a rammer watching its prey to rest and shift a little every 3 to 6 seconds.",
+      "Added a Sandbox mode under Others where everyone is an operator, also played by the phone's Sandbox button.",
+      "Added the Spawn Tool to the Debug Menu: any tank, boss, map entity, wall or Other, with its team, AI, level, XP and skill points, placed at a distance or on the cursor.",
+      "Changed the Shape Spawner into a part of the Spawn Tool, keeping all its settings in the Food Shapes and Sentries tabs.",
+      "Added a team rule for the Rogues: friendly to every player and bot, and hostile only to the Bosses team.",
+      "Added a crash guard: when debug spawns make the game crawl or freeze, the game pauses and Continue removes what the debug tools spawned.",
+      "Changed the Spawn Tool's stat rows to match Manage Players, with bars of one length and no icons.",
+      "Fixed what the cursor places and every Other not appearing whole.",
+      "Changed the Content Library side panel's top into a bar with a line under it.",
+      "Changed the words of the Debug Menu door to the size of its neighbours.",
+      "Fixed a greyed out option's name not opening its tip.",
+      "Fixed the loading screen's links missing when the Classic icons fail to load.",
+      "Fixed a search box losing its fade when left at its start.",
+      "Fixed the explode preview drawing a written 0 as a circle, and added Shape Depth and Curved Edges to it.",
+      "Changed explosion pieces to wear their bomb's colour all the way down the chain.",
+      "Fixed the main menu showing Blackout scenes, and a dark scene's fog staying over the next scene.",
+      "Fixed an upward dropdown in the Classic theme flickering at its bottom edge.",
+      "Changed short select lists to show all their options.",
+      "Fixed the page scrolling while a dropdown opens or closes.",
+      "Fixed the Source Code window flickering when opening a file from the Overview.",
+      "Changed Find in the Source Code window to jump to a match only on Enter, the arrows or F3, never while typing.",
+      "Removed the marks of found words beside the Source Code window's scroll bar.",
+      "Changed Outbreak so pressing O makes no zombie.",
+      "Changed Outbreak so killing a living tank gives no score, no kill message and no kill count, while killing a zombie pays as usual.",
+      "Changed Outbreak zombies to see four times as far and send drones, minions and turret fire four times as far, but only in a straight line at what they see.",
+      "Added the Map Events effects Sight and Drones And Turrets Reach, and How for The Player Dies, with Self Destruct among its choices.",
+      "Added Outbreak FFA, Outbreak Duos, Outbreak Clan Wars and a Blackout Outbreak version of all six Outbreak maps, each with Growth and Arms Race versions.",
+      "Changed an auto turret's sight to grow with the size of its tank.",
+      "Changed map entity tanks to aim ahead of moving targets.",
+      "Changed Dominators, Sanctuaries, Base Protectors and the A.T.M.G. so they cannot be pushed and no tank can sink into them, with the settings Pushed and Solid Body on every Map Entity Type.",
+      "Fixed the Destroyer Dominator's bullet speed.",
+      "Added Release Depth to a barrel's Firing settings: how far inside the barrel its round is let go.",
+      "Fixed the rounds of the Diesel and Jalopy families appearing from a point at the edge of the barrel.",
+      "Changed the app to open in the Classic UI theme unless you picked Modern.",
+      "Changed the Content Library's Bosses to hold every boss, the Celestials among them, with Sentries and Sentinels as collections of their own.",
+      "Changed the Add Bosses window of a boss group to open on all the bosses, not on one boss group.",
+      "Fixed boss turrets showing under Launcher Turrets and other groups: every turret only bosses carry is now under Boss Turrets.",
+      "Fixed the Count box over the canvas coming apart in the Classic theme when its name is long, as on a five sided body.",
+      "Updated the guides for Outbreak, Map Events, the Canvas Tool, the Spawn Tool and The Bots Group."
+    ]
+  },
+  {
+    "date": "2026-11-16",
+    "version": "v0.180",
+    "title": "Rammers, Speed First and polish",
+    "bullets": [
+      "Changed bots on tanks whose guns really push them to ride their recoil.",
+      "Changed a walking bot's drones or minions to lie on its own body, even in danger.",
+      "Added the debug word ASKING FOR PEACE, and a spinning tank now stops its spin for the peace gesture.",
+      "Changed a tank that always fires to hold its fire for a friend in a free for all.",
+      "Changed every bot to leave its area only for a moment, instead of some bots ignoring their area for good.",
+      "Fixed bots standing still in a chase, not walking to food they cannot see, and trapper hulls resting on walls.",
+      "Fixed bots switching between farming and chasing many times a second without moving away.",
+      "Fixed a swarm tank's units flying out in front of it on its way.",
+      "Added a letter limit to every text box.",
+      "Changed a text box you are typing in to never fade or slide.",
+      "Added Ctrl Z undo for every load, remove, reset and map rebuild.",
+      "Changed waiting panels to show their own empty frame while they load.",
+      "Changed spectating to fade your own tank out and ignore your keys, then fade it back in.",
+      "Added a back to top button and a scroll bar of its own to the Source Code window.",
+      "Fixed Manage Players shrinking.",
+      "Changed renaming a card in the Hub to happen in place.",
+      "Changed the loading bar to finish before the menu comes in.",
+      "Fixed a maze card of the Map Library keeping Walls As Blocks from the Haunted Asylum.",
+      "Fixed fights flickering when several bots take on one tank at once.",
+      "Fixed bots going back to food they had given up on.",
+      "Changed trapper bots to camp at food only where they stand to farm it, never for weak food, and to let food go when their shots do nothing to it.",
+      "Added a rammer brain: a rammer works out who would win a ram, then attacks, stalks or leaves, strikes a hurt or fleeing prey, and rams a target standing at a wall.",
+      "Changed tanks to shoot at and back away from a rammer driving straight at them.",
+      "Fixed bots shuffling in place in Assault, looping on food outside their area, and standing still in a chase.",
+      "Fixed a bot's goal jumping off its own screen.",
+      "Added Speed First: most bots trade attack points for movement speed at the start, with a Speed First slider in both bot panels.",
+      "Fixed bots dropping a fight with a tank that still hits them or whose round flies at them.",
+      "Fixed rammers on the player's own team stalking the player.",
+      "Updated The Bots Group guide, the debug guide and the Bots card."
+    ]
+  },
+  {
+    "date": "2026-11-15",
+    "version": "v0.179",
+    "title": "Many fixes and steadier bots",
+    "bullets": [
+      "Fixed a Map Event running when a later test inside Not This should have stopped it.",
+      "Fixed The Killer Is and the `{killer}` word naming the wrong tank after a body was reused.",
+      "Fixed Map Events formulas accepting words that are not their own names.",
+      "Fixed a carried Flag during a pause, when its own side destroys it, and when its carrier jumps to a new place.",
+      "Fixed the closing arena pushing tanks while the game is paused.",
+      "Fixed picking up carried bodies: One At A Time in the any hit mode, a killing blow taking only its share of health, and the striker carrying the body.",
+      "Fixed a carried body's wall collision to use its circle.",
+      "Fixed Keep From Damaging Areas for crasher Entity Types and for areas that hurt only some sides.",
+      "Fixed portals placed In An Area: no portal without an open cell, a gap from Fixed Here portals, the same place after an arena resize, and a closing portal still counting as a spawn hazard.",
+      "Fixed the death screen showing a name twice, naming the wrong killer, and naming a ram that dealt no damage as the killer.",
+      "Fixed V2 Dreadnoughts of the Enemy Tool losing their tiers and points.",
+      "Fixed `$tp area` landing outside the area.",
+      "Fixed a boss group picking tanks the library cannot build.",
+      "Fixed a reloaded tab keeping saved entries that are not its own, and a relabel losing newer label fields.",
+      "Fixed Take Over keeping the hunter credit.",
+      "Fixed bots keeping a stale way home with nothing carried, Bots Keep Out ignoring a shaped area's outline, and darkness memory starting away from where the target stood.",
+      "Fixed a sight rule's repeat time not being read for each wave.",
+      "Fixed a still Magic Maze with Trick or One Way walls building a path grid it does not need.",
+      "Fixed a layer's custom shape being cut off at the edge of the view.",
+      "Fixed the Loose Maze not growing on a long map, Random Map's maze roll in a world of areas, and an enlarged preset losing its original place.",
+      "Fixed switching off a world of areas not counting as unsaved work when picking a mode.",
+      "Fixed `shrinkBox` creating an object every frame.",
+      "Changed drone and minion bots to escort with their units when not fighting, keep their drones on their own body and their pointer on their own screen, and never aim drones at a wall.",
+      "Changed minion bots to take cover, pace instead of standing, stay away from dangerous tanks and keep their body off walls.",
+      "Changed bots to pick a place on the map by its edge, middle or maze, walk to it and stay, passing by food outside it, with half the bots born in their own area.",
+      "Changed bots to watch for danger ahead, keep a kill they started, never back into a tank, and never stand still while a round flies at them.",
+      "Changed bots not to wiggle at a boss, under fire, or at a tank off their screen.",
+      "Changed a fleeing bot to take the least risky way, never a dead end while another way is open.",
+      "Changed food on a bot's way to count as danger only when it is hard to go around: eggs, squares, double squares and triangles never do.",
+      "Changed bosses to drive like playing bots, so they no longer shake under fire.",
+      "Updated The Bots Group guide and the Bots card."
+    ]
+  },
+  {
+    "date": "2026-11-14",
+    "version": "v0.178",
+    "title": "Classic theme and more human bots",
+    "bullets": [
+      "Added the Classic UI theme to the Graphics card of App Settings: grey windows with dark edges, square corners, bold outlined words, white boxes, and its own icons, cursors, scroll bars and green logo.",
+      "Changed the highlight of a picked tab or tool to glide smoothly and come to rest without a visible step.",
+      "Changed windows that switch pages to fade a cover over the change, so no text appears late.",
+      "Added God Mode for bots in Manage Players, next to Ghost Mode.",
+      "Changed dropdowns to open upward when there is no room below, lined up to the exact width of their button.",
+      "Changed filter tags to drop their tick box, grey out when not picked, and smoothly hide tags that would show nothing.",
+      "Fixed sort buttons changing width.",
+      "Added new icons for the bullet group, the draw order and export.",
+      "Changed the Library star to the yellow of the Squares.",
+      "Changed the Sandbox card's picture to an empty minimap and framed the map pictures of the Play menu.",
+      "Changed side panel footers to the colour of the top bar.",
+      "Reworked selecting code in the Source Code window to work like a code editor: drag, double click for a word, triple click for a line, drag on the line numbers for whole lines, Shift click, Ctrl A and Ctrl C.",
+      "Changed a selection in the Source Code window to start anywhere in the white area and to scroll the view when dragged past its edge, with a click below the text clearing it.",
+      "Changed Find in the Source Code window to start from the selected word.",
+      "Fixed lag when clicking in Classic menus, cutting the slowest frame of a tag click from about 90 ms to about 42 ms.",
+      "Fixed the New Group and Rename name box touching the window edge in the Classic theme.",
+      "Updated the guides for Tags, Random Map, the Game Mode export and a bot's God Mode.",
+      "Added the Bots card to every game mode: 42 behaviours that make bots play more like real players, each with its own switch, a strength where it has one, and a match mood, saved with your project.",
+      "Changed bots to see only what a screen shows and to drive with keys, each with its own reaction time, swings and rests.",
+      "Changed bots to look around while travelling and to boost with their own recoil.",
+      "Changed bots in a free for all to make peace, leave a crowd alone, take one fight at a time and answer a wiggle.",
+      "Changed bots to stop, idle and always hold a goal, and to keep team lines, weigh the odds and stay by their mates and protectors.",
+      "Changed bots to let a runner go, fall back calmly and run before it is too late.",
+      "Changed bots to keep a distance by strength, pick a place by the kind of tank and keep a comfortable range.",
+      "Changed bots to treat rounds flying at them as danger, take cover between two fires, and either step aside or shoot an incoming round.",
+      "Changed a mounted auto turret to check its round's own path around a corner.",
+      "Fixed bots forgetting a hidden tank they had found, and a bot staring at a hidden target through a wall.",
+      "Changed hurt bots to keep away from enemies.",
+      "Changed bots to take aura rings into account.",
+      "Changed a bot in a fight to fight from where the fight found it, closing in when it is clearly stronger, when its team is stronger, or when its target is badly hurt beside a mate.",
+      "Added No Backward Boost and Keeps Its Own Distance to an AI Behavior Category in the Enemy Tool, and five new bot leanings to Edit Stats.",
+      "Fixed seven older bot faults.",
+      "Updated the guides for The Bots Group and the bot categories.",
+      "Fixed many tanks not having the right stats, among them the Jalopy Trapper, the Tricker and the Gizmo.",
+      "Fixed 19 tanks being weaker than the rest of their tier and role."
+    ]
+  },
+  {
+    "date": "2026-11-13",
+    "version": "v0.177",
+    "title": "Trap tank stats fixed",
+    "bullets": [
+      "Fixed the guns of 189 tanks not having the right stats, among them 164 dreadnought trap guns and the Bent Barricade, whose traps hit far too hard."
+    ]
+  },
+  {
+    "date": "2026-11-12",
+    "version": "v0.176",
+    "title": "Terms, privacy and trap life",
+    "bullets": [
+      "Changed the Privacy notice to version 1.1: the official websites may count visits with Cloudflare Web Analytics.",
+      "Changed the Terms of Use to version 1.1, adding that the official website may count visits.",
+      "Changed the Update Log and the Source Code window to open only after you press I Agree on the Terms.",
+      "Changed how your agreement to the Terms is stored, so typing in the browser console can no longer set it.",
+      "Fixed the trap life of 120 trap tanks, so their traps no longer last too long."
+    ]
+  },
+  {
     "date": "2026-11-10",
     "version": "v0.175",
     "title": "Capture the Flag, bot fixes and polish",
@@ -77,7 +264,8 @@ export const UPDATES: UpdateEntry[] = [
       "Fixed a typed base name being lost, and Number of Teams replacing map work without asking.",
       "Changed Test Now to answer in a message.",
       "Fixed a message's Undo taking back the wrong edit.",
-      "Updated the Outbreak, Match Rules, Growth Rules, Labyrinth, Nexus, portal, spawn profile and Map Objects guides."
+      "Updated the Outbreak, Match Rules, Growth Rules, Labyrinth, Nexus, portal, spawn profile and Map Objects guides.",
+      "Changed The Conglomerate's front guns to be weaker."
     ]
   },
   {
@@ -2036,7 +2224,7 @@ export const UPDATES: UpdateEntry[] = [
       "Changed the anti shuttle veto to let honest double backs through, since a reversing hop whose landing cell strictly descends the target field is a legitimate route move, after an overlay capture at a passable gap read 61 vetoed moves per second.",
       "Added a temporary navigation debug overlay, tagged so it can be pulled back out, drawing the branch ring including the veto state and the firing spot hold, give up markers, a veto counter, and the route the field is steering along.",
       "Changed healthy throttled coasting to dim the last real branch instead of strobing orange at the 50ms throttle cadence, while the red nothing committed stall keeps its hard stamp.",
-      "Updated the How Bots Think guide to cover shooting over rocks, bullet fit, walking to the shot, eyes on target chasing, and mid fight memory.",
+      "Updated the How Bots Think guide to cover shooting over rocks, bullet fit, walking to the shot, eyes on target chasing, and mid fight memory."
     ]
   },
   {
@@ -2603,7 +2791,7 @@ export const UPDATES: UpdateEntry[] = [
       "Hardened the roam loop with swept path look aheads that test the rocks between probe points, and a 30 second failed goal memory, which ends the commit, fail and recommit loops.",
       "Reworked flee and follow routing to understand corridors, with a target keyed distance field pool of 16 slots, a region mask built from real rock circles, corridor aware fleeing by distance ascent, flee direction hold and continuity, and follow centre steering.",
       "Measured base size looping in a chasing threat simulation falling from 26 of 200 runs to 1 of 200.",
-      "Hardened navigation further with explicit nav offsets at the call sites and a stale field reset.",
+      "Hardened navigation further with explicit nav offsets at the call sites and a stale field reset."
     ]
   },
   {
@@ -2925,7 +3113,7 @@ export const UPDATES: UpdateEntry[] = [
       "Changed grouped tanks to spawn 250 to 550 units from a living group member, preferring the leader, covering initial spawns and waitlist respawns for bots and player teammates alike.",
       "Fixed every Play menu launch dropping into the sandbox instead of the chosen mode: `resolveModeConfig` now stamps the mode id onto the config it returns.",
       "Rebuilt the mode category screen as four full bleed image tiles in a 2x2 grid with overlay text, aspect locked to the artwork and clamped to the viewport height so all four always fit on any screen.",
-      "Converted the 23 source images at 1333x920 to WebP at quality 85, kept at native resolution and around 70% smaller, now living in `components/ui/media/gamemodes/`.",
+      "Converted the 23 source images at 1333x920 to WebP at quality 85, kept at native resolution and around 70% smaller, now living in `components/ui/media/gamemodes/`."
     ]
   },
   {
@@ -2952,7 +3140,7 @@ export const UPDATES: UpdateEntry[] = [
       "Added a theme adaptive Discord icon, built from a CSS mask over a single PNG, linking to the invite.",
       "Fixed the mode field missing from `resolveModeConfig`, which was turning every launch into a sandbox launch.",
       "Fixed the menu root fade exposing the editor underneath it.",
-      "Fixed the main menu theme toggle being blocked by a stacking context.",
+      "Fixed the main menu theme toggle being blocked by a stacking context."
     ]
   },
   {
@@ -3095,7 +3283,7 @@ export const UPDATES: UpdateEntry[] = [
     "title": "Documenting the iStrongNexum converter and its workflow",
     "bullets": [
       "Added it as a separate Cloudflare Pages project bundling a pure TypeScript two way conversion library with a Vite and React web interface.",
-      "Left the converter open source, with no obfuscation and no token gate, and the conversion itself running entirely in the browser.",
+      "Left the converter open source, with no obfuscation and no token gate, and the conversion itself running entirely in the browser."
     ]
   },
   {
@@ -5479,7 +5667,7 @@ export const UPDATES: UpdateEntry[] = [
       "Removed the per spawn allocations from the shape spawn path to cut garbage collection pressure, so `generateSpawnPosition()` reuses a module level position, weighted selection uses parallel arrays with a reusable result, a single pass count replaces three separate iterations, and the cap key string is cached lazily.",
       "Restored per entity bullet interleaving for player and enemy tanks, since an earlier z order restructure had merged every bullet into one global pass which flattened the per layer depth.",
       "Rebuilt the bucketing behind that interleaving, grouping bullets per enemy through an `_enemyIdToSlot` map and `_perEnemyBulletIdx` slots, with `_subBucketBullets()` splitting any entity bullets into layer, below and above buckets.",
-      "Restructured the enemy render loop so normal enemies get the full three pass interleaving while dying, spawning and culled enemies fall back to a flat bullet pass, with orphan bullets rendering in a flat fallback pass.",
+      "Restructured the enemy render loop so normal enemies get the full three pass interleaving while dying, spawning and culled enemies fall back to a flat bullet pass, with orphan bullets rendering in a flat fallback pass."
     ]
   },
   {

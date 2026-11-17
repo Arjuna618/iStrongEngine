@@ -4,6 +4,7 @@ import { GameLogic } from '../game/GameLogic';
 import { TeamBotKey, TeamBotSettings, UpgradeLogic, createDefaultTeamBotSettings } from '../types';
 import { Modal } from './kit/Modal';
 import { NumberField, SelectRow, ToggleRow, SliderRow } from './kit/kit';
+import { Reveal } from './kit/Collapse';
 
 interface Props {
   logic: GameLogic;
@@ -24,6 +25,7 @@ export const TeamBotSettingsPopup: React.FC<Props> = ({ logic, teamKey, teamLabe
 
   const [baseLevel, setBaseLevel] = useState(stored.baseLevel);
   const [upgradeLogic, setUpgradeLogic] = useState<UpgradeLogic>(stored.upgradeLogic);
+  const [speedFirst, setSpeedFirst] = useState(stored.speedFirst ?? 95);
   const [forceAutospin, setForceAutospin] = useState(stored.forceAutospin);
   const [forceAutoshoot, setForceAutoshoot] = useState(stored.forceAutoshoot);
   const [useHardcodedColor, setUseHardcodedColor] = useState(stored.useHardcodedColor);
@@ -33,7 +35,7 @@ export const TeamBotSettingsPopup: React.FC<Props> = ({ logic, teamKey, teamLabe
   const handleSave = () => {
     const s: TeamBotSettings = {
       overridden: true,
-      baseLevel, upgradeLogic, forceAutospin, forceAutoshoot,
+      baseLevel, upgradeLogic, speedFirst, forceAutospin, forceAutoshoot,
       useHardcodedColor, aimbotStrength, turnSpeed,
     };
     logic.setTeamBotSettings(teamKey, s);
@@ -62,6 +64,10 @@ export const TeamBotSettingsPopup: React.FC<Props> = ({ logic, teamKey, teamLabe
         <NumberField id="team-bot-level" label="Base Level (0 to 100)" value={baseLevel} onChange={(e) => handleLevelChange(e.target.value)} min={0} max={100}
           help="Higher levels get more stat points automatically invested." />
         <SelectRow label="Upgrade Logic" help="How the bots spend their skill points: Offensive Weighted goes almost all in on attack, By Order cycles through the stats, Random picks freely." value={upgradeLogic} onChange={(val) => setUpgradeLogic(val as UpgradeLogic)} options={UPGRADE_OPTIONS} />
+        <Reveal when={upgradeLogic === 'OffensiveWeighted'}>
+          <SliderRow label="Speed First" value={speedFirst} onChange={setSpeedFirst} min={0} max={100} step={1} unit="%"
+            help="How many of the bots give up attack points for movement speed when they start. Most of them trade one point each of bullet damage, bullet health and bullet penetration, and fill these gaps later when they have points to spare." />
+        </Reveal>
         <ToggleRow label="Force Autospin" description="Every bot on the team rotates constantly." checked={forceAutospin} onChange={setForceAutospin} />
         <ToggleRow label="Force Autoshoot" description="Every bot fires nonstop even with no target." checked={forceAutoshoot} onChange={setForceAutoshoot} />
         <ToggleRow label="Use Hardcoded Color" description="Bots keep their tank design colors." help="Bots keep their tank design colors instead of the team color. Team membership is unchanged. A tank with Keep Own Color turned on in its design keeps its colors even when this is off."

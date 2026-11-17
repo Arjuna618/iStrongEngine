@@ -2,6 +2,7 @@ import { findTankByNameOrKey } from '../../game/tankByName';
 import React, { useState, useRef } from 'react';
 import { Trash2, Info, ChevronRight, Plus } from '../ui/icons';
 import type { ExplodeConfig, ExplodeRing, Turret, LibraryItem } from '../../types';
+import type { GameLogic } from '../../game/GameLogic';
 import {
   EXPLODE_MAX_COUNT, EXPLODE_MAX_RINGS, EXPLODE_MAX_DEPTH, EXPLODE_MAX_PIECES_PER_SHOT,
   explodeCount, explodeActive, explodeTotalPieces, roundNeverAges, piecesPileUp, fragmentLabel,
@@ -54,10 +55,12 @@ interface ExplodeCardProps {
   roundLayer: number;
   bombTurret?: Turret;
   tankLibrary?: LibraryItem[];
+  logic?: GameLogic | null;
+  bombAncestors?: readonly Turret[];
 }
 
 export const ExplodeCard: React.FC<ExplodeCardProps> = ({
-  explode, onChange, onAddRing, onEditFragment, level, roundLayer, bombTurret, tankLibrary,
+  explode, onChange, onAddRing, onEditFragment, level, roundLayer, bombTurret, tankLibrary, logic, bombAncestors,
 }) => {
   const [confirmFor, setConfirmFor] = useState<ExplodeConfig | null>(null);
   const confirming = confirmFor === explode;
@@ -135,7 +138,7 @@ export const ExplodeCard: React.FC<ExplodeCardProps> = ({
       <Reveal when={ex.enabled}>
         <div className="k-stack">
           <div className="flex items-center gap-3">
-            <ExplodeRingPreview rings={rings} size={64} />
+            <ExplodeRingPreview rings={rings} size={64} bomb={bombTurret} logic={logic} bombAncestors={bombAncestors} />
             <p className="k-row-desc min-w-0">{summaryText(rings)}</p>
           </div>
 

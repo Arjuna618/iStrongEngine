@@ -1,6 +1,7 @@
 import { MAP_EVENTS } from './mapEventsSwitch';
 import { MAGIC_MAZE, MAGIC_MAZE_TYPE, MAGIC_MAZE_MIN_GRID, latticeIn, rollMagicWalls, magicMazeDefaults } from './magicMaze';
 import { MISSING_MODES } from './missingModesSwitch';
+import { SMALL_FIX } from './smallFixSwitch';
 import { MODE_DRAWINGS, type ModeDrawing } from './modeDrawings.generated';
 function mulberry32(seed: number): () => number {
   let a = seed | 0;
@@ -1671,21 +1672,23 @@ export class MazeGenerator {
   }
 
   private runLoose(): void {
-    const w = 32, h = 32;
+    const grow = SMALL_FIX.G783 !== 0 && this._growW > 0 && this._growH > 0 && (this._growW !== 32 || this._growH !== 32);
+    const w = grow ? Math.max(32, this._growW) : 32, h = grow ? Math.max(32, this._growH) : 32;
+    const N = (w - 2) * (h - 2), s = N / 900, nx = grow ? Math.max(1, Math.round(7 * (w - 2) / 30)) : 7, ny = grow ? Math.max(1, Math.round(7 * (h - 2) / 30)) : 7;
     this.maze = Array(w).fill(null).map((_, x) => Array(h).fill(null).map((_, y) => x > 0 && y > 0 && x < w - 1 && y < h - 1));
     this.width = w; this.height = h; this._growArea = 1;
-    let cells = 900;
-    const keep = (n: number) => Math.max(120, Math.round(900 - (900 - n) * this._erosionIntensity));
+    let cells = N;
+    const keep = (n: number) => Math.max(Math.round(120 * s), Math.round(N - (N - n * s) * this._erosionIntensity));
     const lo = keep(427), hi = keep(349);
     const target = Math.min(lo, hi) + Math.floor(((this.rand() + this.rand() * this.rand()) / 2) * (Math.abs(hi - lo) + 1));
     const m = this.maze;
-    for (let a = 0; a < 7; a++) for (let b = 0; b < 7; b++) {
-      const x = 1 + Math.floor(((a + this.rand()) * 30) / 7), y = 1 + Math.floor(((b + this.rand()) * 30) / 7);
+    for (let a = 0; a < nx; a++) for (let b = 0; b < ny; b++) {
+      const x = 1 + Math.floor(((a + this.rand()) * (w - 2)) / nx), y = 1 + Math.floor(((b + this.rand()) * (h - 2)) / ny);
       if (m[x][y]) { m[x][y] = false; cells--; }
     }
     const DX = [1, 0, -1, 0], DY = [0, 1, 0, -1];
-    for (let guard = 0; cells > target && guard < 2000000; guard++) {
-      const x = 1 + Math.floor(this.rand() * 30), y = 1 + Math.floor(this.rand() * 30);
+    for (let guard = 0; cells > target && guard < 2000000 * (s > 1 ? s : 1); guard++) {
+      const x = 1 + Math.floor(this.rand() * (w - 2)), y = 1 + Math.floor(this.rand() * (h - 2));
       if (m[x][y]) continue;
       let d = Math.floor(this.rand() * 4);
       let tx = x + DX[d], ty = y + DY[d];

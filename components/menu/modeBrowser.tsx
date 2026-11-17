@@ -7,6 +7,7 @@ import { useGameDark } from '../../utils/useGameTheme';
 import { useSwapStage } from '../kit/motion';
 import { SwapInPlace, SwapText } from '../kit/Collapse';
 import { PickRow, SearchField, Segmented, emptyArt } from '../kit/kit';
+import { TabSlide } from '../kit/TabSlide';
 
 export type SortId = 'top' | 'name';
 export const ALL_ID = 'all';
@@ -26,6 +27,7 @@ export interface ModeItem {
   rank: number;
   inAll: boolean;
   first?: boolean;
+  leadIn?: string;
 }
 
 const _artReady = new Set<string>();
@@ -108,7 +110,8 @@ export function useModeShelf<C extends string>(items: readonly ModeItem[], categ
   const list = useMemo(() => {
     const l = items.filter(e => (searching ? e.search.includes(shownQ) : shownCategory === ALL_ID ? e.inAll : e.category === shownCategory || e.alsoIn === shownCategory));
     const pin = (a: ModeItem, b: ModeItem) => (b.first ? 1 : 0) - (a.first ? 1 : 0);
-    return sort === 'name' ? l.sort((a, b) => pin(a, b) || a.title.localeCompare(b.title)) : l.sort((a, b) => pin(a, b) || a.rank - b.rank);
+    const lead = (a: ModeItem, b: ModeItem) => (!searching && b.leadIn === shownCategory ? 1 : 0) - (!searching && a.leadIn === shownCategory ? 1 : 0);
+    return sort === 'name' ? l.sort((a, b) => pin(a, b) || a.title.localeCompare(b.title)) : l.sort((a, b) => pin(a, b) || lead(a, b) || a.rank - b.rank);
   }, [items, searching, shownQ, shownCategory, sort]);
   return { stage, searching, shownCategory, list };
 }
@@ -179,6 +182,7 @@ export const ModeSideBody: React.FC<{
   );
   return (
     <div className="k-play-side-scroll">
+      <TabSlide pick=".k-pick-on" />
       <SearchField value={query} onChange={onQuery} placeholder="Search modes" />
       {lead && lead.length > 0 ? <div className="k-stack">{lead.map(row)}</div> : null}
       <div className="space-y-2">

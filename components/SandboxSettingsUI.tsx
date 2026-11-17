@@ -11,9 +11,12 @@ import {
   RENDER_QUALITY_LEVELS, getRenderQualitySetting, setRenderQualitySetting,
   subscribeRenderQuality, getAutoChosenScale, type RenderQualitySetting,
 } from '../utils/renderQuality';
-import { GAME_THEMES, gameThemeId, gameThemeSync, setGameThemeSync, setGameThemePick, borderBlend, setBorderBlend, THEME_SYNC_LOCKED } from '../utils/gameTheme';
+import { GAME_THEMES, gameThemeId, gameThemeSync, setGameThemeSync, setGameThemePick, borderBlend, setBorderBlend, previewBorderBlend, THEME_SYNC_LOCKED } from '../utils/gameTheme';
+
+const liveBlend = (v: number | null) => previewBorderBlend(v === null ? null : v / 100);
 import { useGameThemeVersion } from '../utils/useGameTheme';
 import { toggleTheme } from '../utils/theme';
+import { UI_THEMES, uiThemeId, setUiTheme, subscribeUiTheme } from '../utils/uiTheme';
 
 const QUALITY_OPTIONS: { value: string; label: string }[] = [
   { value: 'auto', label: 'Auto' },
@@ -21,6 +24,8 @@ const QUALITY_OPTIONS: { value: string; label: string }[] = [
 ];
 
 const GAME_THEME_OPTIONS: { value: string; label: string }[] = GAME_THEMES.map(t => ({ value: t.id, label: t.label }));
+
+const UI_THEME_OPTIONS: { value: string; label: string }[] = UI_THEMES.map(t => ({ value: t.id, label: t.label }));
 
 
 interface Props {
@@ -92,6 +97,10 @@ export const SandboxSettingsUI: React.FC<Props> = ({ logic, onUpdate, className,
     if ((id === 'dark') !== document.documentElement.classList.contains('dark')) toggleTheme();
   }, []);
   const handleThemeSync = useCallback((v: boolean) => { setGameThemeSync(v); }, []);
+
+  const [uiTheme, setUiThemeShown] = useState(uiThemeId);
+  useEffect(() => subscribeUiTheme(() => setUiThemeShown(uiThemeId())), []);
+  const handleUiTheme = useCallback((v: string) => { setUiTheme(v === 'classic' ? 'classic' : 'modern'); }, []);
   const handleBlend = useCallback((v: number) => { setBorderBlend(v / 100); }, []);
 
   return (
@@ -110,6 +119,9 @@ export const SandboxSettingsUI: React.FC<Props> = ({ logic, onUpdate, className,
       </div>
 
       <Group title="Graphics" icon={headerIcon(HdImage03)}>
+        <SelectRow label="UI Theme" description="The look of the app's windows and menus."
+          help="Modern is the app's own look. Classic dresses every panel, window, menu and popup in the classic game's grey settings look: dark edges, square corners and bold outlined words. It is experimental. The in game HUD and the game's colours keep their own look."
+          value={uiTheme} onChange={handleUiTheme} options={UI_THEME_OPTIONS} />
         <SelectRow label="Game Theme" description="Colours of the game and its HUD."
           help={THEME_SYNC_LOCKED
             ? "The look of everything inside the game: the map, the tanks, the shapes and the in game HUD, and every picture of a tank, a shape or a map in the app. The game and the app share one theme, so picking one here changes the app's too, as the sun and moon button does."
@@ -118,7 +130,7 @@ export const SandboxSettingsUI: React.FC<Props> = ({ logic, onUpdate, className,
         {!THEME_SYNC_LOCKED && <ToggleRow label="Sync Theme" description="The game and the app share one theme."
           help="On: the game always shows the app's theme, and changing either one changes both. Off: any game theme goes with any app theme."
           checked={themeSync} onChange={handleThemeSync} />}
-        <SliderRow label="Border Blend" deferred value={Math.round(borderBlend() * 100)}
+        <SliderRow label="Border Blend" deferred onLive={liveBlend} value={Math.round(borderBlend() * 100)}
           onChange={handleBlend} min={0} max={100} format={(v) => `${Math.round(v)}%`}
           minLabel="Fill" maxLabel="Border"
           help="How far every outline in the game is mixed from its fill colour toward the border colour. Each theme has its own (Light 60%, Dark 100%), and picking a theme puts it back." />

@@ -371,7 +371,7 @@
         "spread": 0,
         "shudder": 0.25,
         "bulletDamage": 4.2,
-        "bulletHealthBase": 6.2585,
+        "bulletHealthBase": 3.12925,
         "bulletPenetration": 1,
         "bulletLifetime": 22.867,
         "shootResist": 8.7619,

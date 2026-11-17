@@ -2128,6 +2128,8 @@ export function generateMap(config: MapConfig, forFill = false): MapState {
       _inGridOf.set(portal, { gcY, hx: mapHalf, hy: mapHalfY, cs: cellSize });
       if (portal._inCells !== null && portal._inCells.length > 0) _inArea.push(portal);
     }
+    const _standing = (q: PortalEntity): boolean => q._placedInArea === true
+      || (!_inArea.includes(q) && !_needArea.has(q) && !(SMALL_FIX.G747 !== 0 && _willStandInArea(q.id)));
     if (_inArea.length > 0) {
       const ok = (c: number): boolean => { const cx = (c / gcY) | 0, cy = c - cx * gcY; return tileGrid[c] !== TileType.WALL && !_wallBeside(tileGrid, gc, gcY, cx, cy); };
       const put = (p: PortalEntity, c: number): void => { const gx = (c / gcY) | 0, gy = c - gx * gcY; p.x = -mapHalf + gx * cellSize + cellSize / 2; p.y = -mapHalfY + gy * cellSize + cellSize / 2; };
@@ -2143,7 +2145,7 @@ export function generateMap(config: MapConfig, forFill = false): MapState {
             const c = cells[(Math.random() * cells.length) | 0];
             if (!ok(c)) continue;
             const cx = (c / gcY) | 0, cy = c - cx * gcY;
-            if (!_portalGapClear(p, -mapHalf + cx * cellSize + cellSize / 2, -mapHalfY + cy * cellSize + cellSize / 2, portals, true)) continue;
+            if (!_portalGapClear(p, -mapHalf + cx * cellSize + cellSize / 2, -mapHalfY + cy * cellSize + cellSize / 2, portals, SMALL_FIX.G748 !== 0 ? _standing : true)) continue;
             ci = c; break;
           }
           if (ci < 0) { fit = false; ci = cells[(Math.random() * cells.length) | 0]; }
@@ -2151,12 +2153,21 @@ export function generateMap(config: MapConfig, forFill = false): MapState {
         }
         let closest = Infinity;
         for (let i = 0; i < _inArea.length; i++) for (let j = i + 1; j < _inArea.length; j++) closest = Math.min(closest, Math.hypot(_inArea[i].x - _inArea[j].x, _inArea[i].y - _inArea[j].y));
+        if (SMALL_FIX.G748 !== 0) for (const a of _inArea) for (const q of portals) if (!_inArea.includes(q) && _standing(q)) closest = Math.min(closest, Math.hypot(a.x - q.x, a.y - q.y));
         if (closest > bestGap) { bestGap = closest; best = pick; }
         if (fit) break;
       }
       if (best !== null) for (let i = 0; i < _inArea.length; i++) { put(_inArea[i], best[i]); _inArea[i]._placedInArea = true; }
     }
-    if (_needArea.size > 0) for (let i = portals.length - 1; i >= 0; i--) if (_needArea.has(portals[i]) && !portals[i]._placedInArea) portals.splice(i, 1);
+    if (_needArea.size > 0 || SMALL_FIX.G747 !== 0) for (let i = portals.length - 1; i >= 0; i--) {
+      const q = portals[i];
+      if (q._placedInArea || !(_needArea.has(q) || (SMALL_FIX.G747 !== 0 && _willStandInArea(q.id)))) continue;
+      if (!_needArea.has(q)) {
+        const gx = Math.round((q.x + mapHalf - cellSize * 0.5) / cellSize), gy = Math.round((q.y + mapHalfY - cellSize * 0.5) / cellSize), k = gx * gcY + gy;
+        if (gx >= 0 && gy >= 0 && gx < gc && gy < gcY && tileGrid[k] === TileType.PORTAL) tileGrid[k] = TileType.NORMAL;
+      }
+      portals.splice(i, 1);
+    }
     resolvePortalExits(portals);
   }
 
@@ -3156,11 +3167,11 @@ export function outsidePlayfieldOf(x: number, y: number, r: number, mapHalf: num
 
 const _NO_PORTAL_LIST: readonly PortalEntity[] = [];
 export const PORTAL_AREA_GAP = PORTAL_TILE_SIZE * 2.4;
-function _portalGapClear(p: PortalEntity, x: number, y: number, portals: readonly PortalEntity[], placedOnly: boolean): boolean {
+function _portalGapClear(p: PortalEntity, x: number, y: number, portals: readonly PortalEntity[], placedOnly: boolean | ((q: PortalEntity) => boolean)): boolean {
   const g2 = PORTAL_AREA_GAP * PORTAL_AREA_GAP;
   for (let i = 0; i < portals.length; i++) {
     const q = portals[i];
-    if (q === p || (placedOnly && q._placedInArea !== true)) continue;
+    if (q === p || (placedOnly === true && q._placedInArea !== true) || (typeof placedOnly === 'function' && !placedOnly(q))) continue;
     const dx = x - q.x, dy = y - q.y;
     if (dx * dx + dy * dy < g2) return false;
   }
@@ -3185,6 +3196,7 @@ function _relocateTimedPortal(
   const spawnableTiles = areaMs.spawnableTiles;
   if (spawnableTiles.length === 0) return;
   const inCells = SMALL_FIX.R914 !== 0 && p._inCells !== null && p._inCells.length > 0 ? _inCellsOn(p, p._inCells, areaMs) : p._inCells;
+  if (SMALL_FIX.G749 !== 0 && p._inCells !== null && p._inCells.length > 0 && inCells !== null && inCells.length === 0) return;
 
   const localX = p.x - offsetX;
   const localY = p.y - offsetY;
@@ -3495,7 +3507,7 @@ export function spawnHazardAt(
   }
   for (let i = 0; i < portals.length; i++) {
     const p = portals[i];
-    if (p._dying || (!p._timedActive && !evenClosed)) continue;
+    if ((SMALL_FIX.G784 !== 0 ? p._particlesDraining === true : p._dying) || (!p._timedActive && !evenClosed)) continue;
     if (!forTank && p.shapeMode === PORTAL_THINGS_PUSH) continue;
     const dx = x - p.x, dy = y - p.y, r = p.reach + pad;
     if (p.reachSquare) { if ((dx < 0 ? -dx : dx) < r && (dy < 0 ? -dy : dy) < r) return true; }

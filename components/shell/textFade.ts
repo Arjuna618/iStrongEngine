@@ -1,5 +1,5 @@
 const TEXT_BOX = 'input:not([type]), input[type="text"], input[type="search"], input[type="number"]';
-export const FADE_SELECTOR = `.k-fade, .truncate, .k-split-title, .k-pick-title, .k-pick-meta, .k-lib-tag-sm > span, .k-pb-name, .k-death-label, .k-hub-name, .k-hub-foot-text, .k-ev-sentence, .k-ev-mon-line, .k-ev-detail-title, .k-ev-msg-where, ${TEXT_BOX}`;
+export const FADE_SELECTOR = `.k-fade, .truncate, .k-split-title, .k-pick-title, .k-pick-meta, .k-lib-tag-sm > span, .k-pb-name, .k-death-label, .k-hub-name, .k-hub-foot-text, .k-ev-sentence, .k-ev-mon-line, .k-ev-detail-title, .k-ev-msg-where, .k-widest > span, ${TEXT_BOX}`;
 const FADE_EM = 1.6;
 const READ_PX_S = 58;
 const BACK_PX_S = READ_PX_S * 2;
@@ -133,7 +133,8 @@ function setIndent(el: HTMLElement, i: number): void {
   el.style.textIndent = i > 0.01 ? `${(-i).toFixed(2)}px` : '';
 }
 function posOf(el: HTMLElement): number { return (indents.get(el) ?? 0) + el.scrollLeft; }
-function setPos(el: HTMLElement, x: number): void { if (isTextBox(el)) setIndent(el, x); else el.scrollLeft = x; }
+const indentsAll = (): boolean => document.documentElement.classList.contains('ui-classic');
+function setPos(el: HTMLElement, x: number): void { if (isTextBox(el) || indentsAll()) setIndent(el, x); else el.scrollLeft = x; }
 function overOf(el: HTMLElement): number {
   const i = indents.get(el) ?? 0;
   if (i <= 0.01) return el.scrollWidth - el.clientWidth;
@@ -154,7 +155,11 @@ function unfoldIndent(el: HTMLElement): void {
   el.scrollLeft = i;
 }
 
+function clearFade(el: HTMLElement): void {
+  if (el.hasAttribute('data-kfade')) { el.removeAttribute('data-kfade'); el.style.removeProperty('--kf-l'); el.style.removeProperty('--kf-r'); }
+}
 function paint(el: HTMLElement, over: number): void {
+  if (typingIn(el)) { clearFade(el); return; }
   if (over <= 1) {
     if (el.hasAttribute('data-kfade')) { el.removeAttribute('data-kfade'); el.style.removeProperty('--kf-l'); el.style.removeProperty('--kf-r'); }
     if (indents.get(el)) setIndent(el, 0);
@@ -301,21 +306,18 @@ export function installTextFade(): () => void {
       if (el.scrollLeft !== 0) el.scrollLeft = 0;
       setIndent(el, 0); paint(el, overOf(el));
     });
-    if (!el.hasAttribute('data-kfade')) return;
     stop(el);
-    window.setTimeout(() => {
-      if (document.activeElement !== el || standsAtStart(el)) return;
-      unfoldIndent(el); paint(el, overOf(el));
-    }, 0);
+    unfoldIndent(el); clearFade(el);
   };
   const focusOut = (e: FocusEvent) => {
     const el = e.target as Element | null;
     if (!isTextBox(el)) return;
     stop(el);
     const seen = Math.max(posOf(el), lastX.get(el) ?? 0);
-    if (seen <= 0.5) return;
+    if (seen <= 0.5) { paint(el, overOf(el)); return; }
     if (el.scrollLeft !== 0) el.scrollLeft = 0;
     setIndent(el, seen);
+    paint(el, overOf(el));
     glide(el, 0, BACK_PX_S, 0);
   };
   const pointerDown = (e: PointerEvent) => { downOn = e.target; downAt = performance.now(); };

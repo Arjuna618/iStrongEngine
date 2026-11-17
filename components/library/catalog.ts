@@ -2,6 +2,7 @@ import type { LibraryItem, ExportFile, TurretPreset, CustomProjectileDesign, Oth
 import type { ShapeDefinition, ShapeCategory } from '../../game/ShapeRegistry';
 import { SHAPE_DEFS_BY_CATEGORY, getUserShapeDefs, getShapeRegistryVersion } from '../../game/ShapeRegistry';
 import { SMALL_FIX } from '../../game/smallFixSwitch';
+import { TURRET_FOLDER_OF } from './turretFolders.generated';
 import { FULL_EVOLUTION_TREE, isMenuTank } from '../../game/evolutionTree';
 import { bookTreeFileKey } from '../../game/bookTrees';
 import { SENTRY_TANK_CONFIGS, SENTINEL_TANK_CONFIGS, SENTRY_ENEMY_CONFIGS } from '../../game/SentryConfigs';
@@ -36,14 +37,21 @@ const FIRES_OPTIONS: FilterOption[] = [
 const BARREL_OPTIONS: FilterOption[] = [o('b0', 'None'), o('b1', 'One'), o('b2', 'Two'), o('b3', 'Three or four'), o('b5', 'Five to eight'), o('b9', 'Nine or more')];
 const BODY_OPTIONS: FilterOption[] = [o('s0', 'Circle'), o('s3', 'Triangle'), o('s4', 'Square'), o('s5', 'Pentagon'), o('s6', 'Hexagon'), o('s7', 'More sides'), o('star', 'Star')];
 
-export const TANK_COLLECTIONS: FilterOption[] = [
+export const TANK_COLLECTIONS: FilterOption[] = SMALL_FIX.R968 !== 0 ? [
+  o('basic', 'Basic'), o('armsRace', 'Arms Race'), o('dreadV1', 'Dreadnoughts V1'), o('dreadV2', 'Dreadnoughts V2'),
+  o('bosses', 'Bosses'), o('sentries', 'Sentries'), o('sentinels', 'Sentinels'), o('mapEntities', 'Map Entities'), o('devTanks', 'Dev Tanks'), o('mine', 'My Content'), o('otherCol', 'Other'),
+] : [
   o('basic', 'Basic'), o('armsRace', 'Arms Race'), o('dreadV1', 'Dreadnoughts V1'), o('dreadV2', 'Dreadnoughts V2'),
   o('bosses', 'Bosses'), o('celestials', 'Celestials'), o('mapEntities', 'Map Entities'), o('devTanks', 'Dev Tanks'), o('mine', 'My Content'), o('otherCol', 'Other'),
 ];
-const BOSS_GROUPS: FilterOption[] = [
+const BOSS_GROUPS: FilterOption[] = SMALL_FIX.R968 !== 0 ? [
+  o('Elites', 'Elites'), o('Mysticals', 'Mysticals'), o('Nesters', 'Nesters'), o('Rogues', 'Rogues'), o('Rammers', 'Rammers'),
+  o('Terrestrials', 'Terrestrials'), o('Celestials', 'Celestials'), o('Eternals', 'Eternals'), o('Spawned Entities', 'Spawned'),
+] : [
   o('Sentries', 'Sentries'), o('Elites', 'Elites'), o('Mysticals', 'Mysticals'), o('Nesters', 'Nesters'), o('Rogues', 'Rogues'),
   o('Rammers', 'Rammers'), o('Terrestrials', 'Terrestrials'), o('Eternals', 'Eternals'), o('Spawned Entities', 'Spawned'),
 ];
+export function filterLayoutWord(kind: LibKind): string { return kind === 'tank' && SMALL_FIX.R968 !== 0 ? 'r968' : ''; }
 const MAP_GROUPS: FilterOption[] = [o('Map Entities', 'Entities'), o('Sanctuaries', 'Sanctuaries')];
 
 export const KIND_GROUPS: Record<LibKind, FilterGroup[]> = {
@@ -177,12 +185,29 @@ const COLLECTION_OF_CATEGORY: Record<string, string> = {
 };
 Object.setPrototypeOf(COLLECTION_OF_CATEGORY, null);
 
-export function collectionOfItem(item: { source?: string; fileData: { category?: string } } | null | undefined): string | undefined {
+export function collectionOfItem(item: { source?: string; fileData: { category?: string; name?: string } } | null | undefined): string | undefined {
   if (!item) return undefined;
-  return item.source !== 'data-library' ? 'mine' : collectionOfCategory(item.fileData.category);
+  return item.source !== 'data-library' ? 'mine' : tankCollectionOf(item.fileData.category, item.fileData.name);
 }
 
-export function collectionOfCategory(category: string | undefined): string { return (category && COLLECTION_OF_CATEGORY[category]) || 'otherCol'; }
+function turretGroupOf(item: LibraryItem, own: string): string {
+  if (SMALL_FIX.R968 === 0 || item.source !== 'data-library') return own;
+  const at = item.id.lastIndexOf('/');
+  return TURRET_FOLDER_OF[item.id.slice(at + 1)] ?? own;
+}
+
+export function collectionOfCategory(category: string | undefined): string {
+  if (SMALL_FIX.R968 !== 0 && category) {
+    if (category === 'Celestials') return 'bosses';
+    if (category === 'Sentries') return 'sentries';
+  }
+  return (category && COLLECTION_OF_CATEGORY[category]) || 'otherCol';
+}
+
+export function tankCollectionOf(category: string | undefined, name: string | undefined): string {
+  const c = collectionOfCategory(category);
+  return c === 'sentries' && /\bsentinel\b/i.test(name ?? '') ? 'sentinels' : c;
+}
 
 export function wordsOf(s: string): string[] {
   const out: string[] = [];
@@ -462,7 +487,7 @@ function* buildCatalogSteps(inp: CatalogInputs): Generator<void, LibCatalog, voi
     const f: ExportFile = item.fileData;
     const cat = f.category || '';
     if (f.type === 'Tank') {
-      const col = COLLECTION_OF_CATEGORY[cat] ?? 'otherCol';
+      const col = tankCollectionOf(cat, f.name);
       const e = baseEntry('tank', item, col, cat, cat + ' ' + (shippedFileKey(item) ?? ''));
       add(e);
       if (e.fileKey) byFileKey.set(e.fileKey, e);
@@ -470,7 +495,7 @@ function* buildCatalogSteps(inp: CatalogInputs): Generator<void, LibCatalog, voi
       walk((f.data as TankConfig)?.turrets);
     } else if (f.type === 'TurretPreset') {
       const p = f.data as TurretPreset;
-      const c = cat || p?.category || '';
+      const c = turretGroupOf(item, cat || p?.category || '');
       add(baseEntry('turret', item, c || 'otherCol', c, c));
     } else if (f.type === 'CustomProjectile') {
       add(baseEntry('projectile', item, cat || 'otherCol', cat, cat + ' ' + ((f.data as CustomProjectileDesign)?.visual ?? '')));

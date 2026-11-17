@@ -81,6 +81,7 @@ function btWordsOf(e: EnemyTank, bit: number, a: Record<string, unknown>): void 
       e._hsHealers = a.healers !== false; e._hsTag = _idx(a._tag); e._hsZone = _idx(a._zone);
     } else if (bit === BT_FIGHT) {
       e._tfHelp = a.help !== false;
+      e._tfMap = a.bosses === true; e._tfMapShare = btShare(a.bossShare, 85);
       if (SMALL_FIX.GH532 !== 0 && !e._tfHelp && e._tfGoalId !== '') btEndGoal(e, '', 0);
     }
     else if (bit === BT_FEAR) { e._flBelow = btShare(a.below, 20); e._flBack = btBackOf(e._flBelow, btShare(a.back, 100)); }
@@ -102,6 +103,9 @@ function btWordsOf(e: EnemyTank, bit: number, a: Record<string, unknown>): void 
       e._ogTag = _idx(a._tag);
       const r = typeof a.radius === 'number' && Number.isFinite(a.radius) ? a.radius : 900;
       e._ogRadius = Math.max(100, Math.min(6000, r)); e._ogId = ''; e._ogLookAt = 0;
+      e._ogFront = a.front === true; e._ogFrontShare = btShare(a.frontShare, 92); e._ogPendId = '';
+      e._ogBlockShare = typeof a.blockShare === 'number' && Number.isFinite(a.blockShare) && a.blockShare > 0 ? Math.min(1, a.blockShare / 100) : 0; e._ogBlockUntil = 0; e._ogBlockSpotUntil = 0;
+      e._ogUnitShare = typeof a.unitShare === 'number' && Number.isFinite(a.unitShare) && a.unitShare > 0 ? Math.min(1, a.unitShare / 100) : 0; e._ogUnitT = '';
     } else if (bit === BT_ATTACK) { e._oaTag = _idx(a._tag); e._ogId = ''; e._ogLookAt = 0; }
     else if (bit === BT_TAKE) { e._ftTake = _idx(a._tag); e._ftId = ''; e._ftLookAt = 0; }
     else if (bit === BT_SPOIL) { e._ftSpoil = _idx(a._tag); e._ftId = ''; e._ftLookAt = 0; }
@@ -121,7 +125,7 @@ function btOff(e: EnemyTank, bit: number, i: number): void {
   else if (bit === BT_FEAR) e._flLow = false;
   else if (bit === BT_WAVOID) { e._wkMask = 0; e._wkPad = 0; }
   else if (bit === BT_WTOUCH) { e._wqMask = 0; e._wqNext = 0; if (e._mmDo >= 2) e._mmDo = 0; }
-  else if (bit === BT_GUARD) { e._ogTag = -1; e._ogId = ''; }
+  else if (bit === BT_GUARD) { e._ogTag = -1; e._ogId = ''; e._ogFront = false; e._ogPendId = ''; e._ogBlockShare = 0; e._ogBlockUntil = 0; e._ogBlockSpotUntil = 0; e._ogUnitShare = 0; e._ogUnitT = ''; }
   else if (bit === BT_ATTACK) { e._oaTag = -1; e._ogId = ''; }
   else if (bit === BT_TAKE) { e._ftTake = -1; e._ftId = ''; }
   else if (bit === BT_SPOIL) { e._ftSpoil = -1; e._ftId = ''; }
@@ -142,9 +146,13 @@ export function btResetLife(e: EnemyTank): void {
   btEndTrip(e, 0); e._hsCoolUntil = 0; e._hsBestD = 0;
   btEndGoal(e, '', 0); e._tfBanId = ''; e._tfBanUntil = 0; e._tfLookAt = 0; e._flLow = false;
   e._hdMateId = ''; e._hdLookAt = 0;
+  e._tfMap = false; e._tfMapId = ''; e._tfMapAt = 0; e._tfMapLookAt = 0; e._tfPendId = ''; e._tfPendAt = 0; e._tfMeetId = ''; e._tfMeetSid = ''; e._tfMeetGoAt = 0;
   e._btRoute = ''; e._btWAt = 0; e._btWn = 0;
   e._wkMask = 0; e._wkPad = 0; e._wqMask = 0; e._wqNext = 0; if (e._mmDo >= 2) e._mmDo = 0;
   e._ogTag = -1; e._oaTag = -1; e._ogId = ''; e._ogLookAt = 0;
+  e._ogFront = false; e._ogFrontIs = -1; e._ogPendId = ''; e._ogPendAt = 0; e._ogHoldUntil = 0;
+  e._ogBlockShare = 0; e._ogBlockIs = -1; e._ogBlockUntil = 0; e._ogBlockLookAt = 0; e._ogBlockSpotUntil = 0;
+  e._ogUnitShare = 0; e._ogUnitIs = -1; e._ogUnitT = ''; e._ogUnitLookAt = 0;
   e._ftTake = -1; e._ftSpoil = -1; e._ftId = ''; e._ftLookAt = 0; e._ctKite = false;
   e._ftGo = false; e._ftBestD = Infinity; e._ftGiveUpAt = 0; e._ftBan = ''; e._ftBanUntil = 0;
   e._esTag = -1; e._esId = ''; e._esLookAt = 0;

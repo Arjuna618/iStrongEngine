@@ -334,7 +334,7 @@ export function importToHub(picked: readonly PickedFile[], opts: HubImportOpts =
     if (added.length > 0) {
       const one = projects.length === 1 && files.length === 0 ? projects[0] : null;
       const open = opts.open ?? ((it: HubItem) => { void openHubItem(it); });
-      toast('success', one ? `Added "${one.name}" to your Project Hub.` : `Added ${parts.join(' and ')} to your Project Hub.`, one ? { label: 'Open', run: () => open(one) } : undefined);
+      void open; toast('success', one ? `Added "${one.name}" to your Project Hub.` : `Added ${parts.join(' and ')} to your Project Hub.`);
       opts.onAdded?.(added);
     }
     const bad = [

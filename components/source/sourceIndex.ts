@@ -107,15 +107,22 @@ function loadPack(project: SourceProject, i: number): Promise<string> {
 }
 
 const dataTexts = new Map<string, Promise<string>>();
+const textsCame = new Map<string, string>();
 export function loadFileText(project: SourceProject, file: SourceFile): Promise<string> {
-  if (file.kind === 'c') return loadPack(project, file.pack).then(t => t.slice(file.offset, file.offset + file.length));
+  const came = textsCame.get(file.path);
+  if (came !== undefined) return Promise.resolve(came);
+  const keep = (t: string) => { textsCame.set(file.path, t); return t; };
+  if (file.kind === 'c') return loadPack(project, file.pack).then(t => keep(t.slice(file.offset, file.offset + file.length)));
   let p = dataTexts.get(file.path);
   if (!p) {
     p = fetch(urlOf(file.src)).then(r => { if (!r.ok) throw new Error('file'); return r.text(); });
     p.catch(() => dataTexts.delete(file.path));
     dataTexts.set(file.path, p);
   }
-  return p;
+  return p.then(keep);
+}
+export function peekFileText(file: SourceFile): string | null {
+  return textsCame.get(file.path) ?? null;
 }
 
 export interface SearchText { text: string[]; lower: string[] }

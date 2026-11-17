@@ -6,6 +6,19 @@ export function layerOutlineOf(l: { outline?: [number, number][] } | null | unde
   return o !== undefined && o !== null && o.length >= 3 ? o : null;
 }
 
+const _reachByOutline = new WeakMap<object, number>();
+export function layerOutlineReach(l: { outline?: [number, number][] } | null | undefined): number {
+  const o = layerOutlineOf(l);
+  if (o === null) return 1;
+  let r = _reachByOutline.get(o);
+  if (r === undefined) {
+    r = 1;
+    for (let i = 0; i < o.length; i++) { const d = Math.sqrt(o[i][0] * o[i][0] + o[i][1] * o[i][1]); if (d > r && d <= LAYER_OUTLINE_MAX_REACH) r = d; }
+    _reachByOutline.set(o, r);
+  }
+  return r;
+}
+
 export function traceLayerOutline(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   o: readonly (readonly [number, number])[], x: number, y: number, r: number, angle: number,

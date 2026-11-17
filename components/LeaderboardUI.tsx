@@ -1036,7 +1036,7 @@ export const LeaderboardUI: React.FC<Props> = ({ logic }) => {
   return (
     <div
       ref={setRootRef}
-      className="absolute z-40 pointer-events-none select-none"
+      className="k-hud absolute z-40 pointer-events-none select-none"
       data-lb-root=""
       style={{
         top: 'env(safe-area-inset-top, 0px)',

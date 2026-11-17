@@ -1,11 +1,13 @@
 import React, { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { TEXT_LIMITS } from '../kit/textLimits';
 import { createPortal } from 'react-dom';
 import type { AppIcon } from '../ui/icons';
 import { ChevronRight, Scissors, Copy, ClipboardPaste, TextSelect, Check } from '../ui/icons';
 import { useEscapeOwner } from '../shared/escapeStack';
 import { getVisualScale } from '../../utils/zoomCompensation';
 import { useMenuStage } from '../kit/motion';
-import { useLeave, scrollGlide, nearestScrollTop } from '../kit/presence';
+import { useLeave, scrollGlide, nearestScrollTop, motionOff } from '../kit/presence';
+import { uiThemeId } from '../../utils/uiTheme';
 
 export interface MenuPrompt {
   title: string;
@@ -43,6 +45,10 @@ const _handled = new WeakSet<Event>();
 let _leaveTimer = 0;
 const LEAVE_MS = 110;
 const TOUCH_HOLD_MS = 480;
+export const menuOpenMs = (): number => (motionOff() ? 0 : uiThemeId() === 'classic' ? 700 : 130);
+export const MENU_LEAVE_MS = LEAVE_MS;
+let _menuBusyUntil = 0;
+const menuBusy = () => performance.now() < _menuBusyUntil;
 
 export function openContextMenu(e: React.MouseEvent | MouseEvent, entries: MenuEntry[]): void {
   e.preventDefault();
@@ -50,8 +56,10 @@ export function openContextMenu(e: React.MouseEvent | MouseEvent, entries: MenuE
   const native = 'nativeEvent' in e ? e.nativeEvent : e;
   _handled.add(native);
   if (!_isEngine() || entries.length === 0) return;
+  if (menuBusy()) return;
   const zoom = getVisualScale(e.target as Element) || 1;
   window.clearTimeout(_leaveTimer);
+  _menuBusyUntil = performance.now() + menuOpenMs();
   setMenu({ open: true, leaving: false, x: e.clientX / zoom, y: e.clientY / zoom, zoom, entries, prompt: null, key: _state.key + 1, textEl: null, textOver: null });
 }
 
@@ -65,6 +73,7 @@ export function openPromptAt(el: Element, prompt: MenuPrompt): void {
 
 export function closeContextMenu(): void {
   if (!_state.open || _state.leaving) return;
+  _menuBusyUntil = Math.max(_menuBusyUntil, performance.now() + LEAVE_MS);
   setMenu({ ..._state, leaving: true });
   window.clearTimeout(_leaveTimer);
   _leaveTimer = window.setTimeout(() => setMenu({ ...CLOSED, key: _state.key }), LEAVE_MS);
@@ -108,7 +117,9 @@ export function installContextMenuGuard(isEngine: () => boolean): () => void {
         setMenu({ ..._state, textOver: { entries: textMenu(t), x: e.clientX / _state.zoom, y: e.clientY / _state.zoom } });
         return;
       }
+      if (menuBusy()) return;
       window.clearTimeout(_leaveTimer);
+      _menuBusyUntil = performance.now() + menuOpenMs();
       setMenu({ open: true, leaving: false, x: e.clientX / zoom, y: e.clientY / zoom, zoom, entries: textMenu(t), prompt: null, key: _state.key + 1, textEl: t, textOver: null });
     }
   };
@@ -301,7 +312,7 @@ const PromptBox: React.FC<{ p: MenuPrompt; x: number; y: number; zoom: number; l
       onSubmit={e => { e.preventDefault(); if (sent.current || leaving) return; if (clean === '' && !p.initial) return; sent.current = true; p.onSubmit(clean); closeContextMenu(); }}>
       <div className="k-ctx-prompt-title">{p.title}</div>
       <div className="k-ctx-prompt-row">
-        <input ref={input} className="k-field k-ctx-prompt-input" value={text} maxLength={p.maxLength} placeholder={p.placeholder}
+        <input ref={input} className="k-field k-ctx-prompt-input" value={text} maxLength={p.maxLength ?? TEXT_LIMITS.NAME} placeholder={p.placeholder}
           onChange={e => setText(e.target.value)} spellCheck={false} />
         <button type="submit" className="k-btn k-btn-primary k-btn-sm" disabled={clean === '' && !p.initial}>{p.submit}</button>
       </div>

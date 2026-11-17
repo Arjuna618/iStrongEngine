@@ -16,7 +16,7 @@ let _look: HalloweenLook | null = null;
 let _parts = 3;
 
 export function halloweenLook(logic: GameLogic): HalloweenLook | null {
-  const parts = halloweenPartsOf(logic.state.gameModeConfig);
+  const parts = halloweenPartsOf(logic.state.gameModeConfig) | (logic.spawnerPumpkinOn ? 2 : 0);
   if (parts === 0) return null;
   if (parts !== _parts) { _parts = parts; _lib = null; _eyeD = null; _pkD = null; _look = null; }
   const lib = logic.state.otherLibrary;

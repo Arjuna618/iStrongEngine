@@ -4,7 +4,7 @@ import { Keyboard, BadgeInfo } from '../ui/icons';
 import { SHORTCUTS } from './shortcuts';
 import { CURRENT_VERSION } from '../updates/version';
 import { useProjectUi, projectSystem } from '../project/projectSystem';
-import appLogo from '../ui/media/logo5.webp';
+import appLogo from '../ui/media/logo5-green.webp';
 import type { LegalPage } from '../legal/LegalWindow';
 
 function Keys({ keys }: { keys: string }) {

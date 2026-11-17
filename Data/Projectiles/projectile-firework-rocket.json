@@ -30,7 +30,7 @@
         "knockback": 49.7,
         "spread": 7.5,
         "shudder": 0.124,
-        "bulletDamage": 0.8625,
+        "bulletDamage": 1.26839,
         "bulletHealthBase": 1.21739,
         "bulletPenetration": 0.7,
         "bulletLifetime": 1.2,

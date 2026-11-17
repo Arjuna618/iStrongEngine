@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { PickGlide } from '../kit/TabSlide';
 import { createPortal } from 'react-dom';
 import { BookText, ChevronDown, ChevronRight, X, Lightbulb, Info, TriangleAlert } from '../ui/icons';
 import { usePortalMenuScale, useFitScale } from '../../utils/useMenuScale';
+import { useClassicUi, fitWrapStyle } from '../shared/useClassicUi';
 import { useBackdropClose } from '../shared/useBackdropClose';
 import { useEscapeOwner } from '../shared/escapeStack';
 import { useClosing, useSwapStage } from '../kit/motion';
@@ -340,6 +342,7 @@ const CategoryNode = React.memo(function CategoryNode({ cat, open, subsOpen, sel
                                 </button>
                                 <Collapse open={subOpen} onBusyChange={busyCb(`sub:${sub.id}`)}>
                                   <div className="k-rd-sub">
+                                    <PickGlide pick=".k-rd-item-on" look="row" />
                                     {sub.guides.map(g => (
                                       <button
                                         key={g.id}
@@ -439,10 +442,11 @@ export const DocsPopup: React.FC<Props> = ({ onClose: onCloseNow }) => {
   const backdropProps = useBackdropClose(onClose);
   const menuScale = usePortalMenuScale();
   const fitScale = useFitScale(cardRef, menuScale * 1.4, true);
+  const classicUi = useClassicUi();
 
   return createPortal(
     <div ref={scrimRef} className={`modal-scrim z-50 animate-fadeIn ${closing ? 'pointer-events-none' : ''}`} {...backdropProps}>
-      <div style={{ transform: `scale(${fitScale})`, transformOrigin: 'center center', willChange: 'transform' }} onClick={e => e.stopPropagation()}>
+      <div style={fitWrapStyle(fitScale, classicUi)} onClick={e => e.stopPropagation()}>
         <div ref={cardRef} role="dialog" aria-modal="true" aria-label="Documentation" className={`modal-card k-rd-card w-[880px] h-[620px] flex flex-col overflow-hidden animate-scaleUp`}>
 
           <header className="k-modal-head">

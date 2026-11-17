@@ -188,6 +188,13 @@ export const InlineMotion: React.FC<{ items: InlineItem[]; side?: 'l' | 'r' }> =
         if ((inner?.textContent ?? '') !== el.dataset.txt) setSlot(el, true, true, 0);
       }
     }
+    let flows = false;
+    for (const s of slots) {
+      const el = els.get(s.key);
+      if (!el) continue;
+      if (s.leaving ? el.dataset.on !== '0' : el.dataset.on !== '1') { flows = true; break; }
+    }
+    if (!flows) return;
     const reflow = () => {
       const opening: HTMLElement[] = [];
       const moved = flowChange(parent, () => {

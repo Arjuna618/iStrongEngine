@@ -1,4 +1,4 @@
-import { PLAY_MODE_ENTRIES, resolvePlayConfig, type PlayModeEntry } from '../../game/gameModeRegistry';
+import { PLAY_MODE_ENTRIES, resolvePlayConfig, isSandboxEntry, type PlayModeEntry } from '../../game/gameModeRegistry';
 import { StepAccumulator, runFixedStepFrame } from '../../game/fixedStep';
 import { sameNavComponent, ensureRegionFields } from '../../game/Navigation';
 import { ASYLUM_GRID, ASYLUM_FLOOR, ASYLUM_PATCH } from '../../game/mapEvents/presets/asylum.generated';
@@ -19,8 +19,10 @@ export interface ScenePick {
 const STEP_S = 1 / 60;
 const STEP_MS = 1000 / 60;
 
+export function isBlackoutEntry(e: PlayModeEntry): boolean { return (e.overlay ?? '').includes('blackout'); }
+
 export function sceneEntries(): PlayModeEntry[] {
-  return PLAY_MODE_ENTRIES.filter(e => e.overlay !== 'blackout');
+  return PLAY_MODE_ENTRIES.filter(e => !isBlackoutEntry(e) && !isSandboxEntry(e));
 }
 
 export function familyOf(e: PlayModeEntry): string {

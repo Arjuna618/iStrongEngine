@@ -1079,8 +1079,8 @@ class Compiler {
     const parts: number[][] = [];
     for (const r of live) {
       const def = kindOf('cond', r.k);
-      if (!def) { this.problem('newer-kind', `"${owner}": a test made in a newer version is kept. The event does not run, because its test cannot be asked.`, r.id, true); parts.push([this.falseRow()]); continue; }
-      if (def.door) { this.problem('door', `"${owner}": "${def.label}" comes in a later version. The event does not run.`, r.id, true); parts.push([this.falseRow()]); continue; }
+      if (!def) { this.problem('newer-kind', `"${owner}": a test made in a newer version is kept. The event does not run, because its test cannot be asked.`, r.id, true); if (SMALL_FIX.G786 !== 0 && this.ruleNow) this.ruleNow.off = true; parts.push([this.falseRow()]); continue; }
+      if (def.door) { this.problem('door', `"${owner}": "${def.label}" comes in a later version. The event does not run.`, r.id, true); if (SMALL_FIX.G786 !== 0 && this.ruleNow) this.ruleNow.off = true; parts.push([this.falseRow()]); continue; }
       if (def.lower === 'all' || def.lower === 'any' || def.lower === 'not') {
         const list = Array.isArray(r.a?.list) ? r.a.list as Row[] : [];
         const addr = this.condBlock(list, owner, depth + 1, def.lower === 'all' ? 0 : def.lower === 'any' ? 1 : 2);

@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { MenuBox, type MenuEntry, type MenuItem } from '../shell/ContextMenu';
+import { MenuBox, menuOpenMs, type MenuEntry, type MenuItem } from '../shell/ContextMenu';
 import { useEscapeOwner } from '../shared/escapeStack';
 import { getCumulativeZoom } from '../../utils/zoomCompensation';
+import { PickGlide } from './TabSlide';
 
 export interface MenuDef {
   id: string;
@@ -21,6 +22,8 @@ export const MenuBar: React.FC<{ menus: readonly MenuDef[]; enabled: boolean; la
   const leaveTimer = useRef(0);
   const openRef = useRef(open); openRef.current = open;
   const leavingRef = useRef(leaving); leavingRef.current = leaving;
+  const busyUntil = useRef(0);
+  const busy = () => performance.now() < busyUntil.current;
 
   const openAt = useCallback((i: number, instant: boolean) => {
     const el = titles.current[i];
@@ -28,12 +31,14 @@ export const MenuBar: React.FC<{ menus: readonly MenuDef[]; enabled: boolean; la
     const zoom = getCumulativeZoom(el) || 1;
     const r = el.getBoundingClientRect();
     window.clearTimeout(leaveTimer.current);
+    if (!instant) busyUntil.current = performance.now() + menuOpenMs();
     setLeaving(false);
     setOpen({ i, entries: menus[i].entries(), x: r.left / zoom, y: (r.bottom + 4) / zoom, zoom, instant, key: ++keyRef.current });
   }, [menus]);
 
   const close = useCallback(() => {
     if (!openRef.current || leavingRef.current) return;
+    busyUntil.current = Math.max(busyUntil.current, performance.now() + LEAVE_MS);
     setLeaving(true);
     window.clearTimeout(leaveTimer.current);
     leaveTimer.current = window.setTimeout(() => { setOpen(null); setLeaving(false); }, LEAVE_MS);
@@ -68,6 +73,7 @@ export const MenuBar: React.FC<{ menus: readonly MenuDef[]; enabled: boolean; la
 
   return (
     <div ref={bar} className="k-mb" role="menubar" aria-label={label}>
+      <PickGlide pick=".k-mb-title-on" />
       {menus.map((m, i) => {
         const on = !!open && open.i === i && !leaving;
         return (
@@ -77,9 +83,10 @@ export const MenuBar: React.FC<{ menus: readonly MenuDef[]; enabled: boolean; la
             onPointerDown={e => {
               if (e.button !== 0) return;
               e.preventDefault();
+              if (busy()) return;
               if (open && open.i === i && !leaving) close(); else openAt(i, false);
             }}
-            onClick={e => { if (e.detail === 0) { if (open && open.i === i) close(); else openAt(i, false); } }}
+            onClick={e => { if (e.detail === 0 && !busy()) { if (open && open.i === i) close(); else openAt(i, false); } }}
             onPointerEnter={() => { if (open && !leaving && open.i !== i) openAt(i, true); }}
             onKeyDown={e => { if (e.key === 'ArrowDown' && !open) { e.preventDefault(); openAt(i, false); } }}>
             {m.label}

@@ -11,7 +11,7 @@ import { NumberBox } from '../kit/NumberBox';
 import { DirectionDial } from '../kit/DirectionDial';
 import { isCustomMap, editPortals, portalLinksAfterPick, portalExitExists, editZones, builtPortalRows } from '../../game/MapEditor';
 import { MISSING_MODES } from '../../game/missingModesSwitch';
-import { PLAY_MODE_ENTRIES } from '../../game/gameModeRegistry';
+import { PLAY_MODE_ENTRIES, isSandboxEntry } from '../../game/gameModeRegistry';
 import { ColorMapControl, ColorMapSwitch } from './ColorMapField';
 import type { ColorMapValue } from './colorMapRules';
 import { CM_USE, CM_FREE } from '../../utils/colorMap';
@@ -173,7 +173,7 @@ let _leadsToOptions: SelectOption[] | null = null;
 function leadsToOptions(): SelectOption[] {
   if (_leadsToOptions) return _leadsToOptions;
   const out: SelectOption[] = [{ value: '', label: 'This Map\'s Areas' }, { value: 'random', label: 'A Random Normal Mode' }, { value: 'nexus', label: 'The Nexus' }, { value: 'forge', label: 'The Forge' }, { value: 'labyrinth', label: 'The Labyrinth' }];
-  for (const e of PLAY_MODE_ENTRIES) if (e.key !== 'nexus' && e.key !== 'labyrinth') out.push({ value: e.key, label: e.title });
+  for (const e of PLAY_MODE_ENTRIES) if (e.key !== 'nexus' && e.key !== 'labyrinth' && !isSandboxEntry(e)) out.push({ value: e.key, label: e.title });
   _leadsToOptions = out;
   return out;
 }

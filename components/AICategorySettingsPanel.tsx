@@ -30,9 +30,11 @@ function fleeLabel(v: number): string {
 interface Props {
   value: AICategorySettings;
   onChange: (next: AICategorySettings) => void;
+  noBackBoostDefault?: boolean;
+  noGapDistanceDefault?: boolean;
 }
 
-export const AICategorySettingsPanel: React.FC<Props> = ({ value: local, onChange }) => {
+export const AICategorySettingsPanel: React.FC<Props> = ({ value: local, onChange, noBackBoostDefault = false, noGapDistanceDefault = false }) => {
   const dark = useGameDark();
   const update = <K extends keyof AICategorySettings>(key: K, val: AICategorySettings[K]) => {
     onChange({ ...local, [key]: val });
@@ -70,6 +72,12 @@ export const AICategorySettingsPanel: React.FC<Props> = ({ value: local, onChang
         <ToggleRow label="Force Autospin" description="The body keeps turning."
           help="Tank body continuously rotates regardless of target. Useful for smasher / spike archetypes."
           checked={local.forceAutospin} onChange={v => update('forceAutospin', v)} />
+        <ToggleRow label="No Backward Boost" description="Never turns its back to speed up."
+          help="Bots on other tanks sometimes face backward and fire, so their own recoil pushes them along. Tanks of this category never do that. Made for tanks whose rear guns already push them, like the Booster."
+          checked={local.noBackBoost ?? noBackBoostDefault} onChange={v => update('noBackBoost', v)} />
+        <ToggleRow label="Keeps Its Own Distance" description="Ignores Distance By Strength and Fights From Where It Is."
+          help="With Distance By Strength on (the Bots card of a game mode), a bot that is clearly stronger than its target moves in closer and a clearly weaker one stays farther away. Tanks of this category ignore that and keep the distance set above. They also ignore Fights From Where It Is and always walk to that distance. Made for tanks that fight from far away, like drone tanks."
+          checked={local.noGapDistance ?? noGapDistanceDefault} onChange={v => update('noGapDistance', v)} />
       </Group>
 
       <Group title="Shooting" icon={headerIcon(HdAsteroid02)} level={3}>

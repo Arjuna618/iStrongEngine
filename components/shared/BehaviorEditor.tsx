@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Trash2, HdTestTube03 } from '../ui/icons';
 import { BehaviorConfig, BehaviorType, DEFAULT_BEHAVIOR_CONFIG } from '../../types';
 import type { ExplodeConfig, Turret, LibraryItem } from '../../types';
+import type { GameLogic } from '../../game/GameLogic';
 import { BEHAVIOR_LABELS, behaviorLabel, behaviorDescription, EXPLODE_LABEL, withLayerCapReason } from './labels';
 import { renderDropdown, renderMiniSlider } from './uiHelpers';
 import { Group, ToggleRow, Switch, IconButton, headerIcon } from '../kit/kit';
@@ -41,6 +42,8 @@ interface Props {
   onEditFragment?: (ringIndex: number) => void;
   explodeLevel?: number;
   bombTurret?: Turret;
+  logic?: GameLogic | null;
+  bombAncestors?: readonly Turret[];
   tankLibrary?: LibraryItem[];
   roundLayer: number;
 }
@@ -48,7 +51,7 @@ interface Props {
 export const BehaviorEditor: React.FC<Props> = ({
   behaviors, onUpdate, sectionOpen, onSectionToggle,
   explode, onExplodeChange, onAddExplode, onAddRing, onEditFragment, explodeLevel, bombTurret, tankLibrary,
-  roundLayer,
+  roundLayer, logic, bombAncestors,
 }) => {
   const [localOpen, setLocalOpen] = useState(false);
   const isOpen = sectionOpen !== undefined ? sectionOpen : localOpen;
@@ -227,6 +230,8 @@ export const BehaviorEditor: React.FC<Props> = ({
               roundLayer={roundLayer}
               bombTurret={bombTurret}
               tankLibrary={tankLibrary}
+              logic={logic}
+              bombAncestors={bombAncestors}
             />
           )}
           </MotionList>

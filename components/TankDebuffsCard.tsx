@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { GameModeConfig } from '../types';
-import { Group, FieldRow, headerIcon } from './kit/kit';
+import { Group, FieldRow, headerIcon, RowUnit } from './kit/kit';
 import { NumberBox } from './kit/NumberBox';
 import { HdBoxingGlove01 } from './ui/icons';
 import { TANK_KINDS, DEBUFF_RESIST_MIN, DEBUFF_HEALTH_MIN, DEBUFF_HEALTH_MAX, type TankKindId, type TankDebuff } from '../game/tankDebuffs';
@@ -32,7 +32,7 @@ export const TankDebuffsCard: React.FC<{ config: GameModeConfig; onChange: (kind
             <span className="k-ev-numbox">
               <DebuffBox value={d?.health} min={DEBUFF_HEALTH_MIN} max={DEBUFF_HEALTH_MAX} placeholder="100" label={`${k.one} health`}
                 onChange={v => onChange(k.id, { health: v })} />
-              <span className="k-unit">%</span>
+              <RowUnit unit="%" />
             </span>
           </FieldRow>
         </React.Fragment>

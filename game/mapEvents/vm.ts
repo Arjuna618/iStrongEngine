@@ -6,7 +6,7 @@ import { AREA_BEHAVIOR_WORDS, KINDS, NEXT, WAIT, END, OP_END, OP_JUMP, OP_IF, OP
 import type { Program, CPlan, CCard, CGroup, CPlace, CSeq, CSpawner, CStay } from './compile';
 import { refStride } from './compile';
 import type { MapEventsHost, MevBody, SpawnReq } from './host';
-import { CAUSE_AREA, CAUSE_BECOME, CAUSE_HIT, CAUSE_OTHER, CAUSE_RULE, ORDER_STAND } from './host';
+import { CAUSE_AREA, CAUSE_BECOME, CAUSE_HIT, CAUSE_OTHER, CAUSE_RULE, CAUSE_SELF, ORDER_STAND } from './host';
 import { rollWave, waveTestHolds, breakSeconds, PURPOSE_CARD, PURPOSE_PLACE } from './waves';
 import type { RollCtx } from './waves';
 import type { SideSpec, SpawnCard } from './doc';
@@ -252,7 +252,7 @@ export class MapEventsVM implements NumCtx {
   private blankReq(): SpawnReq {
     return { typeIdx: -1, formIdx: 0, tank: '', x: 0, y: 0, angle: 0, team: '', camp: 'none', bossTier: false, colourUse: 'file', colourSlot: 0, size: 0, sizeFactor: 1, name: '', showName: null,
       stands: false, canDie: true, seenByBots: true, onLeaderboard: true, onMinimap: true, minimapAll: false, countsAsKill: true, inWalls: false, score: 0, worthNothing: false, killLine: '', brain: 'full', orderIdx: -1, sight: 0,
-      birthLook: 'none', crashersIgnore: false, canBeHealed: true, contact: 'tank', pushable: null, health: 0, level: 0, skills: null, classWord: '', graceMs: 0, refill: 'none', placed: false, home: -1, areaIdx: -1, shape: null, touch: null, fromWave: false, noGrowth: false, extraTags: null };
+      birthLook: 'none', crashersIgnore: false, canBeHealed: true, contact: 'tank', pushable: null, solid: null, health: 0, level: 0, skills: null, classWord: '', graceMs: 0, refill: 'none', placed: false, home: -1, areaIdx: -1, shape: null, touch: null, fromWave: false, noGrowth: false, extraTags: null };
   }
 
   readRef(id: number): number {
@@ -617,6 +617,13 @@ export class MapEventsVM implements NumCtx {
     const got = this.sigA[s];
     if (cause === 4) return got !== CAUSE_BECOME;
     return (cause === 1 && got === CAUSE_HIT) || (cause === 2 && got === CAUSE_AREA) || (cause === 3 && (got === CAUSE_RULE || got === CAUSE_BECOME));
+  }
+  playerDiedMatch(ip: number, s: number): boolean {
+    const cause = this.code[ip + 1];
+    if (cause === 0 || SMALL_FIX.R962 === 0) return true;
+    const got = this.sigA[s];
+    if (cause === 4) return got !== CAUSE_SELF;
+    return (cause === 1 && got === CAUSE_HIT) || (cause === 2 && got === CAUSE_AREA) || (cause === 3 && got === CAUSE_SELF);
   }
   changedMatch(ip: number, s: number): boolean {
     const row = this.sigRow[s], to0 = this.sigB[s];
@@ -1050,7 +1057,13 @@ export class MapEventsVM implements NumCtx {
     const none = this.code[ip + 2] === 1;
     const o = this.fOther[f];
     if (!this.fOtherId[f]) return none;
-    return this.testBody(this.code[ip + 1], o && this.host.isLive(o, this.fOtherId[f]) ? o : null, o ? o._mev ?? -1 : -1);
+    return this.testBody(this.code[ip + 1], o && this.host.isLive(o, this.fOtherId[f]) ? o : null, this.killerRowOf(f));
+  }
+  private killerRowOf(f: number): number {
+    const o = this.fOther[f];
+    const r = o ? o._mev ?? -1 : -1;
+    if (SMALL_FIX.G787 === 0 || r < 0) return r;
+    return this.bId[r] === this.fOtherId[f] ? r : -1;
   }
   inAreaTest(f: number, ip: number): boolean {
     const z = this.code[ip + 2];
@@ -1248,7 +1261,7 @@ export class MapEventsVM implements NumCtx {
         case 'tank': { const b = this.subjectNow(f); return b ? this.host.shownNameOf(b) : ''; }
         case 'team': { const b = this.subjectNow(f); return b ? this.host.sideShown(this.host.sideOf(b)) : ''; }
         case 'TEAM': { const b = this.subjectNow(f); return b ? this.host.sideShown(this.host.sideOf(b)).toUpperCase() : ''; }
-        case 'killer': { const b = this.fOther[f]; return b && this.fOtherId[f] ? this.host.shownNameOf(b) : ''; }
+        case 'killer': { const b = SMALL_FIX.R953 !== 0 ? this.killerOf(f) : this.fOther[f]; return b && this.fOtherId[f] ? this.host.shownNameOf(b) : ''; }
         case 'area': { const k = this.fKey[f]; return k >= 0 && k < this.p.zones.length ? this.p.zones[k].name : ''; }
         case 'count': return String(Math.floor(this.fNum[f]));
         case 'special': { const k = this.fKey[f]; return k >= 0 && k < this.pSpecial.length ? this.pSpecial[k] : ''; }
@@ -1461,7 +1474,7 @@ export class MapEventsVM implements NumCtx {
     r.brain = def.brain === 'guard' ? 'none' : def.brain ?? 'full';
     if (SMALL_FIX.R900 !== 0) { r.orderIdx = form.orderIdx; r.sight = typeof def.sight === 'number' ? def.sight : 0; }
     r.birthLook = def.birthLook === 'food' ? 'food' : 'none'; r.crashersIgnore = def.crashersIgnore === true; r.canBeHealed = def.canBeHealed !== false; r.contact = def.contact === 'shape' ? 'shape' : 'tank';
-    r.pushable = typeof def.pushable === 'boolean' ? def.pushable : null; r.health = typeof def.health === 'number' ? def.health : 0; r.level = typeof def.level === 'number' ? def.level : 0; r.skills = def.skills ?? null; r.classWord = def.classWord ?? '';
+    r.pushable = typeof def.pushable === 'boolean' ? def.pushable : null; r.solid = typeof def.solid === 'boolean' ? def.solid : null;
     r.shape = def.shape ?? null; r.touch = this.typeTouch[type] ?? null;
     r.graceMs = 0; r.refill = 'none'; r.placed = false; r.home = -1; r.areaIdx = -1;
     r.fromWave = false; r.noGrowth = false;
@@ -2172,16 +2185,20 @@ export class MapEventsVM implements NumCtx {
     if (SMALL_FIX.GH427 && !whole) { const bs = this.p.behaviors; for (let i = 0; i < bs.length; i++) if (bs[i].k === 'darkness' && bs[i].zone === z) this.behaviorOn[i] = c[ip + 3] === 1 ? 1 : 0; }
     return NEXT;
   }
-  sensors(): { ip: number; rule: number; who: number; what: number; zone: number; thing: number; portal: number; againMs: number }[] {
-    const out: { ip: number; rule: number; who: number; what: number; zone: number; thing: number; portal: number; againMs: number }[] = [];
+  sensors(): { ip: number; rule: number; who: number; what: number; zone: number; thing: number; portal: number; againMs: number; againOff: number }[] {
+    const out: { ip: number; rule: number; who: number; what: number; zone: number; thing: number; portal: number; againMs: number; againOff: number }[] = [];
     const list = this.p.byKind[this.opTrig('bot.sees')];
     if (!list) return out;
     const c = this.code;
     for (const tr of list) {
       const again = this.numOfRule(tr.rule, c[tr.ip + 6]);
-      out.push({ ip: tr.ip, rule: tr.rule, who: c[tr.ip + 1], what: c[tr.ip + 2], zone: c[tr.ip + 3], thing: c[tr.ip + 4], portal: c[tr.ip + 5], againMs: (Number.isFinite(again) && again > 0 ? again : 30) * 1000 });
+      out.push({ ip: tr.ip, rule: tr.rule, who: c[tr.ip + 1], what: c[tr.ip + 2], zone: c[tr.ip + 3], thing: c[tr.ip + 4], portal: c[tr.ip + 5], againMs: (Number.isFinite(again) && again > 0 ? again : 30) * 1000, againOff: c[tr.ip + 6] });
     }
     return out;
+  }
+  sensorAgainMs(rule: number, off: number): number {
+    const again = this.numOfRule(rule, off);
+    return (Number.isFinite(again) && again > 0 ? again : 30) * 1000;
   }
   botSaw(ip: number, bot: MevBody, other: MevBody | null, key: number, what: number, x: number, y: number): void {
     this.depthNow = 0;
@@ -2234,7 +2251,7 @@ export class MapEventsVM implements NumCtx {
       return row >= 0 && this.bSlot[row] >= 0 ? this.p.slots[this.bSlot[row]].home : -1;
     }
     if (t && (t.w === 'other' || t.w === 'killer')) {
-      const row = this.fOther[f]?._mev ?? -1;
+      const row = this.killerRowOf(f);
       return row >= 0 && this.bSlot[row] >= 0 ? this.p.slots[this.bSlot[row]].home : -1;
     }
     return -1;

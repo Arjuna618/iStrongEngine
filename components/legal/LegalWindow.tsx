@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Modal } from '../kit/Modal';
 import { PageSwap } from '../kit/Collapse';
+import { PickGlide } from '../kit/TabSlide';
 import { LegalTerms } from '../ui/icons';
 import { useModalMaxHeight, useModalMaxWidth } from '../../utils/useMenuScale';
 import { isTouchScreen } from '../../utils/device';
@@ -113,6 +114,7 @@ export const LegalWindow: React.FC<{
         ) : (
           <nav className="k-rd-side k-legal-side" aria-label="Pages">
             <div className="k-rd-list">
+              <PickGlide pick=".k-rd-item-on" look="row" />
               {PAGES.map(p => (
                 <button key={p.id} type="button" className={page === p.id ? 'k-rd-item k-rd-item-on' : 'k-rd-item'} onClick={() => setPage(p.id)}>
                   <span className="k-rd-item-text">{p.label}</span>

@@ -92,6 +92,12 @@ export function takeOver(el: HTMLElement, prop: Prop): string {
   return now;
 }
 
+const _glided = new WeakSet<Element>();
+function stopOwn(el: HTMLElement, prop: Prop): void {
+  if (!_glided.has(el) || typeof el.getAnimations !== 'function') return;
+  for (const a of el.getAnimations()) if (moves(a, prop)) a.cancel();
+}
+
 export interface GlideOpts {
   from?: string | number;
   delay?: number;
@@ -101,12 +107,13 @@ export interface GlideOpts {
 
 export function glide(el: HTMLElement, prop: Prop, to: string | number, ms: number, o: GlideOpts = {}): Animation | null {
   const from = o.from ?? takeOver(el, prop);
-  if (o.from !== undefined) takeOver(el, prop);
+  if (o.from !== undefined) stopOwn(el, prop);
   const key = camel(prop);
   (el.style as unknown as Record<string, string>)[key] = String(to);
   if (motionOff() || ms <= 0 || typeof el.animate !== 'function' || String(from) === String(to)) { o.done?.(); return null; }
   noteMotion(ms + (o.delay ?? 0));
   const a = el.animate([{ [key]: String(from) }, { [key]: String(to) }], { duration: ms, delay: o.delay ?? 0, easing: o.easing ?? EASE, fill: 'backwards' });
+  _glided.add(el);
   if (o.done) { const cb = o.done; a.onfinish = () => cb(); }
   return a;
 }

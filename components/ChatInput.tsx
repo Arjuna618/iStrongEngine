@@ -101,7 +101,7 @@ export const ChatInput: React.FC<{ logic: GameLogic }> = React.memo(({ logic }) 
     <input
       ref={ref}
       type="text"
-      className="k-chat-in"
+      className="k-chat-in k-hud"
       maxLength={CHAT_MAX_LEN}
       spellCheck={false}
       autoComplete="off"

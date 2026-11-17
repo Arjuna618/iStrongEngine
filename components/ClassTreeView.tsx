@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { TEXT_LIMITS } from './kit/textLimits';
 import { escapeIsOwned } from './shared/escapeStack';
 import type { GameLogic } from '../game/GameLogic';
 import {
@@ -667,6 +668,7 @@ const ClassTreeView: React.FC<{ logic: GameLogic }> = ({ logic }) => {
           <input
             ref={inputRef}
             className="ct-search"
+            maxLength={TEXT_LIMITS.SEARCH}
             type="text"
             placeholder="Search"
             defaultValue={_view.query}

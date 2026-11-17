@@ -190,6 +190,7 @@ export interface EntityType {
   birthLook?: 'none' | 'food';
   health?: number; level?: number; skills?: Record<string, number>;
   pushable?: boolean;
+  solid?: boolean;
   crashersIgnore?: boolean;
   canBeHealed?: boolean;
   contact?: 'tank' | 'shape';

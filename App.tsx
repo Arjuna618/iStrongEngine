@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo, useSyncExternalStore } from 'react';
+import { uiThemeId, subscribeUiTheme } from './utils/uiTheme';
 import { GameCanvas } from './components/GameCanvas';
 import { TankEditorUI } from './components/TankEditorUI';
 import { FoodShapeEditorUI } from './components/FoodShapeEditorUI';
@@ -13,7 +14,8 @@ installTravel(GameLogic as unknown as { travelHooks: unknown });
 import { INITIAL_GAME_STATE } from './types';
 import { EditPlayerStatsPopup } from './components/EditPlayerStatsPopup';
 import { DebugVisibilityPopup } from './components/DebugVisibilityPopup';
-import { ShapeSpawnerPopup } from './components/ShapeSpawnerPopup';
+import { TankSpawnerPopup } from './components/TankSpawnerPopup';
+import { CrashGuardPopup } from './components/CrashGuardPopup';
 import { LoadingScreen } from './components/LoadingScreen';
 import { DeathMenu } from './components/DeathMenu';
 import { ArrasDeathScreen } from './components/ArrasDeathScreen';
@@ -30,17 +32,18 @@ import { ScreenCurtain, useScreenCurtain } from './components/shell/ScreenCurtai
 import { useMenuStage } from './components/kit/motion';
 import { useLeave, installSpamGuard, noteMotion } from './components/kit/presence';
 import { SwapText } from './components/kit/Collapse';
+import { GlideSvg, glideTo } from './components/kit/glideFrame';
 import { useWindowFrame } from './components/kit/focusScope';
 import { cancelMapEditInteraction } from './game/MapEditor';
 import { GameModeDesignerUI } from './components/GameModeDesignerUI';
-import { MevEvents, Box, Dna, Settings, FolderDown, Check, Bot, UserCog, LogOut, X, Shapes, Map, Pause, Play as PlayIcon, Bug, ShieldPlus, Ghost, Sun, Moon, Joystick, House, BookText, Undo2, Eye, GameEngine, ArrowLeft, Megaphone, SourceCode } from './components/ui/icons';
+import { MevEvents, Box, Dna, Settings, FolderDown, Check, SpawnTool, UserCog, LogOut, X, Map, Pause, Play as PlayIcon, Bug, ShieldPlus, Ghost, Sun, Moon, Joystick, House, BookText, Undo2, Eye, GameEngine, ArrowLeft, Megaphone, SourceCode } from './components/ui/icons';
 import { checkGpuAcceleration } from '@/utils/gpuDetect';
 import type { GpuCheckResult } from '@/utils/gpuDetect';
 import { GpuWarningModal } from '@/components/GpuWarningModal';
 import { NumberInput } from './components/shared/uiHelpers';
 import { useBackdropClose } from './components/shared/useBackdropClose';
-import appLogo from './components/ui/media/logo5.webp';
-import { ToastProvider, useToast, toast } from './components/ui/Toast';
+import appLogo from './components/ui/media/logo5-green.webp';
+import { ToastProvider, useToast, toast, clearAllToasts } from './components/ui/Toast';
 import { TipToastHost } from './components/ui/TipToast';
 import { DocsPopup } from './components/docs/DocsPopup';
 import { SOURCE_CODE_ON } from './components/source/sourceSwitch';
@@ -69,6 +72,7 @@ import type { GameModeConfig } from './types';
 import { getStoredTheme, startTheme, toggleTheme } from './utils/theme';
 import { getZoomCompensation, onZoomChange, blockBrowserZoomInputs } from './utils/zoomCompensation';
 import { useMenuScale, useChromeScale, useFitScale } from './utils/useMenuScale';
+import { useClassicUi, fitWrapStyle } from './components/shared/useClassicUi';
 import { useEditorShortcuts } from './components/shared/useEditorShortcuts';
 import { type Tool, ENGINE_TOOLS, engineTool, toolRailLabel, toolTitle } from './components/shell/engineTools';
 import { Button, IconButton, Group, SliderRow, PanelFold, headerIcon } from './components/kit/kit';
@@ -151,6 +155,7 @@ const EngineToolPanels = React.memo(function EngineToolPanels({
   showTool: (tool: Tool) => void;
 }) {
   const activeTool = useActiveTool();
+  const classicWait = useClassicUi();
   const tool = engineTool(activeTool);
   const ToolIcon = tool.Icon;
   const panelTitle = toolTitle(activeTool, logic?.state);
@@ -169,9 +174,9 @@ const EngineToolPanels = React.memo(function EngineToolPanels({
     if (!switching) return;
     switchStart.current = performance.now();
     noteMotion(TOOL_SWAP_MS);
+    if (engineScreen && !isTestMode) { const t = shownToolRef.current, el = layerEls.current[t]; if (el) captureSkeleton(skelIdRef.current(t), el); }
   }, [switching]);
-  const skelShown = !switching && switchStart.current > 0 && performance.now() - switchStart.current > 150;
-  const skel = usePresence(switching, skelShown ? 120 : 0);
+  const skel = usePresence(switching, classicWait ? 240 : 120);
   const frozenKeys = useRef<Partial<Record<Tool, number>>>({});
   const live = (tool: Tool) => {
     if (shownTool === tool) { frozenKeys.current[tool] = panelRefresh; return panelRefresh; }
@@ -184,6 +189,13 @@ const EngineToolPanels = React.memo(function EngineToolPanels({
   const kindSwap = usePanelSwap(entityKind);
   const skelId = (t: Tool) => 'tool:' + t + (t === 'tank' ? ':' + entityKind : '');
   const layerEls = useRef<Partial<Record<Tool, HTMLDivElement | null>>>({});
+  useLayoutEffect(() => {
+    if (switching || switchStart.current === 0 || performance.now() - switchStart.current <= 150) return;
+    const els = Object.values(layerEls.current) as (HTMLDivElement | null | undefined)[];
+    for (const el of els) el?.classList.add('k-tool-layer-cut');
+    const t = window.setTimeout(() => { for (const el of els) el?.classList.remove('k-tool-layer-cut'); }, 400);
+    return () => { window.clearTimeout(t); for (const el of els) el?.classList.remove('k-tool-layer-cut'); };
+  }, [switching]);
   const shownToolRef = useRef(shownTool); shownToolRef.current = shownTool;
   const shownLayer = useMemo(() => ({ get current() { return layerEls.current[shownToolRef.current] ?? null; } }), []);
   useSkeletonCapture(engineScreen && !isTestMode ? skelId(shownTool) : null, shownLayer, !switching);
@@ -287,7 +299,8 @@ const EngineToolPanels = React.memo(function EngineToolPanels({
                 )}
 
                 {genSkel.mounted && (
-                  <div className="absolute inset-0 z-[21] panel-gradient" style={genSkel.style} aria-busy="true">
+                  <div className={`absolute inset-0 z-[21] panel-gradient k-gen-skel${genRaw ? ' k-gen-on' : ''}`} aria-busy="true"
+                    style={classicWait ? { ...genSkel.style, transition: genRaw ? 'opacity 350ms cubic-bezier(0.45, 0, 0.55, 1)' : 'opacity 350ms cubic-bezier(0.45, 0, 0.55, 1) 300ms' } : genSkel.style}>
                     <SnapshotSkeleton id={skelId(shownTool)} fallback={<div className="p-4"><PanelSkeleton /></div>} />
                   </div>
                 )}
@@ -357,7 +370,7 @@ export default function App() {
   const [showEditPlayerStats, setShowEditPlayerStats] = useState(false);
   const [showDebugVisibility, setShowDebugVisibility] = useState(false);
   const [showMapMonitor, setShowMapMonitor] = useState(false);
-  const [showShapeSpawner, setShowShapeSpawner] = useState(false);
+  const [showTankSpawner, setShowTankSpawner] = useState(false);
   const [showAppSettings, setShowAppSettings] = useState(false);
   const [showMenuSettings, setShowMenuSettings] = useState(false);
   const [isDark, setIsDark] = useState(getStoredTheme() === 'dark');
@@ -560,7 +573,7 @@ export default function App() {
     }
     flushDesignHistory();
     { const sure = logic.mapEventsProblems().filter(p => !p.warn).length;
-      if (sure > 0) toast('info', `${sure} ${sure === 1 ? 'Problem' : 'Problems'} in this map's Map Events: what it names will not run.`, { label: 'See', run: () => openMapEvents(logic.state.multiAreaConfig.enableMultiArea ? logic.state.multiAreaConfig.activeAreaId : '', 'problems') }); }
+      if (sure > 0) toast('info', `${sure} ${sure === 1 ? 'Problem' : 'Problems'} in this map's Map Events: what it names will not run.`); }
     logic.enterTestMode();
     setTick(t => t + 1);
   }, [logic]);
@@ -605,6 +618,7 @@ export default function App() {
 
   const isTestMode = logic?.state.isTestMode || false;
   const isDebugMenuOpen = logic?.state.isDebugMenuOpen || false;
+  useEffect(() => { if (isTestMode) clearAllToasts(); }, [isTestMode]);
 
   const curtain = useScreenCurtain();
   curtainGo.current = curtain.go;
@@ -632,7 +646,7 @@ export default function App() {
   const debugMenuOpen = isTestMode && !!logic?.state.paused && isDebugMenuOpen && !deathMenuOpen;
   const stage = useMenuStage<'pause' | 'debug'>(debugMenuOpen ? 'debug' : pauseMenuOpen ? 'pause' : null);
   const deathStage = useMenuStage<'death'>(deathMenuOpen ? 'death' : null);
-  const childOverMenu = isTestMode && (showEditPlayerStats || showDebugVisibility || showMapMonitor || showShapeSpawner || showAppSettings);
+  const childOverMenu = isTestMode && (showEditPlayerStats || showDebugVisibility || showMapMonitor || showTankSpawner || showAppSettings);
   const stageScrimClass = (stage.fresh ? 'animate-fadeIn' : '') + (stage.leaving ? ' pointer-events-none' : '');
   const stageCardClass = 'animate-scaleUp' + (stage.leaving || childOverMenu ? ' pointer-events-none' : '');
   useEffect(() => {
@@ -652,7 +666,8 @@ export default function App() {
   const debugFitScale = useFitScale(debugCardRef, menuScale, stage.shown === 'debug');
   const deathFitScale = useFitScale(deathCardRef, menuScale, SMALL_FIX.R744 !== 0 ? deathStage.shown === 'death' : deathMenuOpen);
   const stageTouch = isTouchScreen();
-  const stageStyle = (fit: number): React.CSSProperties => (stageTouch ? { zoom: menuScale } : { transform: `scale(${fit})`, transformOrigin: 'center center', willChange: 'transform' });
+  const classicUi = useClassicUi();
+  const stageStyle = (fit: number): React.CSSProperties => (stageTouch ? { zoom: menuScale } : fitWrapStyle(fit, classicUi));
 
   useEffect(() => { if (!isTestMode || !logic?.state.paused) setShowAppSettings(false); }, [isTestMode, logic?.state.paused]);
   const handleRespawn = useCallback(() => { logic?.respawnPlayer(); }, [logic]);
@@ -876,6 +891,7 @@ export default function App() {
             inert={isTestMode || undefined}
         >
           <div className="rail-stack">
+            <RailPick />
             {ENGINE_TOOLS.filter(t => t.group !== 'app').map((t, i, arr) => (
               <React.Fragment key={t.id}>
                 {i > 0 && arr[i - 1].group !== t.group && <div className="rail-divider" />}
@@ -973,12 +989,12 @@ export default function App() {
                         <Reveal when={logic.debugAccess()}>
                         <MenuCard>
                             <MenuSwitch id="pause-debug-mode" icon={<SourceCode size={15} />} label="Debug Mode"
-                                help="Turns on the debug tools for testing: the Debug Menu, the shape spawner, stat editing and the debug readouts. The same switch as in App Settings."
+                                help="Turns on the debug tools for testing: the Debug Menu, the Spawn Tool, stat editing and the debug readouts. The same switch as in App Settings."
                                 checked={logic.state.debugMode}
                                 onChange={newVal => { if (!logic.debugAccess()) return; if (newVal) logic.updateState({ debugMode: true }); else logic._debugPowersOff(); }} />
                             <Reveal when={logic.state.debugMode}>
                                 <MenuDoor icon={<Bug size={15} />} label="Debug Menu"
-                                    help="Opens the debug tools: the Shape Spawner, Manage Players, Debug Visibility, God and Ghost Mode, your level and skill points, and the camera zoom."
+                                    help="Opens the debug tools: the Spawn Tool, Manage Players (your level, skill points, God Mode, Ghost Mode and the camera zoom are there too) and Debug Visibility."
                                     onClick={() => {
                                     if (!logic.debugAccess()) return;
                                     setDebugLevelInput(logic.state.level.toString());
@@ -989,7 +1005,7 @@ export default function App() {
                         </MenuCard>
                         </Reveal>
 
-                        <button type="button" className="k-btn k-btn-primary k-btn-lg w-full" onClick={() => setShowAppSettings(true)}>
+                        <button type="button" className="k-btn k-btn-primary k-btn-lg w-full k-btn-door" onClick={() => setShowAppSettings(true)}>
                             <Settings size={16} /> App Settings
                         </button>
                      </GameMenuCard>
@@ -1008,9 +1024,9 @@ export default function App() {
                             </button>
                         }>
                         <MenuCard>
-                            <MenuDoor icon={<Shapes size={15} />} label="Shape Spawner"
-                                help="Places any shape near your tank, as many as you pick."
-                                onClick={() => setShowShapeSpawner(true)} />
+                            <MenuDoor icon={<SpawnTool size={15} />} label="Spawn Tool"
+                                help="Places any tank, boss, map entity, wall, Other, food shape or sentry near your tank or under your pointer, with its team, AI and stats, or as many shapes as you pick."
+                                onClick={() => setShowTankSpawner(true)} />
                             <MenuDoor icon={<UserCog size={15} />} label="Manage Players"
                                 help="Changes the tank, level, skill points and upgrades of you or any bot, and lets you take over a bot."
                                 onClick={() => setShowEditPlayerStats(true)} />
@@ -1024,72 +1040,6 @@ export default function App() {
                             </Reveal>
                         </MenuCard>
 
-                        <MenuCard>
-                            {(() => {
-                                const userGodIntent = logic.state.gracePeriodActive
-                                    ? logic.state._preGraceGodMode
-                                    : logic.state.godMode;
-                                return (
-                                    <MenuSwitch id="debug-god-mode" icon={<ShieldPlus size={15} />} label="God Mode"
-                                        help="Takes no damage, can still attack." checked={!!userGodIntent}
-                                        onChange={newVal => {
-                                            if (logic.state.gracePeriodActive) {
-                                                logic.updateState({ _preGraceGodMode: newVal });
-                                            } else {
-                                                logic.updateState({ godMode: newVal });
-                                            }
-                                        }} />
-                                );
-                            })()}
-                            <MenuSwitch id="debug-ghost-mode" icon={<Ghost size={15} />} label="Ghost Mode"
-                                help="Invisible, no collision, 4x speed." checked={logic.state.ghostMode}
-                                onChange={v => logic.updateState({ ghostMode: v })} />
-                        </MenuCard>
-
-                        <div className="k-group">
-                            <div className="k-group-body k-debug-progress">
-                                <form className="k-row" onSubmit={e => { e.preventDefault(); logic.setLevel(parseInt(debugLevelInput) || 0); }}
-                                    onKeyDownCapture={e => { if (e.key === 'Enter') { e.preventDefault(); logic.setLevel(parseInt(debugLevelInput) || 0); } }}>
-                                    <label htmlFor="debug-set-level" className="k-row-label">
-                                        <span className="k-row-lead"><HelpTooltip text={`Sets your level at once, from 0 to this mode's cap (${logic.getDebugMaxSettableLevel()}). Type it, then press the check or Enter.`} /></span>
-                                        <span className="k-row-label-text">Level</span>
-                                    </label>
-                                    <span className="k-value">
-                                        <NumberInput id="debug-set-level" value={debugLevelInput} onChange={(e) => setDebugLevelInput(e.target.value)}
-                                            className="k-field k-debug-num" placeholder={`0-${logic.getDebugMaxSettableLevel()}`} />
-                                        <IconButton type="submit" label="Set level" size="md"><Check size={16} /></IconButton>
-                                    </span>
-                                </form>
-                                <form className="k-row" onSubmit={e => { e.preventDefault(); logic.setSkillPoints(parseInt(debugPointsInput) || 0); }}
-                                    onKeyDownCapture={e => { if (e.key === 'Enter') { e.preventDefault(); logic.setSkillPoints(parseInt(debugPointsInput) || 0); } }}>
-                                    <label htmlFor="debug-set-skill-points" className="k-row-label">
-                                        <span className="k-row-lead"><HelpTooltip text="Sets your unspent skill points at once. Type it, then press the check or Enter." /></span>
-                                        <span className="k-row-label-text">Skill Points</span>
-                                    </label>
-                                    <span className="k-value">
-                                        <NumberInput id="debug-set-skill-points" value={debugPointsInput}
-                                            onChange={(e) => { if (e.target.value.length <= 9) setDebugPointsInput(e.target.value); }}
-                                            className="k-field k-debug-num" placeholder="Amount" />
-                                        <IconButton type="submit" label="Set skill points" size="md"><Check size={16} /></IconButton>
-                                    </span>
-                                </form>
-                            </div>
-                        </div>
-
-                        <div className="k-group">
-                            <div className="k-group-body">
-                                <SliderRow label="Field of View" help="Camera zoom on top of the tank's own view. The admin panel's minus and equals keys move it too, and it goes back to 1x when your tank changes or dies."
-                                    value={logic.state.debugFovMultiplier ?? 1} min={logic.debugFovMin()} max={logic.debugFovMax()} step={0.01} logScale
-                                    display={`${(logic.state.debugFovMultiplier ?? 1).toFixed(2)}x`}
-                                    onChange={v => logic.setDebugFov(Math.abs(Math.log(v)) < 0.006 ? 1 : v)}
-                                    action={
-                                        <IconButton label="Reset to 1x" size="sm"
-                                            onClick={() => logic.setDebugFov(1)}>
-                                            <Undo2 size={13} />
-                                        </IconButton>
-                                    } />
-                            </div>
-                        </div>
                      </GameMenuCard>
                      </div>
                   </div>
@@ -1117,16 +1067,13 @@ export default function App() {
                 </Modal>
              )}
 
-             {showShapeSpawner && logic && (
-                <ShapeSpawnerPopup
-                    logic={logic}
-                    onClose={() => setShowShapeSpawner(false)}
-                />
-             )}
+             {logic && <CrashGuardPopup logic={logic} />}
+             {showTankSpawner && logic && <TankSpawnerPopup logic={logic} onClose={() => setShowTankSpawner(false)} />} { }
+
         </main>
 
         <div aria-hidden className={`k-layer-frame${isTestMode || sizeGate ? ' k-layer-frame-off' : ''}`}
-            style={{ left: Math.floor(RAIL_W * chromeScale), ['--k-layer-gap' as string]: Math.round(LAYER_GAP * chromeScale) + 'px', ['--k-layer-foot' as string]: Math.round(LAYER_FOOT * chromeScale) + 'px', ['--k-layer-panel' as string]: Math.round((320 + LAYER_GAP) * chromeScale) + 'px', ['--k-layer-r' as string]: Math.round(10 * chromeScale) + 'px' } as React.CSSProperties}>
+            style={{ left: Math.floor(RAIL_W * chromeScale), ['--k-layer-gap' as string]: Math.round(LAYER_GAP * chromeScale) + 'px', ['--k-layer-foot' as string]: Math.round(LAYER_FOOT * chromeScale) + 'px', ['--k-layer-panel' as string]: Math.round((320 + LAYER_GAP) * chromeScale) + 'px', ['--k-layer-r' as string]: Math.round(10 * chromeScale) + 'px', ['--k-ui-zoom' as string]: chromeScale } as React.CSSProperties}>
           <div className="k-layer-frame-box" />
           <div className="k-layer-frame-edge" />
         </div>
@@ -1149,6 +1096,32 @@ export default function App() {
   );
 }
 
+const classicUiNow = () => uiThemeId() === 'classic';
+function RailPick() {
+  const classic = useSyncExternalStore(subscribeUiTheme, classicUiNow, classicUiNow);
+  const tool = useActiveTool();
+  const ref = useRef<SVGSVGElement>(null);
+  const placed = useRef(false);
+  useLayoutEffect(() => {
+    const el = ref.current, stack = el?.parentElement;
+    if (!classic || !el || !stack) { placed.current = false; return; }
+    const place = (glide: boolean) => {
+      const b = stack.querySelector<HTMLElement>(`[data-rail-tool="${tool}"]`);
+      if (!b) { el.style.opacity = '0'; return; }
+      const moving = el.classList.contains('kg-moving');
+      glideTo(el, b, (glide || moving) && placed.current ? 'current' : 'instant');
+      el.style.opacity = '1';
+      placed.current = true;
+    };
+    place(true);
+    let seen = false;
+    const ro = new ResizeObserver(() => { if (seen) place(false); seen = true; });
+    ro.observe(stack);
+    return () => ro.disconnect();
+  }, [classic, tool]);
+  return classic ? <GlideSvg ref={ref} className="k-rail-pick" /> : null;
+}
+
 function ToolbarIcon({ active: activeProp, toolId, onClick, icon, label }: { active?: boolean, toolId?: Tool, onClick: () => void, icon: React.ReactNode, label: string }) {
     const isActive = useIsActiveTool(toolId ?? ('' as Tool));
     const active = toolId ? isActive : !!activeProp;
@@ -1156,6 +1129,7 @@ function ToolbarIcon({ active: activeProp, toolId, onClick, icon, label }: { act
         <button
             onClick={onClick}
             aria-label={label}
+            data-rail-tool={toolId}
             data-tip={label}
             data-tip-side="right"
             className={`toolbar-icon w-10 h-10 rounded-lg flex items-center justify-center active:scale-[0.97] relative ${active ? 'toolbar-icon-active' : 'text-[var(--k-rail-icon)] hover:bg-[var(--k-icon-hover)] hover:text-[var(--k-rail-icon-on)]'}`}

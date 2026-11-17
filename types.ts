@@ -12,6 +12,7 @@ import { AI_CATEGORY_ADDED } from "@/game/aiCategoryLists.generated";
 import { swapSideNamesTwoThree } from "@/game/mapEvents/doc";
 import { MODE_WORLDS, worldIdOf, worldWritesMap, type BaseLayout, type MapPool } from "@/game/modeWorlds";
 import type { TankDebuffs } from "@/game/tankDebuffs";
+import type { HfState, BotFeelConfig } from "@/game/humanFeel";
 import type { GrowthRules } from "@/game/growthRules";
 
 export const SNAP_COUNTS = [4, 8, 16, 32, 64] as const;
@@ -452,6 +453,7 @@ export interface Turret {
   fightResist?: number;
   shootResist?: number;
   launchReversed?: boolean;
+  releaseDepth?: number;
   shootDensity?: number;
   angle: number;
   animProgress: number;
@@ -625,7 +627,7 @@ function teamNumberOf(b: AIBehavior): number {
 export function dreadTeamId(): TeamId { return ALL_MODES.ON !== 0 ? 'team5' : 'team3'; }
 export function dreadBehavior(): AIBehavior { return ALL_MODES.ON !== 0 ? 'Team5' : 'Team3'; }
 
-const _sbG = globalThis as { __ISTRONG_OLD_SANDBOX?: unknown; process?: { env?: Record<string, string | undefined> } };
+const _sbG = globalThis as { __ISTRONG_OLD_SANDBOX?: unknown; __ISTRONG_OLD_ROGUES?: unknown; process?: { env?: Record<string, string | undefined> } };
 export const SANDBOX_TEAMS = { ON: _sbG.__ISTRONG_OLD_SANDBOX === 1 || _sbG.process?.env?.ISTRONG_OLD_SANDBOX === '1' ? 0 : 1 };
 const _odG = globalThis as { __ISTRONG_OLD_DREAD_COLOR?: unknown; process?: { env?: Record<string, string | undefined> } };
 export const OD_DREAD_COLOR = { ON: _odG.__ISTRONG_OLD_DREAD_COLOR === 1 || _odG.process?.env?.ISTRONG_OLD_DREAD_COLOR === '1' ? 0 : 1 };
@@ -703,6 +705,7 @@ export interface TeamBotSettings {
   overridden: boolean;
   baseLevel: number;
   upgradeLogic: UpgradeLogic;
+  speedFirst?: number;
   forceAutospin: boolean;
   forceAutoshoot: boolean;
   useHardcodedColor: boolean;
@@ -755,6 +758,7 @@ export interface GameModeConfig {
   mapPool?: MapPool;
   stopChances?: number[];
   tankDebuffs?: TankDebuffs;
+  botFeel?: BotFeelConfig;
   teamEnemyConfig: TeamEnemyConfig;
   growthMaxMultiplier?: number;
   growthPerLevel?: number;
@@ -831,8 +835,11 @@ export interface GameMessage {
 export const CAMP_NONE = 0;
 export const CAMP_BOSS = 1;
 export const CAMP_SHAPE = 2;
+export const CAMP_ROGUE = 4;
+export const ROGUES_TEAM = { ON: _sbG.__ISTRONG_OLD_ROGUES === 1 || _sbG.process?.env?.ISTRONG_OLD_ROGUES === '1' ? 0 : 1 };
 export function campsClash(a: number, b: number): boolean {
-  return (a | b) === 3;
+  const o = a | b;
+  return o === 3 || (o & 5) === 4;
 }
 
 export interface Bullet {
@@ -1016,6 +1023,7 @@ export interface Bullet {
   inExitPhase: boolean;
   exitProgress: number;
   exitBarrelLen: number;
+  exitReleaseBack: number;
   exitBarrelAngle: number;
   exitBaseX: number;
   exitBaseY: number;
@@ -1852,6 +1860,7 @@ export interface RockEntity {
   paintSlot?: number;
   paintHex?: string;
   paintAlpha?: number;
+  pumpkin?: boolean;
 }
 
 export interface SpawnZoneScale {
@@ -2578,6 +2587,7 @@ export interface EnemyConfig {
   isBossTier?: boolean;
   aiBehavior: AIBehavior;
   upgradeLogic: UpgradeLogic;
+  speedFirst?: number;
   forceAutospin: boolean;
   forceAutoshoot: boolean;
   maxSpawnCount: number;
@@ -2594,6 +2604,10 @@ export interface EnemyConfig {
   isCmdBot?: boolean;
   isStageBody?: boolean;
   bossTeam?: boolean;
+  rogueTeam?: boolean;
+  aiOff?: boolean;
+  spawnerBot?: boolean;
+  spawnerStats?: { level: number; xp: number; skillPoints: number; upgrades: Record<string, number> };
   chosenBehavior?: AIBehavior;
   chosenAs?: AIBehavior;
   useHardcodedColor?: boolean;
@@ -2601,6 +2615,8 @@ export interface EnemyConfig {
   sentryTier?: 'sentry' | 'sentinel';
   sourceLibraryName?: string;
   sourceTankWord?: string;
+  fixedBody?: boolean;
+  solidBody?: boolean;
 }
 
 export const AI_CATEGORY_SCHEMA_VERSION = 1;
@@ -2613,6 +2629,8 @@ export interface AICategorySettings {
   aimbotStrength: number;
   fleeHpThreshold: number;
   customUpgradeLogic: CustomUpgradeLogic;
+  noBackBoost?: boolean;
+  noGapDistance?: boolean;
 }
 
 export interface CustomUpgradeLogic {
@@ -2657,6 +2675,10 @@ export function createDefaultAICategorySettings(): AICategorySettings {
     customUpgradeLogic: createDefaultCustomUpgradeLogic(),
   };
 }
+export function aiCatNoBackBoostDefault(categoryId: string): boolean { return categoryId === 'default-booster-tanks'; }
+export function aiCatNoGapDistanceDefault(categoryId: string): boolean { return categoryId === 'default-droner-tanks'; }
+export function aiCatNoBackBoost(c: AIBehaviorCategory): boolean { const v = c.settings.noBackBoost; return v === true || (v !== false && aiCatNoBackBoostDefault(c.id)); }
+export function aiCatNoGapDistance(c: AIBehaviorCategory): boolean { const v = c.settings.noGapDistance; return v === true || (v !== false && aiCatNoGapDistanceDefault(c.id)); }
 
 export function createDefaultAIBehaviorCategories(): AIBehaviorCategory[] {
   const cats = _categoriesHePlaced();
@@ -2947,6 +2969,8 @@ export interface EnemyTank {
   resistBase?: number;
   _fileResist: number;
   _toughWord: string;
+  bodySolid: boolean;
+  _fileSizePx: number;
   toughKind?: number;
   healthK?: number;
   pushShare?: number;
@@ -3021,6 +3045,7 @@ export interface EnemyTank {
   team: TeamId;
   aiBehavior: AIBehavior;
   upgradeLogic: UpgradeLogic;
+  speedFirst: number;
   aiState: AIState;
 
   groupId: number;
@@ -3045,6 +3070,10 @@ export interface EnemyTank {
   orbitDirection: 1 | -1;
   roamTarget: Vector | null;
   lastDirectionChange: number;
+  roamBestD: number;
+  roamBestAt: number;
+  roamBestX: number;
+  roamBestY: number;
 
   fear: FearState;
   recentDamageIn3s: number;
@@ -3055,6 +3084,8 @@ export interface EnemyTank {
   pressMs: number;
   pressLastDealtMs: number;
   keepAttackingThroughCover?: boolean;
+  catNoBackBoost?: boolean;
+  catNoGapDist?: boolean;
   minAttackDistance?: number;
   categoryPreferredDistance?: number;
   fleeHpThresholdPct?: number;
@@ -3117,6 +3148,10 @@ export interface EnemyTank {
   _mevColour: number;
   _mevInvis: number;
   _mevSpeedK: number;
+  _mevSightK: number;
+  _mevSightSet: number;
+  _mevUnitK: number;
+  _mevStraight: boolean;
   _mevHpK: number;
   _mevPushWas: number;
   _mevFollowOf: string;
@@ -3132,6 +3167,10 @@ export interface EnemyTank {
   _packTargetPlayer: boolean;
   _btBits: number; _btN: Int8Array;
   _ogTag: number; _ogRadius: number; _oaTag: number; _ogId: string; _ogX: number; _ogY: number; _ogLookAt: number;
+  _ogFront: boolean; _ogFrontShare: number; _ogFrontIs: number; _ogPendId: string; _ogPendAt: number; _ogHoldUntil: number;
+  _ogBlockShare: number; _ogBlockIs: number; _ogBlockAngle: number; _ogBlockUntil: number; _ogBlockLookAt: number;
+  _ogBlockX: number; _ogBlockY: number; _ogBlockSpotUntil: number;
+  _ogUnitShare: number; _ogUnitIs: number; _ogUnitT: string; _ogUnitLookAt: number;
   _ftTake: number; _ftSpoil: number; _ftId: string; _ftLookAt: number; _ctKite: boolean;
   _ftGo: boolean; _ftX: number; _ftY: number; _ftBestD: number; _ftGiveUpAt: number; _ftBan: string; _ftBanUntil: number;
   _esTag: number; _esMax: number; _esRadius: number; _esId: string; _esLookAt: number;
@@ -3143,6 +3182,9 @@ export interface EnemyTank {
   _carryHMs: MapState | null; _carryHTeam: string; _carryHx: number; _carryHy: number;
   _hsBelow: number; _hsBack: number; _hsHealers: boolean; _hsTag: number; _hsZone: number;
   _tfHelp: boolean; _flBelow: number; _flBack: number;
+  _tfMap: boolean; _tfMapShare: number; _tfMapId: string; _tfMapAt: number; _tfMapLookAt: number; _tfMapN: number;
+  _tfPendId: string; _tfPendAt: number;
+  _tfMeetId: string; _tfMeetSid: string; _tfMeetX: number; _tfMeetY: number; _tfMeetGoAt: number;
   _hsOn: number; _hsId: string; _hsArea: number; _hsX: number; _hsY: number; _hsNear: number; _hsLeash: number; _hsKite: boolean; _hsPickAt: number; _hsGiveUpAt: number; _hsCoolUntil: number; _hsBestD: number;
   _tfHelpId: string; _tfLookAt: number; _flLow: boolean;
   _tfGoalId: string; _tfGoalX: number; _tfGoalY: number; _tfGoalSeenAt: number; _tfGoalBestD: number; _tfGoalGiveUpAt: number; _tfGoalArriveAt: number; _tfBanId: string; _tfBanUntil: number;
@@ -3321,6 +3363,9 @@ export interface EnemyTank {
   navFieldUnreachAt: number;
   unreachTargetId: string;
   unreachUntil: number;
+  unreachMoreIds: string[];
+  unreachMoreUntils: number[];
+  unreachMoreLive: number;
   navReactiveSince: number;
   navGiveUpFor: string;
   navGiveUpSeenAt: number;
@@ -3498,11 +3543,14 @@ export interface EnemyTank {
 
   isBossTier: boolean;
   camp: number;
+  aiOff: boolean;
+  spawnHeld: boolean;
   dnaCourage: number;
   dnaTeamHelp: number;
   dnaAggression: number;
   dnaVengeful: number;
   dnaCaution: number;
+  hf: HfState;
   assistMateId: string;
   assistUntil: number;
   assistDecisionAt: number;
@@ -3565,6 +3613,9 @@ export interface EnemyTank {
 export interface RevivalEntry {
   configId: string;
   revivalTime: number;
+  hfName?: string;
+  hfG?: number[];
+  hfLives?: number;
 }
 
 export interface XpTextAnimation {
@@ -4533,6 +4584,152 @@ const AI_CONSTANTS_DEF = {
   PORTAL_SEEK_TIMEOUT_MS: 12000,
   PORTAL_SEEK_SCAN_INTERVAL_MS: 1000,
   AUTOSPIN_HUMAN: 1,
+  HF_GENES: 1,
+  HF_MOOD: 1,
+  HF_SIGHT: 1,
+  HF_KEYS: 1,
+  HF_HAND: 1,
+  HF_LOOK: 1,
+  HF_SWING: 1,
+  HF_BOOST: 1,
+  HF_TRUST: 1,
+  HF_CROWD: 1,
+  HF_SPIN: 1,
+  HF_SWEEP: 1,
+  HF_AIM: 1,
+  HF_STOPS: 1,
+  HF_TOGETHER: 1,
+  HF_SIGHT_FIT: 1,
+  HF_LINES: 1,
+  HF_ODDS: 1,
+  HF_MATES: 1,
+  HF_PROTECT: 1,
+  HF_LETGO: 1,
+  HF_CALM: 1,
+  HF_STOPS_FARM: 1,
+  HF_LONE: 1,
+  HF_JOIN: 1,
+  HF_SMASH: 1,
+  HF_WAG: 1,
+  HF_STOPS_STUCK: 1,
+  HF_OWNTIME: 1,
+  HF_HANDSIT: 1,
+  HF_LOOKFREE: 1,
+  HF_STROKE: 1,
+  HF_SURVIVE: 1,
+  HF_FOCUS: 1,
+  HF_GOALS: 1,
+  HF_SPAWN: 1,
+  HF_FINGER: 1,
+  HF_CURSOR: 1,
+  HF_READY: 1,
+  HF_GESTURE: 1,
+  HF_DEFEND: 1,
+  HF_ONEFOE: 1,
+  HF_SEES: 1,
+  HF_GLIDE: 1,
+  HF_MIND: 1,
+  HF_RHINO: 1,
+  HF_GAPDIST: 1,
+  HF_ONIT: 1,
+  HF_FARMFLOW: 1,
+  HF_RISK: 1,
+  HF_EARLYRUN: 1,
+  HF_PLACE: 1,
+  HF_STEADY: 1,
+  HF_BOOSTNEAR: 1,
+  HF_HELPGAP: 1,
+  HF_GLANCE: 1,
+  AUTO_SHOT_LOS: 1,
+  HF_RANGE: 1,
+  HF_QUIET: 1,
+  HF_DODGE: 1,
+  HF_KEEPHID: 1,
+  HF_HURTAWAY: 1,
+  HF_RINGS: 1,
+  HF_MEETDIST: 1,
+  HF_NEST: 1,
+  VALVE_REMEMBERS: 1,
+  HF_DRONEHAND: 1,
+  HF_DRONEDIST: 1,
+  HF_UNITS: 1,
+  HF_DRONEBACK: 1,
+  HF_DRONEKEEP: 1,
+  HF_DRONESAFE: 1,
+  HF_DRONEROCK: 1,
+  HF_DRONEFOOD: 1,
+  HF_OVERRIDE: 1,
+  HF_SWARMHAND: 1,
+  HF_SWARMPLACE: 1,
+  HF_MINIONHAND: 1,
+  HF_TRAVEL: 1,
+  HF_THROWN: 1,
+  HF_CALM_ARMED: 1,
+  HF_ESCORT: 1,
+  HF_FARBACK: 1,
+  HF_UNITCOVER: 1,
+  HF_PACE: 1,
+  HF_NOPUSH: 1,
+  HF_UNITAWAY: 1,
+  HF_SPAWNCLEAR: 1,
+  HF_AREA: 1,
+  HF_AREAFOOD: 1,
+  HF_WAGSAFE: 1,
+  HF_AHEAD: 1,
+  HF_MINDALL: 1,
+  HF_KEEPKILL: 1,
+  HF_AREASPAWN: 1,
+  HF_ONBODY: 1,
+  HF_OFFWALL: 1,
+  HF_SHOTAT: 1,
+  HF_FLEEPATH: 1,
+  HF_ONSCREEN: 1,
+  HF_WAGSEEN: 1,
+  HF_FOODWAY: 1,
+  HF_BOSSLEGS: 1,
+  HF_RIDEFACTS: 1,
+  HF_RIDEOFTEN: 1,
+  HF_WAGSPIN: 1,
+  HF_FIREHOLD: 1,
+  HF_AREAALL: 1,
+  HF_BODYFIRST: 1,
+  HF_FOODWALK: 1,
+  HF_CHASESTAND: 1,
+  HF_CAMPAIM: 1,
+  HF_SWARMBODY: 1,
+  HF_FOODAGREE: 1,
+  HF_CROWDSTEADY: 1,
+  UNREACH_RING: 1,
+  HF_CAMPFOOD: 1,
+  HF_FARMLANDS: 1,
+  ROAM_NOORBIT: 0,
+  HF_RAM: 1,
+  HF_RAMOUT: 1,
+  HF_RAMSTALK: 1,
+  HF_RAMREACH: 1,
+  HF_RAMWALL: 1,
+  HF_RAMSEEN: 1,
+  HF_WALKAHEAD: 1,
+  HF_WALKCLEAR: 1,
+  HF_MATEPASS: 1,
+  HF_AREASCAN: 1,
+  HF_CHASEWALK: 1,
+  HF_GOALCLAMP: 1,
+  HF_HITMEM: 1,
+  HF_SPEEDFIRST: 1,
+  HF_CHASECROWD: 1,
+  HF_LETCALM: 1,
+  HF_RAMFOE: 1,
+  SHRINK_AWARE: 1,
+  BT_BOSSMAP: 1,
+  BT_OWNMOMENT: 1,
+  BT_BOSSMEET: 1,
+  BT_FRONT: 1,
+  BT_BLOCKFIRE: 1,
+  BT_SENDUNITS: 1,
+  HF_RAMSHIFT: 1,
+  BT_BOSSFOE: 0,
+  HF_KEEPSEEN: 0,
 };
 const AI_CONST_OFF: boolean = (typeof location !== 'undefined' && /[?&]oldaiconst(?:[=&]|$)/.test(location.search))
   || (typeof process !== 'undefined' && !!process.env && process.env.ISTRONG_OLD_AICONST === '1');
@@ -4882,6 +5079,152 @@ function AiConstantsShell(this: typeof AI_CONSTANTS_DEF, s: typeof AI_CONSTANTS_
   this.PORTAL_SEEK_TIMEOUT_MS = s.PORTAL_SEEK_TIMEOUT_MS;
   this.PORTAL_SEEK_SCAN_INTERVAL_MS = s.PORTAL_SEEK_SCAN_INTERVAL_MS;
   this.AUTOSPIN_HUMAN = s.AUTOSPIN_HUMAN;
+  this.HF_GENES = s.HF_GENES;
+  this.HF_MOOD = s.HF_MOOD;
+  this.HF_SIGHT = s.HF_SIGHT;
+  this.HF_KEYS = s.HF_KEYS;
+  this.HF_HAND = s.HF_HAND;
+  this.HF_LOOK = s.HF_LOOK;
+  this.HF_SWING = s.HF_SWING;
+  this.HF_BOOST = s.HF_BOOST;
+  this.HF_TRUST = s.HF_TRUST;
+  this.HF_CROWD = s.HF_CROWD;
+  this.HF_SPIN = s.HF_SPIN;
+  this.HF_SWEEP = s.HF_SWEEP;
+  this.HF_AIM = s.HF_AIM;
+  this.HF_STOPS = s.HF_STOPS;
+  this.HF_TOGETHER = s.HF_TOGETHER;
+  this.HF_SIGHT_FIT = s.HF_SIGHT_FIT;
+  this.HF_LINES = s.HF_LINES;
+  this.HF_ODDS = s.HF_ODDS;
+  this.HF_MATES = s.HF_MATES;
+  this.HF_PROTECT = s.HF_PROTECT;
+  this.HF_LETGO = s.HF_LETGO;
+  this.HF_CALM = s.HF_CALM;
+  this.HF_STOPS_FARM = s.HF_STOPS_FARM;
+  this.HF_LONE = s.HF_LONE;
+  this.HF_JOIN = s.HF_JOIN;
+  this.HF_SMASH = s.HF_SMASH;
+  this.HF_WAG = s.HF_WAG;
+  this.HF_STOPS_STUCK = s.HF_STOPS_STUCK;
+  this.HF_OWNTIME = s.HF_OWNTIME;
+  this.HF_HANDSIT = s.HF_HANDSIT;
+  this.HF_LOOKFREE = s.HF_LOOKFREE;
+  this.HF_STROKE = s.HF_STROKE;
+  this.HF_SURVIVE = s.HF_SURVIVE;
+  this.HF_FOCUS = s.HF_FOCUS;
+  this.HF_GOALS = s.HF_GOALS;
+  this.HF_SPAWN = s.HF_SPAWN;
+  this.HF_FINGER = s.HF_FINGER;
+  this.HF_CURSOR = s.HF_CURSOR;
+  this.HF_READY = s.HF_READY;
+  this.HF_GESTURE = s.HF_GESTURE;
+  this.HF_DEFEND = s.HF_DEFEND;
+  this.HF_ONEFOE = s.HF_ONEFOE;
+  this.HF_SEES = s.HF_SEES;
+  this.HF_GLIDE = s.HF_GLIDE;
+  this.HF_MIND = s.HF_MIND;
+  this.HF_RHINO = s.HF_RHINO;
+  this.HF_GAPDIST = s.HF_GAPDIST;
+  this.HF_ONIT = s.HF_ONIT;
+  this.HF_FARMFLOW = s.HF_FARMFLOW;
+  this.HF_RISK = s.HF_RISK;
+  this.HF_EARLYRUN = s.HF_EARLYRUN;
+  this.HF_PLACE = s.HF_PLACE;
+  this.HF_STEADY = s.HF_STEADY;
+  this.HF_BOOSTNEAR = s.HF_BOOSTNEAR;
+  this.HF_HELPGAP = s.HF_HELPGAP;
+  this.HF_GLANCE = s.HF_GLANCE;
+  this.AUTO_SHOT_LOS = s.AUTO_SHOT_LOS;
+  this.HF_RANGE = s.HF_RANGE;
+  this.HF_QUIET = s.HF_QUIET;
+  this.HF_DODGE = s.HF_DODGE;
+  this.HF_KEEPHID = s.HF_KEEPHID;
+  this.HF_HURTAWAY = s.HF_HURTAWAY;
+  this.HF_RINGS = s.HF_RINGS;
+  this.HF_MEETDIST = s.HF_MEETDIST;
+  this.HF_NEST = s.HF_NEST;
+  this.VALVE_REMEMBERS = s.VALVE_REMEMBERS;
+  this.HF_DRONEHAND = s.HF_DRONEHAND;
+  this.HF_DRONEDIST = s.HF_DRONEDIST;
+  this.HF_UNITS = s.HF_UNITS;
+  this.HF_DRONEBACK = s.HF_DRONEBACK;
+  this.HF_DRONEKEEP = s.HF_DRONEKEEP;
+  this.HF_DRONESAFE = s.HF_DRONESAFE;
+  this.HF_DRONEROCK = s.HF_DRONEROCK;
+  this.HF_DRONEFOOD = s.HF_DRONEFOOD;
+  this.HF_OVERRIDE = s.HF_OVERRIDE;
+  this.HF_SWARMHAND = s.HF_SWARMHAND;
+  this.HF_SWARMPLACE = s.HF_SWARMPLACE;
+  this.HF_MINIONHAND = s.HF_MINIONHAND;
+  this.HF_TRAVEL = s.HF_TRAVEL;
+  this.HF_THROWN = s.HF_THROWN;
+  this.HF_CALM_ARMED = s.HF_CALM_ARMED;
+  this.HF_ESCORT = s.HF_ESCORT;
+  this.HF_FARBACK = s.HF_FARBACK;
+  this.HF_UNITCOVER = s.HF_UNITCOVER;
+  this.HF_PACE = s.HF_PACE;
+  this.HF_NOPUSH = s.HF_NOPUSH;
+  this.HF_UNITAWAY = s.HF_UNITAWAY;
+  this.HF_SPAWNCLEAR = s.HF_SPAWNCLEAR;
+  this.HF_AREA = s.HF_AREA;
+  this.HF_AREAFOOD = s.HF_AREAFOOD;
+  this.HF_WAGSAFE = s.HF_WAGSAFE;
+  this.HF_AHEAD = s.HF_AHEAD;
+  this.HF_MINDALL = s.HF_MINDALL;
+  this.HF_KEEPKILL = s.HF_KEEPKILL;
+  this.HF_AREASPAWN = s.HF_AREASPAWN;
+  this.HF_ONBODY = s.HF_ONBODY;
+  this.HF_OFFWALL = s.HF_OFFWALL;
+  this.HF_SHOTAT = s.HF_SHOTAT;
+  this.HF_FLEEPATH = s.HF_FLEEPATH;
+  this.HF_ONSCREEN = s.HF_ONSCREEN;
+  this.HF_WAGSEEN = s.HF_WAGSEEN;
+  this.HF_FOODWAY = s.HF_FOODWAY;
+  this.HF_BOSSLEGS = s.HF_BOSSLEGS;
+  this.HF_RIDEFACTS = s.HF_RIDEFACTS;
+  this.HF_RIDEOFTEN = s.HF_RIDEOFTEN;
+  this.HF_WAGSPIN = s.HF_WAGSPIN;
+  this.HF_FIREHOLD = s.HF_FIREHOLD;
+  this.HF_AREAALL = s.HF_AREAALL;
+  this.HF_BODYFIRST = s.HF_BODYFIRST;
+  this.HF_FOODWALK = s.HF_FOODWALK;
+  this.HF_CHASESTAND = s.HF_CHASESTAND;
+  this.HF_CAMPAIM = s.HF_CAMPAIM;
+  this.HF_SWARMBODY = s.HF_SWARMBODY;
+  this.HF_FOODAGREE = s.HF_FOODAGREE;
+  this.HF_CROWDSTEADY = s.HF_CROWDSTEADY;
+  this.UNREACH_RING = s.UNREACH_RING;
+  this.HF_CAMPFOOD = s.HF_CAMPFOOD;
+  this.HF_FARMLANDS = s.HF_FARMLANDS;
+  this.ROAM_NOORBIT = s.ROAM_NOORBIT;
+  this.HF_RAM = s.HF_RAM;
+  this.HF_RAMOUT = s.HF_RAMOUT;
+  this.HF_RAMSTALK = s.HF_RAMSTALK;
+  this.HF_RAMREACH = s.HF_RAMREACH;
+  this.HF_RAMWALL = s.HF_RAMWALL;
+  this.HF_RAMSEEN = s.HF_RAMSEEN;
+  this.HF_WALKAHEAD = s.HF_WALKAHEAD;
+  this.HF_WALKCLEAR = s.HF_WALKCLEAR;
+  this.HF_MATEPASS = s.HF_MATEPASS;
+  this.HF_AREASCAN = s.HF_AREASCAN;
+  this.HF_CHASEWALK = s.HF_CHASEWALK;
+  this.HF_GOALCLAMP = s.HF_GOALCLAMP;
+  this.HF_HITMEM = s.HF_HITMEM;
+  this.HF_SPEEDFIRST = s.HF_SPEEDFIRST;
+  this.HF_CHASECROWD = s.HF_CHASECROWD;
+  this.HF_LETCALM = s.HF_LETCALM;
+  this.HF_RAMFOE = s.HF_RAMFOE;
+  this.SHRINK_AWARE = s.SHRINK_AWARE;
+  this.BT_BOSSMAP = s.BT_BOSSMAP;
+  this.BT_OWNMOMENT = s.BT_OWNMOMENT;
+  this.BT_BOSSMEET = s.BT_BOSSMEET;
+  this.BT_FRONT = s.BT_FRONT;
+  this.BT_BLOCKFIRE = s.BT_BLOCKFIRE;
+  this.BT_SENDUNITS = s.BT_SENDUNITS;
+  this.HF_RAMSHIFT = s.HF_RAMSHIFT;
+  this.BT_BOSSFOE = s.BT_BOSSFOE;
+  this.HF_KEEPSEEN = s.HF_KEEPSEEN;
 }
 export const AI_CONSTANTS: typeof AI_CONSTANTS_DEF = AI_CONST_OFF ? AI_CONSTANTS_DEF
   : new (AiConstantsShell as unknown as { new (s: typeof AI_CONSTANTS_DEF): typeof AI_CONSTANTS_DEF })(AI_CONSTANTS_DEF);

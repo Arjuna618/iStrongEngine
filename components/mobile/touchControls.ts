@@ -175,6 +175,7 @@ export class TouchControls {
       const t = ts[i];
       if (t.target !== c) continue;
       took = true;
+      if (logic.spawnerHolding()) { this._px(t.clientX, t.clientY, _kn); logic.handleMouseMove(_kn.x, _kn.y); logic.spawnerClick(performance.now(), t.clientX, t.clientY); continue; }
       this._px(t.clientX, t.clientY, _kn);
       if (this.rcMode === MOB_RC_MANUAL && this.manualId === -1 && mobManualZone(_kn.x, _kn.y, W, H)) {
         this.manualId = t.identifier; this._sync(logic); continue;
@@ -197,6 +198,14 @@ export class TouchControls {
   private _onMove = (e: TouchEvent): void => {
     this.touchesDown = e.touches.length;
     if (mobHud.hudDrag > 0 && e.cancelable) e.preventDefault();
+    const _held = this._getLogic();
+    if (_held && _held.state.isTestMode && _held.spawnerHolding()) {
+      const c = this._canvas, ts = e.changedTouches;
+      let moved = false;
+      if (c) for (let i = 0; i < ts.length; i++) { const t = ts[i]; if (t.target !== c) continue; this._px(t.clientX, t.clientY, _kn); _held.handleMouseMove(_kn.x, _kn.y); moved = true; }
+      if (moved && e.cancelable) e.preventDefault();
+      return;
+    }
     if (!this.anyDown()) return;
     const logic = this._getLogic();
     if (!logic) return;

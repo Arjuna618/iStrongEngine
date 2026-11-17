@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
+import { TEXT_LIMITS } from '../kit/textLimits';
 import type { Num, Ref, SpawnGroup, WaveCell, WaveOverride, WavePlan, ZoneLike } from '../../game/mapEvents/doc';
 import { rectsOf, SIDE_WORDS, zoneShapeOf } from '../../game/mapEvents/doc';
 import { tracePoly, shapeCellPoints } from '../../game/areaShape';
@@ -53,7 +54,7 @@ const LineDetail: React.FC<{ g: SpawnGroup; path: Path; ctx: EvCtx }> = ({ g, pa
     <div className="k-ev-page">
       <DetailHead title={g.name} />
       <Group title="This Line">
-        <FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField value={g.name} onChange={v => put('name', v)} /></FieldRow>
+        <FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField maxLength={TEXT_LIMITS.NAME} value={g.name} onChange={v => put('name', v)} /></FieldRow>
         <Facts items={factsFrom(lineFacts(g, thingNamer(ctx)))} />
         <FieldRow label="How Many" help="How many of this line come in a wave. It can grow with the wave."><NumField value={g.count} onChange={v => put('count', v)} /></FieldRow>
         <FieldRow label="Random, More Or Less" help="0.2: up to a fifth more or less."><NumberBox className="k-field k-ev-num" value={g.spread ?? 0} step={0.05} min={0} max={1} onChange={e => put('spread', num(e.target.value) ?? 0)} /></FieldRow>
@@ -142,7 +143,7 @@ const WaveGrid: React.FC<{ plan: WavePlan; pi: number; ctx: EvCtx }> = ({ plan, 
               <td className="k-ev-grid-name">{g.name}</td>
               {waves.map(w => {
                 const t = typedCells.get(`${g.id}:${w}`);
-                return <td key={w}><input className={t ? 'k-ev-cell k-ev-cell-typed' : 'k-ev-cell'} aria-label={`${g.name}, wave ${w}`} value={t ? t.n : Math.round(shown(g, w) * 100) / 100} inputMode="decimal" onChange={e => write(g, w, e.target.value)} /></td>;
+                return <td key={w}><input maxLength={TEXT_LIMITS.NUMBER} className={t ? 'k-ev-cell k-ev-cell-typed' : 'k-ev-cell'} aria-label={`${g.name}, wave ${w}`} value={t ? t.n : Math.round(shown(g, w) * 100) / 100} inputMode="decimal" onChange={e => write(g, w, e.target.value)} /></td>;
               })}
             </tr>
           ))}
@@ -298,7 +299,7 @@ export const WaveEditor: React.FC<{ plan: WavePlan; pi: number; ctx: EvCtx; sear
                           </Group>
             <LongList gap={12} estimate={420} reveal={null} count={plan.specials?.length ?? 0} rowKey={n => String(plan.specials![n].id)} renderRow={i => { const s = plan.specials![i]; return (
                 <Group title={s.name} foldKey={`special-${s.id}`} collapsible count={s.groups.length} right={<IconButton size="sm" label="Remove this special wave" onClick={() => ctx.commit(d => removeAt(d, ['plans', pi, 'specials'], i))}><Trash2 size={13} /></IconButton>}>
-                  <FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField value={s.name} onChange={v => ctx.commit(d => setAt(d, ['plans', pi, 'specials', i, 'name'], v))} /></FieldRow>
+                  <FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField maxLength={TEXT_LIMITS.NAME} value={s.name} onChange={v => ctx.commit(d => setAt(d, ['plans', pi, 'specials', i, 'name'], v))} /></FieldRow>
                   <FieldRow label="Share" help="How likely this special wave is beside the others." note={specialTotal > 0 ? <Facts items={factsFrom([`${Math.round(s.weight / specialTotal * 100)}% Of Special Waves`, `${(s.weight / specialTotal * chance).toFixed(2)}% Of All Waves`])} /> : undefined}>
                     <NumberBox className="k-field k-ev-num" value={s.weight} step={0.1} min={0} onChange={e => ctx.commit(d => setAt(d, ['plans', pi, 'specials', i, 'weight'], num(e.target.value) ?? 0))} />
                   </FieldRow>
@@ -330,7 +331,7 @@ export const WaveEditor: React.FC<{ plan: WavePlan; pi: number; ctx: EvCtx; sear
       : tab === 'timing' ? <ScrollArea className="k-ev-scroll"><div className="k-ev-list-box k-ev-cols">
           <div className="k-ev-page">
             <Group title="This Plan">
-              <FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField value={plan.name} onChange={v => put('name', v)} /></FieldRow>
+              <FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField maxLength={TEXT_LIMITS.NAME} value={plan.name} onChange={v => put('name', v)} /></FieldRow>
               <SelectRow label="Starts" help="With the match, or when a Map Event sends its Signal." value={plan.start.on} options={[{ value: 'match', label: 'With The Match' }, { value: 'signal', label: 'When Told' }]} onChange={v => put('start', { ...plan.start, on: v })} />
               <Reveal when={plan.start.on === 'signal'}>{() => <FieldRow stacked label="Signal" help="The Signal that starts this plan."><RefField of="signal" value={plan.start.signal} ctx={ctx} onChange={v => put('start', { ...plan.start, signal: v })} /></FieldRow>}</Reveal>
               <FieldRow label="First Wave After" help="How long after its start the first wave comes."><NumField value={plan.start.delay} unit="s" onChange={v => put('start', { ...plan.start, delay: v })} /></FieldRow>

@@ -24,7 +24,7 @@ const SOURCE_CODE_GUIDE: DocGuide = {
     { t: 'kv', rows: [
       ['The head', 'The folder the file is in, its name, and tags with its kind, lines, characters and size.'],
       ['Find', 'Press **Ctrl + F** or the search button to find words in the open file. **Enter** goes to the next match and **Shift + Enter** to the one before, and small marks beside the scroll bar show where the matches are. Words you selected in the code are what Find looks for when it opens.'],
-      ['Copy', 'Select code with the mouse and press **Ctrl + C**. Only the code can be selected, never the titles or buttons. **Ctrl + A** in the code selects the whole file, and the copy button copies the whole file too.'],
+      ['Copy', 'Select code with the mouse and press **Ctrl + C**. A double click selects a word, a triple click selects a whole line, and dragging on the line numbers selects whole lines. Hold the mouse above or below the code while you select and it scrolls by itself. Only the code can be selected, never the titles or buttons. **Ctrl + A** in the code selects the whole file, and the copy button copies the whole file too.'],
       ['Download', 'The download button in the head saves the open file.'],
       ['Pictures', 'A picture opens as a picture, with its size in pixels.'],
     ] },
@@ -118,7 +118,7 @@ export const DOCS_BASICS: DocCategory = {
             ] },
             { t: 'note', text: 'In full screen, or on an iPhone, the window never shows.' },
             { t: 'h', text: 'Typing on a Phone' },
-            { t: 'p', text: 'Tap a box you type in, for example your name in the Play menu, a number in the Debug Menu or the chat in a match, and a small window opens right above the keyboard, so the keyboard never hides what you type. It shows the name of the box, what the box holds and a **Done** button. Every letter goes straight into the box.' },
+            { t: 'p', text: 'Tap a box you type in, for example your name in the Play menu, a number in Manage Players or the chat in a match, and a small window opens right above the keyboard, so the keyboard never hides what you type. It shows the name of the box, what the box holds and a **Done** button. Every letter goes straight into the box.' },
             { t: 'kv', rows: [
               ['Done', 'Finishes typing, the same as pressing Enter in that box on a computer. The Enter key of the keyboard does the same. In the Play menu it keeps your name and leaves starting the match to the **Play** button.'],
               ['Tap outside it', 'Stops typing and keeps what you typed, the same as clicking somewhere else on a computer. In the chat it closes the chat without sending.'],
@@ -259,8 +259,9 @@ export const DOCS_BASICS: DocCategory = {
             { t: 'kv', rows: [
               ['Projects', 'Every project you saved. Double click a card to open it, or right click it and choose **Open**. If what is on screen has changes that are not saved, it asks first whether to save them. Point at the card of the open project and its tooltip says **Open now**.'],
               ['Custom User Files', 'Every file you export with **Export to File**, in Import and Export or in the Map Designer, is also kept here, and so is every file you drop into the Hub. Tanks, turrets, projectiles, food shapes and Others show a live picture, and a map shows a map icon.'],
-              ['Recently Deleted', 'A deleted card waits here for 30 days before it is gone for good. The message after a delete has an **Undo** button. If the browser runs out of room, older saved versions go first, then this list, and a notice says what went.'],
+              ['Recently Deleted', 'A deleted card waits here for 30 days before it is gone for good. Press **Ctrl Z** in the Hub right after a delete to bring the card back. If the browser runs out of room, older saved versions go first, then this list, and a notice says what went.'],
               ['The card menu', 'The three dots on a card, or a right click: rename, duplicate, download, details and delete. A file of yours can also be added to the Content Library of the open project or opened on the canvas, and a map can be loaded.'],
+              ['Rename', 'Double click the name at the top of a card, or choose Rename in its menu, then type the new name and press **Enter**. **Escape** keeps the old name.'],
               ['Search and sort', 'Search with **Ctrl + K**. Sort by last opened, name, newest or size, and pick the card size.'],
             ] },
             { t: 'h', text: 'Bringing files in' },

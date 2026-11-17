@@ -118,12 +118,13 @@ export function pruneDeadImports(live: ReadonlyMap<string, unknown>): void {
 export function storedTab(place: string): LibKind | undefined { return _s.tab[place]; }
 export function storeTab(place: string, kind: LibKind): void { if (_s.tab[place] !== kind) { _s.tab[place] = kind; save(); } }
 
-export function storedFilter(kind: LibKind, groups: number): KindFilter | undefined {
-  const f = _s.filters[kind];
+export function storedFilter(kind: LibKind, groups: number, layout = ''): KindFilter | undefined {
+  const f = _s.filters[kind] as (KindFilter & { layout?: string }) | undefined;
   if (!f || !Array.isArray(f.inc) || f.inc.length !== groups) return undefined;
+  if ((typeof f.layout === 'string' ? f.layout : '') !== layout) return undefined;
   return { inc: f.inc.map(v => (typeof v === 'number' ? v >>> 0 : 0)) };
 }
-export function storeFilter(kind: LibKind, f: KindFilter): void { _s.filters[kind] = { inc: f.inc.slice() }; save(); }
+export function storeFilter(kind: LibKind, f: KindFilter, layout = ''): void { _s.filters[kind] = (layout ? { inc: f.inc.slice(), layout } : { inc: f.inc.slice() }) as KindFilter; save(); }
 
 export function storedSort(kind: LibKind): SortId | undefined { return _s.sort[kind]; }
 export function storeSort(kind: LibKind, s: SortId): void { _s.sort[kind] = s; save(); }

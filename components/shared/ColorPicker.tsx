@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { TEXT_LIMITS } from '../kit/textLimits';
 import { createPortal } from 'react-dom';
 import { useFloatingPopup } from './useFloatingPopup';
 import { useBackdropClose } from './useBackdropClose';
@@ -77,7 +78,7 @@ const PresetGrid: React.FC<{
   selected: string;
   onSelect: (color: string) => void;
 }> = ({ selected, onSelect }) => (
-  <div className="grid grid-cols-6 gap-2 mb-3">
+  <div className="k-cp-presets grid grid-cols-6 gap-2 mb-3">
     {PRESET_COLORS.map((color, i) => {
       const isSelected = selected.toLowerCase() === color.toLowerCase();
       return (
@@ -147,7 +148,7 @@ const SaturationValuePicker: React.FC<{
   return (
     <div
       ref={containerRef}
-      className="relative w-full rounded-lg cursor-crosshair overflow-hidden"
+      className="k-cp-sv relative w-full rounded-lg cursor-crosshair overflow-hidden"
       style={{ height: 140, touchAction: 'none' }}
       onPointerDown={handlePointerDown}
     >
@@ -155,7 +156,7 @@ const SaturationValuePicker: React.FC<{
       <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, #ffffff, transparent)' }} />
       <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent, #000000)' }} />
       <div
-        className="absolute w-3.5 h-3.5 rounded-full border-2 border-white pointer-events-none"
+        className="k-cp-mark absolute w-3.5 h-3.5 rounded-full border-2 border-white pointer-events-none"
         style={{
           left: `${saturation * 100}%`,
           top: `${(1 - brightness) * 100}%`,
@@ -211,7 +212,7 @@ const HueSlider: React.FC<{
   return (
     <div
       ref={trackRef}
-      className="relative w-full h-3 rounded-full cursor-pointer mt-2"
+      className="k-cp-hue relative w-full h-3 rounded-full cursor-pointer mt-2"
       style={{
         background: 'linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)',
         touchAction: 'none',
@@ -219,7 +220,7 @@ const HueSlider: React.FC<{
       onPointerDown={handlePointerDown}
     >
       <div
-        className="absolute w-3.5 h-3.5 rounded-full bg-white border-2 border-white pointer-events-none"
+        className="k-cp-hue-mark absolute w-3.5 h-3.5 rounded-full bg-white border-2 border-white pointer-events-none"
         style={{
           left: `${(hue / 360) * 100}%`,
           top: '50%',
@@ -231,6 +232,14 @@ const HueSlider: React.FC<{
   );
 };
 
+function cpVars(st: React.CSSProperties, zoom: number, now: string, hue: number): Record<string, string> {
+  const z = zoom || 1, W = 240;
+  const left = typeof st.left === 'number' ? st.left : 0;
+  const viewW = (typeof window !== 'undefined' ? window.innerWidth : 1920) / z;
+  const fromLeft = left + W / 2 < viewW / 2;
+  return { '--k-cp-from': `${fromLeft ? -(left + W + 16) : viewW - left + 16}px`, '--k-cp-now': now, '--k-cp-hue': hueToHex(hue) };
+}
+
 interface ColorPickerProps {
   value: string;
   onChange: (color: string) => void;
@@ -238,7 +247,7 @@ interface ColorPickerProps {
 }
 
 export const ColorPicker: React.FC<ColorPickerProps> = ({ value, onChange, size = 'md' }) => {
-  const { triggerRef, popupRef, isOpen, toggle, close, popupStyle, leaving, dropClass } = useFloatingPopup({
+  const { triggerRef, popupRef, isOpen, toggle, close, popupStyle, popupZoom, leaving, dropClass } = useFloatingPopup({
     claimsEscape: true,
     estimatedWidth: 248,
     estimatedHeight: 334,
@@ -332,8 +341,8 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({ value, onChange, size 
           <div className={`fixed inset-0 z-[9998]${leaving ? ' pointer-events-none' : ''}`} {...backdropProps} />
           <div
             ref={popupRef as React.RefObject<HTMLDivElement>}
-            className={`fixed z-[9999] bg-[var(--k-popover)] rounded-lg border border-[var(--alpha-card-border)] shadow-[var(--k-drop-shadow)] p-3 ${dropClass}`}
-            style={{ ...popupStyle, width: 240, boxShadow: 'var(--shadow-lg)' }}
+            className={`k-cp fixed z-[9999] bg-[var(--k-popover)] rounded-lg border border-[var(--alpha-card-border)] shadow-[var(--k-drop-shadow)] p-3 ${dropClass}`}
+            style={{ ...popupStyle, width: 240, boxShadow: 'var(--shadow-lg)', ...cpVars(popupStyle, popupZoom, hexInput, hsv[0]) } as React.CSSProperties}
           >
             <div className="k-drop-in">
             <PresetGrid selected={hexInput} onSelect={handlePreset} />
@@ -359,7 +368,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({ value, onChange, size 
                 onKeyDown={e => {
                   if (e.key === 'Enter') { e.preventDefault(); handleHexBlur(); }
                 }}
-                maxLength={6}
+                maxLength={TEXT_LIMITS.HEX}
                 className="k-text-in flex-1 border border-[var(--border-subtle)] rounded-lg px-2 py-1.5 text-xs tabular-nums text-[var(--text-primary)] bg-[var(--surface-input)]"
               />
             </div>

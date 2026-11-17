@@ -11,6 +11,7 @@ import { useGameDark } from '../utils/useGameTheme';
 import { anyForcedTeamLayer } from '../game/teamColourSwitch';
 import { isTouchScreen } from '../utils/device';
 import { useMenuScale, useModalMaxHeight, useModalMaxWidth } from '../utils/useMenuScale';
+import { useClassicUi, fitWrapStyle } from './shared/useClassicUi';
 
 const DEATH_WIDE_W = 600;
 const DEATH_WIDE_RATIO = 1.15;
@@ -116,6 +117,7 @@ export const DeathMenu: React.FC<Props> = ({
   const showCause = hasCause(s.deathCauseKind, s.deathCauseName);
   const survived = shortDuration(s.deathSurvivalMs);
   const touch = isTouchScreen();
+  const classicUi = useClassicUi();
   const menuScale = useMenuScale();
   const maxW = useModalMaxWidth();
   const maxH = useModalMaxHeight();
@@ -139,7 +141,7 @@ export const DeathMenu: React.FC<Props> = ({
 
   return (
     <div ref={scrimRef} className={`absolute inset-0 k-glass flex items-center justify-center z-50 animate-fadeIn ${leaving ? 'pointer-events-none' : 'pointer-events-auto'}`}>
-      <div style={touch ? { zoom: menuScale * touchFit } : { transform: `scale(${fitScale})`, transformOrigin: 'center center', willChange: 'transform' }}>
+      <div style={touch ? { zoom: menuScale * touchFit } : fitWrapStyle(fitScale, classicUi)}>
         <GameMenuCard ref={cardRef} className={wide ? 'animate-scaleUp k-death-wide' : 'animate-scaleUp'} fitted={touch} width={touch ? Math.min(wide ? DEATH_WIDE_W : GAME_MENU_W, maxW) : GAME_MENU_W}
           icon={<HdCaduceus size={18} absoluteStrokeWidth />} title={endTitle !== '' ? endTitle : 'You Died'}
           subtitle={showCause ? <CauseLine kind={s.deathCauseKind} name={s.deathCauseName} /> : undefined}

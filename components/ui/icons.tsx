@@ -1,5 +1,6 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useEffect, useReducer, useSyncExternalStore } from 'react';
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
+import { uiThemeId, subscribeUiTheme } from '../../utils/uiTheme';
 import {
   Archive02Icon, ArrowLeft02Icon, ArrowLeftRightIcon, ArrowUp02Icon, ArrowUpDownIcon, BookOpen01Icon,
   BotIcon, CubeIcon, Bug02Icon, Tick02Icon, CheckmarkCircle02Icon, ArrowDown01Icon, ArrowRight01Icon,
@@ -61,11 +62,65 @@ export type LucideIcon = AppIcon;
 const STROKE = 1.5;
 const MIN_REAL_STROKE = 1.25;
 
+let _classicSet: Readonly<Record<string, readonly string[]>> | null = null;
+let _classicLoading = false;
+let _classicFailed = false;
+const _classicWaiters = new Set<() => void>();
+function loadClassicSet(): void {
+  if (_classicSet || _classicLoading) return;
+  _classicLoading = true;
+  import('./classicIcons.generated')
+    .then(m => { _classicSet = m.CLASSIC_ICONS; _classicFailed = false; _classicWaiters.forEach(fn => fn()); _classicWaiters.clear(); })
+    .catch(() => { _classicLoading = false; _classicFailed = true; _classicWaiters.forEach(fn => fn()); });
+}
+const classicNow = () => uiThemeId() === 'classic';
+function useClassicShape(cls: string): readonly string[] | null {
+  const classic = useSyncExternalStore(subscribeUiTheme, classicNow, classicNow);
+  const [, bump] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => {
+    if (!classic || _classicSet) return;
+    _classicWaiters.add(bump);
+    loadClassicSet();
+    return () => { _classicWaiters.delete(bump); };
+  }, [classic]);
+  return classic && _classicSet ? (_classicSet[cls] ?? null) : null;
+}
+export function useClassicIconsReady(): boolean {
+  const classic = useSyncExternalStore(subscribeUiTheme, classicNow, classicNow);
+  const [, bump] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => {
+    if (!classic || _classicSet) return;
+    _classicWaiters.add(bump);
+    loadClassicSet();
+    return () => { _classicWaiters.delete(bump); };
+  }, [classic]);
+  return !classic || !!_classicSet || _classicFailed;
+}
+
 function make(icon: IconSvgElement, cls: string): AppIcon {
   const C = forwardRef<SVGSVGElement, IconProps>(function Icon(
     { size = 24, strokeWidth, absoluteStrokeWidth = false, className, style, ...rest }, ref,
   ) {
     const px = typeof size === 'number' ? size : parseFloat(size) || 24;
+    const classicShape = useClassicShape(cls);
+    if (classicShape) {
+      const { color, fill: _fill, ...svgRest } = rest;
+      return (
+        <svg
+          ref={ref}
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 256 256"
+          width={size}
+          height={size}
+          fill={color ?? 'currentColor'}
+          className={className ? `k-svg k-ph ${cls} ${className}` : `k-svg k-ph ${cls}`}
+          style={{ ['--k-ico' as string]: px, ...style } as React.CSSProperties}
+          {...svgRest}
+        >
+          {classicShape.map((d, i) => <path key={i} d={d} />)}
+        </svg>
+      );
+    }
     const sw = strokeWidth ?? (absoluteStrokeWidth ? STROKE : Math.max(STROKE, (MIN_REAL_STROKE * 24) / px));
     return (
       <HugeiconsIcon
@@ -235,6 +290,10 @@ export const HdLibrary = make(LibraryIcon, 'lucide-hd-library');
 export const HdShuffleSquare = make(ShuffleSquareIcon, 'lucide-hd-shuffle-square');
 export const HdPaintBrush04 = make(PaintBrush04Icon, 'lucide-hd-paint-brush04');
 export const HdArtificialIntelligence07 = make(ArtificialIntelligence07Icon, 'lucide-hd-artificial-intelligence07');
+export const BodyLayersIcon = make(AiElementsIcon, 'lucide-body-layers');
+export const ExportConfigIcon = make(ArtificialIntelligence07Icon, 'lucide-export-config');
+export const BulletCardIcon = make(AiElementsIcon, 'lucide-bullet-card');
+export const DrawOrderIcon = make(AiDrawingIcon, 'lucide-draw-order');
 export const HdFileAttachment = make(FileAttachmentIcon, 'lucide-hd-file-attachment');
 export const HdAiSwap = make(AiSwapIcon, 'lucide-hd-ai-swap');
 export const HdAppWindow = make(AppWindowIcon, 'lucide-hd-app-window');
@@ -394,3 +453,6 @@ export const FileScript = make(FileScriptIcon, 'lucide-file-script');
 export const FilePlain = make(File01Icon, 'lucide-file-plain');
 export const ArrowDown = make(ArrowDown02Icon, 'lucide-arrow-down');
 export const Overview = make(DashboardSquare01Icon, 'lucide-overview');
+
+import { EggIcon } from '@hugeicons/core-free-icons';
+export const SpawnTool = make(EggIcon, 'lucide-spawn-tool');

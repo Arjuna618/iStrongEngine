@@ -1,15 +1,16 @@
-import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { useEscapeOwner } from './shared/escapeStack';
 import { useClosing, useSwapFade, useGlideHeight, SWAP_OUT_MS } from './kit/motion';
 import { DROP_EXIT_MS } from './shared/useFloatingPopup';
 import { useDropMenu, DropMenu, menuOpen } from './kit/DropMenu';
 import { Collapse } from './kit/Collapse';
+import { Undo2 } from './ui/icons';
 import { X, ChevronDown, User, UserCog, Bot, ShieldAlert, Cross, Rabbit, ShieldOff, Crosshair, Recycle, FastForward, ShieldPlus, Shield, Heart, Drama, Dna, Ghost, Minus, Plus, SlidersHorizontal, HdBrainCircuit, HdGeometricShapes01, HdScanEye } from './ui/icons';
 import { GameLogic, DEBUG_SKILL_POINTS_MAX } from '../game/GameLogic';
 import type { EditStatsBoxes, EditStatsPreview } from '../game/GameLogic';
 import { boxesOf, noTypedEdits, typeLevel, typeSkillPoints, typeStat } from './shared/editStatsBoxes';
 import type { EditStatsTyped } from './shared/editStatsBoxes';
-import { UpgradeStat, LibraryItem, TankConfig, EnemyTank, AIBehavior, StatNamesType, getStatLabel, isSmasherStatNames, AI_CONSTANTS, teamOverrideColor } from '../types';
+import { UpgradeStat, LibraryItem, TankConfig, EnemyTank, AIBehavior, StatNamesType, getStatLabel, isSmasherStatNames, AI_CONSTANTS, teamOverrideColor, isTeamMode } from '../types';
 import { isGameDark } from '../utils/gameColors';
 import { isMenuTank } from '../game/evolutionTree';
 import { TankPreview } from './TankPreview';
@@ -28,6 +29,9 @@ import { Button, Group, IconButton, SliderRow, ToggleRow, headerIcon } from './k
 import { ThemeSwitch } from './kit/ThemeSwitch';
 import { isTouchScreen, isPhoneUi } from '../utils/device';
 import { useWindowLayer } from './kit/windowStack';
+import { uiThemeId, subscribeUiTheme } from '../utils/uiTheme';
+import { useGameDark } from '../utils/useGameTheme';
+import { hudColors, hudSkillColors, HUD_SK_OUTLINE_R, HUD_SK_TRACK_R, HUD_SK_RIM_R, HUD_SK_SEP_W } from '../utils/hudArras';
 
 
 interface Props {
@@ -35,7 +39,7 @@ interface Props {
   onClose: () => void;
 }
 
-const STAT_ORDER: UpgradeStat[] = [
+export const STAT_ORDER: UpgradeStat[] = [
   'bodyDamage',
   'maxHealth',
   'bulletSpeed',
@@ -48,7 +52,7 @@ const STAT_ORDER: UpgradeStat[] = [
   'shieldCapacity'
 ];
 
-const STAT_ICONS: Record<UpgradeStat, React.ReactNode> = {
+export const STAT_ICONS: Record<UpgradeStat, React.ReactNode> = {
   bodyDamage: <ShieldAlert size={14} />,
   maxHealth: <Cross size={14} />,
   bulletSpeed: <FastForward size={14} />,
@@ -87,27 +91,27 @@ interface EntityOption {
   tankType?: string;
 }
 
-const DNA_TRAITS: { key: 'courage' | 'teamHelp' | 'aggression' | 'vengeful' | 'caution'; left: string; right: string; help: string; read: (e: EnemyTank) => number }[] = [
+const DNA_TRAITS: { key: 'courage' | 'teamHelp' | 'aggression' | 'vengeful' | 'caution' | 'trust' | 'gesture' | 'spin' | 'still' | 'hand'; left: string; right: string; help: string; read: (e: EnemyTank) => number }[] = [
   { key: 'courage', left: 'Cowardice', right: 'Courage', help: 'How willing the bot is to approach tanks stronger than itself.', read: e => e.dnaCourage },
   { key: 'teamHelp', left: 'Greed', right: 'Team Help', help: 'In team modes, whether it abandons food to rescue a teammate under attack.', read: e => e.dnaTeamHelp },
   { key: 'aggression', left: 'Patience', right: 'Aggression', help: 'How eager it is to pick fights instead of farming.', read: e => e.dnaAggression },
   { key: 'vengeful', left: 'Forgiving', right: 'Vengeful', help: 'How long it keeps chasing a target it lost.', read: e => e.dnaVengeful },
   { key: 'caution', left: 'Reckless', right: 'Cautious', help: 'How low it lets its health drop before running away.', read: e => e.dnaCaution },
+  { key: 'trust', left: 'Wary', right: 'Trusting', help: 'How open it is to leaving a tank alone that has not hurt it.', read: e => e.hf.dnaTrust },
+  { key: 'gesture', left: 'Quiet', right: 'Expressive', help: 'How much it likes to signal with its barrel, a wag or a spin.', read: e => e.hf.dnaGesture },
+  { key: 'spin', left: 'Steady Aim', right: 'Spins and Sweeps', help: 'How much it likes to spin under crossfire and to sweep its aim while firing fast.', read: e => e.hf.dnaSpin },
+  { key: 'still', left: 'Restless', right: 'Stands Still', help: 'How often it stops for a moment when nothing threatens it.', read: e => e.hf.dnaStill },
+  { key: 'hand', left: 'Slow Hand', right: 'Quick Hand', help: 'How fast its aim moves and how quickly it reacts.', read: e => e.hf.dnaHand },
 ];
 
 type Layout = 'one' | 'two' | 'three';
 const LAYOUT_W: Record<Layout, number> = { one: 460, two: 820, three: 1180 };
 const EPS_PAIR_W = 340;
 const EPS_PHONE_TWO_W = 640;
-const STACK_GAP = 12;
-const TWO_COL_BIAS = 1.12;
-const KEEP_BIAS = 1.03;
-const LAYOUTS: readonly Layout[] = ['two', 'one'];
-const LAYOUTS_BOT: readonly Layout[] = ['two', 'three', 'one'];
 const COLS_2 = 'minmax(0, 1fr) minmax(0, 1.1fr)';
 const GRID_STYLE: Record<Layout, { bot: React.CSSProperties; plain: React.CSSProperties }> = {
   two: {
-    bot: { gridTemplateColumns: COLS_2, gridTemplateRows: 'auto 1fr', gridTemplateAreas: '"who stats" "bot stats"' },
+    bot: { gridTemplateColumns: COLS_2, gridTemplateAreas: '"who stats" "bot bot"' },
     plain: { gridTemplateColumns: COLS_2, gridTemplateAreas: '"who stats"' },
   },
   three: {
@@ -122,53 +126,6 @@ const GRID_STYLE: Record<Layout, { bot: React.CSSProperties; plain: React.CSSPro
 const AREA_WHO: React.CSSProperties = { gridArea: 'who' };
 const AREA_BOT: React.CSSProperties = { gridArea: 'bot' };
 const AREA_STATS: React.CSSProperties = { gridArea: 'stats' };
-
-function useFitLayout(
-  refs: { dialog: React.RefObject<HTMLDivElement | null>; grid: React.RefObject<HTMLDivElement | null>; who: React.RefObject<HTMLDivElement | null>; bot: React.RefObject<HTMLDivElement | null>; stats: React.RefObject<HTMLDivElement | null> },
-  hasBot: boolean, maxW: number, maxH: number,
-  frozen: boolean,
-  swap: (fn: () => void) => void,
-): { layout: Layout; fit: number } {
-  const [state, setState] = useState<{ layout: Layout; fit: number }>({ layout: 'two', fit: 1 });
-  const shown = useRef<Layout>('two');
-  const frozenRef = useRef(frozen);
-  frozenRef.current = frozen;
-  const swapRef = useRef(swap);
-  swapRef.current = swap;
-  const chosen = useRef(false);
-  useLayoutEffect(() => { shown.current = state.layout; });
-  useLayoutEffect(() => {
-    const dialog = refs.dialog.current, grid = refs.grid.current, who = refs.who.current, stats = refs.stats.current;
-    if (!dialog || !grid || !who || !stats) return;
-    const compute = () => {
-      if (frozenRef.current) return;
-      const bot = refs.bot.current;
-      const W = who.offsetHeight, S = stats.offsetHeight, B = bot ? bot.offsetHeight : 0;
-      if (W <= 0 || S <= 0) return;
-      const chrome = dialog.offsetHeight - grid.offsetHeight;
-      const left = bot ? W + STACK_GAP + B : W;
-      const heightOf = (l: Layout) => chrome + (l === 'one' ? left + STACK_GAP + S : l === 'three' ? Math.max(W, B, S) : Math.max(left, S));
-      const scaleOf = (l: Layout) => Math.min(1, maxW / LAYOUT_W[l], maxH / heightOf(l));
-      const cur = shown.current;
-      let best = cur, bestScore = -1;
-      for (const l of (bot ? LAYOUTS_BOT : LAYOUTS)) {
-        const score = scaleOf(l) * (l === 'two' ? TWO_COL_BIAS : 1) * (l === cur ? KEEP_BIAS : 1);
-        if (score > bestScore) { best = l; bestScore = score; }
-      }
-      if (bot && scaleOf('three') >= 0.999 && heightOf('three') < heightOf('two') * (cur === 'three' ? 0.88 : 0.8)) best = 'three';
-      const fit = best === cur ? Math.min(1, maxW / dialog.offsetWidth, maxH / dialog.offsetHeight) : scaleOf(best);
-      if (best !== cur && chosen.current) { swapRef.current(() => setState({ layout: best, fit })); return; }
-      chosen.current = true;
-      setState(prev => (prev.layout === best && Math.abs(prev.fit - fit) < 0.001 ? prev : { layout: best, fit }));
-    };
-    compute();
-    const ro = new ResizeObserver(compute);
-    ro.observe(dialog); ro.observe(who); ro.observe(stats);
-    if (refs.bot.current) ro.observe(refs.bot.current);
-    return () => ro.disconnect();
-  }, [refs, hasBot, maxW, maxH, frozen]);
-  return state;
-}
 
 const Tag: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <span className="inline-flex items-center h-[18px] px-1.5 rounded-[8px] text-[10.5px] [font-weight:var(--fw-control)] leading-none whitespace-nowrap border border-transparent bg-[var(--k-tag-bg)] text-[var(--text-secondary)]">{children}</span>
@@ -185,7 +142,7 @@ const EntityTags: React.FC<{ e: EntityOption }> = ({ e }) => {
   );
 };
 
-const Stepper: React.FC<{
+export const Stepper: React.FC<{
   less: string; more: string; onLess: () => void; onMore: () => void; lessOff?: boolean; moreOff?: boolean; cap?: string; children: React.ReactNode;
   big?: boolean;
 }> = ({ less, more, onLess, onMore, lessOff, moreOff, cap, children, big }) => (
@@ -198,10 +155,56 @@ const Stepper: React.FC<{
     {cap && <span className="k-unit tabular-nums whitespace-nowrap">{cap}</span>}
   </span>
 );
-const VALUE_BOX = 'k-stepper-input';
-const STAT_BOX = 'k-stepper-input inline-flex items-center justify-center';
+export const VALUE_BOX = 'k-stepper-input';
+export const STAT_BOX = 'k-stepper-input inline-flex items-center justify-center';
 
-const StatBar: React.FC<{ value: number; cap: number }> = ({ value, cap }) => {
+const classicUiNow = () => uiThemeId() === 'classic';
+const BAR_PX = 14;
+const HudStatBar: React.FC<{ stat: UpgradeStat; value: number; cap: number }> = ({ stat, value, cap }) => {
+  const box = useRef<HTMLDivElement>(null);
+  const [w, setW] = useState(0);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const read = () => setW(el.clientWidth);
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const dark = useGameDark();
+  const col = hudColors(dark);
+  const R = HUD_SK_OUTLINE_R, r = HUD_SK_TRACK_R, left = R - r;
+  const H = 2 * R, Wu = w * H / BAR_PX;
+  const shapes: React.ReactNode[] = [];
+  if (Wu > H) {
+    const line = (x1: number, x2: number, width: number, color: string, key: string) =>
+      <line key={key} x1={x1} y1={R} x2={x2} y2={R} stroke={color} strokeWidth={width} strokeLinecap="round" />;
+    shapes.push(line(R, Wu - R, H, col.ink, 'o'), line(R, Wu - R, 2 * r, col.track, 't'));
+    if (cap > 0) {
+      const L = Math.max(0, Math.min(cap, value));
+      const seg = (Wu - 2 * left) / cap;
+      const capX = Math.max(R, left + seg * L - r);
+      const fill = hudSkillColors(stat, dark).fill;
+      shapes.push(<circle key="rim" cx={capX} cy={R} r={HUD_SK_RIM_R} fill={col.ink} />);
+      shapes.push(L > 0 ? line(R, capX, 2 * r, fill, 'f') : <circle key="f" cx={R} cy={R} r={r} fill={fill} />);
+      const sy = r - HUD_SK_SEP_W / 2;
+      for (let i = 1; i < L; i++) {
+        const x = left + seg * i;
+        shapes.push(<line key={'s' + i} x1={x} y1={R - sy} x2={x} y2={R + sy} stroke={col.ink} strokeWidth={HUD_SK_SEP_W} strokeLinecap="round" />);
+      }
+    }
+  }
+  return (
+    <div ref={box} className="flex-1 min-w-0" style={{ height: BAR_PX }} aria-hidden="true">
+      {Wu > H && <svg width={w} height={BAR_PX} viewBox={`0 0 ${Wu} ${H}`} style={{ display: 'block' }}>{shapes}</svg>}
+    </div>
+  );
+};
+
+export const StatBar: React.FC<{ stat: UpgradeStat; value: number; cap: number }> = ({ stat, value, cap }) => {
+  const classic = useSyncExternalStore(subscribeUiTheme, classicUiNow, classicUiNow);
+  if (classic) return <HudStatBar stat={stat} value={value} cap={cap} />;
   const n = cap > 0 ? cap : 1;
   const segs: React.ReactNode[] = [];
   for (let i = 0; i < n; i++) {
@@ -225,17 +228,19 @@ export const EditPlayerStatsPopup: React.FC<Props> = ({ logic, onClose: onCloseN
   const whoRef = useRef<HTMLDivElement>(null);
   const botRef = useRef<HTMLDivElement>(null);
   const statsRef = useRef<HTMLDivElement>(null);
-  const [fitRefs] = useState(() => ({ dialog: dialogRef, grid: gridRef, who: whoRef, bot: botRef, stats: statsRef }));
   const buildEntityList = (): EntityOption[] => {
     const entities: EntityOption[] = [];
 
+    const gm = logic.state.gameModeConfig;
+    const myName = (logic.state.playerName ?? '').trim();
     entities.push({
       id: logic.state.playerId,
-      name: 'You',
+      name: myName || 'You',
       isPlayer: true,
       level: logic.state.level,
-      behavior: 'Player',
-      tier: logic.getStrengthTierName('player')
+      behavior: gm && isTeamMode(gm.mode) && gm.playerTeam >= 1 && gm.playerTeam <= 4 ? (`Team${gm.playerTeam}` as AIBehavior) : 'FFA',
+      tier: logic.getStrengthTierName('player'),
+      tankType: logic.playerTankDisplayName() ?? logic.resolveTankDisplayName(null) ?? undefined,
     });
 
     for (const enemy of logic.state.enemyTanks) {
@@ -267,10 +272,9 @@ export const EditPlayerStatsPopup: React.FC<Props> = ({ logic, onClose: onCloseN
     const w = logic.spectatingId;
     return w !== '' && logic.state.enemyTanks.some(e => e.id === w && e.active && !e.isDying) ? w : logic.state.playerId;
   });
-  const listMenu = useDropMenu({ align: 'start', estimatedHeight: 242 });
+  const listMenu = useDropMenu({ align: 'start', estimatedHeight: 242, hangs: true });
   const dropdownOpen = menuOpen(listMenu);
   const bodySwap = useSwapFade({ glide: true });
-  const [noteBusy, setNoteBusy] = useState(false);
 
   const dnaOpen = true;
   const [dnaValues, setDnaValues] = useState<Record<string, number>>({});
@@ -304,7 +308,7 @@ export const EditPlayerStatsPopup: React.FC<Props> = ({ logic, onClose: onCloseN
     listMenu.close();
     if (entity.id === selectedEntityId) return;
     window.clearTimeout(pickTimer.current);
-    pickTimer.current = window.setTimeout(() => bodySwap.run(() => setSelectedEntityId(entity.id)),
+    pickTimer.current = window.setTimeout(() => bodySwap.run(() => { setSelectedEntityId(entity.id); loadEntityData(entity.id); setDnaValues({}); }),
       reducedMotion() ? 0 : Math.max(0, DROP_EXIT_MS - SWAP_OUT_MS));
   };
 
@@ -355,8 +359,9 @@ export const EditPlayerStatsPopup: React.FC<Props> = ({ logic, onClose: onCloseN
     if (p) setPreview(p);
   };
 
+  const loadedFor = useRef<string | null>(null);
   useEffect(() => {
-    loadEntityData(selectedEntityId);
+    if (loadedFor.current !== selectedEntityId) loadEntityData(selectedEntityId);
   }, [selectedEntityId]);
 
   useEffect(() => {
@@ -366,6 +371,7 @@ export const EditPlayerStatsPopup: React.FC<Props> = ({ logic, onClose: onCloseN
   useEscapeOwner(onClose, !dropdownOpen);
 
   const loadEntityData = (entityId: string) => {
+    loadedFor.current = entityId;
     const enemy = entityId === logic.state.playerId ? null : logic.state.enemyTanks.find(e => e.id === entityId);
     const pickId = enemy ? logic.enemyTankLibraryItemId(enemy) : null;
     setEditTankLibraryId(pickId);
@@ -460,21 +466,19 @@ export const EditPlayerStatsPopup: React.FC<Props> = ({ logic, onClose: onCloseN
   if (noteOpen) noteFreshRef.current = !!preview?.freshStart;
   const noteFresh = noteFreshRef.current;
 
-  const hasBot = !!selectedEnemyLive;
-  const layoutFrozen = bodySwap.phase === 'out' || bodySwap.phase === 'in' || noteBusy;
-  const fitted = useFitLayout(fitRefs, hasBot, maxW, maxH, layoutFrozen, bodySwap.run);
+  const hasBot = !!selectedEnemyLive || isPlayerSelected;
   const touch = isTouchScreen();
-  const layout: Layout = phone ? (maxW >= EPS_PHONE_TWO_W ? 'two' : 'one') : touch ? (maxW >= LAYOUT_W.two ? 'two' : 'one') : fitted.layout;
-  const fit = touch ? 1 : fitted.fit;
+  const layout: Layout = phone ? (maxW >= EPS_PHONE_TWO_W ? 'two' : 'one') : (maxW >= LAYOUT_W.two ? 'two' : 'one');
+  const colsClass = layout === 'one' ? 'k-eps-cols k-eps-cols-one' : 'k-eps-cols';
   useGlideHeight(dialogRef, phone ? 'phone' : `${selectedEntityId}|${dnaOpen ? 1 : 0}|${layout}`);
 
   return (
     <Backdrop onClose={onClose} closing={closing} className={layer.over ? 'k-scrim-over' : undefined}>
       <div className="pointer-events-none" style={{ zoom: menuScale }}>
-        <div className="pointer-events-none" style={{ transform: fit < 1 ? `scale(${fit})` : undefined, transition: 'transform 160ms var(--ease-default)' }}>
+        <div className="pointer-events-none">
           <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Manage Players" tabIndex={-1}
             className={`k-modal animate-scaleUp${phone ? ' k-modal-full k-eps-phone' : ''} ${closing || layer.covered ? 'pointer-events-none' : 'pointer-events-auto'}`}
-            style={phone ? { width: maxW, height: maxH } : touch ? { width: Math.min(LAYOUT_W[layout], maxW), maxHeight: maxH, transition: 'width 160ms var(--ease-default)' } : { width: LAYOUT_W[layout], transition: 'width 160ms var(--ease-default)' }} onClick={e => e.stopPropagation()}>
+            style={phone ? { width: maxW, height: maxH } : { width: Math.min(LAYOUT_W[layout], maxW), maxHeight: maxH, transition: 'width 160ms var(--ease-default)' }} onClick={e => e.stopPropagation()}>
             <header className="k-modal-head">
               <span className="k-modal-icon"><UserCog size={18} strokeWidth={1.5} absoluteStrokeWidth /></span>
               <div className="min-w-0 flex-1"><h2 className="k-modal-title truncate">Manage Players</h2></div>
@@ -482,7 +486,7 @@ export const EditPlayerStatsPopup: React.FC<Props> = ({ logic, onClose: onCloseN
               <IconButton label="Close" onClick={onClose}><X size={18} /></IconButton>
             </header>
 
-            <div className={`k-modal-body ${touch ? 'overflow-y-auto popup-scrollbar' : 'overflow-hidden'} ${bodySwap.swapClass}`}>
+            <div className={`k-modal-body overflow-y-auto popup-scrollbar ${bodySwap.swapClass}`}>
               <div ref={gridRef} className="grid gap-x-4 gap-y-3" style={GRID_STYLE[layout][hasBot ? 'bot' : 'plain']}>
 
                 <div ref={whoRef} className="min-w-0 self-start space-y-3" style={AREA_WHO}>
@@ -499,7 +503,7 @@ export const EditPlayerStatsPopup: React.FC<Props> = ({ logic, onClose: onCloseN
                         }}
                         className="k-mode-pick min-h-[46px] text-left"
                       >
-                        <span className="w-8 h-8 rounded-lg grid place-items-center shrink-0 bg-[var(--alpha-selected)] text-[var(--text-primary)]">
+                        <span className="k-eps-who-icon w-8 h-8 rounded-lg grid place-items-center shrink-0 bg-[var(--alpha-selected)] text-[var(--text-primary)]">
                           {selectedEntity?.isPlayer ? <User size={16} /> : <Bot size={16} />}
                         </span>
                         <span className="min-w-0 flex-1">
@@ -527,7 +531,7 @@ export const EditPlayerStatsPopup: React.FC<Props> = ({ logic, onClose: onCloseN
                                 onClick={() => handleEntityPick(entity)}
                                 className={`w-full flex items-center gap-2 h-8 px-2.5 rounded-lg text-left text-[var(--text-primary)] transition-colors ${on ? 'bg-[var(--control-alpha)]' : 'hover:bg-[var(--alpha-hover)]'}`}
                               >
-                                {entity.isPlayer ? <User size={14} className="shrink-0" /> : <Bot size={14} className="shrink-0" />}
+                                {entity.isPlayer ? <User size={14} className="shrink-0 k-eps-who-icon" /> : <Bot size={14} className="shrink-0 k-eps-who-icon" />}
                                 <span className="min-w-0 flex-1 truncate text-[12px]">
                                   {entity.name}
                                   {entity.tankType && (
@@ -586,7 +590,7 @@ export const EditPlayerStatsPopup: React.FC<Props> = ({ logic, onClose: onCloseN
                       </div>
                     </div>
 
-                    <Collapse open={noteOpen} onBusyChange={setNoteBusy} className="k-fold-note">
+                    <Collapse open={noteOpen} className="k-fold-note">
                       <div className="flex items-center gap-1.5 k-row-desc pt-3">
                         <HelpTooltip text={noteFresh
                           ? 'A fresh start, like the dev menu: then this tank gets its own stats and points.'
@@ -640,20 +644,61 @@ export const EditPlayerStatsPopup: React.FC<Props> = ({ logic, onClose: onCloseN
                   </Group>
                 </div>
 
-                {selectedEnemyLive && (
-                  <div ref={botRef} className="min-w-0 self-start" style={AREA_BOT}>
-                    <Group title="Bot Behaviour" icon={headerIcon(HdBrainCircuit)} right={<span className="k-row-info">Applies at once</span>}>
-                      {AI_CONSTANTS.GHOST_BOT !== 0 && (
-                        <ToggleRow
-                          label="Ghost Mode"
-                          icon={<Ghost size={14} />}
-                          help="This bot becomes untouchable and impossible to notice, stops hunting anything and simply roams. Guns its design holds down still fire, harmlessly."
-                          checked={selectedEnemyLive.ghostMode === true}
+                {isPlayerSelected && !selectedEnemyLive && (
+                  <div ref={botRef} className="min-w-0" style={AREA_BOT}>
+                    <Group title="You" icon={headerIcon(User)} right={<span className="k-row-info">Applies at once</span>}>
+                      <div className={colsClass}>
+                       <div className="k-eps-col">
+                        <ToggleRow label="God Mode" help="Takes no damage, can still attack."
+                          checked={!!(logic.state.gracePeriodActive ? logic.state._preGraceGodMode : logic.state.godMode)}
                           onChange={v => {
-                            if (logic.setEnemyGhostMode(selectedEnemyLive.id, v)) setGhostTick(t => t + 1);
+                            if (logic.state.gracePeriodActive) logic.updateState({ _preGraceGodMode: v }); else logic.updateState({ godMode: v });
+                            setGhostTick(t => t + 1);
+                          }} />
+                        <ToggleRow label="Ghost Mode" help="Invisible, no collision, 4x speed." checked={logic.state.ghostMode}
+                          onChange={v => { logic.updateState({ ghostMode: v }); setGhostTick(t => t + 1); }} />
+                       </div>
+                       <div className="k-eps-col">
+                        <SliderRow label="Field of View" help="Camera zoom on top of the tank's own view. The admin panel's minus and equals keys move it too, and it goes back to 1x when your tank changes or dies."
+                          value={logic.state.debugFovMultiplier ?? 1} min={logic.debugFovMin()} max={logic.debugFovMax()} step={0.01} logScale
+                          display={`${(logic.state.debugFovMultiplier ?? 1).toFixed(2)}x`}
+                          onChange={v => { logic.setDebugFov(Math.abs(Math.log(v)) < 0.006 ? 1 : v); setGhostTick(t => t + 1); }}
+                          action={<IconButton label="Reset to 1x" size="sm" onClick={() => { logic.setDebugFov(1); setGhostTick(t => t + 1); }}><Undo2 size={13} /></IconButton>} />
+                       </div>
+                      </div>
+                    </Group>
+                  </div>
+                )}
+
+                {selectedEnemyLive && (
+                  <div ref={botRef} className="min-w-0 k-eps-bot" style={AREA_BOT}>
+                    <Group title="Bot Behaviour" icon={headerIcon(HdBrainCircuit)} right={<span className="k-row-info">Applies at once</span>}>
+                      <div className={colsClass}>
+                       <div className="k-eps-col">
+                        <ToggleRow
+                          label="God Mode"
+                          icon={<ShieldPlus size={14} />}
+                          help="Takes no damage, can still attack."
+                          checked={logic.enemyGodMode(selectedEnemyLive)}
+                          onChange={v => {
+                            if (logic.setEnemyGodMode(selectedEnemyLive.id, v)) setGhostTick(t => t + 1);
                           }}
                         />
-                      )}
+                       </div>
+                       <div className="k-eps-col">
+                        {AI_CONSTANTS.GHOST_BOT !== 0 && (
+                          <ToggleRow
+                            label="Ghost Mode"
+                            icon={<Ghost size={14} />}
+                            help="This bot becomes untouchable and impossible to notice, stops hunting anything and simply roams. Guns its design holds down still fire, harmlessly."
+                            checked={selectedEnemyLive.ghostMode === true}
+                            onChange={v => {
+                              if (logic.setEnemyGhostMode(selectedEnemyLive.id, v)) setGhostTick(t => t + 1);
+                            }}
+                          />
+                        )}
+                       </div>
+                      </div>
 
                       <div className="k-row">
                         <span className="k-row-label">
@@ -663,7 +708,7 @@ export const EditPlayerStatsPopup: React.FC<Props> = ({ logic, onClose: onCloseN
                         </span>
                       </div>
                       {dnaOpen && (
-                        <div className="pl-5 space-y-3">
+                        <div className={colsClass}>
                           {DNA_TRAITS.map(t => (
                             <SliderRow
                               key={t.key}
@@ -705,15 +750,15 @@ export const EditPlayerStatsPopup: React.FC<Props> = ({ logic, onClose: onCloseN
                           <div key={stat} className={`k-eps-stat${isLocked ? ' k-row-disabled' : ''}`}>
                             <span className="k-eps-stat-icon">{STAT_ICONS[stat]}</span>
                             <span className="k-eps-stat-name">{label}</span>
-                            <span className="k-eps-stat-bar"><StatBar value={isLocked ? 0 : editUpgrades[stat]} cap={statCap} /></span>
+                            <span className="k-eps-stat-bar"><StatBar stat={stat} value={isLocked ? 0 : editUpgrades[stat]} cap={statCap} /></span>
                             <span className="k-eps-stat-step">{stepper}</span>
                           </div>
                         );
                         return (
                           <div key={stat} className={`flex items-center gap-2 h-7 text-[var(--text-primary)]${isLocked ? ' k-row-disabled' : ''}`}>
-                            <span className="w-4 shrink-0 flex">{STAT_ICONS[stat]}</span>
+                            <span className="k-eps-icon w-4 shrink-0 flex">{STAT_ICONS[stat]}</span>
                             <span className="w-[128px] shrink-0 text-[12px] leading-[1.25]">{label}</span>
-                            <StatBar value={isLocked ? 0 : editUpgrades[stat]} cap={statCap} />
+                            <StatBar stat={stat} value={isLocked ? 0 : editUpgrades[stat]} cap={statCap} />
                             {stepper}
                           </div>
                         );

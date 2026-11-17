@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { TEXT_LIMITS } from '../kit/textLimits';
 import type { GameLogic } from '../../game/GameLogic';
 import type { EntityType, PlacedEntity, Ref, Row, ZoneLike } from '../../game/mapEvents/doc';
 import { behaviorsOf, SIDE_WORDS, zoneShapeOf } from '../../game/mapEvents/doc';
@@ -79,7 +80,7 @@ const ZoneBehaviors: React.FC<{ z: ZoneLike; i: number; ctx: EvCtx }> = ({ z, i,
   return (
     <div className="k-ev-list">
       <LongList gap={4} estimate={68} empty={<div className="k-ev-note">It only looks. Add what it does.</div>} count={list.length} rowKey={j => String(list[j].id || j)} renderRow={j => { const b = list[j]; return <BehaviorRow b={b} path={[...path, j]} ctx={ctx} onOpen={() => setOpen(b.id)}
-          onRemove={() => { const thing = list[j]; ctx.commit(d => removeAt(written(d), path, j)); toast('info', `${kindOf('behavior', b.k)?.label ?? 'Behaviour'} removed.`, { label: 'Undo', run: SMALL_FIX.R908 !== 0 ? sameProjectUndo(ctx.logic, toast, () => ctx.commit(d => insertAt(d, path, j, thing))) : () => ctx.commit(d => insertAt(d, path, j, thing)) }); }} />; }} />
+          onRemove={() => { const thing = list[j]; ctx.commit(d => removeAt(written(d), path, j)); void thing; toast('info', `${kindOf('behavior', b.k)?.label ?? 'Behaviour'} removed. Ctrl Z brings it back.`); }} />; }} />
       <EvSelect add="Add A Behaviour" groups={groupsOfKinds('behavior')} onChange={add} />
       {shown >= 0 ? (
         <Modal title={`${kindOf('behavior', list[shown].k)?.label ?? 'Behaviour'} in ${z.name ?? 'this area'}`} size="lg" onClose={() => setOpen(null)}>
@@ -115,7 +116,7 @@ const AreaInspector: React.FC<{ logic: GameLogic; ctx: EvCtx; z: PlacedZone; are
   return (
     <div className="k-ev-inspector">
       <div className="k-ev-detail-head"><span className="k-ev-detail-title">{z.name ?? (isBase ? 'Team Base' : 'Custom Area')}</span><span className="k-count">{isBase ? 'Team Base' : 'Custom Area'}</span></div>
-      <div ref={nameBox}><FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField value={z.name ?? ''} placeholder="Give It A Name" onChange={setName} /></FieldRow></div>
+      <div ref={nameBox}><FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField maxLength={TEXT_LIMITS.NAME} value={z.name ?? ''} placeholder="Give It A Name" onChange={setName} /></FieldRow></div>
       <Reveal when={custom && BASE_AREAS.ON === 0}>
         <SelectRow label="It Is" help="Team Base: a team's safe ground, on a Custom Editor map. Custom Area: what its behaviours say." value={isBase ? 'base' : 'area'} options={[{ value: 'area', label: 'Custom Area' }, { value: 'base', label: 'Team Base' }]} onChange={v => put({ kind: v === 'base' ? 'base' : 'cosmetic' })} />
       </Reveal>
@@ -292,7 +293,7 @@ const EntityInspector: React.FC<{ logic: GameLogic; ctx: EvCtx; e: PlacedEntity;
   return (
     <div className="k-ev-inspector">
       <div className="k-ev-detail-head"><span className="k-ev-detail-title">{e.name}</span><span className="k-count">Map Entity</span></div>
-      <div ref={nameBox}><FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField value={e.name} onChange={v => putRow('name', v)} /></FieldRow></div>
+      <div ref={nameBox}><FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField maxLength={TEXT_LIMITS.NAME} value={e.name} onChange={v => putRow('name', v)} /></FieldRow></div>
       <FieldRow stacked label="Entity Type" help="What it is: its tank, how it acts and what it becomes. Many Map Entities can share one.">
         <EvSelect value={String(type.id)} options={[...choicesOf('type', ctx).map(x => ({ value: String(x.id), label: x.name })), { value: 'new', label: 'New Entity Type' }]} onChange={v => {
           if (v === 'new') { ctx.commit(d => { const r = addEntityType(d, 'Entity Type', typeof form0.tank === 'string' ? form0.tank : 'basic'); return setAt(r.doc, ['placed', pi, 'type'], r.ref); }); return; }
@@ -449,7 +450,8 @@ export const MapObjectsCard: React.FC<{ logic: GameLogic; areaId: string; onUpda
     logic.applyMapEdit(areaId, c => opDelete(c, sel0));
     if (me.hasSelection && me.selection.kind === kind && me.selection.id === id) clearMapEditSelection(me);
     const mark = markOfLastEdit(logic);
-    toast('info', `"${name}" removed.${used ? ` ${used} ${used === 1 ? 'link now finds' : 'links now find'} nothing.` : ''}`, { label: 'Undo', run: () => { undoMarkedEdit(logic, mark); onUpdate(); ctx.refresh?.(); } });
+    void mark;
+    toast('info', `"${name}" removed.${used ? ` ${used} ${used === 1 ? 'link now finds' : 'links now find'} nothing.` : ''} Ctrl Z brings it back.`);
     onUpdate();
   };
   const zoneFacts = (z: PlacedZone) => [
@@ -459,18 +461,18 @@ export const MapObjectsCard: React.FC<{ logic: GameLogic; areaId: string; onUpda
   return (
     <div className="k-ev-card">
       <div className="k-ev-door">
-        <Button variant="primary" size="md" icon={<MevEvents size={14} />} onClick={() => openMapEvents(areaId)}>Map Events</Button>
+        <Button variant="primary" size="md" className="k-btn-door" icon={<MevEvents size={14} />} onClick={() => openMapEvents(areaId)}>Map Events</Button>
         <Reveal when={problems > 0}><IconButton label={`${problems} ${problems === 1 ? 'Problem' : 'Problems'}`} onClick={() => openMapEvents(areaId, 'problems')}><MevProblems size={15} /></IconButton></Reveal>
       </div>
       <Button variant="secondary" size="sm" block onClick={() => setTemplates(true)}>Start From A Template</Button>
       <div className="k-ev-find">
-        <SearchField value={query} onChange={setQuery} placeholder="Search this map" />
+        <SearchField value={query} onChange={setQuery} placeholder="Search this map" maxLength={TEXT_LIMITS.SEARCH_SMALL} />
         <IconButton size="sm" label="Undo" disabled={!logic.canUndoMapEdit()} onClick={() => { logic.undoMapEdit(); onUpdate(); ctx.refresh?.(); }}><Undo2 size={14} /></IconButton>
         <IconButton size="sm" label="Redo" disabled={!logic.canRedoMapEdit()} onClick={() => { logic.redoMapEdit(); onUpdate(); ctx.refresh?.(); }}><Redo2 size={14} /></IconButton>
       </div>
       <div className="k-ev-tabs-tight"><Tabs<string> value={tab} onChange={setTab} tabs={[{ value: 'areas', label: 'Custom Areas', count: zones.length }, { value: 'entities', label: 'Map Entities', count: placed.length }]} /></div>
-      <SwapBox swapKey={tab}>
-        <div className="k-ev-list k-ev-obj-list popup-scrollbar">
+      <SwapBox swapKey={tab} widthGlide={false}>
+        <div key={tab} className="k-ev-list k-ev-obj-list popup-scrollbar">
           {tab === 'areas'
             ? <LongList gap={4} estimate={68} empty={<div className="k-ev-note">Draw one with the Custom Area tool, on the map.</div>} reveal={selZone ? String(selZone.id) : null} count={shownZones.length} rowKey={i => String(shownZones[i].id)} renderRow={i => { const z = shownZones[i]; return (
                   <div onMouseDownCapture={noteMods}><PickRow title={z.name ?? (zoneBaseTeam(z as unknown as ZoneLike) >= 0 ? 'Team Base' : 'Custom Area')} facts={zoneFacts(z)} selected={(!!selZone && selZone.id === z.id) || me.marks.includes(z.id)} onPick={() => pick('zone', z.id)}

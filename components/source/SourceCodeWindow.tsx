@@ -1,4 +1,6 @@
 import React, { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { TEXT_LIMITS } from '../kit/textLimits';
+import { PickGlide } from '../kit/TabSlide';
 import { Modal } from '../kit/Modal';
 import { PageSwap, SwapInPlace, SwapText, Reveal, Fade } from '../kit/Collapse';
 import { VirtualList, scrollVirtualRowIntoView } from '../kit/VirtualList';
@@ -11,9 +13,9 @@ import {
   SourceCode, Github, FileScript, FilePlain, FileJson, Folder, FolderOpen, Image, ChevronDown, Search, Copy, Check, Download,
   ArrowUp, ArrowDown, X, Overview, PanelLeft,
 } from '../ui/icons';
-import { CodeView } from './CodeView';
+import { CodeView, CodeWait, codeViewPicked, prepareCode } from './CodeView';
 import {
-  loadSourceProject, loadFileText, loadSearchText, searchProject, lineTextOf, visibleRows, foldersOf, urlOf, baseHref,
+  loadSourceProject, loadFileText, peekFileText, loadSearchText, searchProject, lineTextOf, visibleRows, foldersOf, urlOf, baseHref,
   kindName, groupOf, fmtCount, fmtBytes, fmtShort,
   type SourceProject, type SourceFile, type SourceFolder, type SearchText, type SearchHit,
 } from './sourceIndex';
@@ -21,6 +23,21 @@ import {
 type Page = { kind: 'overview' } | { kind: 'file'; path: string; find: string; line: number | null; seq: number };
 const kept: { open: Set<string>; page: Page; query: string } = { open: new Set(), page: { kind: 'overview' }, query: '' };
 let pageSeq = 0;
+
+const PREP_CAP_MS = 600;
+function prepareFile(project: SourceProject, file: SourceFile): Promise<void> | null {
+  if (file.kind === 'c' || file.kind === 'd') {
+    const now = peekFileText(file);
+    if (now !== null) return prepareCode(now, file.lang);
+    return loadFileText(project, file).then(t => prepareCode(t, file.lang) ?? undefined);
+  }
+  if (file.kind === 'i') {
+    const img = new Image();
+    img.src = urlOf(file.src);
+    return img.decode().catch(() => undefined);
+  }
+  return null;
+}
 
 interface ZipState { busy: boolean; done: number; total: number }
 let zipState: ZipState = { busy: false, done: 0, total: 0 };
@@ -206,14 +223,37 @@ function SourceBody({ project, touch, narrow }: { project: SourceProject; touch:
     setOpen(prev => { const next = new Set(prev); if (next.has(path)) next.delete(path); else next.add(path); return next; });
   }, []);
   const [revealAsk, setRevealAsk] = useState<{ path: string; seq: number } | null>(null);
+  const [picking, setPicking] = useState<string | null>(null);
+  const prep = useRef({ seq: 0, timer: 0 });
+  useEffect(() => () => window.clearTimeout(prep.current.timer), []);
   const openFile = useCallback((path: string, find = '', line: number | null = null, reveal = false) => {
-    setPage({ kind: 'file', path, find, line, seq: ++pageSeq });
+    const seq = ++pageSeq;
     setFilesOpen(false);
     if (reveal) {
       setOpen(prev => { const next = new Set(prev); for (const d of foldersOf(path)) next.add(d); return next; });
-      setRevealAsk({ path, seq: pageSeq });
+      setRevealAsk({ path, seq });
     }
-  }, []);
+    window.clearTimeout(prep.current.timer);
+    prep.current.seq = seq;
+    const go = () => {
+      if (prep.current.seq !== seq) return;
+      prep.current.seq = 0; window.clearTimeout(prep.current.timer);
+      setPicking(null);
+      setPage({ kind: 'file', path, find, line, seq });
+    };
+    const file = project.byPath.get(path);
+    const ready = file ? prepareFile(project, file) : null;
+    if (!ready) { go(); return; }
+    setPicking(path);
+    ready.then(go, go);
+    prep.current.timer = window.setTimeout(go, PREP_CAP_MS);
+  }, [project]);
+  const openOverview = () => {
+    prep.current.seq = 0; window.clearTimeout(prep.current.timer);
+    setPicking(null);
+    setPage({ kind: 'overview' });
+    setFilesOpen(false);
+  };
   useEffect(() => {
     if (!revealAsk || query) return;
     const at = rows.findIndex(r => r.file?.path === revealAsk.path);
@@ -277,7 +317,7 @@ function SourceBody({ project, touch, narrow }: { project: SourceProject; touch:
     </div>
   ) : null;
 
-  const shownPath = page.kind === 'file' ? page.path : null;
+  const shownPath = picking ?? (page.kind === 'file' ? page.path : null);
   const renderTreeRow = (i: number) => {
     const r = rows[i];
     const guides = r.depth > 0 ? <span className="k-sc-guides" style={{ width: r.depth * 14 }} aria-hidden /> : null;
@@ -302,7 +342,7 @@ function SourceBody({ project, touch, narrow }: { project: SourceProject; touch:
       <div className="k-sc-node-wrap">
         {guides}
         <button type="button" className={`k-rd-item k-rd-item-sm k-sc-node${file.path === shownPath ? ' k-rd-item-on' : ''}`}
-          style={{ paddingLeft: 26 + r.depth * 14 }} onClick={() => openFile(file.path)} title={file.path}>
+          style={{ paddingLeft: 26 + r.depth * 14 }} onClick={() => openFile(file.path)} title={file.path} data-glide-group={file.path.slice(0, file.path.lastIndexOf('/') + 1)}>
           <span className="k-rd-item-icon k-sc-file-icon">{iconOf(file)}</span>
           <span className="k-rd-item-text truncate">{file.name}</span>
         </button>
@@ -406,21 +446,22 @@ function SourceBody({ project, touch, narrow }: { project: SourceProject; touch:
         onPointerUp={narrow ? onSwipeUp : undefined} onPointerCancel={narrow ? onSwipeUp : undefined} onClickCapture={narrow ? onSwipeClick : undefined}>
         {drawerHead}
         <div className="k-rd-search">
-          <div className="relative">
+          <div className="k-search-host relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--k-search-icon)] pointer-events-none" />
-            <input ref={searchRef} type="text" value={query} onChange={e => setQuery(e.target.value)} spellCheck={false}
+            <input ref={searchRef} type="text" value={query} maxLength={TEXT_LIMITS.SEARCH} onChange={e => setQuery(e.target.value)} spellCheck={false}
               placeholder="Search files and code"
               className="k-text-in k-search-bar w-full h-9 pl-9 pr-16 rounded-lg text-[13px] bg-[var(--k-search-bg)] border border-[var(--alpha-card-border)] shadow-[var(--shadow-input)] text-[var(--text-primary)] placeholder:text-[var(--k-placeholder)] outline-none" />
             <SearchEnd query={query} onClear={() => { setQuery(''); searchRef.current?.focus(); }} />
           </div>
         </div>
         <div className="k-sc-pin">
-          <button type="button" className={`k-rd-item k-rd-item-sm${page.kind === 'overview' ? ' k-rd-item-on' : ''}`} onClick={() => { setPage({ kind: 'overview' }); setFilesOpen(false); }}>
+          <button type="button" className={`k-rd-item k-rd-item-sm${page.kind === 'overview' && !picking ? ' k-rd-item-on' : ''}`} onClick={openOverview}>
             <span className="k-rd-item-icon"><Overview size={14} /></span>
             <span className="k-rd-item-text truncate">Overview</span>
           </button>
         </div>
         <div ref={listHost} className="k-sc-list">
+          <PickGlide pick=".k-sc-node.k-rd-item-on" group="data-glide-group" look="row" />
           <SwapInPlace swapKey={searching} hold={false} className="h-full">
             {searching ? resultsList : treeList}
           </SwapInPlace>
@@ -532,10 +573,11 @@ const OverviewPage: React.FC<{ project: SourceProject; onOpen: (path: string) =>
 
 const FilePage: React.FC<{ project: SourceProject; file: SourceFile; find: string; line: number | null; seq: number }> = ({ project, file, find: findAsked, line, seq }) => {
   const isText = file.kind === 'c' || file.kind === 'd';
-  const [text, setText] = useState<string | null>(null);
+  const [text, setText] = useState<string | null>(() => (isText ? peekFileText(file) : null));
+  const waited = useRef(isText && text === null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
-    if (!isText) return;
+    if (!isText || text !== null) return;
     let alive = true;
     loadFileText(project, file).then(t => { if (alive) setText(t); }).catch(() => { if (alive) setFailed(true); });
     return () => { alive = false; };
@@ -558,10 +600,8 @@ const FilePage: React.FC<{ project: SourceProject; file: SourceFile; find: strin
 
   const focusFind = () => window.setTimeout(() => { const el = findBox.current?.querySelector('input'); el?.focus(); el?.select(); }, 0);
   const openFind = useCallback(() => {
-    const sel = window.getSelection();
-    const picked = sel && !sel.isCollapsed ? sel.toString() : '';
-    const inCode = !!sel?.anchorNode?.parentElement?.closest('.k-sc-lines');
-    if (inCode && picked && !/[\r\n]/.test(picked) && picked.length <= 200) setFind(picked);
+    const picked = codeViewPicked();
+    if (picked && !/[\r\n]/.test(picked) && picked.length <= 200) setFind(picked);
     setFindOpen(true);
     focusFind();
   }, []);
@@ -608,14 +648,10 @@ const FilePage: React.FC<{ project: SourceProject; file: SourceFile; find: strin
       body = <div className="h-full grid place-items-center"><EmptyState icon={emptyArt(FilePlain)} title="This file could not be loaded" hint="Close the window and open it again." words /></div>;
       break;
     case 'wait':
-      body = (
-        <div className="k-skel-delay absolute inset-0 px-6 py-4 flex flex-col gap-2.5" aria-hidden>
-          {Array.from({ length: 18 }, (_, i) => <div key={i} className="skeleton-shimmer h-3 rounded" style={{ width: `${20 + ((i * 53) % 60)}%`, marginLeft: `${(i % 4) * 16}px` }} />)}
-        </div>
-      );
+      body = <CodeWait lines={file.lines} />;
       break;
     default:
-      body = <CodeView text={text as string} lang={file.lang} find={findOpen ? find : ''} step={step} onFind={onFind} goLine={goLine} />;
+      body = <CodeView text={text as string} lang={file.lang} find={findOpen ? find : ''} step={step} onFind={onFind} goLine={goLine} arrive={waited.current} />;
   }
   const copyIcon = copied ? ICON_COPIED : ICON_COPY;
 
@@ -655,9 +691,9 @@ const FilePage: React.FC<{ project: SourceProject; file: SourceFile; find: strin
         <Reveal when={findOpen}>
           <div ref={findBox} className="k-sc-findbar"
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); next(e.shiftKey ? -1 : 1); } }}>
-            <div className="relative k-sc-findfield">
+            <div className="k-search-host relative k-sc-findfield">
               <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--k-search-icon)] pointer-events-none" />
-              <input type="text" value={find} onChange={e => setFind(e.target.value)} placeholder="Find in this file" spellCheck={false} autoFocus
+              <input type="text" value={find} maxLength={TEXT_LIMITS.SEARCH} onChange={e => setFind(e.target.value)} placeholder="Find in this file" spellCheck={false} autoFocus
                 className="k-text-in k-search-bar w-full h-8 pl-8 pr-3 rounded-lg text-[12.5px] bg-[var(--k-search-bg)] border border-[var(--alpha-card-border)] text-[var(--text-primary)] placeholder:text-[var(--k-placeholder)] outline-none" />
             </div>
             <span className="k-sc-findcount">
@@ -669,7 +705,7 @@ const FilePage: React.FC<{ project: SourceProject; file: SourceFile; find: strin
           </div>
         </Reveal>
       )}
-      <SwapInPlace swapKey={bodyKind} hold={false} className="flex-1 min-h-0 relative">{body}</SwapInPlace>
+      <SwapInPlace swapKey={bodyKind === 'wait' ? 'code' : bodyKind} hold={false} className="flex-1 min-h-0 relative">{body}</SwapInPlace>
     </div>
   );
 }

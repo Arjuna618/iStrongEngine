@@ -1,4 +1,5 @@
 import React, { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { TEXT_LIMITS } from '../kit/textLimits';
 import { createPortal } from 'react-dom';
 import { ContentLibraryIcon, Search, SearchX, X, Upload, FolderOpen, Star, Check, ChevronDown, ArrowUpDown, Lock, PanelRightClose, MessageSquareWarning, EMPTY_LINE, SlidersHorizontal } from '../ui/icons';
 import type { GameLogic } from '../../game/GameLogic';
@@ -13,7 +14,7 @@ import { updateAnimatedColors, RARITY_LABELS } from '../../game/ShapeRegistry';
 import { useToast } from '../ui/Toast';
 import {
   getCatalogSliced, loadBuiltCatalog, runFilter, emptyKindFilter, KIND_GROUPS, LIB_KIND_LABEL, LIB_KIND_ONE, SORT_LABEL,
-  type LibCatalog, type LibEntry, type LibKind, type KindFilter, type SortId, type FilterResult,
+  type LibCatalog, type LibEntry, type LibKind, type KindFilter, type SortId, type FilterResult, filterLayoutWord,
 } from './catalog';
 import { LibraryGrid, type GridHost, type GridPassProvider, type GridSection, type LibraryGridHandle } from './LibraryGrid';
 import { libraryGL, type LibFrame, type LibPass } from './libraryGL';
@@ -27,7 +28,7 @@ import * as store from './libraryStore';
 import { FACT } from './catalogCore';
 import { useGameDark } from '../../utils/useGameTheme';
 import { ThemeSwitch } from '../kit/ThemeSwitch';
-import { useSwapFade, useMenuStage, SWAP_OUT_MS, SWAP_IN_MS } from '../kit/motion';
+import { useSwapFade, useSwapVeil, useMenuStage, SWAP_OUT_MS, SWAP_IN_MS } from '../kit/motion';
 import { useLeave, useHeld, motionOff, scrollGlide, noteMotion } from '../kit/presence';
 import { useWindowFrame } from '../kit/focusScope';
 import { useLibraryCanvas } from './libraryCanvas';
@@ -35,11 +36,12 @@ import { useDropTarget, DropOverlay } from '../kit/DropZone';
 import { useDropMenu, DropMenu, menuOpen } from '../kit/DropMenu';
 import { useAfterFirstPaint } from '../kit/Deferred';
 import { SnapshotSkeleton, useSkeletonCapture } from '../kit/SkeletonSnapshot';
-import { PanelFold, IconButton, EmptyState, emptyArt, SearchEnd } from '../kit/kit';
+import { PanelFold, IconButton, EmptyState, emptyArt, SearchEnd, WidestWords } from '../kit/kit';
 import { SwapText, Reveal, Fade, FOLD_FADE_MS } from '../kit/Collapse';
 import { InlineMotion } from '../kit/TagLine';
 import { gameGridLine } from '../shared/GameFloor';
 import { useDebugRevokeClose } from '../shared/debugRevoke';
+import { TabSlide } from '../kit/TabSlide';
 
 interface Props {
   logic: GameLogic;
@@ -324,10 +326,11 @@ export const ContentLibrary: React.FC<Props> = ({ logic, mode, onClose }) => {
     }
     return { [pf.kind]: f };
   });
-  const filterOf = (k: LibKind): KindFilter => filters[k] ?? store.storedFilter(k, KIND_GROUPS[k].length) ?? emptyKindFilter(k);
+  const filterOf = (k: LibKind): KindFilter => filters[k] ?? store.storedFilter(k, KIND_GROUPS[k].length, filterLayoutWord(k)) ?? emptyKindFilter(k);
   const filter = filterOf(kind);
   const [sorts, setSorts] = useState<Partial<Record<LibKind, SortId>>>({});
   const sort: SortId = sorts[kind] ?? store.storedSort(kind) ?? 'best';
+  const sortIds = (Object.keys(SORT_LABEL) as SortId[]).filter(s => kind === 'tank' || s !== 'tier');
   const [query, setQuery] = useState('');
   const dq = useDeferredValue(query);
   const [cardSize, setCardSize] = useState<store.CardSize>(store.storedSize);
@@ -352,7 +355,7 @@ export const ContentLibrary: React.FC<Props> = ({ logic, mode, onClose }) => {
   }, [mode, kindSwap.run]);
   useEffect(() => { onKindOpened(kind); }, []);
 
-  const setFilter = useCallback((k: LibKind, f: KindFilter) => { setFilters(prev => ({ ...prev, [k]: f })); store.storeFilter(k, f); }, []);
+  const setFilter = useCallback((k: LibKind, f: KindFilter) => { setFilters(prev => ({ ...prev, [k]: f })); store.storeFilter(k, f, filterLayoutWord(k)); }, []);
   const toggleTag = (gi: number, bit: number) => {
     const f = filterOf(kind);
     const inc = f.inc.slice();
@@ -417,6 +420,7 @@ export const ContentLibrary: React.FC<Props> = ({ logic, mode, onClose }) => {
   const [panelOut, setPanelOut] = useState(false);
   const panelWrapRef = useRef<HTMLDivElement>(null);
   const [panelSwap, setPanelSwap] = useState<'idle' | 'out' | 'scroll' | 'in'>('idle');
+  const panelVeil = useSwapVeil(panelSwap === 'idle' ? 'idle' : panelSwap === 'in' ? 'in' : 'out');
   const swapRef = useRef<{ phase: 'idle' | 'out' | 'scroll' | 'in'; next: string | null; t0: number; timer: number }>({ phase: 'idle', next: null, t0: 0, timer: 0 });
   const panelAlpha = useCallback((): number => {
     const w = swapRef.current;
@@ -629,15 +633,17 @@ export const ContentLibrary: React.FC<Props> = ({ logic, mode, onClose }) => {
   }));
   const one = LIB_KIND_ONE[kind];
   const resultN = result ? result.list.length : 0;
-  const extraH = mode.extraH ?? 0;
+  const extraH = typeof mode.extraH === 'function' ? mode.extraH(kind) : (mode.extraH ?? 0);
+  const status = typeof mode.status === 'function' ? mode.status(kind) : mode.status;
 
   const searchBlock = (
-    <div className="relative flex-1 max-w-[560px] mx-auto">
+    <div className="k-search-host relative flex-1 max-w-[560px] mx-auto">
       <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--k-search-icon)] pointer-events-none" />
       <input
         ref={searchRef}
         type="text"
         value={query}
+        maxLength={TEXT_LIMITS.SEARCH}
         autoFocus={!isTouchScreen()}
         onChange={e => setQuery(e.target.value)}
         onKeyDown={e => { if (e.key === 'Escape' && query) { e.preventDefault(); e.stopPropagation(); setQuery(''); } }}
@@ -649,6 +655,7 @@ export const ContentLibrary: React.FC<Props> = ({ logic, mode, onClose }) => {
   );
   const kindTabs = (
     <div className="k-lib-tabs" role="tablist">
+      <TabSlide pick=".k-lib-tab-on" />
       {kinds.map(k => {
         const lockedWhy = mode.lockedKinds?.[k];
         const on = k === tabShown;
@@ -665,6 +672,7 @@ export const ContentLibrary: React.FC<Props> = ({ logic, mode, onClose }) => {
   );
   const sizeToggle = (
     <div className="k-lib-tabs k-lib-tabs-sm" role="radiogroup" aria-label="Card size">
+      <TabSlide pick=".k-lib-tab-on" />
       {(['s', 'm', 'l'] as store.CardSize[]).map(sz => (
         <button key={sz} type="button" role="radio" aria-checked={cardSize === sz} onClick={() => { if (sz !== cardSize) kindSwap.run(() => { setCardSize(sz); store.storeSize(sz); }); }}
           title={sz === 's' ? 'Small cards' : sz === 'm' ? 'Medium cards' : 'Large cards'} aria-label={sz === 's' ? 'Small cards' : sz === 'm' ? 'Medium cards' : 'Large cards'}
@@ -761,9 +769,10 @@ export const ContentLibrary: React.FC<Props> = ({ logic, mode, onClose }) => {
                 </div>
               ) : null}
               {!cat || !result || !totals ? <SnapshotSkeleton id={filterSkelId} fallback={<FilterShape kind={kind} />} /> : (
-                <div className="space-y-5 p-4">
+                <div key={kind} className="space-y-5 p-4">
                   {groups.map((g, gi) => {
-                    const shown = g.options.map((op, oi) => ({ op, oi })).filter(({ oi }) => g.dynamic || totals[gi][oi] > 0 || (filter.inc[gi] & (1 << oi)));
+                    const shown = g.options.map((op, oi) => ({ op, oi })).filter(({ oi }) => (g.dynamic || totals[gi][oi] > 0 || (filter.inc[gi] & (1 << oi)))
+                      && ((filter.inc[gi] & (1 << oi)) !== 0 || result.counts[gi][oi] > 0));
                     const groupOn = filter.inc[gi] !== 0;
                     return (
                       <Reveal key={g.id} when={result.visible[gi] && shown.length > 0}>
@@ -772,11 +781,11 @@ export const ContentLibrary: React.FC<Props> = ({ logic, mode, onClose }) => {
                           <span className="k-subhead">{g.label}</span>
                           <Fade when={groupOn}><button type="button" onClick={() => { const f = { inc: filter.inc.slice() }; f.inc[gi] = 0; setFilter(kind, f); }} className="k-btn k-btn-ghost k-lib-btn-xs -mr-2 -my-0.5">Clear</button></Fade>
                         </div>
-                        <div className="flex flex-wrap gap-1.5 mt-2">
-                          {shown.map(({ op, oi }) => {
+                        <div className="flex flex-wrap gap-y-1.5 mt-2">
+                          <InlineMotion items={shown.map(({ op, oi }) => {
                             const bit = (1 << oi) >>> 0;
-                            return <TagChip key={op.id} label={op.label} count={result.counts[gi][oi]} on={(filter.inc[gi] & bit) !== 0} onClick={() => toggleTag(gi, bit)} />;
-                          })}
+                            return { key: op.id, node: <TagChip label={op.label} count={result.counts[gi][oi]} on={(filter.inc[gi] & bit) !== 0} onClick={() => toggleTag(gi, bit)} /> };
+                          })} />
                         </div>
                       </div>
                       </Reveal>
@@ -796,11 +805,11 @@ export const ContentLibrary: React.FC<Props> = ({ logic, mode, onClose }) => {
                   </button>
                 ) : null}
                 <div className="flex-1 min-w-0 flex flex-wrap items-center gap-y-1.5">
-                  {shortLib && mode.status ? <span className="k-lib-status flex flex-wrap items-center gap-x-3 gap-y-0.5 mr-3">{mode.status}</span> : null}
+                  {shortLib && status ? <span className="k-lib-status flex flex-wrap items-center gap-x-3 gap-y-0.5 mr-3">{status}</span> : null}
                   <span className={shortLib && kinds.length > 1 ? 'hidden' : 'text-[12px] text-[var(--text-secondary)] tabular-nums mr-2.5'}>
-                    <SwapText>{cat ? `${resultN} ${resultN === 1 ? one : LIB_KIND_LABEL[kind].toLowerCase()}` : ''}</SwapText>
+                    <SwapText key={kind}>{cat ? `${resultN} ${resultN === 1 ? one : LIB_KIND_LABEL[kind].toLowerCase()}` : ''}</SwapText>
                   </span>
-                  <InlineMotion items={[
+                  <InlineMotion key={kind} items={[
                     ...activeChips.map(c => ({ key: c.gi + ':' + c.bit, node: (
                       <span className="k-lib-chip">
                         <span>{c.label}</span>
@@ -815,14 +824,14 @@ export const ContentLibrary: React.FC<Props> = ({ logic, mode, onClose }) => {
                   <button type="button" ref={sortMenu.triggerRef as React.RefObject<HTMLButtonElement>} onClick={e => sortMenu.toggle(e.currentTarget.getBoundingClientRect())}
                     aria-haspopup="menu" aria-expanded={menuOpen(sortMenu)} className="k-btn k-btn-secondary k-btn-md">
                     <span className="k-btn-icon"><ArrowUpDown size={13} /></span>
-                    <span className="truncate">{SORT_LABEL[sort]}</span>
+                    <WidestWords shown={SORT_LABEL[sort]} all={sortIds.map(s => SORT_LABEL[s])} />
                     <span className="k-btn-icon"><ChevronDown size={14} className="text-[var(--text-tertiary)]" /></span>
                   </button>
                   <DropMenu menu={sortMenu} className="k-lib-menu w-[184px]">
-                      {(Object.keys(SORT_LABEL) as SortId[]).filter(s => kind === 'tank' || s !== 'tier').map(s => (
+                      {sortIds.map(s => (
                         <button key={s} type="button" role="menuitemradio" aria-checked={s === sort} onClick={() => { setSorts(p => ({ ...p, [kind]: s })); store.storeSort(kind, s); sortMenu.close(); }}
                           className={`k-lib-menu-item${s === sort ? ' k-lib-menu-item-on' : ''}`}>
-                          {SORT_LABEL[s]} {s === sort && <Check size={14} className="shrink-0 text-[var(--accent)]" />}
+                          {SORT_LABEL[s]} <Check size={14} className={s === sort ? 'shrink-0 text-[var(--accent)]' : 'shrink-0 text-[var(--accent)] invisible'} />
                         </button>
                       ))}
                   </DropMenu>
@@ -872,7 +881,7 @@ export const ContentLibrary: React.FC<Props> = ({ logic, mode, onClose }) => {
               <div ref={panelWrapRef} data-panel-clip className="absolute top-0 bottom-0 z-[4] overflow-hidden pointer-events-none flex justify-end"
                 style={narrowLib ? { right: 0, width: '100%' } : { right: mode.settingsPanel ? 300 : 0, width: 356 }}>
                 <div className={`k-lib-panel pointer-events-auto flex ${panelOut ? 'k-lib-panel-out' : 'k-lib-panel-in'}`}>
-                  <SidePanel key={shown.key} swapClass={panelSwap === 'out' || panelSwap === 'scroll' ? 'k-swap-out' : panelSwap === 'in' ? 'k-swap-in' : ''} e={shown} cat={cat} mode={mode} logic={logic} dark={dark} host={host} floor={floor} gridLine={gridLine}
+                  <SidePanel key={shown.key} swapClass={panelSwap === 'out' || panelSwap === 'scroll' ? `k-swap-out ${panelVeil}` : panelSwap === 'in' ? `k-swap-in ${panelVeil}` : ''} e={shown} cat={cat} mode={mode} logic={logic} dark={dark} host={host} floor={floor} gridLine={gridLine}
                     fav={ctx.fav.has(shown.key)} onFav={() => onFav(shown)} onClose={() => setSelectedKey(null)}
                     onPick={(e) => { setSelectedKey(e.key); setFocusKey(e.key); }} run={runAction} />
                 </div>
@@ -880,7 +889,7 @@ export const ContentLibrary: React.FC<Props> = ({ logic, mode, onClose }) => {
             )}
           </div>
 
-          {mode.footer && <div className="k-pop-foot shrink-0 border-t border-[var(--alpha-divider)] bg-[var(--k-content)]"><div className="k-bar bg-[var(--k-foot-bg)]">{typeof mode.footer === 'function' ? mode.footer(close, shortLib && !!mode.status) : mode.footer}</div></div>}
+          {mode.footer && <div className="k-pop-foot shrink-0 border-t border-[var(--alpha-divider)] bg-[var(--k-content)]"><div className="k-bar bg-[var(--k-foot-bg)]">{typeof mode.footer === 'function' ? mode.footer(close, shortLib && !!status, kind) : mode.footer}</div></div>}
 
           {mode.allowImport && <DropOverlay shown={dropShown} sub="Every file is checked as one import is checked." />}
           {sumStage.shown && heldSummary && <ImportSummarySheet sum={heldSummary} leaving={sumStage.leaving} onClose={() => setSummary(null)} />}
@@ -918,16 +927,16 @@ const SidePanel: React.FC<{
   };
   return (
     <div className="k-lib-panel-box w-[332px] shrink-0 border-l border-[var(--alpha-divider)] bg-[var(--layer-1)] flex flex-col min-h-0">
-      <div className="flex items-center justify-between px-4 h-[52px] shrink-0">
+      <div className="k-win-head flex items-center justify-between px-4 h-[52px] shrink-0 border-b border-[var(--alpha-divider)]">
         <span className="k-subhead truncate">{COLLECTION_WORD(e) || LIB_KIND_LABEL[e.kind]}</span>
         <div className="flex items-center">
-          <IconButton label={fav ? 'Remove from favourites' : 'Add to favourites'} onClick={onFav}>
+          <IconButton label={fav ? 'Remove from favourites' : 'Add to favourites'} onClick={onFav} className={fav ? 'k-lib-star k-lib-star-on' : 'k-lib-star'}>
             <Star size={16} fill={fav ? 'currentColor' : 'none'} />
           </IconButton>
           <IconButton label="Close the panel" onClick={onClose}><PanelRightClose size={16} /></IconButton>
         </div>
       </div>
-      <div data-panel-scroll className={`flex-1 min-h-0 overflow-y-auto popup-scrollbar px-4 pb-4 ${swapClass ?? ''}`} onScroll={() => host.loop.request()}>
+      <div data-panel-scroll className={`flex-1 min-h-0 overflow-y-auto popup-scrollbar px-4 pt-4 pb-4 ${swapClass ?? ''}`} onScroll={() => host.loop.request()}>
         <PanelPicture e={e} dark={dark} host={host} floor={floor} gridLine={gridLine} />
         <div className="mt-4">
           <h3 className="text-[17px] font-medium leading-snug text-[var(--text-primary)] break-words">{e.name}</h3>
@@ -943,6 +952,7 @@ const SidePanel: React.FC<{
             <Lock size={13} className="shrink-0" /> <span>{lock}</span>
           </div>
         )}
+        {mode.renderPanelExtra && mode.panelExtraFirst && <div className="mt-4">{mode.renderPanelExtra(e)}</div>}
         {acts.length > 0 && (
           <div className="mt-4 flex flex-col gap-2">
             {acts.map((a, i) => (
@@ -953,7 +963,7 @@ const SidePanel: React.FC<{
             ))}
           </div>
         )}
-        {mode.renderPanelExtra && <div className="mt-3">{mode.renderPanelExtra(e)}</div>}
+        {mode.renderPanelExtra && !mode.panelExtraFirst && <div className="mt-3">{mode.renderPanelExtra(e)}</div>}
         {fires.length > 0 && (
           <div className="mt-5">
             <div className="k-subhead mb-2">{e.kind === 'projectile' ? 'Its turrets fire' : 'Fires'}</div>

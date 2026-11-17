@@ -1,8 +1,9 @@
-import { EnemyTank, FloatingPolygon, AIState, AI_CONSTANTS, UpgradeStat, TeamId, MovementPersonality, MapState, Bullet, campsClash } from '../types';
+import { EnemyTank, FloatingPolygon, AIState, AI_CONSTANTS, UpgradeStat, TeamId, MovementPersonality, MapState, Bullet, campsClash, CAMP_ROGUE } from '../types';
 import { BASE_PROTECTOR_FEATURE } from './BaseProtector';
 import { Vector } from '../utils/MathUtils';
 import { seenBy, tankOwnShowing } from '../utils/seenRule';
 import { DARK_HOOK } from './darkness';
+import { HF_HOOK, hfHash, hfIdNum, FEEL_LIVE } from './humanFeel';
 import { growthFactor, growthRulesOf } from './growthRules';
 import { ARRAS_PARITY, ARRAS_SKILL_POINTS_BAR, arrasEngineMult, bodyDriveMult, bodyPushShareOf } from './arrasCombat';
 import { defenseOnBody, defenseShieldMult, defenseBrst, defenseAtkVsRounds } from './defenseSwitch';
@@ -56,8 +57,14 @@ export function isInFOV(
   enemyPos: Vector,
   targetPos: Vector,
   fovRadius: number,
-  isCurrentTarget: boolean
+  isCurrentTarget: boolean,
+  box: boolean = false
 ): boolean {
+  if (box) {
+    const r = isCurrentTarget ? fovRadius * AI_CONSTANTS.FOV_HYSTERESIS : fovRadius;
+    const bx = targetPos.x - enemyPos.x, by = targetPos.y - enemyPos.y;
+    return (bx < 0 ? -bx : bx) <= r && (by < 0 ? -by : by) <= r * 0.5625;
+  }
   const dist = Vector.dist(enemyPos, targetPos);
   const radius = isCurrentTarget ? fovRadius * AI_CONSTANTS.FOV_HYSTERESIS : fovRadius;
   return dist <= radius;
@@ -343,6 +350,9 @@ export function calculateRoamTarget(
     const step = cs * 0.5;
     const mh = mapState.mapHalf;
     const mhY = mapState.mapHalfY;
+    const _shOn = AI_CONSTANTS.SHRINK_AWARE !== 0 && mapState.shrinkHX !== undefined && mapState.shrinkHX > 0;
+    const _shX = _shOn ? mapState.shrinkHX! - bodyRadius - 40 : 0, _shY = _shOn ? (mapState.shrinkHY ?? 0) - bodyRadius - 40 : 0;
+    const _shOX = Math.abs(fromX - ox), _shOY = Math.abs(fromY - oy);
     const gc = mapState.gridCells;
     const gcY = mapState.gridCellsY;
     const wg = mapState.wallGrid;
@@ -382,6 +392,7 @@ export function calculateRoamTarget(
           } else {
             if (Math.abs(cx) > mapLimit - margin || Math.abs(cy) > mapLimitY - margin) break;
           }
+          if (_shOn) { const _ax = Math.abs(cx - ox), _ay = Math.abs(cy - oy); if ((_ax > _shX && _ax >= _shOX) || (_ay > _shY && _ay >= _shOY)) break; }
           if (!isWalkable(mapState, cx - ox, cy - oy, ox, oy, pr)) break;
           const curGX = Math.floor((cx - ox + mh) / cs);
           const curGY = Math.floor((cy - oy + mhY) / cs);
@@ -593,7 +604,81 @@ export function updateDamageTracking(
   enemy.recentDamageIn3s = totalDamage;
 }
 
+const _spTrade = new Int8Array(4);
+function capFor(enemy: EnemyTank, stat: UpgradeStat): number { return enemy.skillCaps ? enemy.skillCaps[stat] : enemy.maxPointsPerSkill; }
+function speedPlan(enemy: EnemyTank): number {
+  const T = _spTrade; T[0] = 0; T[1] = 0; T[2] = 0; T[3] = 0;
+  const seed = hfIdNum(enemy.id);
+  if (!(hfHash(seed, 481, 0) < (enemy.speedFirst ?? 95) / 100)) return -1;
+  const u = hfHash(seed, 482, 0);
+  if (u < 0.79) { T[0] = 1; T[1] = 1; T[2] = 1; }
+  else if (u < 0.88) { T[0] = 1; T[1] = 1; T[2] = 1; T[3] = 1; }
+  else if (u < 0.95) {
+    const k = Math.floor(hfHash(seed, 483, 0) * 6) % 6, skip = k % 3, two = (skip + 1 + (k >= 3 ? 1 : 0)) % 3;
+    T[0] = 1; T[1] = 1; T[2] = 1; T[skip] = 0; T[two] = 2;
+  } else T[3] = 2;
+  return hfHash(seed, 484, 0) < 0.1 ? (hfHash(seed, 485, 0) < 0.5 ? 1 : 2) : 0;
+}
+function plannedPick(enemy: EnemyTank): UpgradeStat | null {
+  const T = _spTrade;
+  let total = 0;
+  for (let i = 0; i < UPGRADE_ORDER.length; i++) {
+    if (i === 7) continue;
+    const stat = UPGRADE_ORDER[i];
+    if (enemy.upgrades[stat] < capFor(enemy, stat) - (i >= 3 && i <= 6 ? T[i - 3] : 0)) total += UPGRADE_WEIGHTS[i];
+  }
+  if (total === 0) return null;
+  let roll = Math.random() * total;
+  for (let i = 0; i < UPGRADE_ORDER.length; i++) {
+    if (i === 7) continue;
+    const stat = UPGRADE_ORDER[i];
+    if (enemy.upgrades[stat] < capFor(enemy, stat) - (i >= 3 && i <= 6 ? T[i - 3] : 0)) {
+      if (roll < UPGRADE_WEIGHTS[i]) return stat;
+      roll -= UPGRADE_WEIGHTS[i];
+    }
+  }
+  return null;
+}
+const _capOff = new Int8Array(10);
+let _planPass = false;
+function planOk(enemy: EnemyTank): boolean {
+  return FEEL_LIVE && AI_CONSTANTS.HF_SPEEDFIRST !== 0 && enemy.isBossTier !== true && !enemy.spawnedByEntityId && enemy.isBaseProtector !== true && enemy.minAttackDistance !== 0;
+}
+function customWithPlan(enemy: EnemyTank): UpgradeStat | null {
+  const pr = enemy.customUpgradePriorities;
+  if (pr && planOk(enemy) && pr.bulletPenetration > 0 && pr.bulletHealth > 0 && pr.bulletDamage > 0) {
+    const first = speedPlan(enemy), T = _spTrade;
+    if (first >= 0 && (T[3] === 0 || pr.reload > 0)) {
+      const up = enemy.upgrades, want = T[0] + T[1] + T[2] + T[3];
+      if (capFor(enemy, 'movementSpeed') >= want && capFor(enemy, 'bulletPenetration') > T[0] && capFor(enemy, 'bulletHealth') > T[1] && capFor(enemy, 'bulletDamage') > T[2] && capFor(enemy, 'reload') > T[3]) {
+        if (first > 0 && pr.bulletSpeed > 0 && up.movementSpeed === 0 && up.bulletSpeed < first && up.bulletSpeed < capFor(enemy, 'bulletSpeed')) return 'bulletSpeed';
+        if (up.movementSpeed < want) return 'movementSpeed';
+        _capOff[3] = T[0]; _capOff[4] = T[1]; _capOff[5] = T[2]; _capOff[6] = T[3]; _planPass = true;
+        const s = getCustomUpgradeStat(enemy);
+        _capOff[3] = 0; _capOff[4] = 0; _capOff[5] = 0; _capOff[6] = 0; _planPass = false;
+        if (s !== null) return s;
+      }
+    }
+  }
+  return getCustomUpgradeStat(enemy);
+}
 function getWeightedUpgradeStat(enemy: EnemyTank): UpgradeStat | null {
+  if (planOk(enemy)) {
+    const first = speedPlan(enemy);
+    if (first >= 0) {
+      const up = enemy.upgrades, T = _spTrade, want = T[0] + T[1] + T[2] + T[3];
+      const cP = capFor(enemy, 'bulletPenetration') - T[0], cH = capFor(enemy, 'bulletHealth') - T[1], cD = capFor(enemy, 'bulletDamage') - T[2], cR = capFor(enemy, 'reload') - T[3];
+      if (capFor(enemy, 'movementSpeed') >= want && cP > 0 && cH > 0 && cD > 0 && cR > 0) {
+        const cB = capFor(enemy, 'bulletSpeed');
+        if (first > 0 && up.movementSpeed === 0 && up.bulletSpeed < first && up.bulletSpeed < cB) return 'bulletSpeed';
+        if (up.movementSpeed < want) return 'movementSpeed';
+        if (!(up.bulletSpeed >= cB && up.bulletPenetration >= cP && up.bulletHealth >= cH && up.bulletDamage >= cD && up.reload >= cR)) {
+          const s = plannedPick(enemy);
+          if (s !== null) return s;
+        }
+      }
+    }
+  }
   let totalWeight = 0;
   for (let i = 0; i < UPGRADE_ORDER.length; i++) {
     const stat = UPGRADE_ORDER[i];
@@ -656,11 +741,12 @@ function getCustomUpgradeStat(enemy: EnemyTank): UpgradeStat | null {
     const p = priorities[stat];
     if (p <= 0) continue;
     const cap = enemy.skillCaps ? enemy.skillCaps[stat] : enemy.maxPointsPerSkill;
-    if (enemy.upgrades[stat] >= cap) continue;
+    if (enemy.upgrades[stat] >= cap - _capOff[i]) continue;
     if (p < bestPriority) bestPriority = p;
   }
 
   if (bestPriority === Infinity) {
+    if (_planPass) return null;
     if (enemy.customUpgradeFillRandom) {
       return getRandomUnlistedUpgradeStat(enemy, priorities);
     }
@@ -672,7 +758,7 @@ function getCustomUpgradeStat(enemy: EnemyTank): UpgradeStat | null {
     const stat = UPGRADE_ORDER[i];
     if (priorities[stat] !== bestPriority) continue;
     const cap = enemy.skillCaps ? enemy.skillCaps[stat] : enemy.maxPointsPerSkill;
-    if (enemy.upgrades[stat] >= cap) continue;
+    if (enemy.upgrades[stat] >= cap - _capOff[i]) continue;
     tierStats.push(stat);
   }
   if (tierStats.length === 0) return null;
@@ -698,7 +784,7 @@ export function applyUpgrade(enemy: EnemyTank): boolean {
   let stat: UpgradeStat | null;
 
   if (enemy.customUpgradePriorities !== undefined) {
-    stat = getCustomUpgradeStat(enemy);
+    stat = customWithPlan(enemy);
   } else if (enemy.upgradeLogic === 'Random') {
     stat = getRandomUpgradeStat(enemy);
   } else if (enemy.upgradeLogic === 'OffensiveWeighted') {
@@ -846,11 +932,17 @@ export function getEnemyMaxTurretDamage(enemy: EnemyTank): number {
   return maxDamage;
 }
 
+export function unreachMoreHas(enemy: EnemyTank, id: string, now: number): boolean {
+  const ids = enemy.unreachMoreIds, un = enemy.unreachMoreUntils;
+  for (let i = 0; i < ids.length; i++) if (ids[i] === id && now < un[i]) return true;
+  return false;
+}
 export function findNearestShape(
   enemy: EnemyTank,
   shapes: FloatingPolygon[],
   rangeLimit?: number,
-  nowMs: number = 0
+  nowMs: number = 0,
+  skip: ((enemy: EnemyTank, shape: FloatingPolygon) => boolean) | null = null
 ): FloatingPolygon | null {
   let nearestCrasher: FloatingPolygon | null = null;
   let nearestCrasherDistSq = Infinity;
@@ -868,7 +960,8 @@ export function findNearestShape(
     const shape = shapes[i];
     if (!shape.active || shape.fadingOut) continue;
     if (nowMs > 0 && !shape.isCrasher &&
-        shape.id === enemy.unreachTargetId && nowMs < enemy.unreachUntil) continue;
+        ((shape.id === enemy.unreachTargetId && nowMs < enemy.unreachUntil) ||
+         (enemy.unreachMoreLive > nowMs && unreachMoreHas(enemy, shape.id, nowMs)))) continue;
 
     const dx = shape.position.x - ex;
     const dy = shape.position.y - ey;
@@ -881,7 +974,7 @@ export function findNearestShape(
         nearestCrasherDistSq = distSq;
       }
     } else {
-      if (distSq < nearestFoodDistSq) {
+      if (distSq < nearestFoodDistSq && (skip === null || !skip(enemy, shape))) {
         nearestFood = shape;
         nearestFoodDistSq = distSq;
       }
@@ -997,6 +1090,7 @@ function _resetKnownScan(): void {
 export type MuzzleLosFn = ((enemy: EnemyTank, tx: number, ty: number, tr: number) => boolean) | null;
 
 export type SafeGroundFn = ((attacker: EnemyTank, tx: number, ty: number, isCurrent: boolean) => boolean) | null;
+export type SpareFn = ((attacker: EnemyTank, target: EnemyTank, isCurrent: boolean) => boolean) | null;
 
 export type AreaApartFn = ((attacker: EnemyTank, tx: number, ty: number) => boolean) | null;
 
@@ -1017,6 +1111,7 @@ export function findBestEnemyTankTarget(
   engagedPlayerVisible: boolean = false,
   safeGround: SafeGroundFn = null,
   apart: AreaApartFn = null,
+  spare: SpareFn = null,
 ): EnemyTank | null {
   let bestTarget: EnemyTank | null = null;
   let bestScoreSq = Infinity;
@@ -1041,8 +1136,10 @@ export function findBestEnemyTankTarget(
     if (campsClash(enemy.camp, target.camp)) continue;
 
     const isCurrentTarget = enemy.currentTargetId === target.id;
-    if (!isInFOV(enemy.position, target.position, enemy.fovRadius, isCurrentTarget)) continue;
-    if (target.invisEnabled && tankHiddenAt(enemy.position.x, enemy.position.y, enemy.size * 0.5, target, isCurrentTarget)) continue;
+    if (!isInFOV(enemy.position, isCurrentTarget && HF_HOOK.keeps !== null && enemy.hf.hsLost !== 0 && enemy.hf.hsId === target.id ? _hfMemPos.set(enemy.hf.hsX, enemy.hf.hsY) : target.position,
+        enemy.fovRadius, isCurrentTarget, enemy.hf.sightBox)) continue;
+    if (target.invisEnabled && tankHiddenAt(enemy.position.x, enemy.position.y, enemy.size * 0.5, target, isCurrentTarget)
+        && !(isCurrentTarget && HF_HOOK.keeps !== null && HF_HOOK.keeps(enemy, target))) continue;
     if (DARK_HOOK.botHides !== null && DARK_HOOK.botHides(enemy, target, isCurrentTarget)) continue;
 
     const isMate = isTankMate(enemy, target, isTeamBehavior);
@@ -1070,7 +1167,7 @@ export function findBestEnemyTankTarget(
       const tTier = target.isBossTier ? 3 : tierOfLevel(target.level, powerCeiling);
       gap = tTier - myTier;
       const _ownSide = gap > 0 && SMALL_FIX.CC053 !== 0 &&
-        (shouldSkipTeamCollision(enemy.team, enemy.aiBehavior, enemy.groupId, target.team, target.aiBehavior, target.groupId) ||
+        (shouldSkipTeamCollision(enemy.team, enemy.aiBehavior, enemy.groupId, target.team, target.aiBehavior, target.groupId, enemy.camp, target.camp) ||
          tapFamilyIdOf(target) === tapFamilyIdOf(enemy));
       if (gap > 0 && !_ownSide && (gap > _knownScan.threatGap ||
           (gap === _knownScan.threatGap && distSq < _knownScan.threatDistSq))) {
@@ -1086,6 +1183,7 @@ export function findBestEnemyTankTarget(
 
     if (safeGround !== null && safeGround(enemy, target.position.x, target.position.y, isCurrentTarget)) continue;
     if (apart !== null && apart(enemy, target.position.x, target.position.y)) continue;
+    if (spare !== null && spare(enemy, target, isCurrentTarget)) continue;
     if (!canEngageTarget(enemy, losMapState, target.position.x, target.position.y, losOffX, losOffY, target.id)) continue;
 
     if (tapFamilyIdOf(target) === tapFamilyIdOf(enemy)) continue;
@@ -1269,6 +1367,7 @@ function _findCorneredTargets(
   safeGround: SafeGroundFn = null,
   playerSafeFromMe: boolean = false,
   apart: AreaApartFn = null,
+  spare: SpareFn = null,
 ): void {
   const _cr = enemy.fovRadius * AI_CONSTANTS.FEAR_CORNERED_RANGE_MULT;
   const rangeSq = _cr * _cr;
@@ -1299,7 +1398,8 @@ function _findCorneredTargets(
     const t = allTanks[i];
     if (t.id === enemy.id || !t.active || t.isDying || t.isSpawning || t.graceActive || isUnseeableTank(t)) continue;
     if (t.invisEnabled && tankHiddenAt(enemy.position.x, enemy.position.y, enemy.size * 0.5, t,
-        t.id === fleeSourceId || t.id === enemy.currentTargetId)) continue;
+        t.id === fleeSourceId || t.id === enemy.currentTargetId)
+        && !(t.id === enemy.currentTargetId && HF_HOOK.keeps !== null && HF_HOOK.keeps(enemy, t))) continue;
     if (DARK_HOOK.botHides !== null && DARK_HOOK.botHides(enemy, t, t.id === fleeSourceId || t.id === enemy.currentTargetId)) continue;
     if (campsClash(enemy.camp, t.camp)) continue;
     if (safeGround !== null && safeGround(enemy, t.position.x, t.position.y, false)) continue;
@@ -1346,6 +1446,7 @@ function _findCorneredTargets(
     }
 
     if (dSq < _corneredBestDistSq) {
+      if (!_tIsTrappedSrc && spare !== null && spare(enemy, t, false)) continue;
       _corneredBestDistSq = dSq;
       _corneredBestTank = t;
       _corneredTrapped = _tIsTrappedSrc;
@@ -1361,7 +1462,8 @@ function _findCorneredTargets(
     const pdSq = pdx * pdx + pdy * pdy;
     if (pdSq <= rangeSq) {
       let shouldAttackPlayer = false;
-      if (enemy.aiBehavior === 'Enemy' || enemy.aiBehavior === 'FFA') {
+      if (enemy.camp === CAMP_ROGUE) {
+      } else if (enemy.aiBehavior === 'Enemy' || enemy.aiBehavior === 'FFA') {
         shouldAttackPlayer = true;
       } else if (enemy.aiBehavior === 'Team1' || enemy.aiBehavior === 'Team2' ||
                  enemy.aiBehavior === 'Team3' || enemy.aiBehavior === 'Team4' || enemy.aiBehavior === 'Team5') {
@@ -1537,6 +1639,7 @@ export function tapFamilyIdOf(e: EnemyTank): string {
 let _ghostFamilyRoot = '';
 export function setGhostFamilyRoot(id: string): void { _ghostFamilyRoot = id; }
 
+const _hfMemPos = new Vector(0, 0);
 export function tankHiddenAt(vx: number, vy: number, vr: number, t: EnemyTank, held: boolean): boolean {
   if (!t.invisEnabled || AI_CONSTANTS.SEEN_RULE === 0) return false;
   const dx = t.position.x - vx, dy = t.position.y - vy;
@@ -1545,7 +1648,7 @@ export function tankHiddenAt(vx: number, vy: number, vr: number, t: EnemyTank, h
 
 export function isUnseeableTank(e: EnemyTank): boolean {
   if (BASE_PROTECTOR_FEATURE !== 0 && e.isBaseProtector === true) return true;
-  if (((e as { _mevF?: number })._mevF ?? 0) & (8 | 33554432)) return true;
+  if (((e as { _mevF?: number })._mevF ?? 0) & (8 | (SMALL_FIX.R960 !== 0 ? 134217728 : 33554432))) return true;
   return isGhostTank(e);
 }
 
@@ -1588,6 +1691,7 @@ export function mayAttackPlayer(
   enemy: EnemyTank, playerId: string, playerTeam: string, playerGroupId: number
 ): boolean {
   if (enemy.groupId !== 0 && enemy.groupId === playerGroupId) return false;
+  if (enemy.camp === CAMP_ROGUE) return false;
   if (enemy.aiBehavior === 'Enemy' || enemy.aiBehavior === 'FFA') return true;
   if (isTeamBehaviorOf(enemy)) return enemy.team !== playerTeam;
   if (enemy.aiBehavior === 'Neutral') return shouldNeutralAttackTarget(enemy, playerId);
@@ -1617,6 +1721,7 @@ export function determineAIStateInto(
   safeGround: SafeGroundFn = null,
   playerSafeFromMe: boolean = false,
   apart: AreaApartFn = null,
+  spare: SpareFn = null,
 ): AIStateResult {
   if (SMALL_FIX.CC027 !== 0) _resetKnownScan();
   const isPlayerCurrentTarget = enemy.currentTargetType === 'player';
@@ -1637,7 +1742,7 @@ export function determineAIStateInto(
       bpBestD2 = _bx * _bx + _by * _by;
       bpBestId = bpTarget.id; bpBestPos = bpTarget.position; bpBestType = 'enemy';
     }
-    if (playerPos && isInFOV(enemy.position, playerPos, enemy.fovRadius, true) &&
+    if (playerPos && isInFOV(enemy.position, playerPos, enemy.fovRadius, true, enemy.hf.sightBox) &&
         mayAttackPlayer(enemy, playerId, playerTeam, playerGroupId) && !playerSafeFromMe) {
       const _px = playerPos.x - enemy.position.x;
       const _py = playerPos.y - enemy.position.y;
@@ -1662,14 +1767,14 @@ export function determineAIStateInto(
     return _aiStateResult;
   }
 
-  const playerInFOV = playerPos ? isInFOV(enemy.position, playerPos, enemy.fovRadius, isPlayerCurrentTarget) : false;
+  const playerInFOV = playerPos ? isInFOV(enemy.position, playerPos, enemy.fovRadius, isPlayerCurrentTarget, enemy.hf.sightBox) : false;
   const isPlayerTeammate = enemy.groupId !== 0 && enemy.groupId === playerGroupId;
   let _frRefusedPlayer = false;
 
   if (enemy.fear.isFleeing) {
     if (enemy.fear.fearReason === 'heat') {
       if (enemy.fearHeat >= AI_CONSTANTS.FEAR_HEAT_FLEE_THRESHOLD * 0.5) {
-        _findCorneredTargets(enemy, allTanks, enemy.fear.fleeSourceId, playerPos, playerId, losMapState, losOffX, losOffY, playerTeam, playerGroupId, muzzleLos, playerPower, safeGround, playerSafeFromMe, apart);
+        _findCorneredTargets(enemy, allTanks, enemy.fear.fleeSourceId, playerPos, playerId, losMapState, losOffX, losOffY, playerTeam, playerGroupId, muzzleLos, playerPower, safeGround, playerSafeFromMe, apart, AI_CONSTANTS.HF_STEADY !== 0 ? spare : null);
         if (_corneredBestTank || _corneredPlayerValid) {
           const tankCloser = _corneredBestTank && (!_corneredPlayerValid || _corneredBestDistSq <= _corneredPlayerDistSq);
           enemy.fear.isFleeing = false;
@@ -1700,7 +1805,7 @@ export function determineAIStateInto(
         enemy.fear.fleeSourceId = null;
       }
     } else if (enemy.fear.fearReason === 'hunted') {
-      _findCorneredTargets(enemy, allTanks, enemy.fear.fleeSourceId, playerPos, playerId, losMapState, losOffX, losOffY, playerTeam, playerGroupId, muzzleLos, playerPower, safeGround, playerSafeFromMe, apart);
+      _findCorneredTargets(enemy, allTanks, enemy.fear.fleeSourceId, playerPos, playerId, losMapState, losOffX, losOffY, playerTeam, playerGroupId, muzzleLos, playerPower, safeGround, playerSafeFromMe, apart, AI_CONSTANTS.HF_STEADY !== 0 ? spare : null);
       if (_corneredBestTank || _corneredPlayerValid) {
         const tankCloser = _corneredBestTank && (!_corneredPlayerValid || _corneredBestDistSq <= _corneredPlayerDistSq);
         enemy.fear.isFleeing = false;
@@ -1731,7 +1836,7 @@ export function determineAIStateInto(
       const _lgHold = _lgSeen || (_lgCommit &&
         gameNow - enemy.fleeLegacySeenMs < AI_CONSTANTS.FLEE_LEGACY_LINGER_MS);
       if (_lgHold) {
-        _findCorneredTargets(enemy, allTanks, enemy.fear.fleeSourceId, playerPos, playerId, losMapState, losOffX, losOffY, playerTeam, playerGroupId, muzzleLos, playerPower, safeGround, playerSafeFromMe, apart);
+        _findCorneredTargets(enemy, allTanks, enemy.fear.fleeSourceId, playerPos, playerId, losMapState, losOffX, losOffY, playerTeam, playerGroupId, muzzleLos, playerPower, safeGround, playerSafeFromMe, apart, AI_CONSTANTS.HF_STEADY !== 0 ? spare : null);
         if (_corneredBestTank || _corneredPlayerValid) {
           const tankCloser = _corneredBestTank && (!_corneredPlayerValid || _corneredBestDistSq <= _corneredPlayerDistSq);
           enemy.fear.isFleeing = false;
@@ -1783,7 +1888,7 @@ export function determineAIStateInto(
     if (_fearResult.trigger && _frCd) {
       _aiStateResult.rearmHeld = true;
       _frRefusedPlayer = true;
-    } else if (_fearResult.trigger && !(enemy.chargeAI === true && AI_CONSTANTS.CHARGE_AI !== 0) && !btNoFear(enemy)) {
+    } else if (_fearResult.trigger && !(enemy.chargeAI === true && AI_CONSTANTS.CHARGE_AI !== 0) && !btNoFear(enemy) && !enemy.hf.rmNoFear) {
       enemy.fear.isFleeing = true;
       enemy.fear.fleeTarget = playerPos!.copy();
       enemy.fear.fleeStartTime = gameNow;
@@ -1796,7 +1901,7 @@ export function determineAIStateInto(
   }
 
   let shouldAttackPlayer = false;
-  if (playerInFOV && playerPos && !isPlayerTeammate && !_frRefusedPlayer) {
+  if (playerInFOV && playerPos && !isPlayerTeammate && !_frRefusedPlayer && enemy.camp !== CAMP_ROGUE) {
     if (enemy.aiBehavior === 'Enemy') {
       shouldAttackPlayer = true;
     } else if (enemy.aiBehavior === 'FFA') {
@@ -1819,12 +1924,12 @@ export function determineAIStateInto(
   const _swTankId = _swEngaged && enemy.currentTargetType === 'enemy' && enemy.currentTargetId
     ? enemy.currentTargetId : '';
   const _swPlayerHeld = _swEngaged && enemy.currentTargetType === 'player' && shouldAttackPlayer;
-  let tankTarget = findBestEnemyTankTarget(enemy, allTanks, playerId, losMapState, losOffX, losOffY, gameNow, losHysteresisMs, myTier, powerCeiling, courage, muzzleLos, _swTankId, _swPlayerHeld, safeGround, apart);
+  let tankTarget = findBestEnemyTankTarget(enemy, allTanks, playerId, losMapState, losOffX, losOffY, gameNow, losHysteresisMs, myTier, powerCeiling, courage, muzzleLos, _swTankId, _swPlayerHeld, safeGround, apart, spare);
 
   const _ffGateBehavior = enemy.aiBehavior === 'Enemy' || enemy.aiBehavior === 'FFA' ||
     enemy.aiBehavior === 'Team1' || enemy.aiBehavior === 'Team2' ||
     enemy.aiBehavior === 'Team3' || enemy.aiBehavior === 'Team4' || enemy.aiBehavior === 'Team5';
-  if (hasShapesInFOV && _ffGateBehavior && !isProvoked(enemy, gameNow)) {
+  if (hasShapesInFOV && _ffGateBehavior && !isProvoked(enemy, gameNow) && !(enemy.hf.rcUntil > gameNow)) {
     const _ffEngaged = enemy.aiState === 'attacking' || enemy.aiState === 'following';
     if (shouldAttackPlayer &&
         !(_ffEngaged && enemy.currentTargetType === 'player')) {

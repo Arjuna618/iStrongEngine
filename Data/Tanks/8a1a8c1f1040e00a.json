@@ -33,11 +33,11 @@
         "knockback": 6.9,
         "spread": 37.5,
         "shudder": 0.195,
-        "bulletDamage": 0.64749,
-        "bulletHealthBase": 1.22402,
-        "bulletPenetration": 1,
+        "bulletDamage": 0.41071,
+        "bulletHealthBase": 0.66667,
+        "bulletPenetration": 0.95238,
         "bulletLifetime": 2.433333333333333,
-        "shootResist": 1.09524,
+        "shootResist": 0.95238,
         "isCustom": false,
         "animProgress": 0,
         "turretType": "regular",
@@ -130,7 +130,8 @@
         "gunStatScale": 1,
         "color": "#a7a7af",
         "colorMap": 16,
-        "fightResist": 1
+        "fightResist": 1,
+        "releaseDepth": 14.8
       },
       {
         "id": "8a1a8c1f1040e00a__g1",
@@ -146,11 +147,11 @@
         "knockback": 6.9,
         "spread": 37.5,
         "shudder": 0.202,
-        "bulletDamage": 0.64749,
-        "bulletHealthBase": 1.22402,
-        "bulletPenetration": 1,
+        "bulletDamage": 0.41071,
+        "bulletHealthBase": 0.66667,
+        "bulletPenetration": 0.95238,
         "bulletLifetime": 2.433333333333333,
-        "shootResist": 1.09524,
+        "shootResist": 0.95238,
         "isCustom": false,
         "animProgress": 0,
         "turretType": "regular",
@@ -243,7 +244,8 @@
         "gunStatScale": 1,
         "color": "#a7a7af",
         "colorMap": 16,
-        "fightResist": 1
+        "fightResist": 1,
+        "releaseDepth": 16.2
       },
       {
         "id": "8a1a8c1f1040e00a__g2",
@@ -259,11 +261,11 @@
         "knockback": 6.9,
         "spread": 41.35,
         "shudder": 0.203,
-        "bulletDamage": 0.64749,
-        "bulletHealthBase": 1.22402,
-        "bulletPenetration": 1,
+        "bulletDamage": 0.41071,
+        "bulletHealthBase": 0.66667,
+        "bulletPenetration": 0.95238,
         "bulletLifetime": 2.433333333333333,
-        "shootResist": 1.09524,
+        "shootResist": 0.95238,
         "shootDensity": 1.25,
         "isCustom": false,
         "animProgress": 0,
@@ -357,7 +359,8 @@
         "gunStatScale": 1,
         "color": "#a7a7af",
         "colorMap": 16,
-        "fightResist": 1.1
+        "fightResist": 1.1,
+        "releaseDepth": 18
       }
     ],
     "maxSkillPoints": 42,

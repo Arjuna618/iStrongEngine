@@ -414,6 +414,8 @@ function clampTurret(t: any, layer: number = 1, hops: number = 0): void {
   clampScalarFinite(t, 'fightResist', undefined);
   clampScalarFinite(t, 'shootDensity', undefined);
   clampScalarFinite(t, 'shudder', undefined);
+  clampScalarFinite(t, 'releaseDepth', undefined);
+  if (typeof t.releaseDepth === 'number') t.releaseDepth = Math.max(0, Math.min(100, t.releaseDepth));
   if (SMALL_FIX.R775 !== 0) {
     if (typeof t.shootDensity === 'number') t.shootDensity = Math.max(0.0026, Math.min(81, t.shootDensity));
     if (typeof t.shudder === 'number') t.shudder = Math.max(-10, Math.min(10, t.shudder));

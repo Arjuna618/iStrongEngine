@@ -1,4 +1,5 @@
 import type { Num, Ramp } from './doc';
+import { SMALL_FIX } from '../smallFixSwitch';
 
 export class Sfc32 {
   a = 0; b = 0; c = 0; d = 1;
@@ -60,6 +61,7 @@ const STACK_MAX = 64;
 export interface FormulaResult { ok: boolean; err?: string; at?: number; }
 
 type Tok = { t: 'num'; v: number; at: number } | { t: 'name'; v: string; at: number } | { t: 'ref'; v: number; at: number } | { t: 'op'; v: string; at: number };
+const _own = (o: object, k: string): boolean => Object.prototype.hasOwnProperty.call(o, k);
 const NAMES: Record<string, number> = { wave: OP_WAVE, seconds: OP_SECONDS, players: OP_PLAYERS, humans: OP_HUMANS, bots: OP_BOTS, tier: OP_TIER,
   side1: OP_SIDE1, side2: OP_SIDE2, side3: OP_SIDE3, side4: OP_SIDE4 };
 const FUNCS: Record<string, { op: number; args: number }> = {
@@ -158,8 +160,8 @@ export function compileFormula(text: string, out: number[]): FormulaResult {
     if (q.t === 'ref') { p++; out.push(OP_REF, q.v); stack(1); return; }
     if (q.t === 'name') {
       p++;
-      if (q.v in NAMES) { out.push(NAMES[q.v]); stack(1); return; }
-      const fn = FUNCS[q.v];
+      if (SMALL_FIX.G788 !== 0 ? _own(NAMES, q.v) : q.v in NAMES) { out.push(NAMES[q.v]); stack(1); return; }
+      const fn = SMALL_FIX.G788 !== 0 && !_own(FUNCS, q.v) ? undefined : FUNCS[q.v];
       if (!fn) { fail('Unknown word "' + q.v + '"', q.at); return; }
       if (!isOp('(')) { fail('"' + q.v + '" needs brackets', q.at); return; }
       p++;

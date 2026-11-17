@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { TEXT_LIMITS } from './kit/textLimits';
 import { Bot, HdFileUser, HdArtificialIntelligence03, HdBoxingGlove01, HdFingerprintScan } from './ui/icons';
 import { dreadBehavior } from '../types';
 import { LibraryItem, EnemyConfig, AIBehavior, UpgradeLogic, FacingType, TankConfig, GameModeConfig, TEAM_COLORS, TEAM_COLORS_DARK, TEAM_COLORS_LIGHT, TEAM_NAMES, AIBehaviorCategory, isTeamMode, offeredBehaviorsForMode, allowedBehaviorsForMode, defaultBehaviorForMode, keepsOwnColor, SANDBOX_TEAMS, TEAM_IDX_NEUTRAL } from '../types';
@@ -9,6 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { normalizeTurret } from '../game/GameLogic';
 import { Modal } from './kit/Modal';
 import { Group, NumberField, SelectRow, ToggleRow, SliderRow, headerIcon } from './kit/kit';
+import { Reveal } from './kit/Collapse';
 import { HelpTooltip } from './shared/HelpTooltip';
 
 
@@ -84,6 +86,7 @@ export const EnemyConfigPopup: React.FC<Props> = ({
   const [baseLevel, setBaseLevel] = useState(existingConfig?.baseLevel || 0);
   const [aiBehavior, setAiBehavior] = useState<string>(initialBehavior);
   const [upgradeLogic, setUpgradeLogic] = useState<UpgradeLogic>(existingConfig?.upgradeLogic || 'OffensiveWeighted');
+  const [speedFirst, setSpeedFirst] = useState(existingConfig?.speedFirst ?? 95);
   const [forceAutospin, setForceAutospin] = useState(existingConfig?.forceAutospin || false);
   const [forceAutoshoot, setForceAutoshoot] = useState(existingConfig?.forceAutoshoot || false);
   const [maxSpawnCount, setMaxSpawnCount] = useState(existingConfig?.maxSpawnCount || 1);
@@ -135,6 +138,7 @@ export const EnemyConfigPopup: React.FC<Props> = ({
       aiBehavior: (aiBehavior === BOSS_TEAM_OPTION ? 'FFA' : aiBehavior) as AIBehavior,
       bossTeam: aiBehavior === BOSS_TEAM_OPTION ? true : undefined,
       upgradeLogic: finalUpgradeLogic,
+      speedFirst,
       forceAutospin: lockedAutospin !== null ? lockedAutospin : forceAutospin,
       forceAutoshoot: lockedAutoshoot !== null ? lockedAutoshoot : forceAutoshoot,
       maxSpawnCount: Math.max(1, Math.min(20, maxSpawnCount)),
@@ -229,7 +233,7 @@ export const EnemyConfigPopup: React.FC<Props> = ({
         <Group title="Enemy" icon={headerIcon(HdFileUser)}>
           <div className="k-num">
             <label htmlFor="enemy-cfg-name" className="k-num-label"><HelpTooltip text="The name shown over this bot in a game and on the leaderboard." />Enemy Name</label>
-            <input id="enemy-cfg-name" type="text" value={enemyName} onChange={(e) => setEnemyName(e.target.value)} placeholder="Enter enemy name..." className="k-field" />
+            <input id="enemy-cfg-name" type="text" maxLength={TEXT_LIMITS.NAME} value={enemyName} onChange={(e) => setEnemyName(e.target.value)} placeholder="Enter enemy name..." className="k-field" />
           </div>
           <div className="k-grid-2">
             <NumberField id="enemy-cfg-level" label="Base Level (0 to 100)" value={baseLevel} onChange={(e) => handleLevelChange(e.target.value)} min={0} max={100}
@@ -245,6 +249,10 @@ export const EnemyConfigPopup: React.FC<Props> = ({
             options={{ 'primaryTurret': 'Primary Turret (Default)', 'faceTarget': 'Face Target', 'smoothFaceTarget': 'Smooth Face Target', 'faceMotion': 'Face Motion' }} />
           <SelectRow label="Upgrade Logic" locked={upgradeLockMode !== 'none'} description={upgradeNote}
             value={upgradeSelect.value} onChange={(val) => { if (!upgradeSelect.disabled) setUpgradeLogic(val as UpgradeLogic); }} options={upgradeSelect.options} disabled={upgradeSelect.disabled} />
+          <Reveal when={upgradeLockMode === 'custom' || (upgradeLockMode === 'none' && upgradeLogic === 'OffensiveWeighted')}>
+            <SliderRow label="Speed First" value={speedFirst} onChange={setSpeedFirst} min={0} max={100} step={1} unit="%"
+              help="The chance that this bot gives up attack points for movement speed when it starts. Most bots trade one point each of bullet damage, bullet health and bullet penetration, and fill these gaps later when they have points to spare." />
+          </Reveal>
         </Group>
 
         <Group title="Combat" icon={headerIcon(HdBoxingGlove01)}>

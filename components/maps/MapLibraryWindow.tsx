@@ -1,4 +1,5 @@
 import { isTouchScreen } from '../../utils/device';
+import { TEXT_LIMITS } from '../kit/textLimits';
 import { getPlayEntry } from '../../game/gameModeRegistry';
 import { modeCards, entryCardConfig } from './modeCatalog';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
@@ -33,6 +34,7 @@ import { rockCards, rockCardConfig, rockPicKey, rockCardIsUsed, rocksScattered, 
 import { mapPictures, requestMapPicture, loadBuiltMazePictures, builtMazePicturesFailed, releaseMapPictures, mazePicKey, minePicKey, modePicKey, type MapPic } from './mapPictures';
 import { Search, X, Play, Trash2, Download, HdLibrary, HdMapFile, HdPaintBrush04, SearchX, EMPTY_LINE, type AppIcon } from '../ui/icons';
 import type { OpenFlag } from '../library/LibraryWindowSlot';
+import { TabSlide } from '../kit/TabSlide';
 
 const CLOSE_MS = 120;
 const BAR_H = 36;
@@ -227,6 +229,7 @@ export const MapLibraryWindow: React.FC<MapLibraryWindowProps> = (p) => {
       tabs={(
         <div className="k-win-head shrink-0 flex items-center px-5 pb-3 border-b border-[var(--alpha-divider)]">
           <div className="k-lib-tabs" role="tablist" aria-label="Show">
+            <TabSlide pick=".k-lib-tab-on" />
             {TABS.filter(t => !p.pickOnly || t.id !== 'mode').map(t => (
               <button key={t.id} type="button" role="tab" aria-selected={t.id === tabShown} onClick={() => pickTab(t.id)}
                 className={`k-lib-tab${t.id === tabShown ? ' k-lib-tab-on' : ''}`}>
@@ -389,9 +392,9 @@ export const CardsWindow: React.FC<CardsWindowProps> = (p) => {
               <HdLibrary size={20} absoluteStrokeWidth className="text-[var(--text-primary)] shrink-0" />
               <h2 className="k-modal-title min-w-0 truncate">{p.title}</h2>
             </div>
-            <div className="relative flex-1 max-w-[520px] mx-auto">
+            <div className="k-search-host relative flex-1 max-w-[520px] mx-auto">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--k-search-icon)] pointer-events-none" />
-              <input ref={searchRef} type="text" value={query} onChange={e => setQuery(e.target.value)} dir="auto" autoFocus={!isTouchScreen()}
+              <input ref={searchRef} type="text" value={query} maxLength={TEXT_LIMITS.SEARCH} onChange={e => setQuery(e.target.value)} dir="auto" autoFocus={!isTouchScreen()}
                 onKeyDown={e => { if (e.key === 'Escape' && query) { e.preventDefault(); e.stopPropagation(); setQuery(''); } }}
                 placeholder={p.searchLabel} aria-label={p.searchLabel}
                 className="k-text-in k-search-bar w-full h-9 pl-9 pr-16 rounded-lg text-[13px] bg-[var(--k-search-bg)] border border-[var(--alpha-card-border)] shadow-[var(--shadow-input)] text-[var(--text-primary)] placeholder:text-[var(--k-placeholder)] outline-none" />

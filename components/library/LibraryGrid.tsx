@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { TEXT_LIMITS } from '../kit/textLimits';
 import { Star, Check, Lock, HdFileBox, HdMapFile, HdFileAttachment, MoreHorizontal, EMPTY_LINE } from '../ui/icons';
 import { useEscapeOwner } from '../shared/escapeStack';
 import type { LibEntry } from './catalog';
@@ -8,13 +9,15 @@ import type { FrameLoop } from './frameLoop';
 import { pictureOf, hasPicture } from './libraryPictures';
 import { cardFacts } from './libraryMeta';
 import { cmHex, CM, CM_USE } from '../../utils/colorMap';
-import { FOLD_FADE_MS, Fade, SwapInPlace } from '../kit/Collapse';
+import { FOLD_FADE_MS, Fade } from '../kit/Collapse';
+import { usePresence } from '../kit/Deferred';
 import { motionOff, easeToward, motionCause, holdControl } from '../kit/presence';
 import { planCardMotion, stepCardMotion, type CardMotion, type CardPlace } from '../kit/cardMotion';
 const PIC_WAIT_MS = 200;
 const PIC_SHOWN_MS = 50;
 import { gameGridLine } from '../shared/GameFloor';
 import { SMALL_FIX } from '../../game/smallFixSwitch';
+import { useClassicUi } from '../shared/useClassicUi';
 
 export interface GridSection { id: string; title?: string; entries: readonly LibEntry[]; }
 
@@ -67,6 +70,7 @@ const MIN_W: Record<CardSize, number> = { s: 146, m: 178, l: 230 };
 const MIN_W_NARROW: Record<CardSize, number> = { s: 84, m: 104, l: 200 };
 const NARROW_CTRL_W = 124;
 const FOOT_H = 58;
+const FOOT_H_NAME = 34;
 export const HUB_BAR_H = 36;
 export type GridVariant = 'library' | 'hub';
 
@@ -74,6 +78,7 @@ export interface HubHost {
   renamingKey: string | null;
   onMenu(e: LibEntry, ev: React.MouseEvent): void;
   onRenameDone(e: LibEntry, name: string | null): void;
+  onRename(e: LibEntry): void;
   need(e: LibEntry): void;
 }
 const FAST_PX_S = 2600;
@@ -81,9 +86,9 @@ const SETTLE_MS = 90;
 const EASE_MS = 70;
 
 interface Row { kind: 'title' | 'cards'; top: number; h: number; section: number; start: number; count: number; title: string; }
-export interface GridLayout { cols: number; cardW: number; heroH: number; heroTop: number; cardH: number; rows: Row[]; contentH: number; }
+export interface GridLayout { cols: number; cardW: number; heroH: number; heroTop: number; cardH: number; rows: Row[]; contentH: number; footH: number; }
 
-export function gridLayout(sections: readonly GridSection[], vw: number, size: CardSize, extraH: number, variant: GridVariant = 'library', narrow = false): GridLayout {
+export function gridLayout(sections: readonly GridSection[], vw: number, size: CardSize, extraH: number, variant: GridVariant = 'library', narrow = false, footH = FOOT_H): GridLayout {
   const inner = Math.max(120, vw - PAD * 2);
   const minW = narrow ? Math.max(MIN_W_NARROW[size], extraH > 0 ? NARROW_CTRL_W : 0) : MIN_W[size];
   const cols = Math.max(1, Math.floor((inner + GAP) / (minW + GAP)));
@@ -91,7 +96,7 @@ export function gridLayout(sections: readonly GridSection[], vw: number, size: C
   const hub = variant === 'hub';
   const heroH = Math.round(cardW * (hub ? 0.74 : 0.8));
   const heroTop = hub ? HUB_BAR_H : 0;
-  const cardH = hub ? HUB_BAR_H + heroH : heroH + FOOT_H + extraH;
+  const cardH = hub ? HUB_BAR_H + heroH : heroH + footH + extraH;
   const rows: Row[] = [];
   let y = PAD;
   sections.forEach((s, si) => {
@@ -103,7 +108,7 @@ export function gridLayout(sections: readonly GridSection[], vw: number, size: C
     }
     y += GAP;
   });
-  return { cols, cardW, heroH, heroTop, cardH, rows, contentH: Math.max(0, y - GAP * 2 + PAD) };
+  return { cols, cardW, heroH, heroTop, cardH, rows, contentH: Math.max(0, y - GAP * 2 + PAD), footH };
 }
 
 function rowsSkeletonTile(L: GridLayout, vw: number): string {
@@ -112,22 +117,26 @@ function rowsSkeletonTile(L: GridLayout, vw: number): string {
   const v = (n: string, d: string) => (css.getPropertyValue(n).trim() || d);
   const card = hub ? v('--k-box-bg', '#fffffe') : v('--k-lib-card-bg', v('--layer-2', '#fffffe')), edge = v('--alpha-card-border', 'rgba(0,0,0,0.1)'), skel = v('--shimmer-a', '#f5f5f6');
   const head = hub ? v('--k-hub-card-head', v('--k-card-head', card)) : v('--k-card-head', card);
+  const lw = parseFloat(v('--k-line', '1')) || 1, R = parseFloat(v('--k-skel-r', '11.5'));
+  const ir = Math.max(0, R - lw / 2), sq = R === 0, rr = (n: number) => (sq ? 0 : n);
+  const sw = lw === 1 ? '' : ` stroke-width="${lw}"`;
+  const top = (x: number, base: number) => `M${x + lw} ${base}V${lw + ir}a${ir} ${ir} 0 0 1 ${ir}-${ir}h${L.cardW - 2 * lw - 2 * ir}a${ir} ${ir} 0 0 1 ${ir} ${ir}V${base}Z`;
   const W = Math.max(1, Math.ceil(vw)), H = Math.max(1, Math.round(L.cardH + GAP));
   const bw = (L.cardW - 26);
   let r = '';
   for (let c = 0; c < L.cols; c++) {
     const x = PAD + c * (L.cardW + GAP);
-    r += `<rect x="${x + 0.5}" y="0.5" width="${L.cardW - 1}" height="${L.cardH - 1}" rx="11.5" fill="${card}" stroke="${edge}"/>`;
+    r += `<rect x="${x + lw / 2}" y="${lw / 2}" width="${L.cardW - lw}" height="${L.cardH - lw}" rx="${R}" fill="${card}" stroke="${edge}"${sw}/>`;
     if (L.heroTop > 0) {
-      r += `<path d="M${x + 1} ${L.heroTop}V12a11 11 0 0 1 11-11h${L.cardW - 24}a11 11 0 0 1 11 11V${L.heroTop}Z" fill="${head}"/>`;
-      r += `<rect x="${x + 12}" y="${L.heroTop / 2 - 6}" width="12" height="12" rx="3" fill="${skel}"/>`;
-      r += `<rect x="${x + 32}" y="${L.heroTop / 2 - 5}" width="${bw * 0.55}" height="10" rx="4" fill="${skel}"/>`;
-      r += `<rect x="${x + 12}" y="${L.heroTop + 12}" width="${L.cardW - 24}" height="${L.heroH - 24}" rx="8" fill="${skel}"/>`;
+      r += `<path d="${top(x, L.heroTop)}" fill="${head}"/>`;
+      r += `<rect x="${x + 12}" y="${L.heroTop / 2 - 6}" width="12" height="12" rx="${rr(3)}" fill="${skel}"/>`;
+      r += `<rect x="${x + 32}" y="${L.heroTop / 2 - 5}" width="${bw * 0.55}" height="10" rx="${rr(4)}" fill="${skel}"/>`;
+      r += `<rect x="${x + 12}" y="${L.heroTop + 12}" width="${L.cardW - 24}" height="${L.heroH - 24}" rx="${rr(8)}" fill="${skel}"/>`;
       continue;
     }
-    r += `<path d="M${x + 1} ${L.heroH}V12a11 11 0 0 1 11-11h${L.cardW - 24}a11 11 0 0 1 11 11V${L.heroH}Z" fill="${skel}"/>`;
-    r += `<rect x="${x + 13}" y="${L.heroH + 12}" width="${bw * 0.62}" height="14" rx="4" fill="${skel}"/>`;
-    r += `<rect x="${x + 13}" y="${L.heroH + 31}" width="${bw * 0.38}" height="20" rx="8" fill="${skel}"/>`;
+    r += `<path d="${top(x, L.heroH)}" fill="${skel}"/>`;
+    r += `<rect x="${x + 13}" y="${L.heroH + 12}" width="${bw * 0.62}" height="14" rx="${rr(4)}" fill="${skel}"/>`;
+    if (L.footH >= FOOT_H) r += `<rect x="${x + 13}" y="${L.heroH + 31}" width="${bw * 0.38}" height="20" rx="${rr(8)}" fill="${skel}"/>`;
   }
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${r}</svg>`;
   return `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}")`;
@@ -189,11 +198,14 @@ export const CardSkeleton: React.FC<{ x: number; y: number; w: number; heroH: nu
       <div className="p-3" style={{ height: heroH }}><div className="skeleton-shimmer h-full w-full rounded-lg" /></div>
     </div>
   ) : (
-  <div aria-hidden className="absolute rounded-xl border border-[var(--alpha-card-border)] bg-[var(--k-lib-card-bg)] overflow-hidden" style={{ left: x, top: y, width: w, height: h }}>
-    <div className="skeleton-shimmer" style={{ height: heroH, borderRadius: 0 }} />
-    <div className="px-3 pt-3">
-      <div className="skeleton-shimmer h-3.5 rounded" style={{ width: '62%' }} />
-      <div className="skeleton-shimmer h-5 rounded-lg mt-[5px]" style={{ width: '38%' }} />
+  <div aria-hidden className="group absolute" style={{ left: x, top: y, width: w, height: h }}>
+    <div className="absolute inset-0 rounded-xl border bg-[var(--k-lib-card-bg)] shadow-[var(--k-card-shadow)] border-[var(--alpha-card-border)]" />
+    <div className="absolute overflow-hidden rounded-t-[11px]" style={{ left: 1, top: 1, right: 1, height: heroH - 1 }}>
+      <div className="absolute inset-0 skeleton-shimmer" style={{ borderRadius: 0 }} />
+    </div>
+    <div className="absolute left-0 right-0 px-3" style={{ top: heroH + 9 }}>
+      <div className="skeleton-shimmer k-lib-skel-name" style={{ width: '62%' }} />
+      <div className="skeleton-shimmer k-lib-skel-facts" style={{ width: '38%' }} />
     </div>
   </div>
   )
@@ -201,16 +213,22 @@ export const CardSkeleton: React.FC<{ x: number; y: number; w: number; heroH: nu
 CardSkeleton.displayName = 'CardSkeleton';
 
 const HUB_ICON = { project: HdFileBox, map: HdMapFile, file: HdFileAttachment } as const;
+const HUB_RENAME_MS = 140;
 
 const HubRename: React.FC<{ initial: string; onDone: (name: string | null) => void }> = ({ initial, onDone }) => {
   const [v, setV] = useState(initial);
   const ref = useRef<HTMLInputElement>(null);
   const done = useRef(false);
   const finish = (name: string | null) => { if (done.current) return; done.current = true; onDone(name); };
-  useEffect(() => { const el = ref.current; if (el) { el.focus(); el.select(); } }, []);
+  useEffect(() => {
+    let raf = 0, tries = 0;
+    const take = () => { raf = 0; const el = ref.current; if (!el || done.current) return; if (document.activeElement !== el) { el.focus(); el.select(); } if (document.activeElement !== el && ++tries < 90) raf = requestAnimationFrame(take); };
+    take();
+    return () => { if (raf) cancelAnimationFrame(raf); };
+  }, []);
   useEscapeOwner(() => finish(null));
   return (
-    <input ref={ref} dir="auto" className="k-hub-rename k-text-in" value={v} maxLength={80} aria-label="New name"
+    <input ref={ref} dir="auto" className="k-hub-rename k-text-in" value={v} maxLength={TEXT_LIMITS.NAME} aria-label="New name"
       onChange={e => setV(e.target.value)} onClick={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}
       onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); finish(v); } }}
       onBlur={() => finish(v)} />
@@ -231,6 +249,19 @@ const HubCard: React.FC<HubCardProps> = React.memo(({ e, slotKey, x, y, w, heroH
   const big = Math.max(28, Math.min(48, Math.round(heroH * 0.32)));
   const cell = Math.max(14, Math.round(w / 9));
   const word = hb.kind === 'project' ? 'Project' : hb.icon === 'map' ? 'Map file' : 'File';
+  const rn = usePresence(renaming, HUB_RENAME_MS);
+  const rnAt = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const at = rnAt.current, box = at?.querySelector('input'), name = at?.parentElement?.querySelector('.k-hub-name');
+    if (!at || !box || !name) return;
+    at.style.left = '0px';
+    const cs = getComputedStyle(box);
+    const range = document.createRange(); range.selectNodeContents(name);
+    const nameX = range.getClientRects()[0]?.left ?? name.getBoundingClientRect().left;
+    const boxX = box.getBoundingClientRect().left + (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.paddingLeft) || 0);
+    const k = at.offsetWidth > 0 ? at.getBoundingClientRect().width / at.offsetWidth : 1;
+    at.style.left = `${((nameX - boxX) / k).toFixed(2)}px`;
+  }, [rn.mounted]);
   return (
     <div
       ref={refCb}
@@ -248,11 +279,14 @@ const HubCard: React.FC<HubCardProps> = React.memo(({ e, slotKey, x, y, w, heroH
       <div className="absolute inset-0 rounded-xl shadow-[var(--shadow-raise)] opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none" />
       <div className="k-hub-bar">
         <Small size={14} className="shrink-0" />
-        <SwapInPlace swapKey={!!renaming} hold={false} className="min-w-0 flex-1 flex">
-        {renaming
-          ? <HubRename initial={e.name} onDone={name => host.onRenameDone(e, name)} />
-          : <span className="k-hub-name" dir="auto">{e.name}</span>}
-        </SwapInPlace>
+        <div className="relative min-w-0 flex-1 flex">
+          <span className={`k-hub-name${renaming ? ' k-hub-name-away' : ''}`} dir="auto" onDoubleClick={ev => { ev.stopPropagation(); host.onRename(e); }}>{e.name}</span>
+          {rn.mounted && (
+            <span ref={rnAt} className={`k-hub-rename-at${rn.leaving ? ' k-hub-rename-leave' : ''}`} inert={rn.leaving || undefined}>
+              <HubRename initial={e.name} onDone={name => host.onRenameDone(e, name)} />
+            </span>
+          )}
+        </div>
         <Fade when={!renaming}>{(
           <button type="button" className="k-hub-more" aria-label={`More for ${e.name}`} data-tip="More"
             onClick={ev => { ev.stopPropagation(); host.onMenu(e, ev); }} onDoubleClick={ev => ev.stopPropagation()}>
@@ -300,7 +334,7 @@ const Card: React.FC<CardProps> = React.memo(({ e, slotKey, x, y, w, heroH, h, l
         backgroundImage: `linear-gradient(${grid} 1px, transparent 1px), linear-gradient(90deg, ${grid} 1px, transparent 1px)`,
         backgroundSize: `${cell}px ${cell}px`, backgroundPosition: 'center center' }}>
         <div className="absolute inset-0 skeleton-shimmer transition-opacity duration-200 group-data-[ready=1]:opacity-0" style={{ borderRadius: 0 }} />
-        <div aria-hidden={!chosen} className={`absolute left-2.5 bottom-2.5 h-6 w-6 rounded-full bg-[var(--accent)] text-[var(--accent-ink)] grid place-items-center shadow-[var(--shadow-sm)] transition-opacity duration-150 ${chosen ? 'opacity-100' : 'opacity-0'}`}>
+        <div aria-hidden={!chosen} className={`k-lib-chosen absolute left-2.5 bottom-2.5 h-6 w-6 rounded-full bg-[var(--accent)] text-[var(--accent-ink)] grid place-items-center shadow-[var(--shadow-sm)] transition-opacity duration-150 ${chosen ? 'opacity-100' : 'opacity-0'}`}>
           <Check size={14} strokeWidth={3} />
         </div>
         {lock && (
@@ -323,7 +357,7 @@ const Card: React.FC<CardProps> = React.memo(({ e, slotKey, x, y, w, heroH, h, l
         onDoubleClick={(ev) => ev.stopPropagation()}
         title={fav ? 'Remove from favourites' : 'Add to favourites'}
         aria-label={fav ? 'Remove from favourites' : 'Add to favourites'}
-        className={`k-ico absolute right-2 top-2 h-7 w-7 grid place-items-center rounded-md transition-opacity duration-150 text-[var(--text-secondary)] hover:bg-[var(--alpha-hover)] ${fav ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
+        className={`k-ico k-lib-star absolute right-2 top-2 h-7 w-7 grid place-items-center rounded-md transition-opacity duration-150 text-[var(--text-secondary)] hover:bg-[var(--alpha-hover)] ${fav ? 'k-lib-star-on opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
       >
         <Star size={15} fill={fav ? 'currentColor' : 'none'} />
       </button>
@@ -333,7 +367,7 @@ const Card: React.FC<CardProps> = React.memo(({ e, slotKey, x, y, w, heroH, h, l
           <span className={`text-[13px] leading-tight truncate ${lock ? 'text-[var(--text-tertiary)]' : 'text-[var(--text-primary)]'}`}>{e.name}</span>
         </div>
         {lock
-          ? <div className="mt-1.5 flex items-center gap-1.5 min-w-0 text-[11px] leading-none text-[var(--text-tertiary)]"><span className="truncate">{lock}</span></div>
+          ? <div className="k-lib-lockline mt-1.5 flex items-center gap-1.5 min-w-0 text-[11px] leading-none text-[var(--text-tertiary)]"><span className="truncate">{lock}</span></div>
           : <div className="k-lib-facts k-fade">{facts.map(t => <span key={t} className="k-badge">{t}</span>)}</div>}
         {extra}
       </div>
@@ -363,7 +397,8 @@ export const LibraryGrid = React.forwardRef<LibraryGridHandle, Props>((props, re
   const readyKeys = useRef(new Set<string>());
   const bornAt = useRef(new Map<string, number>());
   const readyAt = useRef(new Map<string, number>());
-  const layout = useMemo(() => gridLayout(sections, vw, size, extraH, variant, narrow), [sections, vw, size, extraH, variant, narrow]);
+  const classicUi = useClassicUi();
+  const layout = useMemo(() => gridLayout(sections, vw, size, extraH, variant, narrow, classicUi ? FOOT_H_NAME : FOOT_H), [sections, vw, size, extraH, variant, narrow, classicUi]);
   const layoutRef = useRef(layout); layoutRef.current = layout;
   const sectionsRef = useRef(sections); sectionsRef.current = sections;
   const motionRef = useRef<GridMotion | null>(null);
@@ -842,7 +877,7 @@ export const LibraryGrid = React.forwardRef<LibraryGridHandle, Props>((props, re
         {items}
       </div>
       <Fade when={noResults} delay={FOLD_FADE_MS} className="absolute inset-0 grid place-items-center px-8">{empty}</Fade>
-      <div ref={trackRef} onPointerDown={onTrackDown} className="absolute right-px top-1.5 bottom-1.5 w-2.5 z-[2]">
+      <div ref={trackRef} onPointerDown={onTrackDown} className="k-lgrid-bar absolute right-px top-1.5 bottom-1.5 w-2.5 z-[2]">
         <div
           ref={thumbRef}
           onPointerDown={onThumbDown}

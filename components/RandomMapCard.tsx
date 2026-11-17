@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { pushUndoAction } from './shell/undoActions';
 import type { GameLogic } from '../game/GameLogic';
 import type { GameModeConfig, LibraryItem } from '../types';
 import type { MapPool, MapPoolRow } from '../game/modeWorlds';
@@ -48,11 +49,12 @@ export const RandomMapCard: React.FC<{ logic: GameLogic; config: GameModeConfig;
     const at = pool.rows.indexOf(r);
     setRows(pool.rows.filter(x => x !== r));
     const back = () => { const now = logic.state.gameModeConfig.mapPool ?? pool; const rows = now.rows.slice(); rows.splice(at, 0, r); onChange({ ...now, rows }); };
-    toast('success', `Removed "${r.name}" from the list.`, { label: 'Undo', run: SMALL_FIX.R908 !== 0 ? sameProjectUndo(logic, toast, back) : back });
+    toast('success', `Removed "${r.name}" from the list. Ctrl Z brings it back.`);
+    pushUndoAction(logic, SMALL_FIX.R908 !== 0 ? sameProjectUndo(logic, toast, back) : back);
   };
   return (
     <Group title="Random Map" icon={headerIcon(HdGame)}>
-      <ToggleRow label="Random Map" help="Each match starts on one map of this list, picked by the shares. A maze type or a rock pattern gives a new layout every match; a saved map, single or multi area, is always that map. Your map in the editor stays yours."
+      <ToggleRow label="Choose Between" help="Each match starts on one map of this list, picked by the shares. A maze type or a rock pattern gives a new layout every match; a saved map, single or multi area, is always that map. Your map in the editor stays yours."
         checked={pool.on} onChange={v => onChange({ ...pool, on: v })} />
       <Reveal when={pool.on}>
         <div className="k-stack">

@@ -142,9 +142,9 @@
         "knockback": 8.214286,
         "spread": 0,
         "shudder": 0.201,
-        "bulletDamage": 1.74386,
-        "bulletHealthBase": 1.28043,
-        "bulletPenetration": 1.38,
+        "bulletDamage": 2.15291,
+        "bulletHealthBase": 1.25533,
+        "bulletPenetration": 1.53333,
         "bulletLifetime": 6.833333333333333,
         "shootResist": 5.55324,
         "shootDensity": 1.2,
@@ -243,7 +243,8 @@
         "gunStatScale": 1,
         "color": "#a7a7af",
         "colorMap": 16,
-        "fightResist": 3
+        "fightResist": 3,
+        "releaseDepth": 91.4
       },
       {
         "id": "cf6e937996293be2__g2",
@@ -369,9 +370,9 @@
         "knockback": 8.214286,
         "spread": 103.06,
         "shudder": 0.206,
-        "bulletDamage": 1.74386,
-        "bulletHealthBase": 1.28043,
-        "bulletPenetration": 1.38,
+        "bulletDamage": 2.15291,
+        "bulletHealthBase": 1.25533,
+        "bulletPenetration": 1.53333,
         "bulletLifetime": 6.833333333333333,
         "shootResist": 5.55324,
         "shootDensity": 1.2,
@@ -470,7 +471,8 @@
         "gunStatScale": 1,
         "color": "#a7a7af",
         "colorMap": 16,
-        "fightResist": 3
+        "fightResist": 3,
+        "releaseDepth": 91.4
       },
       {
         "id": "cf6e937996293be2__g4",
@@ -596,9 +598,9 @@
         "knockback": 8.214286,
         "spread": 0,
         "shudder": 0.195,
-        "bulletDamage": 1.74386,
-        "bulletHealthBase": 1.28043,
-        "bulletPenetration": 1.38,
+        "bulletDamage": 2.15291,
+        "bulletHealthBase": 1.25533,
+        "bulletPenetration": 1.53333,
         "bulletLifetime": 6.833333333333333,
         "shootResist": 5.55324,
         "isCustom": false,
@@ -696,7 +698,8 @@
         "gunStatScale": 1,
         "color": "#a7a7af",
         "colorMap": 16,
-        "fightResist": 3
+        "fightResist": 3,
+        "releaseDepth": 91.4
       }
     ],
     "maxSkillPoints": 42,

@@ -1,4 +1,6 @@
 import { SMALL_FIX } from '../../game/smallFixSwitch';
+import { pushUndoAction } from '../shell/undoActions';
+import { TEXT_LIMITS } from '../kit/textLimits';
 import { UNDO_ELSEWHERE } from './sameProjectUndo';
 import { toast } from '../ui/Toast';
 import { firstFreeName } from '../../game/MapEditor';
@@ -98,6 +100,7 @@ const GroupCard: React.FC<{
             onFocus={e => e.currentTarget.select()}
             ref={el => { if (el && document.activeElement !== el) el.focus({ preventScroll: true }); }}
             aria-label="Group name"
+            maxLength={TEXT_LIMITS.NAME}
             className="k-field flex-1 min-w-0"
           />
         ) : (
@@ -185,7 +188,7 @@ export const BossSpawnSettings: React.FC<Props> = ({ config, updateConfig, tankL
     const before = copyGroups(), beforeKeys = keysRef.current;
     keysRef.current = keysRef.current.filter((_, i) => i !== index);
     updateConfig({ bossGroups: copyGroups().filter((_, i) => i !== index) });
-    if (SMALL_FIX.R811) toast('success', `Deleted "${before[index].name}".`, { label: 'Undo', run: samePlace(() => { keysRef.current = beforeKeys; latestUpdate.current({ bossGroups: before }); }) });
+    if (SMALL_FIX.R811) { toast('success', `Deleted "${before[index].name}". Ctrl Z brings it back.`); if (logic) pushUndoAction(logic, samePlace(() => { keysRef.current = beforeKeys; latestUpdate.current({ bossGroups: before }); })); }
   };
 
   return (
@@ -258,7 +261,7 @@ export const BossSpawnSettings: React.FC<Props> = ({ config, updateConfig, tankL
                 <MotionRow.Item key="reset"><Button size="sm" onClick={() => {
                   const before = copyGroups();
                   updateConfig({ bossGroups: defaultBossGroups() });
-                  if (SMALL_FIX.R811) toast('success', 'The shipped boss groups are back.', { label: 'Undo', run: samePlace(() => latestUpdate.current({ bossGroups: before })) });
+                  if (SMALL_FIX.R811) { toast('success', 'The shipped boss groups are back. Ctrl Z takes it back.'); if (logic) pushUndoAction(logic, samePlace(() => latestUpdate.current({ bossGroups: before }))); }
                 }}
                   title="Put the shipped groups back">
                   Reset

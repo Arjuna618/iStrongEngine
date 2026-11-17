@@ -6,6 +6,7 @@ import { GAME_MODE_TITLES } from '../gameModeTitles';
 import { MAX_ARENA_TANKS } from '../../types';
 import { CMD_ROOM_MAX } from '../chatCommands';
 import { clampTankDebuffs } from '../tankDebuffs';
+import { clampBotFeel } from '../humanFeel';
 import { cleanHalloweenLook } from '../../utils/halloween';
 import { clampGrowthRules } from '../growthRules';
 import { STARTING_SCORE_MAX } from '../vampirism';
@@ -260,6 +261,7 @@ function readEnemies(d: unknown, fresh: EngineSnapshot['enemies']): EngineSnapsh
     cfg.maxSpawnCount = clamp(c.maxSpawnCount, 1, 20, 1);
     if (SMALL_FIX.GH328 !== 0) { cfg.baseLevel = Math.round(cfg.baseLevel); cfg.maxSpawnCount = Math.round(cfg.maxSpawnCount); }
     cfg.aimbotStrength = clamp(c.aimbotStrength, 0, 100, 50);
+    if (c.speedFirst !== undefined) cfg.speedFirst = Math.round(clamp(c.speedFirst, 0, 100, 95));
     cfg.turnSpeed = clamp(c.turnSpeed, 0, 100, 50);
     if (cfg.sourceTankWord !== undefined && typeof cfg.sourceTankWord !== 'string') delete cfg.sourceTankWord;
     if (isObj(c.tankRef) && typeof c.tankRef.libraryId === 'string') { cfg.tankRef = { libraryId: c.tankRef.libraryId }; delete cfg.tankConfig; }
@@ -328,6 +330,7 @@ function modeLimits(m: Record<string, unknown>, fresh: Record<string, unknown>):
     }
     if (g.world !== undefined && typeof g.world !== 'string') delete g.world;
     if (g.tankDebuffs !== undefined) { const d = clampTankDebuffs(g.tankDebuffs); if (d) g.tankDebuffs = d; else delete g.tankDebuffs; }
+    if (g.botFeel !== undefined) { const b = clampBotFeel(g.botFeel); if (b) g.botFeel = b; else delete g.botFeel; }
     if (g.halloween !== undefined) { const h = cleanHalloweenLook(g.halloween); if (h) g.halloween = h; else delete g.halloween; }
     if (g.vampirism !== undefined && g.vampirism !== true) delete g.vampirism;
     if (g.startingScore !== undefined && (typeof g.startingScore !== 'number' || !Number.isFinite(g.startingScore))) delete g.startingScore;
@@ -342,6 +345,7 @@ function modeLimits(m: Record<string, unknown>, fresh: Record<string, unknown>):
     if (!isObj(t)) continue;
     limitNum(t, 'baseLevel', 0, 100, true);
     limitNum(t, 'aimbotStrength', 0, 100, false);
+    limitNum(t, 'speedFirst', 0, 100, true);
     limitNum(t, 'turnSpeed', 0, 100, false);
   }
 }

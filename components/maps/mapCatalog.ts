@@ -10,6 +10,7 @@ export function mazeCardPatch(type: number, seed: number): Partial<MapConfig> {
     mazeType: type, enableMaze: true, enableRocks: false, seed,
     gridCells: Math.max(32, MAZE_NATIVE_GRID[type] || 0), gridCellsY: undefined,
     erosionIntensity: clampErosion(type, 1),
+    wallBlocks: undefined, wallPaint: undefined, rockPaint: undefined,
   };
 }
 

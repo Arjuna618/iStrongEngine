@@ -5,6 +5,7 @@ import type { Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { buildCatalogFacts, type CatalogRecord } from './components/library/catalogCore';
 import { MENU_SCENES } from './components/menuScene/menuSceneSwitch';
+import { classicPalettes } from './utils/uiTheme';
 import { buildSourceCode } from './scripts/sourceCode.ts';
 
 function sourceCodePlugin(): Plugin {
@@ -27,6 +28,17 @@ function menuScenesSwitchPlugin(): Plugin {
   return {
     name: 'menu-scenes-switch',
     transformIndexHtml(html) { return html.replace('data-menu-scenes="1"', `data-menu-scenes="${MENU_SCENES.ON ? 1 : 0}"`); },
+  };
+}
+
+function classicPalettePlugin(): Plugin {
+  return {
+    name: 'classic-palette',
+    transformIndexHtml(html) {
+      const spot = "||__CLASSIC_PALETTE__,";
+      if (html.split(spot).length !== 2) throw new Error('classic-palette: the pre-paint line of index.html must hold its palette spot exactly once');
+      return html.replace(spot, () => '||' + JSON.stringify(classicPalettes()) + ',');
+    },
   };
 }
 
@@ -71,6 +83,7 @@ export default defineConfig(() => {
         { name: 'tailwind-css-verbatim', config: () => ({ build: { cssMinify: false } }) },
         contentCatalogPlugin(),
         menuScenesSwitchPlugin(),
+        classicPalettePlugin(),
         sourceCodePlugin(),
       ],
       resolve: {

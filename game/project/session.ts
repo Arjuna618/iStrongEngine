@@ -307,6 +307,7 @@ export class ProjectSession {
         }
         const report = this.applyRead(read);
         this.kept = read.kept;
+        if (SMALL_FIX.G785 !== 0) { this.keptEntries = null; this.keptEntryHashes = []; }
         try {
           const ke = await this.store.getMeta<{ projectId: string | null; entries: [string, Uint8Array][] }>(KEPT_ENTRIES_META);
           if (ke && ke.projectId === h.projectId && ke.entries.length > 0) await this.adoptEntries(new Map(ke.entries), h.projectId, false);

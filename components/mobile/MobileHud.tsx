@@ -19,7 +19,7 @@ import { chatInputOpenNow } from '../ChatInput';
 import { CMD_NO_ACCESS } from '../../game/chatCommands';
 import { enterFullscreen, isFullscreen, subscribeFullscreen } from '../../utils/fullscreen';
 import { hudSlideLayer } from '../../utils/hudLayer';
-
+import { spawnHoldStore } from '../../game/spawnTool';
 const STATS: readonly UpgradeStat[] = [
   'bodyDamage', 'maxHealth', 'bulletSpeed', 'bulletHealth', 'bulletPenetration', 'bulletDamage', 'reload', 'movementSpeed', 'shieldRegen', 'shieldCapacity',
 ];
@@ -187,7 +187,7 @@ export const MobileHud: React.FC<{ logic: GameLogic; scale: number; dark: boolea
   useEffect(() => () => { if (d.timer !== 0) clearTimeout(d.timer); if (d.id !== -1) { mobHudDragUp(); d.id = -1; } }, [d]);
 
   const isFull = useSyncExternalStore(subscribeFullscreen, isFullscreen, isFullscreen);
-
+  const held = useSyncExternalStore(spawnHoldStore.subscribe, spawnHoldStore.get, spawnHoldStore.get);
   const keysHeld = useRef(new Map<number, string>()).current;
   const keyDown = (e: React.PointerEvent, code: string) => {
     if (e.pointerType === 'mouse') return;
@@ -273,9 +273,12 @@ export const MobileHud: React.FC<{ logic: GameLogic; scale: number; dark: boolea
       <div ref={blockEl} style={{ position: 'absolute', left: 0, top: 0, width: 0, height: 0, pointerEvents: 'none', touchAction: 'none' }}>
         <svg width={(blockW + 2 * pad) * scale} height={(blockH + 2 * pad) * scale} viewBox={`${-pad} ${-pad} ${blockW + 2 * pad} ${blockH + 2 * pad}`}
           style={{ position: 'absolute', left: -pad * scale, top: -pad * scale, overflow: 'visible', touchAction: 'none' }}>
-          {open === 'none' && button('plus', 0, 0, MOB_BTN_H, '+', () => setOpen('menu'))}
-          {open === 'none' && button('tick', MOB_BTN_H + MOB_BTN_GAP, 0, MOB_BTN_H, '`', () => setOpen('keys'))}
-          {open === 'none' && !isFull && button('full', 2 * (MOB_BTN_H + MOB_BTN_GAP), 0, MOB_FULL_W, 'Fullscreen', fullscreen)}
+          {held.on && held.turns && button('spl', 0, 0, MOB_BTN_H, '<', () => logic.spawnerTurn(-1))}
+          {held.on && held.turns && button('spr', MOB_BTN_H + MOB_BTN_GAP, 0, MOB_BTN_H, '>', () => logic.spawnerTurn(1))}
+          {held.on && button('spx', held.turns ? 2 * (MOB_BTN_H + MOB_BTN_GAP) : 0, 0, MOB_FULL_W, 'Cancel', () => logic.spawnerCancelHeld(true))}
+          {open === 'none' && !held.on && button('plus', 0, 0, MOB_BTN_H, '+', () => setOpen('menu'))}
+          {open === 'none' && !held.on && button('tick', MOB_BTN_H + MOB_BTN_GAP, 0, MOB_BTN_H, '`', () => setOpen('keys'))}
+          {open === 'none' && !held.on && !isFull && button('full', 2 * (MOB_BTN_H + MOB_BTN_GAP), 0, MOB_FULL_W, 'Fullscreen', fullscreen)}
         </svg>
       </div>
       {open !== 'none' ? (

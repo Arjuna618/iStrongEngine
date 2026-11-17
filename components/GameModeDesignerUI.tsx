@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useSyncExternalStore } from 'react';
+import { pushUndoAction } from './shell/undoActions';
 import { GameLogic } from '../game/GameLogic';
 import { GameModeConfig, TEAM_NAMES, isManhuntMode, BOT_PORTAL_DEFAULTS, isPortalMode, SANDBOX_TEAMS } from '../types';
 import { SMALL_FIX } from '../game/smallFixSwitch';
@@ -9,6 +10,7 @@ import { useGameDark } from '../utils/useGameTheme';
 import { modeCardPictures, modeCardUrl } from './menu/modeCardPictures';
 import { Group, ToggleRow, SliderRow, SelectRow, FieldRow, Segmented, Dim, RowLabel, headerIcon, Button } from './kit/kit';
 import { sliderFillStyle } from './shared/uiHelpers';
+import { BotsCard } from './BotsCard';
 import { EditableValue } from './shared/EditableValue';
 import { ScrollArea } from './ui/ScrollArea';
 import { getPlayEntry, MODE_OPTIONS, ENGINE_MODE_GROUPS, engineModeKey, isCurrentEngineModeKey, engineModeIdForKey, engineModeLabel, resolveEngineModeConfig, isTeamModeId, supportsTeamCountChoice, teamCountForMode } from '../game/gameModeRegistry';
@@ -28,6 +30,7 @@ import { GROWTH_LIMITS, growthModeRules, type GrowthRules } from '../game/growth
 import { ALL_MODES } from '../game/allModesSwitch';
 import { HALLOWEEN_FULL, halloweenLocked } from '../utils/halloween';
 import { BASE_AREAS } from '../game/baseAreasSwitch';
+import { gameModeExportFile } from './shared/gameModeFile';
 const HALLOWEEN_LOCKED_TIP = 'Locked in this match: its map has stone and gravel, which never turn into pumpkins. It stays as you started the match. Start a new match to change it.';
 
 export { MODE_OPTIONS };
@@ -114,8 +117,7 @@ const ModeRulesCard: React.FC<{ logic: GameLogic; config: GameModeConfig; applyC
   const scripted = config.mode === 'scripted';
   const areaId = logic.state.multiAreaConfig.enableMultiArea ? logic.state.multiAreaConfig.activeAreaId : '';
   const saveFile = async () => {
-    const data = logic.gameModeFileData();
-    const file = { version: '1', type: 'GameMode', name: logic.state.mapConfig.events?.meta?.title ?? engineModeLabel(engineModeKey(config.mode, config.growth, config.preset, config.armsRace, config.world, config.teams, config.enableSpawnZones, config.overlay)), timestamp: Date.now(), data };
+    const file = gameModeExportFile(logic, logic.state.mapConfig.events?.meta?.title ?? engineModeLabel(engineModeKey(config.mode, config.growth, config.preset, config.armsRace, config.world, config.teams, config.enableSpawnZones, config.overlay)));
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' }));
     a.download = `mode-${file.name.toLowerCase().replace(/\s+/g, '-')}.json`;
@@ -131,11 +133,11 @@ const ModeRulesCard: React.FC<{ logic: GameLogic; config: GameModeConfig; applyC
         <ToggleRow label="Arms Race Tree" help="You start on the Arms Race tree. Bots stay on the Basic one." checked={config.armsRace === true} onChange={v => applyConfig({ armsRace: v || undefined })} />
       </Reveal>
       <div className="k-ev-door-col">
-        <Button size="sm" variant="primary" block onClick={() => openMapEvents(areaId)}>Open Map Events</Button>
+        <Button size="sm" variant="primary" block className="k-btn-door" onClick={() => openMapEvents(areaId)}>Open Map Events</Button>
         <Button size="sm" variant="secondary" block onClick={() => openMapEvents(areaId, 'match')}>Match Rules</Button>
         <Button size="sm" variant="secondary" block title="Tank Debuffs, Bots Stop Upgrading and Bots and Portals, with groups of tanks of your own." onClick={() => openMapEvents(areaId, 'groups')}>Tank Groups</Button>
         <Reveal when={scripted || config.mode === 'sandbox'}><Button size="sm" variant="secondary" block onClick={() => { void saveFile(); }} title="Saves this mode as a file: its rules, its map, its Map Events.">Save Mode As File</Button></Reveal>
-        <Reveal when={!!config.preset}><Button size="sm" variant="ghost" block title="This mode's Map Events and Custom Areas again, as shipped. Undo brings yours back." onClick={() => { logic.resetModeToShipped(areaId); onUpdate(); const mark = markOfLastEdit(logic); toast('info', 'Reset to shipped.', { label: 'Undo', run: () => { undoMarkedEdit(logic, mark); onUpdate(); } }); }}>Reset To Shipped</Button></Reveal>
+        <Reveal when={!!config.preset}><Button size="sm" variant="ghost" block title="This mode's Map Events and Custom Areas again, as shipped. Ctrl Z brings yours back." onClick={() => { logic.resetModeToShipped(areaId); onUpdate(); const mark = markOfLastEdit(logic); toast('info', 'Reset to shipped. Ctrl Z takes it back.'); pushUndoAction(logic, () => { undoMarkedEdit(logic, mark); onUpdate(); }); }}>Reset To Shipped</Button></Reveal>
       </div>
     </Group>
   );
@@ -515,6 +517,8 @@ export const GameModeDesignerUI: React.FC<Props> = ({ logic, onUpdate, className
           value={respawn.maxLevel} onChange={v => setRespawn({ respawnMaxLevel: v })} min={0} max={1000} step={1} />
         </Dim>
       </Group>
+
+      <BotsCard logic={logic} config={config} onUpdate={onUpdate} />
 
       <Group title="Active Settings" icon={headerIcon(HdSettingDone01)} collapsible defaultOpen={false}>
         <SummaryRow label="Mode" value={engineModeLabel(selectedModeKey)} />

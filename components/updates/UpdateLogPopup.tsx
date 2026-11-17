@@ -1,7 +1,9 @@
 import React, { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { PickGlide } from '../kit/TabSlide';
 import { createPortal } from 'react-dom';
 import { Megaphone, ChevronDown, X, ArrowUp, Archive, EMPTY_LINE } from '../ui/icons';
 import { usePortalMenuScale, useFitScale, useModalMaxHeight, useModalMaxWidth } from '../../utils/useMenuScale';
+import { useClassicUi, fitWrapStyle } from '../shared/useClassicUi';
 import { isTouchScreen } from '../../utils/device';
 
 const UL_W = 900;
@@ -214,6 +216,7 @@ export const UpdateLogPopup: React.FC<Props> = ({ onClose }) => {
   const menuScale = usePortalMenuScale();
   const fitScale = useFitScale(cardRef, menuScale * 1.3, true);
   const touch = isTouchScreen();
+  const classicUi = useClassicUi();
   const maxW = useModalMaxWidth();
   const maxH = useModalMaxHeight();
   const cardW = Math.min(UL_W, maxW), cardH = Math.min(UL_H, maxH);
@@ -391,7 +394,7 @@ export const UpdateLogPopup: React.FC<Props> = ({ onClose }) => {
   return createPortal(
     <div ref={scrimRef} className={`modal-scrim z-50 animate-fadeIn ${closing ? 'pointer-events-none' : ''}`} {...backdropProps}>
       <div
-        style={touch ? { zoom: menuScale } : { transform: `scale(${fitScale})`, transformOrigin: 'center center', willChange: 'transform' }}
+        style={touch ? { zoom: menuScale } : fitWrapStyle(fitScale, classicUi)}
         onClick={e => e.stopPropagation()}
       >
         <div ref={cardRef} role="dialog" aria-modal="true" aria-label="Update Log"
@@ -485,6 +488,7 @@ export const UpdateLogPopup: React.FC<Props> = ({ onClose }) => {
                                 </button>
                                 <Collapse open={open} onBusyChange={b => { if (b) foldBusy.current.add(mo.key); else foldBusy.current.delete(mo.key); }}>
                                   <div className="k-rd-sub">
+                                    <PickGlide pick=".k-rd-item-on" look="row" />
                                     {mo.entries.map(e => (
                                       <button
                                         key={e.date}

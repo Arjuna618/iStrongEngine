@@ -14,6 +14,8 @@ import { darkAt, type DarkWorld } from '../darkness';
 import { MF_WAVE, MF_NO_GROW } from '../growthRules';
 import { SMALL_FIX } from '../smallFixSwitch';
 import { wornMatches } from './colourWord';
+import { aimsAheadFully } from '../fixedBodies';
+import { findByShownNameOrFileKey } from '../tankByName';
 export { MF_WAVE, MF_NO_GROW };
 export const MF_STAGE = 1;
 export const MF_STANDS = 2;
@@ -40,7 +42,7 @@ export const MF_HORDE = 2097152;
 export const MF_MM_ALL = 4194304;
 export const MF_NO_KILL = 8388608;
 export const MF_IN_WALLS = 16777216;
-export const MF_LEFT_ALONE = 33554432;
+export const MF_LEFT_ALONE = SMALL_FIX.R960 !== 0 ? 134217728 : 33554432;
 export function isStage(e: { _mevF?: number }): boolean { return ((e._mevF ?? 0) & MF_STAGE) !== 0; }
 
 export interface MevEngine {
@@ -282,7 +284,7 @@ export class GameMapEventsHost implements MapEventsHost {
 
   private configFor(req: SpawnReq): EnemyConfig | null {
     const lk = req.like;
-    const key = `${req.tank}|${SMALL_FIX.GH482 ? this.behaviorOf(req.team) : req.team}|${req.camp}|${req.bossTier ? 1 : 0}|${req.stands ? 1 : 0}|${req.size}|${req.health}|${req.level}|${req.colourUse}${req.colourSlot}|${req.pushable}|${req.brain}|${req.sight}|${req.typeIdx}|${req.formIdx}|${req.skills ? JSON.stringify(req.skills) : ''}|${lk ? `${lk.autospin ? 1 : 0}${lk.facing}${lk.aimbot}/${lk.turn}${lk.logic}` : ''}`;
+    const key = `${req.tank}|${SMALL_FIX.GH482 ? this.behaviorOf(req.team) : req.team}|${req.camp}|${req.bossTier ? 1 : 0}|${req.stands ? 1 : 0}|${req.size}|${req.health}|${req.level}|${req.colourUse}${req.colourSlot}|${req.pushable}|${req.solid}|${req.brain}|${req.sight}|${req.typeIdx}|${req.formIdx}|${req.skills ? JSON.stringify(req.skills) : ''}|${lk ? `${lk.autospin ? 1 : 0}${lk.facing}${lk.aimbot}/${lk.turn}${lk.logic}` : ''}`;
     let cfg = this.configs.get(key);
     if (cfg) {
       if (!this.g.state.enemyConfigs.includes(cfg)) this.g.state.enemyConfigs.push(cfg);
@@ -317,7 +319,7 @@ export class GameMapEventsHost implements MapEventsHost {
       upgradeLogic: (lk?.logic ?? 'OffensiveWeighted') as EnemyConfig['upgradeLogic'],
       forceAutospin: lk?.autospin ?? false,
       forceAutoshoot: req.brain === 'order',
-      aimbotStrength: lk?.aimbot ?? 25,
+      aimbotStrength: lk?.aimbot ?? (SMALL_FIX.R964 !== 0 && aimsAheadFully((findByShownNameOrFileKey(lib, req.tank, false)?.fileData as { category?: string } | undefined)?.category) ? 100 : 25),
       turnSpeed: lk?.turn ?? 50,
       facingType: (lk?.facing ?? 'primaryTurret') as EnemyConfig['facingType'],
       aiBehavior: this.behaviorOf(req.team),
@@ -329,6 +331,8 @@ export class GameMapEventsHost implements MapEventsHost {
       useHardcodedColor: req.colourUse === 'file' || req.colourUse === 'slot' ? true : undefined,
       sourceLibraryName: g.resolveTankDisplayName(req.tank),
       sourceTankWord: req.tank,
+      fixedBody: SMALL_FIX.R965 !== 0 && req.pushable !== null ? !req.pushable : undefined,
+      solidBody: SMALL_FIX.R965 !== 0 && req.solid !== null ? req.solid : undefined,
     } as EnemyConfig;
     this.configs.set(key, cfg);
     g.state.enemyConfigs.push(cfg);

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { TEXT_LIMITS } from '../kit/textLimits';
 import { lintEvents } from '../../game/mapEvents/problems';
 import { TileType } from '../../types';
 import type { GameLogic } from '../../game/GameLogic';
@@ -6,6 +7,7 @@ import { buildPresetWorld } from '../../game/mapEvents/presets';
 import { Modal } from '../kit/Modal';
 import { Button, IconButton, SearchField } from '../kit/kit';
 import { Fade, PageSwap, Reveal } from '../kit/Collapse';
+import { PickGlide } from '../kit/TabSlide';
 import { usePanelMemory, isOneOf } from '../kit/panelMemory';
 import { toast } from '../ui/Toast';
 import { markOfLastEdit, undoMarkedEdit } from '../shared/markedUndo';
@@ -81,7 +83,8 @@ export const MapEventsWindow: React.FC<{ logic: GameLogic; areaId: string; page:
     if (!world) return;
     ctx.commit(d => ({ ...world.events, [ZONES_KEY]: world.mapAreas.zones, nextId: Math.max(world.events.nextId, d?.nextId ?? 1) }));
     const mark = markOfLastEdit(logic);
-    toast('info', 'Restored as it was shipped.', { label: 'Undo', run: () => { undoMarkedEdit(logic, mark); ctx.refresh(); } });
+    void mark;
+    toast('info', 'Restored as it was shipped. Ctrl Z takes it back.');
   };
   const count = (p: Page): number | undefined => {
     const d = ctx.doc;
@@ -123,12 +126,13 @@ export const MapEventsWindow: React.FC<{ logic: GameLogic; areaId: string; page:
     <>
       <Modal title="Map Events" icon={<MevEvents size={18} absoluteStrokeWidth />} width={windowSize().w} onClose={onClose} fit bodyClassName="k-modal-body-flush" waitHeight={bodyH} surface="content"
         headerRight={<>
-          <div ref={searchBox} className="k-ev-search"><SearchField value={search} onChange={setSearch} placeholder="Search" /></div>
+          <div ref={searchBox} className="k-ev-search"><SearchField value={search} onChange={setSearch} placeholder="Search" maxLength={TEXT_LIMITS.SEARCH_SMALL} /></div>
           <IconButton aria-label="Undo" title="Undo" disabled={readOnly || !logic.canUndoMapEdit()} onClick={undo}><Undo2 size={15} /></IconButton>
           <IconButton aria-label="Redo" title="Redo" disabled={readOnly || !logic.canRedoMapEdit()} onClick={redo}><Redo2 size={15} /></IconButton>
         </>}>
         <div className="flex min-h-0" style={{ height: bodyH }}>
           <aside className="k-gm-side k-ev-side popup-scrollbar">
+            <PickGlide pick=".k-rd-item-on" look="row" />
             <Reveal when={areas.length > 1}><div className="k-ev-area-pick"><EvSelect value={areaId} options={areas.map(a => ({ value: a.id, label: a.name }))} onChange={setAreaId} /></div></Reveal>
             {PAGES.map(p => {
               const n = count(p);

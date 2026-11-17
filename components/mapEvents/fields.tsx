@@ -5,7 +5,7 @@ import { SIDE_WORDS } from '../../game/mapEvents/doc';
 import type { BodyTest, MapEventsDoc, Num, PlaceRule, Ref, Row, SpawnCard, Target, WaveTest, ZoneLike } from '../../game/mapEvents/doc';
 import { addCard, addRowAt, changeRowKind, factsOf, getAt, insertAt, makeRow, removeAt, setAt, tokensToIds, tokensToNames, withIds, wordOfTarget, namesOf, type Fact, type Path } from '../../game/mapEvents/docOps';
 import { SHAPE_DEFINITIONS } from '../../game/ShapeRegistry';
-import { Button, Chip, FieldRow, Group, IconButton, RowLabel, Segmented, SelectRow, SliderRow as KitSliderRow, Switch, TextField, ToggleRow } from '../kit/kit';
+import { Button, Chip, FieldRow, Group, IconButton, RowLabel, RowUnit, Segmented, SelectRow, SliderRow as KitSliderRow, Switch, TextField, ToggleRow } from '../kit/kit';
 import { FarmableShapesWindow } from '../FarmableShapesWindow';
 import type { ShapeSpawnConfig } from '../../types';
 import { Collapse, Reveal, SwapBox } from '../kit/Collapse';
@@ -73,7 +73,7 @@ export const NumField: React.FC<{ value: Num | undefined; onChange: (v: Num) => 
   return (
     <span className="k-ev-numfield">
       <SwapBox swapKey={isPlain}>{isPlain
-        ? <span className="k-ev-numbox"><NumberBox className="k-field k-ev-num" value={typeof value === 'number' ? value : ''} min={min} max={max} step={0.1} onChange={e => { const n = num(e.target.value); if (n !== null) onChange(n); }} />{unit ? <span className="k-unit">{unit}</span> : null}</span>
+        ? <span className="k-ev-numbox"><NumberBox className="k-field k-ev-num" value={typeof value === 'number' ? value : ''} min={min} max={max} step={0.1} onChange={e => { const n = num(e.target.value); if (n !== null) onChange(n); }} />{unit ? <RowUnit unit={unit} /> : null}</span>
         : <button type="button" className="k-ev-numword" onClick={e => menu.toggle(e.currentTarget.getBoundingClientRect())}><span className="truncate">{wordOfNum(value, unit)}</span></button>}
       </SwapBox>
       <IconButton ref={menu.triggerRef as React.Ref<HTMLButtonElement>} size="sm" label="Random, by wave, a curve or a formula" aria-expanded={menuOpen(menu)} onClick={e => menu.toggle(e.currentTarget.getBoundingClientRect())}><SlidersHorizontal size={13} /></IconButton>

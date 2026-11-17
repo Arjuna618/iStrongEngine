@@ -7,6 +7,22 @@ import { useMenuStage, SWAP_OUT_MS, SWAP_IN_MS } from '../kit/motion';
 import { glide, motionOff, useLeave, onLeaveStart } from '../kit/presence';
 import { FADE_SELECTOR } from '../shell/textFade';
 import { toolStore } from '../shell/toolStore';
+import { uiThemeId, subscribeUiTheme } from '../../utils/uiTheme';
+
+function optionNameOf(bubble: HTMLElement): HTMLElement | null {
+  const lead = bubble.closest('.k-row-lead');
+  if (lead) return (lead.nextElementSibling as HTMLElement | null) ?? null;
+  const numLabel = bubble.closest('.k-num-label') as HTMLElement | null;
+  if (numLabel) return numLabel;
+  const next = bubble.nextElementSibling as HTMLElement | null;
+  if (next && /^(SPAN|P|LABEL)$/.test(next.tagName) && !next.querySelector('input, button, select, textarea') && (next.textContent ?? '').trim() !== '') return next;
+  return null;
+}
+function useClassicUi(): boolean {
+  const [on, setOn] = useState(() => uiThemeId() === 'classic');
+  useEffect(() => subscribeUiTheme(() => setOn(uiThemeId() === 'classic')), []);
+  return on;
+}
 
 const MARGIN = 8;
 const MAX_TIP_WIDTH = 320;
@@ -425,16 +441,38 @@ export const HelpTooltip: React.FC<{
   const show = hover.show;
   const [pinned, setPinned] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
+  const anchor = useRef<HTMLElement | null>(null);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [zoom, setZoom] = useState(1);
 
   const place = useCallback(() => {
-    if (!ref.current) return false;
-    setRect(ref.current.getBoundingClientRect());
-    setZoom(getVisualScale(ref.current) || 1);
+    const el = anchor.current ?? ref.current;
+    if (!el) return false;
+    setRect(el.getBoundingClientRect());
+    setZoom(getVisualScale(el) || 1);
     return true;
   }, []);
   const { enter, leave, closeNow } = hover;
+  const classic = useClassicUi();
+  const [onName, setOnName] = useState(false);
+  useEffect(() => {
+    const me = ref.current;
+    const name = classic && !icon && me ? optionNameOf(me) : null;
+    if (!name) { anchor.current = me; setOnName(false); return; }
+    anchor.current = name;
+    setOnName(true);
+    const enterName = () => { if (place()) enter(); };
+    const greyedPress = (e: Event) => { if (name.closest('.k-row-disabled, .k-row-locked')) { e.preventDefault(); e.stopPropagation(); } };
+    name.setAttribute('data-k-tip-name', '');
+    name.addEventListener('mouseenter', enterName);
+    name.addEventListener('mouseleave', leave);
+    name.addEventListener('click', greyedPress, true);
+    return () => {
+      name.removeEventListener('mouseenter', enterName); name.removeEventListener('mouseleave', leave); name.removeEventListener('click', greyedPress, true);
+      name.removeAttribute('data-k-tip-name');
+      anchor.current = ref.current;
+    };
+  }, [classic, icon, place, enter, leave]);
   const setShow = useCallback((v: boolean) => { if (v) enter(); else closeNow(); }, [enter, closeNow]);
   const onEnter = useCallback(() => { if (place()) enter(); }, [place, enter]);
   const onFocusIn = useCallback(() => { if (place()) enter(true); }, [place, enter]);
@@ -460,7 +498,7 @@ export const HelpTooltip: React.FC<{
 
   const open = show || pinned;
   const tipStage = useMenuStage<'tip'>(open ? 'tip' : null);
-  useTipHost(ref, open, () => { setPinned(false); closeNow(); });
+  useTipHost(anchor, open, () => { setPinned(false); closeNow(); });
 
   useEffect(() => {
     if (!open) return;
@@ -468,7 +506,7 @@ export const HelpTooltip: React.FC<{
   }, [open, setShow]);
 
   return (
-    <span ref={ref} data-k-own-tip className="k-ico inline-flex items-center align-middle pointer-events-auto" onMouseEnter={onEnter} onMouseLeave={onLeave}
+    <span ref={ref} data-k-own-tip data-k-tip-on-label={onName ? '' : undefined} className="k-ico inline-flex items-center align-middle pointer-events-auto" onMouseEnter={onEnter} onMouseLeave={onLeave}
       onClick={onTap} onFocus={onFocusIn} onBlur={onLeave} tabIndex={0} role="button" aria-label="Help" aria-expanded={open}>
       <span className="k-ico-art w-[14px] h-[14px] flex items-center justify-center cursor-help shrink-0 select-none text-[var(--k-help-ink)] hover:text-[var(--text-secondary)] transition-colors">{icon ?? <HelpBubble size={14} />}</span>
       {tipStage.shown && rect && <TooltipPopup text={text} rect={rect} zoom={zoom} position="below" leaving={tipStage.leaving} />}

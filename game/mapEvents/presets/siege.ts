@@ -89,7 +89,7 @@ export function buildSiegeWorld(which: SiegeMapId): SiegeWorld {
   const tactics: StatusDef = { ...named('Siege Tactics'), seconds: null, effects: [
     row('seekHeal', { below: T.healBelow, back: T.healBack, healers: true, tag: ref(standing) }),
     row('healerDuty', {}),
-    row('teamFight', { help: true }),
+    row('teamFight', { help: true, bosses: true, bossShare: 85 }),
     row('fearLow', { below: T.fearBelow, back: T.fearBack }),
   ] };
 

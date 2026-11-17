@@ -29,6 +29,7 @@ const WORKS = [
 const SHIPPED = [
   'react', 'react-dom', 'scheduler', 'uuid',
   '@hugeicons/react', '@hugeicons/core-free-icons',
+  '@phosphor-icons/core',
   'tailwindcss',
 ];
 const NAMES = ['LICENSE', 'LICENSE.md', 'LICENSE.txt', 'license', 'LICENCE', 'LICENSE-MIT'];
