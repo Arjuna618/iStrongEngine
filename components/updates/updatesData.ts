@@ -2,6 +2,28 @@ import type { UpdateEntry } from './updatesTypes';
 
 export const UPDATES: UpdateEntry[] = [
   {
+    "date": "2026-11-18",
+    "version": "v0.182",
+    "title": "Loading screen, kill bar and phone fixes",
+    "bullets": [
+      "Added a loading screen with a tip, in the colours of the game theme, that covers entering a match from the Play menu and travelling to another mode through a portal, so the screen never turns black while the match loads.",
+      "Changed wormholes and portals between areas of the same mode to keep skipping the loading screen.",
+      "Changed the Play menu and the Game Modes window to build only the mode cards in view, so changing categories or turning the phone no longer stutters.",
+      "Fixed short freezes on slow devices while the game checks which characters of bot names the device can draw.",
+      "Fixed the death screen on phones standing to one side of the HUD bars, so its date and buttons now line up with the middle of the screen.",
+      "Fixed the death screen's Respawn and Play Menu buttons sometimes never appearing at low frame rates.",
+      "Fixed the in-game chat box text showing a thick dark outline in the Classic theme.",
+      "Changed the in-game HUD, chat box, leaderboard and death screen to keep their own look whatever the menu theme, a browser contrast theme or a dark mode extension does.",
+      "Fixed the right panel and several screen placements going wrong when the browser's font size setting is not the default, such as a line through the right panel in Edge on Large.",
+      "Changed autofire to keep your spawn protection: your guns and drones wait until your first move or click ends it, then autofire starts shooting.",
+      "Fixed a boss kill also raising the kill bar's kill count, and a boss kill now counts for every tank of the boss groups, wherever it came from.",
+      "Added assists to the kill bar: dealing at least a quarter of a tank's or a boss's full health in the 7 seconds before another tank kills it earns one.",
+      "Changed sentry and sentinel kills to count in none of the kill bar's three numbers.",
+      "Changed the death screen's kill line to list kills, assists and bosses the same way as the kill bar.",
+      "Updated the guides for The Play Menu, The Nexus, the Forge and Travel, Spawn Protection, Leveling and XP, and Dying and Respawning."
+    ]
+  },
+  {
     "date": "2026-11-17",
     "version": "v0.181",
     "title": "Outbreak, Sandbox and the Spawn Tool",
@@ -50,7 +72,20 @@ export const UPDATES: UpdateEntry[] = [
       "Fixed boss turrets showing under Launcher Turrets and other groups: every turret only bosses carry is now under Boss Turrets.",
       "Fixed the Count box over the canvas coming apart in the Classic theme when its name is long, as on a five sided body.",
       "Fixed the main menu's new updates dot showing as a square in the Classic theme, and the Update Log's New tag now shows only its word.",
-      "Updated the guides for Outbreak, Map Events, the Canvas Tool, the Spawn Tool and The Bots Group."
+      "Updated Vite, Rollup, `uuid` and four other build packages to patched versions that fix known security issues.",
+      "Changed tanks of the Bosses team, from the Spawn Tool or the boss system, to never target or hurt each other while fighting everyone else except crashers, sentries and sentinels.",
+      "Changed Outbreak zombies to move as one swarm in each area: followers fight only the leader's target and otherwise hold their place around it, and the leader gathers stragglers and keeps their pace.",
+      "Added a Strength setting for each boss group in the Boss Spawns panel, in percent of its bosses' own values for each of the ten stats, also on a Map Events Entity Type and a wave line.",
+      "Changed every shipped boss group and every Siege visitor to 90 % of its Max Health, Body Damage, Bullet Health, Bullet Penetration, Bullet Damage, Shield Regeneration and Shield Capacity.",
+      "Added Strength For Every Boss, on by default: a boss from the Spawn Tool, a command or the Enemy Tool, a tank changed into a boss, and your own tank while you play one take the strength of their boss group.",
+      "Changed a boss group's Chance slider to show and set its real chance in percent, the other groups moving to keep the total at 100.",
+      "Removed the weight number from a boss group's header.",
+      "Changed the list boxes and the Strength box to a slightly darker fill in the Classic theme.",
+      "Fixed the first letter of the Areas list losing its outline in the Classic theme.",
+      "Fixed a Map Events body not taking its Entity Type's Health, Level, Skill Points and class word.",
+      "Fixed Dominators aiming where a moving tank was instead of ahead of it, so their shots now reach a tank driving past.",
+      "Changed every tank kill's reward to be shared by damage: each tank that dealt at least 3 % of the body's full health in the last 7 seconds gets its share, and the killer gets it all when nobody else does.",
+      "Updated the guides for Outbreak, Map Events, the Canvas Tool, the Spawn Tool, The Bots Group, Boss Spawns, Entity Types and Forms, Take Over Tank, Domination and Leveling and XP."
     ]
   },
   {
