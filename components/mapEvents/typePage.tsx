@@ -16,6 +16,7 @@ import { MAP_TANK_HEAD } from '../../game/mapEvents/thingWord';
 import { ShapeSettingsCard, TouchRulesCard, typeIsShapeBody } from './thingCards';
 import { SMALL_FIX } from '../../game/smallFixSwitch';
 import { isFixedMapThing } from '../../game/fixedBodies';
+import { StatSharesGrid } from '../shared/StatShares';
 
 const num = (s: string): number | undefined => { const v = Number(s); return s.trim() !== '' && Number.isFinite(v) ? v : undefined; };
 const CarryRows: React.FC<{ type: EntityType; put: (k: 'carry', v: EntityType['carry']) => void }> = ({ type, put }) => {
@@ -210,6 +211,9 @@ export const EntityTypePage: React.FC<{ type: EntityType; ti: number; ctx: EvCtx
             </label>
           ))}
         </div>
+      </Group>
+      <Group title="Strength" foldKey="type-strength" collapsible defaultOpen={false}>
+        <StatSharesGrid value={type.stats} onChange={v => put('stats', v)} whose="Its" />
       </Group>
       <Group title="On Screen" foldKey="type-screen" collapsible defaultOpen={false}>
         <ToggleRow label="Show Name" help="Its name, drawn over it in a match." checked={type.showName === true} onChange={v => put('showName', v)} />

@@ -30,7 +30,7 @@
         "yOffset": 8.572527594031472e-17,
         "angle": 3.141592653589793,
         "bps": 1.375516,
-        "speed": 3,
+        "speed": -3.029017,
         "delay": 0,
         "knockback": 6.571428571428571,
         "spread": 0.93,
@@ -79,7 +79,7 @@
           "bounciness": 0.9,
           "bouncy": true,
           "statCalculatorType": "swarm",
-          "topSpeedRatio": 0.9,
+          "topSpeedRatio": 3.653,
           "necroInfect": false,
           "touchScale": 0.886227
         },

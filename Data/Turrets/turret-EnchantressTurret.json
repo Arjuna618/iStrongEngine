@@ -18,7 +18,7 @@
         "yOffset": 0,
         "angle": 0,
         "bps": 1.8518518518518519,
-        "speed": -2,
+        "speed": 1.191592,
         "delay": 0,
         "knockback": 7.142857142857143,
         "spread": 0.1,
@@ -68,7 +68,7 @@
           "bounciness": 0.9,
           "bouncy": true,
           "statCalculatorType": "drone",
-          "topSpeedRatio": 2.533333333333333,
+          "topSpeedRatio": 0.856137,
           "necroInfect": false,
           "touchScale": 0.886227
         },

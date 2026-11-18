@@ -1908,7 +1908,7 @@
         "yOffset": 0,
         "angle": 0,
         "bps": 0.10416666666666667,
-        "speed": 0.09999999999999964,
+        "speed": -2.923465,
         "delay": 0,
         "knockback": 45.71428571428572,
         "spread": 0.1,
@@ -2114,7 +2114,7 @@
           "bounciness": 0.9,
           "bouncy": true,
           "statCalculatorType": "drone",
-          "topSpeedRatio": 0.5647058823529413,
+          "topSpeedRatio": 1.614173,
           "necroInfect": false
         },
         "projectileBehaviors": [
@@ -2324,7 +2324,7 @@
         "yOffset": 0.6928203230275509,
         "angle": 1.0471975511965976,
         "bps": 0.10416666666666667,
-        "speed": 0.09999999999999964,
+        "speed": -2.923465,
         "delay": 0,
         "knockback": 45.71428571428572,
         "spread": 0.1,
@@ -2530,7 +2530,7 @@
           "bounciness": 0.9,
           "bouncy": true,
           "statCalculatorType": "drone",
-          "topSpeedRatio": 0.5647058823529413,
+          "topSpeedRatio": 1.614173,
           "necroInfect": false
         },
         "projectileBehaviors": [
@@ -2740,7 +2740,7 @@
         "yOffset": 0.6928203230275509,
         "angle": 2.0943951023931953,
         "bps": 0.10416666666666667,
-        "speed": 0.09999999999999964,
+        "speed": -2.923465,
         "delay": 0,
         "knockback": 45.71428571428572,
         "spread": 0.1,
@@ -2946,7 +2946,7 @@
           "bounciness": 0.9,
           "bouncy": true,
           "statCalculatorType": "drone",
-          "topSpeedRatio": 0.5647058823529413,
+          "topSpeedRatio": 1.614173,
           "necroInfect": false
         },
         "projectileBehaviors": [
@@ -3156,7 +3156,7 @@
         "yOffset": 9.797174393178826e-17,
         "angle": 3.141592653589793,
         "bps": 0.10416666666666667,
-        "speed": 0.09999999999999964,
+        "speed": -2.923465,
         "delay": 0,
         "knockback": 45.71428571428572,
         "spread": 0.1,
@@ -3362,7 +3362,7 @@
           "bounciness": 0.9,
           "bouncy": true,
           "statCalculatorType": "drone",
-          "topSpeedRatio": 0.5647058823529413,
+          "topSpeedRatio": 1.614173,
           "necroInfect": false
         },
         "projectileBehaviors": [
@@ -3572,7 +3572,7 @@
         "yOffset": -0.6928203230275508,
         "angle": 4.1887902047863905,
         "bps": 0.10416666666666667,
-        "speed": 0.09999999999999964,
+        "speed": -2.923465,
         "delay": 0,
         "knockback": 45.71428571428572,
         "spread": 0.1,
@@ -3778,7 +3778,7 @@
           "bounciness": 0.9,
           "bouncy": true,
           "statCalculatorType": "drone",
-          "topSpeedRatio": 0.5647058823529413,
+          "topSpeedRatio": 1.614173,
           "necroInfect": false
         },
         "projectileBehaviors": [
@@ -3988,7 +3988,7 @@
         "yOffset": -0.6928203230275509,
         "angle": 5.235987755982989,
         "bps": 0.10416666666666667,
-        "speed": 0.09999999999999964,
+        "speed": -2.923465,
         "delay": 0,
         "knockback": 45.71428571428572,
         "spread": 0.1,
@@ -4194,7 +4194,7 @@
           "bounciness": 0.9,
           "bouncy": true,
           "statCalculatorType": "drone",
-          "topSpeedRatio": 0.5647058823529413,
+          "topSpeedRatio": 1.614173,
           "necroInfect": false
         },
         "projectileBehaviors": [

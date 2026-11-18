@@ -126,7 +126,7 @@
         "yOffset": 0,
         "angle": 0,
         "bps": 0.3864734299516908,
-        "speed": 3,
+        "speed": 7.173405,
         "delay": 0,
         "knockback": 7.142857142857143,
         "spread": 5,
@@ -331,7 +331,7 @@
           "bounciness": 0.9,
           "bouncy": true,
           "statCalculatorType": "bullet",
-          "topSpeedRatio": 0.5625,
+          "topSpeedRatio": 0.920026,
           "necroInfect": false,
           "buffVsFood": true
         },

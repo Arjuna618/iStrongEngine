@@ -12,10 +12,10 @@ function scrollerOf(el: HTMLElement | null): HTMLElement | null {
   }
   return null;
 }
-function topsOf(keys: readonly string[], heights: ReadonlyMap<string, number>, estimate: number): Float64Array {
+function topsOf(keys: readonly string[], heights: ReadonlyMap<string, number>, estimate: number, estimateOf?: (i: number) => number): Float64Array {
   const t = new Float64Array(keys.length + 1);
   let y = 0;
-  for (let i = 0; i < keys.length; i++) { t[i] = y; y += heights.get(keys[i]) ?? estimate; }
+  for (let i = 0; i < keys.length; i++) { t[i] = y; y += heights.get(keys[i]) ?? (estimateOf ? estimateOf(i) : estimate); }
   t[keys.length] = y;
   return t;
 }
@@ -36,12 +36,15 @@ export interface RowWindow {
   reveal: (key: string) => void;
 }
 
-export function useRowWindow(count: number, rowKey: (i: number) => string, estimate: number): RowWindow {
+export interface RowWindowOptions { estimateOf?: (i: number) => number; first?: number }
+
+export function useRowWindow(count: number, rowKey: (i: number) => string, estimate: number, opts?: RowWindowOptions): RowWindow {
   const box = useRef<HTMLElement | null>(null);
   const rows = useRef<HTMLElement | null>(null);
   const scroller = useRef<HTMLElement | null>(null);
   const heights = useRef(new Map<string, number>());
-  const [range, setRange] = useState({ a: 0, b: FIRST_ROWS });
+  const [range, setRange] = useState(() => ({ a: 0, b: opts?.first ?? FIRST_ROWS }));
+  const estimateOf = opts?.estimateOf;
   const rangeNow = useRef(range);
   const raf = useRef(0);
   const ro = useRef<ResizeObserver | null>(null);
@@ -50,14 +53,14 @@ export function useRowWindow(count: number, rowKey: (i: number) => string, estim
   const keys: string[] = new Array(count);
   const all = new Set<string>();
   for (let i = 0; i < count; i++) { const k = rowKey(i); keys[i] = k; all.add(k); }
-  const tops = topsOf(keys, heights.current, estimate);
+  const tops = topsOf(keys, heights.current, estimate, estimateOf);
   const a = Math.min(range.a, count), b = Math.max(a, Math.min(range.b, count));
 
-  const live = useRef({ keys, tops, estimate, all, dirty: false });
-  live.current.keys = keys; live.current.tops = tops; live.current.estimate = estimate; live.current.all = all; live.current.dirty = false;
+  const live = useRef({ keys, tops, estimate, estimateOf, all, dirty: false });
+  live.current.keys = keys; live.current.tops = tops; live.current.estimate = estimate; live.current.estimateOf = estimateOf; live.current.all = all; live.current.dirty = false;
   const freshTops = () => {
     const L = live.current;
-    if (L.dirty) { L.tops = topsOf(L.keys, heights.current, L.estimate); L.dirty = false; }
+    if (L.dirty) { L.tops = topsOf(L.keys, heights.current, L.estimate, L.estimateOf); L.dirty = false; }
     return L.tops;
   };
 

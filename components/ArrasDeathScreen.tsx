@@ -4,6 +4,7 @@ import { TankPreview, computeCircumcircle } from './TankPreview';
 import { teamOverrideColor } from '../types';
 import { useGameDark } from '../utils/useGameTheme';
 import { anyForcedTeamLayer } from '../game/teamColourSwitch';
+import { SMALL_FIX } from '../game/smallFixSwitch';
 import { useHudScale } from '../utils/useGuiScale';
 import { getEffectiveViewportWidth, getEffectiveViewportHeight } from '../utils/zoomCompensation';
 import { mobileActive } from '../utils/mobileMode';
@@ -16,7 +17,7 @@ import {
   DEATH_STROKE_F, DEATH_MID, DEATH_LINE_PITCH, DEATH_X_LEFT, DEATH_X_WORDS, DEATH_X_TANK, DEATH_BTN_W, DEATH_BTN_H, DEATH_BTN_DX,
   DEATH_BTN_TOP, DEATH_BTN_EDGE, DEATH_BTN_BAND, DEATH_BTN_TOP_ALONE, DEATH_MID_END_TITLE, DEATH_TANK_CIRCLE, DEATH_TANK_TURN,
   deathTankCircle, deathCommas, deathDuration, deathSecondsOf, DEATH_ICON, deathKillIcon, deathKillWords, DEATH_TIP,
-  deathKillerLine, deathScoreTitle, deathRespawnIn, deathCannotRespawn, deathStamp, deathPhonePlace,
+  deathKillerLine, deathScoreTitle, deathRespawnIn, deathCannotRespawn, deathStamp, deathPhonePlace, deathBlockKey, watchDeathBlock,
 } from '../utils/deathArras';
 
 interface Props {
@@ -53,11 +54,14 @@ export const ArrasDeathScreen: React.FC<Props> = ({ logic, onRespawn, onExit, fr
   const [facts] = useState(() => {
     const now = logic.gameNow();
     const t0 = Math.max(0, (now - s.deathMenuOpenedAt) / 1000);
-    const bosses = Math.max(0, Math.min(s.deathKills, s.bossKills ?? 0));
+    const r993 = SMALL_FIX.R993 !== 0;
+    const bosses = r993 ? Math.max(0, s.bossKills ?? 0) : Math.max(0, Math.min(s.deathKills, s.bossKills ?? 0));
+    const tankKills = r993 ? Math.max(0, s.tankKills ?? 0) : s.deathKills - bosses;
+    const assists = r993 ? Math.max(0, s.assists ?? 0) : 0;
     const cause = deathKillerLine(s.deathCauseKind, logic.deathKillerName(), s.deathCauseName);
     const lines: { icon: string; words: string }[] = [
       { icon: DEATH_ICON.survived, words: 'Survived for ' + deathDuration(deathSecondsOf(s.deathSurvivalMs)) },
-      { icon: deathKillIcon(s.deathKills - bosses, bosses), words: deathKillWords(s.deathKills - bosses, 0, bosses, s.deathFoodKills) },
+      { icon: deathKillIcon(tankKills, bosses), words: deathKillWords(tankKills, assists, bosses, s.deathFoodKills) },
       { icon: DEATH_ICON.tip, words: DEATH_TIP },
       cause,
     ];
@@ -78,20 +82,23 @@ export const ArrasDeathScreen: React.FC<Props> = ({ logic, onRespawn, onExit, fr
   const mountMs = useRef(performance.now());
   const elapsed = () => facts.t0 + (performance.now() - mountMs.current) / 1000;
   const gameT = () => (logic.gameNow() - s.deathMenuOpenedAt) / 1000;
-  const blockOn = gameT() >= DEATH_BLOCK_START - 0.001;
+  const waitMs = logic.respawnCooldownRemainingMs();
+  const blockKey = deathBlockKey(gameT(), waitMs);
+  const blockOn = blockKey !== -1;
   const closedForGood = logic.matchClosedForGood();
   const endTitle = logic.matchEndTitle();
   const refused = closedForGood ? 'the arena is closed' : logic.respawnRefusedWhy();
-  const waitMs = logic.respawnCooldownRemainingMs();
-  const canRespawn = blockOn && refused === '' && waitMs <= 0;
+  const canRespawn = blockOn && refused === '' && blockKey === 0;
   const rulesRun = logic.mapEventsRunning() && !closedForGood;
+  const shownKey = useRef(blockKey); shownKey.current = blockKey;
+  useEffect(() => watchDeathBlock(
+    () => deathBlockKey((logic.gameNow() - logic.state.deathMenuOpenedAt) / 1000, logic.respawnCooldownRemainingMs()),
+    () => shownKey.current,
+    () => tick((n) => n + 1),
+    (cb) => requestAnimationFrame(cb), (id) => cancelAnimationFrame(id)), [logic]);
   useEffect(() => {
-    let ms = -1;
-    if (!blockOn) ms = (DEATH_BLOCK_START - gameT()) * 1000 + 5;
-    else if (refused === '' && waitMs > 0) ms = (waitMs % 1000 || 1000) + 5;
-    else if (rulesRun) ms = 1000;
-    if (ms < 0) return;
-    const id = window.setTimeout(() => tick((n) => n + 1), Math.max(0, ms));
+    if (!blockOn || !rulesRun) return;
+    const id = window.setTimeout(() => tick((n) => n + 1), 1000);
     return () => window.clearTimeout(id);
   });
 

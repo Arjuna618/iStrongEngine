@@ -55,7 +55,7 @@ export const PROJECT_FIELDS: Record<keyof GameState, Home> = {
 
   tankCurrentHealth: 'runtime', tankCurrentShield: 'runtime', tankDisplayHealth: 'runtime', tankDisplayShield: 'runtime',
   lastTankDamageTime: 'runtime', tankHpBarOpacity: 'runtime', level: 'runtime', currentXp: 'runtime', skillPoints: 'runtime',
-  upgrades: 'runtime', arrasResist: 'runtime', kills: 'runtime', bossKills: 'runtime', topKills: 'runtime', foodKills: 'runtime',
+  upgrades: 'runtime', arrasResist: 'runtime', kills: 'runtime', bossKills: 'runtime', tankKills: 'runtime', assists: 'runtime', topKills: 'runtime', foodKills: 'runtime',
   playerDead: 'runtime', deathKills: 'runtime', deathLevel: 'runtime', deathFoodKills: 'runtime', deathSurvivalMs: 'runtime',
   deathCauseKind: 'runtime', deathCauseName: 'runtime', deathColorTeamIndex: 'runtime', deathMenuOpenedAt: 'runtime',
   isTestMode: 'runtime', paused: 'runtime', isDebugMenuOpen: 'runtime', currentBranchRoot: 'runtime',

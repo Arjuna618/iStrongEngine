@@ -412,7 +412,7 @@ export const PlayMenu: React.FC<Props> = ({
 
   const middle = (
     <ModeMain shelf={shelf} title={shownSearching ? 'Search results' : (CATEGORY_INFO.get(shownCategory)?.title ?? '')} hint={shownSearching ? undefined : CATEGORY_INFO.get(shownCategory)?.description}
-      sort={sort} onSort={setSort} onClear={clearSearch} card={card} />
+      sort={sort} onSort={setSort} onClear={clearSearch} card={card} reveal={selectedKey} />
   );
 
   const modeInfo = (e: PlayModeEntry) => (<>

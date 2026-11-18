@@ -13,6 +13,7 @@ import type { SideSpec, SpawnCard } from './doc';
 import { compileTouch } from './thingBody';
 import { isShapeThing } from './thingWord';
 import { SMALL_FIX } from '../smallFixSwitch';
+import { statKOf, STAT_SHARES } from '../statShares';
 import { TEAM_COLOUR } from '../teamColourSwitch';
 
 const CHAIN_MAX = 16, SIG_PER_STEP = 512, OPS_PER_STEP = 8192, RUNS_MAX = 2048, FLIPS_MAX = 20, STALL_MS = 10000;
@@ -252,7 +253,7 @@ export class MapEventsVM implements NumCtx {
   private blankReq(): SpawnReq {
     return { typeIdx: -1, formIdx: 0, tank: '', x: 0, y: 0, angle: 0, team: '', camp: 'none', bossTier: false, colourUse: 'file', colourSlot: 0, size: 0, sizeFactor: 1, name: '', showName: null,
       stands: false, canDie: true, seenByBots: true, onLeaderboard: true, onMinimap: true, minimapAll: false, countsAsKill: true, inWalls: false, score: 0, worthNothing: false, killLine: '', brain: 'full', orderIdx: -1, sight: 0,
-      birthLook: 'none', crashersIgnore: false, canBeHealed: true, contact: 'tank', pushable: null, solid: null, health: 0, level: 0, skills: null, classWord: '', graceMs: 0, refill: 'none', placed: false, home: -1, areaIdx: -1, shape: null, touch: null, fromWave: false, noGrowth: false, extraTags: null };
+      birthLook: 'none', crashersIgnore: false, canBeHealed: true, contact: 'tank', pushable: null, solid: null, health: 0, level: 0, skills: null, statK: null, classWord: '', graceMs: 0, refill: 'none', placed: false, home: -1, areaIdx: -1, shape: null, touch: null, fromWave: false, noGrowth: false, extraTags: null };
   }
 
   readRef(id: number): number {
@@ -1475,6 +1476,9 @@ export class MapEventsVM implements NumCtx {
     if (SMALL_FIX.R900 !== 0) { r.orderIdx = form.orderIdx; r.sight = typeof def.sight === 'number' ? def.sight : 0; }
     r.birthLook = def.birthLook === 'food' ? 'food' : 'none'; r.crashersIgnore = def.crashersIgnore === true; r.canBeHealed = def.canBeHealed !== false; r.contact = def.contact === 'shape' ? 'shape' : 'tank';
     r.pushable = typeof def.pushable === 'boolean' ? def.pushable : null; r.solid = typeof def.solid === 'boolean' ? def.solid : null;
+    if (SMALL_FIX.R979 !== 0) { r.health = typeof def.health === 'number' ? def.health : 0; r.level = typeof def.level === 'number' ? def.level : 0; r.skills = def.skills ?? null; r.classWord = def.classWord ?? ''; }
+    r.statK = statKOf(def.stats);
+    if (STAT_SHARES.EVERY_WAY !== 0 && (def.stats === undefined || def.stats === null)) r.statK = undefined;
     r.shape = def.shape ?? null; r.touch = this.typeTouch[type] ?? null;
     r.graceMs = 0; r.refill = 'none'; r.placed = false; r.home = -1; r.areaIdx = -1;
     r.fromWave = false; r.noGrowth = false;

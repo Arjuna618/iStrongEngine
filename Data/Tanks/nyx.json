@@ -2838,7 +2838,7 @@
         "yOffset": 0.3254129728189428,
         "angle": 0.4487991998455779,
         "bps": 0.4166666666666667,
-        "speed": 1,
+        "speed": -0.389545,
         "delay": 0,
         "knockback": 28.571428571428573,
         "spread": 0.1,
@@ -3043,7 +3043,7 @@
           "bounciness": 0.9,
           "bouncy": true,
           "statCalculatorType": "bullet",
-          "topSpeedRatio": 0.51,
+          "topSpeedRatio": 1.066743,
           "necroInfect": false
         },
         "projectileBehaviors": [
@@ -3229,7 +3229,7 @@
         "yOffset": 0.7311960589701152,
         "angle": 1.3463975995367337,
         "bps": 0.4166666666666667,
-        "speed": 1,
+        "speed": -0.389545,
         "delay": 0,
         "knockback": 28.571428571428573,
         "spread": 0.1,
@@ -3434,7 +3434,7 @@
           "bounciness": 0.9,
           "bouncy": true,
           "statCalculatorType": "bullet",
-          "topSpeedRatio": 0.51,
+          "topSpeedRatio": 1.066743,
           "necroInfect": false
         },
         "projectileBehaviors": [
@@ -3620,7 +3620,7 @@
         "yOffset": 0.58637384503559,
         "angle": 2.2439942538986375,
         "bps": 0.4166666666666667,
-        "speed": 1,
+        "speed": -0.389545,
         "delay": 0,
         "knockback": 28.571428571428573,
         "spread": 0.1,
@@ -3825,7 +3825,7 @@
           "bounciness": 0.9,
           "bouncy": true,
           "statCalculatorType": "bullet",
-          "topSpeedRatio": 0.51,
+          "topSpeedRatio": 1.066743,
           "necroInfect": false
         },
         "projectileBehaviors": [
@@ -4011,7 +4011,7 @@
         "yOffset": 9.797174393178826e-17,
         "angle": 3.141592653589793,
         "bps": 0.4166666666666667,
-        "speed": 1,
+        "speed": -0.389545,
         "delay": 0,
         "knockback": 28.571428571428573,
         "spread": 0.1,
@@ -4216,7 +4216,7 @@
           "bounciness": 0.9,
           "bouncy": true,
           "statCalculatorType": "bullet",
-          "topSpeedRatio": 0.51,
+          "topSpeedRatio": 1.066743,
           "necroInfect": false
         },
         "projectileBehaviors": [
@@ -4402,7 +4402,7 @@
         "yOffset": -0.5863738450355898,
         "angle": 4.039191053280948,
         "bps": 0.4166666666666667,
-        "speed": 1,
+        "speed": -0.389545,
         "delay": 0,
         "knockback": 28.571428571428573,
         "spread": 0.1,
@@ -4607,7 +4607,7 @@
           "bounciness": 0.9,
           "bouncy": true,
           "statCalculatorType": "bullet",
-          "topSpeedRatio": 0.51,
+          "topSpeedRatio": 1.066743,
           "necroInfect": false
         },
         "projectileBehaviors": [
@@ -4793,7 +4793,7 @@
         "yOffset": -0.7311960589701152,
         "angle": 4.936787707642853,
         "bps": 0.4166666666666667,
-        "speed": 1,
+        "speed": -0.389545,
         "delay": 0,
         "knockback": 28.571428571428573,
         "spread": 0.1,
@@ -4998,7 +4998,7 @@
           "bounciness": 0.9,
           "bouncy": true,
           "statCalculatorType": "bullet",
-          "topSpeedRatio": 0.51,
+          "topSpeedRatio": 1.066743,
           "necroInfect": false
         },
         "projectileBehaviors": [
@@ -5184,7 +5184,7 @@
         "yOffset": -0.32541297281894277,
         "angle": 5.834386107334009,
         "bps": 0.4166666666666667,
-        "speed": 1,
+        "speed": -0.389545,
         "delay": 0,
         "knockback": 28.571428571428573,
         "spread": 0.1,
@@ -5389,7 +5389,7 @@
           "bounciness": 0.9,
           "bouncy": true,
           "statCalculatorType": "bullet",
-          "topSpeedRatio": 0.51,
+          "topSpeedRatio": 1.066743,
           "necroInfect": false
         },
         "projectileBehaviors": [

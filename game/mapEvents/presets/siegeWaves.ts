@@ -1,4 +1,5 @@
 import type { Id, PlaceRule, Ref, Row, SpawnCard, SpawnGroup, SpecialWave, WavePlan, Num } from '../doc';
+import { bossShares } from '../../statShares';
 
 export interface SiegeWaveRefs {
   id: () => Id;
@@ -39,7 +40,8 @@ function line(r: SiegeWaveRefs, name: string, cards: SpawnCard[], o: LineOpts): 
     id: r.id(), name, cards, count: o.count, spread: 0.2, round: 'chance', test: o.from ? { from: o.from } : undefined,
     at: [o.at ?? r.gates], split: 'shared', blocks: o.holds !== false, side: BOSS_SIDE, showName: false,
     place: o.place ?? GATE_PLACE, tags: o.visitor ? [r.visitor] : undefined,
-    body: { brain: 'order', bossTier: o.visitor ? true : undefined, order: o.order, killLine: o.killLine, score: o.score, onLeaderboard: true, onMinimap: o.onMinimap !== false },
+    body: { brain: 'order', bossTier: o.visitor ? true : undefined, order: o.order, killLine: o.killLine, score: o.score, onLeaderboard: true, onMinimap: o.onMinimap !== false,
+      stats: o.visitor ? bossShares() : undefined },
   };
 }
 const by = (k: number): Num => ({ ramp: { per: k } });

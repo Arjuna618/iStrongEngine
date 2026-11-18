@@ -90,15 +90,8 @@ function _draws(cp: number): boolean {
   return ok;
 }
 
-function _drawsAll(text: string): boolean {
-  let ok = true;
-  for (let i = 0; i < text.length; i++) {
-    const cp = text.codePointAt(i) as number;
-    if (cp > 0xffff) i++;
-    if (!_draws(cp)) ok = false;
-  }
-  return ok;
-}
+let _char = 0;
+let _entryOk = true;
 
 function _start(): boolean {
   _started = true;
@@ -148,9 +141,19 @@ function _step(): void {
     if (_table > 4) { BOT_NAME_GLYPHS.done = true; _ctx = null; _refA = null; _refWide = null; }
     return;
   }
+  const text = list[_entry];
+  if (_char < text.length) {
+    const cp = text.codePointAt(_char) as number;
+    _char += cp > 0xffff ? 2 : 1;
+    let drew = false;
+    try { drew = _draws(cp); } catch { drew = false; }
+    if (!drew) _entryOk = false;
+    if (_char < text.length) return;
+  }
   const i = _entry++;
-  let ok = false;
-  try { ok = _drawsAll(list[i]); } catch { ok = false; }
+  const ok = _entryOk;
+  _char = 0;
+  _entryOk = true;
   if (!ok) return;
   if (_table === 0) { t.fontOk[i] = 1; BOT_NAME_GLYPHS.fontsOk++; }
   else if (_table === 1) { t.emojiOk[i] = 1; BOT_NAME_GLYPHS.emojiOk++; }

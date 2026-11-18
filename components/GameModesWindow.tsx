@@ -119,7 +119,7 @@ export const GameModesWindow: React.FC<Props> = ({ current, onPick, onClose }) =
               <ModeSideBody query={query} onQuery={setQuery} lead={LEAD_CATEGORIES} categories={SIDE_CATEGORIES} category={category} searching={q !== ''} onCategory={c => { setCategory(c as ShelfId); setQuery(''); }} />
             </aside>
             <ModeMain shelf={shelf} title={shelf.searching ? 'Search results' : CATEGORY_TITLE[shelf.shownCategory]} hint={shelf.searching ? undefined : CATEGORY_LINE.get(shelf.shownCategory)}
-              sort={sort} onSort={setSort} onClear={clearSearch}
+              sort={sort} onSort={setSort} onClear={clearSearch} reveal={picked}
               card={(e, w, h) => <ModeCard key={e.key} item={e} w={w} h={h} picked={picked === e.key} current={e.key === current} onPick={() => setPicked(e.key)} onDouble={() => use(e.key)} />} />
             <aside className="k-play-details" aria-label="The picked mode">
               <div className={`k-play-details-body ${detail.swapClass}`}>

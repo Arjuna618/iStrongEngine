@@ -8,6 +8,7 @@ import { useSwapStage } from '../kit/motion';
 import { SwapInPlace, SwapText } from '../kit/Collapse';
 import { PickRow, SearchField, Segmented, emptyArt } from '../kit/kit';
 import { TabSlide } from '../kit/TabSlide';
+import { useRowWindow } from '../kit/LongList';
 
 export type SortId = 'top' | 'name';
 export const ALL_ID = 'all';
@@ -126,7 +127,8 @@ const ShelfEmpty: React.FC<{ onClear: () => void }> = ({ onClear }) => (
 export const ModeMain: React.FC<{
   shelf: { stage: { shown: string; swapClass: string }; searching: boolean; list: readonly ModeItem[] };
   title: string; hint?: string; sort: SortId; onSort: (s: SortId) => void; onClear: () => void; card: (item: ModeItem, w: number, h: number) => React.ReactNode;
-}> = ({ shelf, title, hint, sort, onSort, onClear, card }) => {
+  reveal?: string | null;
+}> = ({ shelf, title, hint, sort, onSort, onClear, card, reveal }) => {
   const box = useRef<HTMLElement>(null);
   useLayoutEffect(() => { if (box.current) box.current.scrollTop = 0; }, [shelf.stage.shown]);
   return (
@@ -141,15 +143,17 @@ export const ModeMain: React.FC<{
       </div>
       {hint ? <p className="k-hint">{hint}</p> : null}
       <SwapInPlace key={shelf.stage.shown} swapKey={shelf.list.map(e => e.key).join('|')} className="k-play-shelf">
-      {shelf.list.length === 0 ? <ShelfEmpty onClear={onClear} /> : <CardRows list={shelf.list} card={card} />}
+      {shelf.list.length === 0 ? <ShelfEmpty onClear={onClear} /> : <CardRows list={shelf.list} card={card} reveal={reveal} />}
       </SwapInPlace>
     </section>
   );
 };
 
 const CARD_ROW_H = 132, CARD_GAP = 12;
-const CardRows: React.FC<{ list: readonly ModeItem[]; card: (item: ModeItem, w: number, h: number) => React.ReactNode }> = ({ list, card }) => {
-  const ref = useRef<HTMLDivElement>(null);
+const CARD_FOOT_EST = 34;
+const CARD_FIRST_ROWS = 4;
+const CardRows: React.FC<{ list: readonly ModeItem[]; card: (item: ModeItem, w: number, h: number) => React.ReactNode; reveal?: string | null }> = ({ list, card, reveal }) => {
+  const ref = useRef<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(0);
   useLayoutEffect(() => {
     const el = ref.current;
@@ -163,11 +167,36 @@ const CardRows: React.FC<{ list: readonly ModeItem[]; card: (item: ModeItem, w: 
   const picVer = useSyncExternalStore(modeCardPictures.subscribe, modeCardPictures.version, modeCardPictures.version);
   const rows = useMemo(() => layoutRows(list.map(i => (i.mapKey ? modeCardAspect(i.mapKey) : 16 / 9)), width, CARD_ROW_H, CARD_GAP),
     [list, width, picVer]);
+  const foot = useRef(CARD_FOOT_EST);
+  const rowKey = (i: number): string => { const r = rows[i]; return `${list[r.start].key}~${r.end - r.start}~${Math.round(r.h)}`; };
+  const win = useRowWindow(rows.length, rowKey, CARD_ROW_H + CARD_FOOT_EST + CARD_GAP, { first: CARD_FIRST_ROWS, estimateOf: (i) => rows[i].h + foot.current + CARD_GAP });
+  useLayoutEffect(() => {
+    const first = ref.current?.querySelector<HTMLElement>(':scope > .k-play-row');
+    const i = first ? Number(first.dataset.ri) : -1;
+    if (first && i >= 0 && i < rows.length) { const f = first.offsetHeight - rows[i].h - CARD_GAP; if (f > 0 && f < 200) foot.current = f; }
+  });
+  const shownReveal = useRef(reveal);
+  useLayoutEffect(() => {
+    if (reveal === shownReveal.current) return;
+    shownReveal.current = reveal;
+    if (!reveal) return;
+    const at = list.findIndex(e => e.key === reveal);
+    if (at < 0) return;
+    let ri = 0;
+    while (ri < rows.length && rows[ri].end <= at) ri++;
+    if (ri < rows.length && (ri < win.a || ri >= win.b)) win.reveal(win.keys[ri]);
+  }, [reveal]);
+  const setRef = (el: HTMLDivElement | null) => { ref.current = el; win.box.current = el; win.rows.current = el; };
+  const space = (h: number, k: string) => (
+    <div key={k} className="k-play-rows-skel" aria-hidden="true" style={{ height: h, ['--pr-row' as string]: `${CARD_ROW_H + foot.current + CARD_GAP}px` }} />
+  );
   return (
-    <div ref={ref} className="k-play-rows">
-      {rows.map(r => (
-        <div key={r.start} className="k-play-row">{list.slice(r.start, r.end).map((it, j) => card(it, r.widths[j], r.h))}</div>
+    <div ref={setRef} className="k-play-rows k-play-rows-win">
+      {win.above > 0 ? space(win.above, '\u0000above') : null}
+      {rows.slice(win.a, win.b).map((r, j) => (
+        <div key={win.keys[win.a + j]} data-ll={win.keys[win.a + j]} data-ri={win.a + j} className="k-play-row">{list.slice(r.start, r.end).map((it, k) => card(it, r.widths[k], r.h))}</div>
       ))}
+      {win.below > 0 ? space(win.below, '\u0000below') : null}
     </div>
   );
 };

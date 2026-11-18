@@ -1,4 +1,5 @@
 import type { MapConfig, GameModeType, BossGroupConfig } from '../types';
+import { bossShares, clampStatShares, STAT_SHARES, type StatShares } from './statShares';
 
 export type { BossGroupConfig };
 
@@ -45,9 +46,21 @@ const ROGUE_TANKS: readonly string[] = [
 function cloneGroups(src: readonly { name: string; tanks: readonly string[]; weight: number }[]): BossGroupConfig[] {
   const out: BossGroupConfig[] = [];
   for (let i = 0; i < src.length; i++) {
-    out.push({ name: src[i].name, tanks: src[i].tanks.slice(), weight: src[i].weight });
+    out.push({ name: src[i].name, tanks: src[i].tanks.slice(), weight: src[i].weight, stats: bossShares() });
   }
   return out;
+}
+
+export function copyBossGroup(g: BossGroupConfig): BossGroupConfig {
+  const out: BossGroupConfig = { name: g.name, tanks: g.tanks.slice(), weight: g.weight };
+  if (g.stats) out.stats = { ...g.stats };
+  return out;
+}
+
+export function bossStatsOf(cfg: MapConfig | undefined, name: string): StatShares | undefined {
+  const groups = bossStrengthGroupsOf(cfg);
+  for (let i = 0; i < groups.length; i++) if (Array.isArray(groups[i].tanks) && groups[i].tanks.includes(name)) return groups[i].stats;
+  return undefined;
 }
 
 export function defaultBossGroups(): BossGroupConfig[] {
@@ -119,6 +132,16 @@ export function bossGroupEligible(g: BossGroupConfig | undefined): boolean {
   return !!g && g.weight > 0 && Array.isArray(g.tanks) && g.tanks.length > 0;
 }
 
+let _shippedForStrength: readonly BossGroupConfig[] | null = null;
+export function bossStrengthGroupsOf(cfg: MapConfig | undefined): readonly BossGroupConfig[] {
+  if (STAT_SHARES.EVERY_WAY !== 0 && !Array.isArray(cfg?.bossGroups)) return _shippedForStrength ?? (_shippedForStrength = defaultBossGroups());
+  return bossGroupsOf(cfg);
+}
+
+export function bossStrengthEveryWay(cfg: MapConfig | undefined): boolean {
+  return cfg?.bossStrengthEveryWay !== false;
+}
+
 export function bossGroupPercent(groups: readonly BossGroupConfig[], index: number, can?: (g: BossGroupConfig) => boolean): number {
   let total = 0;
   for (let i = 0; i < groups.length; i++) {
@@ -128,6 +151,50 @@ export function bossGroupPercent(groups: readonly BossGroupConfig[], index: numb
   const g = groups[index];
   if (!bossGroupEligible(g) || (can && !can(g))) return 0;
   return (g.weight / total) * 100;
+}
+
+function chanceLive(g: BossGroupConfig | undefined, can?: (g: BossGroupConfig) => boolean): boolean {
+  return !!g && Array.isArray(g.tanks) && g.tanks.length > 0 && (!can || can(g));
+}
+const _w3 = (x: number): number => Math.round(x * 1000) / 1000;
+
+export function bossGroupChances(groups: readonly BossGroupConfig[], can?: (g: BossGroupConfig) => boolean): number[] {
+  const n = groups.length;
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) out.push(0);
+  let total = 0;
+  for (let i = 0; i < n; i++) if (chanceLive(groups[i], can) && groups[i].weight > 0) total += groups[i].weight;
+  if (!(total > 0)) return out;
+  const live: number[] = [], frac: number[] = [];
+  let sum = 0;
+  for (let i = 0; i < n; i++) {
+    if (!chanceLive(groups[i], can) || !(groups[i].weight > 0)) continue;
+    const exact = (groups[i].weight / total) * 100;
+    out[i] = Math.floor(exact);
+    frac[i] = exact - out[i];
+    sum += out[i];
+    live.push(i);
+  }
+  live.sort((a, b) => (frac[b] - frac[a]) || (a - b));
+  for (let k = 0; k < 100 - sum && k < live.length; k++) out[live[k]]++;
+  return out;
+}
+
+export function bossGroupsWithChance(groups: readonly BossGroupConfig[], index: number, pct: number, can?: (g: BossGroupConfig) => boolean): BossGroupConfig[] {
+  const out = groups.map(copyBossGroup);
+  const me = out[index];
+  if (!me) return out;
+  const p = Math.max(0, Math.min(100, Number.isFinite(pct) ? pct : 0));
+  let others = 0, count = 0;
+  for (let i = 0; i < out.length; i++) if (i !== index && chanceLive(out[i], can)) { others += Math.max(0, out[i].weight); count++; }
+  me.weight = _w3(p);
+  if (count === 0) return out;
+  const rest = 100 - p;
+  for (let i = 0; i < out.length; i++) {
+    if (i === index || !chanceLive(out[i], can)) continue;
+    out[i].weight = _w3(others > 0 ? (rest * Math.max(0, out[i].weight)) / others : rest / count);
+  }
+  return out;
 }
 
 export function rollBossGroup(groups: readonly BossGroupConfig[], rnd: () => number): number {
@@ -195,7 +262,10 @@ export function clampBossGroups(raw: unknown): BossGroupConfig[] | undefined {
     if (tanks.length === 0) continue;
 
     const w = typeof g.weight === 'number' && isFinite(g.weight) ? g.weight : 0;
-    out.push({ name, tanks, weight: Math.max(0, Math.min(BOSS_MAX_WEIGHT, w)) });
+    const one: BossGroupConfig = { name, tanks, weight: Math.max(0, Math.min(BOSS_MAX_WEIGHT, w)) };
+    const stats = clampStatShares(g.stats);
+    if (stats) one.stats = stats;
+    out.push(one);
   }
   return out.length > 0 ? out : undefined;
 }

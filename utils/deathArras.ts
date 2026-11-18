@@ -76,10 +76,10 @@ export function deathTankCircle(axis: number, mx: number, my: number, wv: number
 
 export function deathPhonePlace(bw: number, bh: number, hudS: number, left: number, right: number, top: number, bottom: number,
   margin: number): { u: number; y: number; xs: number } {
-  const w = right - left, h = bottom - top;
-  const u = Math.max(0.05, Math.min(hudS, (bw - 2 * margin) / w, (bh - 2 * margin) / h));
+  const half = Math.max(-left, right, 1e-3), h = bottom - top;
+  const u = Math.max(0.05, Math.min(hudS, (bw - 2 * margin) / (2 * half), (bh - 2 * margin) / h));
   const yPx = (bh - h * u) / 2 - top * u;
-  return { u, y: yPx / u, xs: -(left + right) / 2 };
+  return { u, y: yPx / u, xs: 0 };
 }
 
 export function deathCommas(n: number): string {
@@ -141,6 +141,23 @@ export function deathKillerLine(kind: '' | 'tank' | 'shape' | 'zone' | 'area', n
 }
 export function deathScoreTitle(name: string): string {
   return name !== '' ? `${name}'s Score:` : 'Your Score:';
+}
+export function deathBlockKey(gameSec: number, waitMs: number): number {
+  if (gameSec < DEATH_BLOCK_START - 0.001) return -1;
+  return waitMs > 1 ? deathSecondsOf(waitMs) : 0;
+}
+export function watchDeathBlock(keyNow: () => number, keyShown: () => number, redraw: () => void,
+  raf: (cb: () => void) => number, caf: (id: number) => void): () => void {
+  let id = 0;
+  const step = (): void => {
+    id = 0;
+    const k = keyNow();
+    if (k !== keyShown()) redraw();
+    else if (k === 0) return;
+    id = raf(step);
+  };
+  id = raf(step);
+  return () => { if (id !== 0) caf(id); id = 0; };
 }
 export function deathRespawnIn(ms: number): string {
   return `(you may respawn in ${deathDuration(deathSecondsOf(ms))})`;

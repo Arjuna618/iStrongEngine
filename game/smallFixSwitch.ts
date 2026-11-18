@@ -720,6 +720,13 @@ type SmallFixKeys = {
   R962C: number;
   R966: number;
   R968: number;
+  R972: number;
+  R976: number;
+  R979: number;
+  R981: number;
+  R982: number;
+  R992: number;
+  R993: number;
   R945: number;
   R173B: number;
   R65B: number;
@@ -1489,6 +1496,13 @@ const SMALL_FIX_DEF: SmallFixKeys = {
   R962C: _on('R962C'),
   R966: _on('R966'),
   R968: _on('R968'),
+  R972: _on('R972'),
+  R976: _on('R976'),
+  R979: _on('R979'),
+  R981: _on('R981'),
+  R982: _on('R982'),
+  R992: _on('R992'),
+  R993: _on('R993'),
   R945: _on('R945'),
   R173B: _on('R173B'),
   R65B: _on('R65B'),
@@ -2256,6 +2270,13 @@ function SmallFixShell(this: SmallFixKeys, d: SmallFixKeys): void {
   this.R962C = d.R962C;
   this.R966 = d.R966;
   this.R968 = d.R968;
+  this.R972 = d.R972;
+  this.R976 = d.R976;
+  this.R979 = d.R979;
+  this.R981 = d.R981;
+  this.R982 = d.R982;
+  this.R992 = d.R992;
+  this.R993 = d.R993;
   this.R945 = d.R945;
   this.R173B = d.R173B;
   this.R65B = d.R65B;

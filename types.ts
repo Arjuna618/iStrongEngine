@@ -1883,6 +1883,7 @@ export interface BossGroupConfig {
   name: string;
   tanks: string[];
   weight: number;
+  stats?: Partial<Record<UpgradeStat, number>>;
 }
 
 export const MAZE_TYPE_CUSTOM = -1;
@@ -2085,6 +2086,7 @@ export interface MapConfig {
   bossGroups?: BossGroupConfig[];
   bossesCanGrow?: boolean;
   bossesUsePortals?: boolean;
+  bossStrengthEveryWay?: boolean;
 
   events?: import('./game/mapEvents/doc').MapEventsDoc;
   mapAreas?: { nextId: number; zones: PlacedZone[] };
@@ -2603,6 +2605,7 @@ export interface EnemyConfig {
   isAutoBot?: boolean;
   isCmdBot?: boolean;
   isStageBody?: boolean;
+  _statK?: import('./game/statShares').StatK | null;
   bossTeam?: boolean;
   rogueTeam?: boolean;
   aiOff?: boolean;
@@ -2973,6 +2976,7 @@ export interface EnemyTank {
   _fileSizePx: number;
   toughKind?: number;
   healthK?: number;
+  _statK?: import('./game/statShares').StatK | null;
   pushShare?: number;
   penetrationBase?: number;
   touchScale?: number;
@@ -3042,6 +3046,10 @@ export interface EnemyTank {
   nextUpgradeIndex: number;
   arrasResist: number;
   kills: number;
+  tankKills: number;
+  assists: number;
+  bossKills: number;
+
   team: TeamId;
   aiBehavior: AIBehavior;
   upgradeLogic: UpgradeLogic;
@@ -3095,6 +3103,7 @@ export interface EnemyTank {
   isAggro: boolean;
   totalPlayerDamage: number;
   damageFromTanks: Map<string, number>;
+  killShares: Map<string, DamageContribution>;
   aggroTowards: Set<string>;
   isSentryEnemy: boolean;
   sentryTier?: 'sentry' | 'sentinel';
@@ -3165,6 +3174,8 @@ export interface EnemyTank {
   _zPack: boolean;
   _packTargetId: string;
   _packTargetPlayer: boolean;
+  _zSwarmN: number;
+  _zSwarmLag: number;
   _btBits: number; _btN: Int8Array;
   _ogTag: number; _ogRadius: number; _oaTag: number; _ogId: string; _ogX: number; _ogY: number; _ogLookAt: number;
   _ogFront: boolean; _ogFrontShare: number; _ogFrontIs: number; _ogPendId: string; _ogPendAt: number; _ogHoldUntil: number;
@@ -3664,6 +3675,8 @@ export interface GameState {
 
   kills: number;
   bossKills: number;
+  tankKills: number;
+  assists: number;
   topKills: number;
   foodKills: number;
   playerDead: boolean;
@@ -4009,6 +4022,8 @@ export const INITIAL_GAME_STATE: GameState = {
   playerName: '',
   kills: 0,
   bossKills: 0,
+  tankKills: 0,
+  assists: 0,
   topKills: 0,
   foodKills: 0,
   playerDead: false,

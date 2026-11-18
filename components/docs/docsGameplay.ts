@@ -31,19 +31,19 @@ export const DOCS_GAMEPLAY: DocCategory = {
         {
           id: 'spawn-protection',
           title: 'Spawn Protection',
-          keywords: ['spawn', 'protection', 'grace', 'grace period', 'invulnerable', 'safe', 'start', 'blink', 'blinking', 'flashing', 'white', 'portal', 'wormhole', 'black hole', 'bots'],
+          keywords: ['spawn', 'protection', 'grace', 'grace period', 'invulnerable', 'safe', 'start', 'blink', 'blinking', 'flashing', 'white', 'portal', 'wormhole', 'black hole', 'bots', 'auto fire', 'autofire'],
           blocks: [
             { t: 'p', text: 'Every time you enter a game, every time you respawn, and every time you come out of a black hole or a wormhole, you start with spawn protection. Nothing can hurt you while it lasts, and bots cannot see you at all, so you get a quiet moment to look around and pick a direction.' },
             { t: 'kv', rows: [
               ['The developer tank', 'Becoming the developer tank starts spawn protection again, whether you press **P** or pick it in **Manage Players**. If protection is already running, its time simply starts over. The developer tank and every page tank of the P menu have the body of a Basic: the same health, shield, speed and push, so they ram and push shapes exactly like a Basic.'],
               ['How long it lasts', 'Up to 45 seconds, if you do nothing at all.'],
-              ['What ends it', 'Moving or shooting. The first movement key you press, or the first shot you fire, ends it straight away.'],
+              ['What ends it', 'Moving or shooting. The first movement key you press, or the first click to shoot, ends it straight away. Auto fire and auto spin do not end it.'],
               ['What it does', 'You take no damage from anything, and bots treat you as if you are not there.'],
               ['How you can tell', 'When you spawn, a message at the top says **You will be invulnerable until you move or shoot.** Your tank also blinks while the protection is up. When the blinking stops, you are a normal target again.'],
               ['Bots', 'A bot that comes out of a black hole or a wormhole is protected too. It stops steering and shooting for one to two seconds and blinks, and nothing can hurt it or aim at it. Then it plays on.'],
               ['The first half second', 'Every new tank waits half a second before it can act or be hit, even one with no spawn protection at all, like a boss, a sentry or an enemy you place in the sandbox. It blinks for that half second, so a tank that blinks is a tank your shots still pass through.'],
             ] },
-            { t: 'note', text: 'Turning auto fire on counts as shooting and ends the protection at once. That is why a trip through a black hole or a wormhole turns your auto fire and auto spin off: turn them back on when you are ready.' },
+            { t: 'note', text: 'Turning auto fire on with **E** keeps your protection: your guns wait and fire nothing, and your drones stay with you. The moment you move or click, the protection ends and auto fire starts shooting. A trip through a black hole or a wormhole still turns your auto fire and auto spin off: turn them back on when you are ready.' },
             { t: 'tip', text: 'Spend it deciding where to go. Pausing does not use it up, so you can open the pause menu and study the map without losing any of it.' },
             { t: 'links', ids: ['dying-and-respawning', 'testing-your-tank', 'game-controls', 'game-messages'] },
           ],
@@ -175,13 +175,14 @@ export const DOCS_GAMEPLAY: DocCategory = {
         {
           id: 'leveling-xp',
           title: 'Leveling and XP',
-          keywords: ['xp', 'level', 'experience', 'score', 'damage share', 'level cap', 'kill reward', 'jackpot', 'manhunt', 'level bar', 'score bar', 'kills bar', 'boss kills', 'name'],
+          keywords: ['xp', 'level', 'experience', 'score', 'damage share', 'shared kill', 'assist', 'level cap', 'kill reward', 'jackpot', 'manhunt', 'level bar', 'score bar', 'kills bar', 'boss kills', 'name'],
           blocks: [
             { t: 'p', text: 'You earn XP by destroying shapes and other tanks. XP raises your level, and levels give you skill points to spend.' },
             { t: 'kv', rows: [
-              ['Damage share', 'Shape XP is split fairly. If you dealt 20 percent of the damage, you get 20 percent of the XP, even if someone else lands the final hit. A shape pays its whole worth, and bots are paid by exactly the same rule. What each shape is worth is listed in Shapes and Rarities.'],
-              ['The 7 second rule', 'Stop damaging a shape for more than 7 seconds and your damage share on it is forgotten.'],
-              ['Tank kills', 'Killing a tank pays out from the score that tank had built up, not from its level. In most modes you collect about two thirds of its score, and the share tapers off for very rich targets. Unlike shapes, a tank kill is not shared: whoever lands the killing blow takes the whole payout, no matter who did the damage. A tank your gun spawns with **Use AI** counts as your projectile, so its kills and the shapes it destroys pay you, unless that gun has **XP Goes to Owner** turned off. Bots work the same way. Bosses and sentries instead pay a fixed reward set on the tank itself.'],
+              ['Damage share', 'Every kill is split fairly: shapes, tanks, bosses and Map Entities alike. If you dealt 20 percent of the damage, you get 20 percent of the reward, even if someone else lands the final hit. The whole reward is always paid out, and never more. Bots are paid by exactly the same rule. What each shape is worth is listed in Shapes and Rarities.'],
+              ['The 3 percent rule', 'Deal less than 3 percent of its full health and that kill gives you nothing. Your part goes to the others who earned a share. If nobody reached 3 percent, whoever lands the final hit takes the whole reward.'],
+              ['The 7 second rule', 'Stop damaging something for more than 7 seconds and your damage share on it is forgotten.'],
+              ['Tank kills', 'Killing a tank pays out from the score that tank had built up, not from its level. In most modes the reward is about two thirds of its score, and the share tapers off for very rich targets. It is split by damage like every other kill, and the kill itself counts for whoever lands the final hit. When a tank kills you, every tank that hurt you shares your reward the same way. A tank your gun spawns with **Use AI** counts as your projectile, so its damage, its kills and the shapes it destroys pay you, unless that gun has **XP Goes to Owner** turned off. Bots work the same way. Bosses and sentries instead pay a fixed reward set on the tank itself.'],
               ['Manhunt kills', 'In Manhunt modes you take the whole score instead of two thirds, which is what makes the leader worth hunting.'],
               ['Level cap', 'In normal modes your level stays where you start, and your score keeps counting with no limit. Growth modes raise the cap to 1000. Manhunt modes have no practical cap at all. The Sandbox keeps the classic cap of 45.'],
               ['Skill points', 'Normally one point per level up, until you hit the tank Max Skill Points cap, which is 42 by default and counts any bonus points the tank started with. Growth modes use their own rules instead. The growth modes of the Play menu and Old Dreadnoughts give a point at levels 2, 4 and 6, then one every 10 levels from level 16, so a tank holds 78 points at most with the 42 it starts with. A mode built in the engine can use its own runs of points in its Growth Rules, a steady point every few levels, or the older curve that slows down at higher levels. A tank can also be built with Can Earn Skill Points off, so leveling gives it none at all, which is how bosses work.'],
@@ -190,7 +191,7 @@ export const DOCS_GAMEPLAY: DocCategory = {
             { t: 'kv', title: 'The bars at the bottom of the screen', rows: [
               ['Level bar', 'The wide purple bar. It fills with XP and shows your level and your tank.'],
               ['Score bar', 'The thin green bar on the left. Its number is your score, the same number the leaderboard shows, and the bar is full when you have the best score on the leaderboard.'],
-              ['Kills bar', 'The thin light blue bar on the right counts your tank kills. It fills with how much of your score came from kills: each tank kill counts as 35,000 and each boss kill as 70,000. After your first boss kill it reads kills, assists and boss kills, like **Kills: 3/0/1**. Assists always read 0. The **Show Kills Bar** setting turns it off.'],
+              ['Kills bar', 'The thin light blue bar on the right counts your kills. It reads **Kills: 3** at first, and from your first assist or boss kill it reads kills, assists and boss kills, like **Kills: 3/1/2**. A kill is a tank you finish off. A boss kill is a boss you finish off, from Celestials, Elites, Terrestrials and the other boss groups, and it counts only there. Sentries and sentinels count nowhere. You earn an assist when another tank finishes off a tank or a boss after you dealt at least a quarter of its full health in its last 7 seconds. The bar fills with how much of your score came from kills: each kill counts as 35,000 and each boss kill as 70,000, and assists do not fill it. While you spectate a tank it shows that tank\'s counts. The **Show Kills Bar** setting turns it off.'],
               ['Your name', 'Your player name sits above the bars.'],
             ] },
             { t: 'links', ids: ['upgrading-stats', 'shapes-rarities', 'growth-leveling'] },
@@ -784,7 +785,7 @@ export const DOCS_GAMEPLAY: DocCategory = {
               ['Your tank', 'A picture of the tank you died as, turned up and to the right, with the level you reached and the name of the tank under it.'],
               ['Your score', 'Your name and the word Score over the score you died with, or **Your Score** when you have no name. The number counts up from zero over two seconds.'],
               ['Survived for', 'How long that life lasted, its largest unit and every unit after it, like **2 minutes and 5 seconds** or **1 hour, 0 minutes, and 3 seconds**. Time spent paused does not count.'],
-              ['Your kills', 'The tanks you killed, the bosses among them as visitors, and the shapes you destroyed, like **3 kills, 1 visitor defeated, and 41 polygons destroyed**. With none at all it says **A true pacifist**. The little picture in front of it grows wilder with your kills, a boss counting twice.'],
+              ['Your kills', 'The same three counts as the kills bar, and the shapes you destroyed: the tanks you killed, your assists, and the bosses you killed as visitors, like **3 kills, 2 assists, 1 visitor defeated, and 41 polygons destroyed**. With none at all it says **A true pacifist**. The little picture in front of it grows wilder with your kills, a boss counting twice and an assist not at all.'],
               ['A tip', '**Kill players and polygons to get more score.**'],
               ['What killed you', 'A tank is named by its own name and its kind, like **Succumbed to Bob\'s Overlord**. A shape, or a tank with no name of its own, by its kind alone, like **Succumbed to a Pentagon**. If a tank that another tank spawned killed you, it names the tank that spawned it. An enemy base says **Succumbed to an enemy base**, a Damaging Area **Succumbed to a Damaging Area**, and when nothing can be named it says **Vanished into thin air**.'],
               ['The wave', 'In a mode whose rules count waves, one more line with the wave you reached.'],
@@ -815,7 +816,7 @@ export const DOCS_GAMEPLAY: DocCategory = {
         {
           id: 'take-over-tank',
           title: 'Take Over Tank',
-          keywords: ['take over', 'takeover', 'spectate', 'spectator', 'swap', 'control', 'possess', 'become', 'switch tank', 'manage players', 'edit player stats'],
+          keywords: ['take over', 'takeover', 'spectate', 'spectator', 'swap', 'control', 'possess', 'become', 'switch tank', 'manage players', 'edit player stats', 'boss strength'],
           blocks: [
             { t: 'p', text: 'Take Over Tank lets you leave your tank and become another tank on the map. Your old tank keeps playing on its own as a bot, and you can take it back the same way. Anything a turret spawned, such as a minion or a drone tank, never appears in the list. A sentry, or a tank that is still spawning, shows the button greyed out with **This tank cannot be taken over**.' },
             { t: 'h', text: 'How to do it' },
@@ -828,6 +829,7 @@ export const DOCS_GAMEPLAY: DocCategory = {
             { t: 'note', text: 'The button only shows on another tank, never on your own. If the tank is standing in a base that would destroy you once you are driving it, Take Over says no with a message and nothing changes. Wait until it has left the base and press it again.' },
             { t: 'h', text: 'What you get' },
             { t: 'p', text: 'You become that tank completely: its class, its design, its stats, its upgrades, its skill points, its level, its growth, its health, and even its auto spin or auto fire. The score bar and the class tree show its class, even for a tank placed with the Enemy Tool or a boss. You take its exact spot on the map, and your view slides over to it and then settles into its field of view.' },
+            { t: 'note', text: 'A boss that a **Boss Spawns** group holds has that group\'s **Strength**, and so do you while you drive it, as long as the mode has **Strength For Every Boss** on. To start with that is a tenth less Max Health, Body Damage, Bullet Health, Bullet Penetration, Bullet Damage, Shield Regeneration and Shield Capacity.' },
             { t: 'h', text: 'Evolving it further' },
             { t: 'p', text: 'If the tank you took over still has somewhere to evolve to, that choice is yours. The evolve menu opens and you can take an upgrade or stay as you are, exactly like a tank of your own. This works for tanks placed with the Enemy Tool too. A tank that has reached the end of its branch has nothing left to offer, so no menu appears for it, and that includes every boss.' },
             { t: 'h', text: 'Your old tank' },
@@ -842,7 +844,7 @@ export const DOCS_GAMEPLAY: DocCategory = {
         {
           id: 'spawn-tool',
           title: 'Spawn Tool',
-          keywords: ['spawn tool', 'tank spawner', 'shape spawner', 'spawn', 'spawner', 'spawn shape', 'food', 'sentry', 'sentinel', 'count', 'to spawn', 'grow in', 'spawn animation', 'spawn tank', 'spawn boss', 'spawn wall', 'spawn on cursor', 'place', 'preview', 'ai', 'ai off', 'how many', 'respawn', 'distance', 'level', 'xp', 'skill points', 'team', 'rogues', 'rogue', 'props', 'prop', 'pumpkin', 'ball', 'eye', 'crash', 'crash guard', 'freeze', 'operator'],
+          keywords: ['spawn tool', 'tank spawner', 'shape spawner', 'spawn', 'spawner', 'spawn shape', 'food', 'sentry', 'sentinel', 'count', 'to spawn', 'grow in', 'spawn animation', 'spawn tank', 'spawn boss', 'boss strength', 'spawn wall', 'spawn on cursor', 'place', 'preview', 'ai', 'ai off', 'how many', 'respawn', 'distance', 'level', 'xp', 'skill points', 'team', 'rogues', 'rogue', 'props', 'prop', 'pumpkin', 'ball', 'eye', 'crash', 'crash guard', 'freeze', 'operator'],
           blocks: [
             { t: 'p', text: 'The **Spawn Tool** places anything of the Content Library into the match: any tank, boss or map entity, any wall or other piece of the **Others**, any food shape and the sentries. Open the pause menu, then the **Debug Menu**, and press **Spawn Tool**. It works in every mode for an Arena Conductor, which means while Debug Mode is on.' },
             { t: 'p', text: 'It is the Content Library window with four tabs: **Tanks**, **Others**, **Food Shapes** and **Sentries**. Pick a card and its panel shows what you can set, then its buttons.' },
@@ -855,6 +857,7 @@ export const DOCS_GAMEPLAY: DocCategory = {
               ['Level, XP and Skill Points', 'They start at what this tank really has when it spawns in this mode: its own bonus points and what the mode gives at its level. Change the level and the points follow it, unless you typed the points yourself. Typing an XP sets the level that XP reaches.'],
               ['Upgrade Stats', 'The ten bars, each holding as many points as this tank allows, as in Manage Players. A tank with built in stats shows them. Set any bar yourself. With its AI on, the tank spends its other points its own way.'],
             ] },
+            { t: 'note', text: 'A boss you spawn is as strong as its group in **Boss Spawns**, and so is any other tank those groups hold, as long as the mode has **Strength For Every Boss** on. To start with that is a tenth weaker in seven stats.' },
             { t: 'kv', title: 'For the Others', rows: [
               ['Walls', 'Every wall of the Walls folder works as the walls of the backtick panel do: a Deadly Wall hurts, a Bouncy Wall throws, a One Way Wall lets you through one way, and so on. **Size** sets how many cells of 60 each side is, and the wall stands on the grid of the backtick panel.'],
               ['The pumpkin', 'A real rock that wears the pumpkin in any mode. **Size** sets how big it is.'],
@@ -990,7 +993,7 @@ export const DOCS_GAMEPLAY: DocCategory = {
             { t: 'kv', title: 'A zombie', rows: [
               ['Grey', 'For 3 seconds it cannot move, turn or fire, and it takes only a tenth of every hit.'],
               ['Green', 'Then it wakes. It moves at 75 percent of its speed, is pushed half as far, and charges at the living with no fear.'],
-              ['The horde', 'Zombies keep close behind the strongest zombie they see, and a pack goes for one target together.'],
+              ['The horde', 'All the zombies of an area move as one swarm behind one leader, the strongest zombie the leader can see. They stay close round it, find their way through mazes together, never stop to look round, and fight only the target their leader picks, all turning to it together. A zombie that rises far away walks over and joins them.'],
               ['Its tank', 'It keeps the tank, the level, the skill points and the spin of the tank it was.'],
               ['Its sight', 'It sees four times as far as a tank, but walls still hide what is behind them.'],
               ['Its drones and turrets', 'Its drones and minions go for tanks four times as far around it, and its auto turrets see four times as far, but only at a tank it sees in a straight line from where it stands, never round a wall or into one.'],
@@ -1108,6 +1111,7 @@ export const DOCS_GAMEPLAY: DocCategory = {
               ['The bots', 'Some bots of each team guard the Dominators their team holds, the rest go for the others. A fight always comes first.'],
               ['Taking control', 'Press **F** to take over the nearest Dominator of your team: you aim it and fire it, and your tank waits on it. **F** again gives it back. With none free you read **There are no dominators available that are on your team or not already controlled by a player.**'],
             ] },
+            { t: 'note', text: 'A Dominator aims ahead of a moving tank, the way Sentries do: driving straight past it does not dodge its shots, a change of direction does. A Dominator Destroyer\'s round is slow, so from far away it cannot catch a fast tank.' },
             { t: 'tip', text: 'Every part is a Map Event you can open and change: each Dominator is a Map Entity with a Neutral and a Taken form.' },
             { t: 'links', ids: ['map-entities', 'entity-types', 'map-events-steps', 'play-menu'] },
           ],
@@ -1206,9 +1210,10 @@ export const DOCS_GAMEPLAY: DocCategory = {
         {
           id: 'nexus-forge',
           title: 'The Nexus, the Forge and Travel',
-          keywords: ['nexus', 'forge', 'nexus point', 'black hole', 'travel', 'trip', 'dreadnought', 'level 45', 'portal', 'other mode', 'remembered match'],
+          keywords: ['nexus', 'forge', 'nexus point', 'black hole', 'travel', 'trip', 'dreadnought', 'level 45', 'portal', 'other mode', 'remembered match', 'loading screen'],
           blocks: [
             { t: 'p', text: 'Some black holes lead into another game mode. You come out in a match already going on there, with your tank, your level and your score, and read **You have traveled through a portal!**' },
+            { t: 'p', text: 'On the way the screen fades to dark, and the loading screen shows while the other match is made. It goes away once that match runs smoothly. A wormhole, or a portal between the areas of one mode, takes you there at once, with no loading screen.' },
             { t: 'kv', title: 'Where they lead', rows: [
               ['Nexus Points', 'Every plain normal mode (never Growth, Arms Race, Assault, Siege or Others) has one: a black hole to the Nexus. It first opens a minute and a half into the match, stays a minute and is gone for 3 minutes.'],
               ['The Nexus', 'A small map of rooms with one team, Blue, its base in the middle room with one Base Protector. 5 to 15 tanks the first time, no bosses and no food shapes. Tanks come in only inside its building, and inside it nobody can hurt anyone. It starts as if it had been open 5 minutes, so the tanks are spread out and many have grown. Its card is in the Normal category and with the Dreadnoughts.'],
@@ -1237,7 +1242,7 @@ export const DOCS_GAMEPLAY: DocCategory = {
         {
           id: 'play-menu',
           title: 'The Play Menu',
-          keywords: ['play menu', 'main menu', 'categories', 'launch', 'modes', 'search', 'tags', 'sort', 'your name', 'phone', 'siege'],
+          keywords: ['play menu', 'main menu', 'categories', 'launch', 'modes', 'search', 'tags', 'sort', 'your name', 'phone', 'siege', 'loading', 'loading screen', 'black screen'],
           blocks: [
             { t: 'p', text: 'The **Play Game** button on the main menu opens the Play menu, the quick way to start a match without touching the editor. It is one window: the list on the left, the mode cards in the middle and the picked mode on the right. The **Your name** box at the top is the name your tank shows in the match.' },
             { t: 'note', text: 'The very first time, the Terms of Use open before the Play menu. Press **I Agree** and the Play menu follows. See **Terms, Privacy and License**.' },
@@ -1254,6 +1259,7 @@ export const DOCS_GAMEPLAY: DocCategory = {
               'Adjust the match in the card at the bottom of the right side, just above **Play**. Every mode has a bot slider. It is called **Bots** in most modes and **Bots per Team** in the team modes, which are the TDM and Open TDM modes, Old Dreadnoughts and the three Portal modes. Team modes also let you pick **Your Team**, shown by its colour and its name. Each of them is built for a set number of sides, such as 2TDM and 4TDM, so you choose your side but not the number of teams. In Siege the sides are fixed, you against the bosses, so you choose neither, and **Bots** is how many fight on your team.',
               'Press **Play**, or double click the card. The mode launches with a ready made setup.',
             ] },
+            { t: 'p', text: 'While the match is made, a loading screen covers everything: **Loading...** with a tip under it, in the colors of your game theme. It goes away as soon as the match runs smoothly, so the screen never turns black on the way in, on a computer or on a phone.' },
             { t: 'tip', text: 'On a keyboard the arrow keys move the pick, **Enter** plays, and **Escape** clears the search first, then goes back to the main menu.' },
             { t: 'note', text: 'On a computer the **To Sandbox** button at the bottom of the list opens the Game Engine instead, since sandbox worlds are yours to set up. It asks you first. On a phone it starts the **Sandbox** mode of Others. See Sandbox Mode.' },
             { t: 'p', text: 'On a phone the window is one list. Tap a mode to open its own page with its settings and **Play**, and use the back arrow to return to the list.' },

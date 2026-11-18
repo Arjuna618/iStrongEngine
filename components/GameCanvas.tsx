@@ -3523,7 +3523,7 @@ interface XpBarAnim {
     name: string | null;
     lvFill: HudSlot; lvText: HudSlot; lvName: string | null;
     scFill: HudSlot; scText: HudSlot;
-    klFill: HudSlot; klText: HudSlot; klBoss: number;
+    klFill: HudSlot; klText: HudSlot; klBoss: number; klAs: number;
     subj: string;
 }
 
@@ -3551,12 +3551,15 @@ function paintHudBars(a: XpBarAnim, st: GameState, logic: GameLogic): void {
         a.scText.el = stx; a.scText.v = score;
     }
     if (killsOn) {
-        const k = _w !== null ? _w.kills : st.kills, b = _w !== null ? 0 : (st.bossKills ?? 0);
+        const r993 = SMALL_FIX.R993 !== 0;
+        const k = r993 ? (_w !== null ? _w.tankKills : st.tankKills) : (_w !== null ? _w.kills : st.kills);
+        const as = r993 ? (_w !== null ? _w.assists : st.assists) : 0;
+        const b = r993 ? (_w !== null ? _w.bossKills : st.bossKills) : (_w !== null ? 0 : (st.bossKills ?? 0));
         _paintShift(a.klFill, a.kill.fill.current, hudBarShift(HUD_BAR_KILL, hudKillFill(k, b, score)));
         const ktx = a.kill.text.current;
-        if (ktx && (ktx !== a.klText.el || k !== a.klText.v || b !== a.klBoss)) {
-            ktx.textContent = hudKillText(k, 0, b);
-            a.klText.el = ktx; a.klText.v = k; a.klBoss = b;
+        if (ktx && (ktx !== a.klText.el || k !== a.klText.v || b !== a.klBoss || as !== a.klAs)) {
+            ktx.textContent = hudKillText(k, as, b);
+            a.klText.el = ktx; a.klText.v = k; a.klBoss = b; a.klAs = as;
         }
     }
 }
@@ -3609,7 +3612,7 @@ const InGameHUD: React.FC<{ logic: GameLogic }> = ({ logic }) => {
             name: null,
             lvFill: _newSlot(), lvText: _newSlot(), lvName: null,
             scFill: _newSlot(), scText: _newSlot(),
-            klFill: _newSlot(), klText: _newSlot(), klBoss: NaN,
+            klFill: _newSlot(), klText: _newSlot(), klBoss: NaN, klAs: NaN,
             subj: logic.spectatedTank()?.id ?? '',
         };
     }

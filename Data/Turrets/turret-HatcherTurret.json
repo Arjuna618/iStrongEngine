@@ -1,16 +1,16 @@
 {
   "version": "1.0.0",
   "type": "TurretPreset",
-  "name": "Tainter Turret",
+  "name": "Hatcher Turret",
   "category": "Drone/Swarm",
   "source": "arras-migration",
   "timestamp": 1793491200000,
   "data": {
-    "name": "Tainter Turret",
+    "name": "Hatcher Turret",
     "category": "Drone/Swarm",
     "turrets": [
       {
-        "id": "07753f888fef618c__g1",
+        "id": "ed4aad4ca66aa4b0__g3",
         "length": 3.029075309818875,
         "width": 26.041666666666668,
         "aspect": 1,
@@ -120,21 +120,21 @@
         "colorMap": 16
       },
       {
-        "id": "07753f888fef618c__g2",
+        "id": "ed4aad4ca66aa4b0__g4",
         "length": 1.3775023832221163,
         "width": 31.25,
         "aspect": 1,
         "xOffset": 1.5,
         "yOffset": 0,
         "angle": 0,
-        "bps": 0.279947,
-        "speed": 1,
+        "bps": 0.279767,
+        "speed": -3.29563,
         "delay": 0,
         "knockback": 28.571429,
         "spread": 0.1,
         "shudder": 0.1,
-        "bulletDamage": 1.7295,
-        "bulletHealthBase": 2.07996,
+        "bulletDamage": 1.70322,
+        "bulletHealthBase": 1.99036,
         "bulletPenetration": 1,
         "bulletLifetime": 3,
         "shootResist": 1,
@@ -180,7 +180,7 @@
             "growRate": 1,
             "turrets": [
               {
-                "id": "07753f888fef618c__g2_g0",
+                "id": "ed4aad4ca66aa4b0__g4_g0",
                 "length": 8.927550047664443,
                 "width": 23.4375,
                 "aspect": 1,
@@ -188,16 +188,16 @@
                 "yOffset": 0,
                 "angle": 0,
                 "bps": 1.890002,
-                "speed": 4.444444444444445,
+                "speed": 5.59629,
                 "delay": 0,
                 "knockback": 0,
                 "spread": 30,
-                "shudder": 0.21,
-                "bulletDamage": 0.23662,
-                "bulletHealthBase": 1.3524,
+                "shudder": 0.212,
+                "bulletDamage": 0.7795,
+                "bulletHealthBase": 0.67156,
                 "bulletPenetration": 1.2,
                 "bulletLifetime": 1.8333333333333333,
-                "shootResist": 0.58583,
+                "shootResist": 0.9915,
                 "isCustom": false,
                 "animProgress": 0,
                 "turretType": "regular",
@@ -237,7 +237,7 @@
                   "bounciness": 0.9,
                   "bouncy": true,
                   "statCalculatorType": "bullet",
-                  "topSpeedRatio": 0.75,
+                  "topSpeedRatio": 0.662686,
                   "necroInfect": false
                 },
                 "projectileBehaviors": [
@@ -335,7 +335,7 @@
           "bounciness": 0.9,
           "bouncy": true,
           "statCalculatorType": "drone",
-          "topSpeedRatio": 0.75,
+          "topSpeedRatio": 2.640272,
           "necroInfect": false
         },
         "projectileBehaviors": [
@@ -515,7 +515,7 @@
         "fightResist": 1
       },
       {
-        "id": "07753f888fef618c__g3",
+        "id": "ed4aad4ca66aa4b0__g5",
         "length": 2.5571973307912295,
         "width": 31.25,
         "aspect": 1,

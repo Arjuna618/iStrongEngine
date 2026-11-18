@@ -24,6 +24,7 @@ export interface SpawnReq {
   brain: 'full' | 'none' | 'order'; orderIdx: number; sight: number;
   birthLook: 'none' | 'food'; crashersIgnore: boolean; canBeHealed: boolean; contact: 'tank' | 'shape';
   pushable: boolean | null; solid: boolean | null; health: number; level: number; skills: Record<string, number> | null; classWord: string;
+  statK: import('../statShares').StatK | null | undefined;
   graceMs: number;
   refill: 'none' | 'shield' | 'all';
   placed: boolean;

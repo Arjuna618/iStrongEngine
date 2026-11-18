@@ -79,6 +79,8 @@ import { applySpawnProfile, spawnProfileOfWorld, spawnProfileSpecial, RELIC_CORE
 import { SIZE_ARRAS, SIZE_ANCHOR_K } from "./sizeSwitch";
 import { DEFENSE_ARRAS, defenseOnBody, defenseShieldMult, defenseBrst, defenseAtkVsRounds, defenseShieldStep, defenseHealthStep, defenseHumpK } from "./defenseSwitch";
 import { TANK_KINDS, tankKindOf, debuffResist, debuffHealthK, clampTankDebuffs, setTankGroupRules, groupStopChance, groupPortals, kindFileResist, type TankDebuffs, type TankDebuff, type TankKindId, type TankGroupRule } from "./tankDebuffs";
+import { STAT_SHARES, statKOf, type StatK, type StatShares } from "./statShares";
+import { KILL_SHARE_FLOOR, ksNote, ksClear, ksDrop, ksEarns, ksFresh, KILL_ASSIST_SHARE } from './killShares';
 import { isFixedMapThing } from "./fixedBodies";
 import { ACTIVE_GROWTH, growthFactor, growthSkillPointsAt, growthRespawnXp, clampGrowthRules, defaultGrowthRules, type GrowthRules, growthRulesOf, MF_WAVE, MF_NO_GROW } from "./growthRules";
 import { skipTargetXp, SKIP_MAX_MINUTES, SKIP_CLIMB_S, SKIP_CLIMB_MAX_MS } from './skipTime';
@@ -114,7 +116,8 @@ import {
 import {
   BOSS_SPAWN_FEATURE, bossSpawnsActive, bossInitialDelay, bossSpawnCooldown, bossesCanGrow, bossesUsePortals,
   bossGroupsOf, rollBossGroup, pickBossTank, modeBossGroups, bossSpawnsDefaultFor,
-  BOSS_ANNOUNCE_LEAD_MS, bossAnyEligible, bossNameAt, bossGroupEligible,
+  BOSS_ANNOUNCE_LEAD_MS, bossAnyEligible, bossNameAt, bossGroupEligible, bossStatsOf,
+  bossStrengthEveryWay, bossStrengthGroupsOf,
 } from "./BossSpawn";
 import {
   BASE_THREAT_FEATURE, buildBaseThreatField, baseThreatHostile, baseThreatRectFraction,
@@ -190,7 +193,7 @@ import { MAX_ROUND_LAYERS, roundCanNest, autoSubCanNest, roundMayFire } from './
 import { sandboxTeamsOn, sandboxFfaOn, SANDBOX_TEAMS, TEAM_IDX_NEUTRAL, TEAM_IDX_DREAD, TEAM_IDX_ROGUES, OD_DREAD_COLOR, teamIdxSlot } from '../types';
 import { TEAM_COLOUR } from './teamColourSwitch';
 import { dreadTeamId, dreadBehavior } from '../types';
-import { shouldSkipTeamCollision } from './teamCollision';
+import { shouldSkipTeamCollision, bossCampMates } from './teamCollision';
 import { isFfaStyleMode, isManhuntMode, isGroupsMode, groupSizeForMode, PLAYER_GROUP_ID, DEFAULT_MULTI_AREA_CONFIG, clampBehaviorToMode, isSmasherStatNames, isPortalMode, teamColourMode, isScriptedMode } from '../types';
 import { buildPresetWorld } from './mapEvents/presets/index';
 import { buildPortalWorld, isPortalWorldAreaId, type PortalModeId } from './portalModes';
@@ -403,7 +406,7 @@ function copyRoster(to: MapConfig, from: MapConfig): MapConfig {
 }
 
 const SANDBOX_ROSTER_KEYS: readonly string[] = ['enableBaseProtectors', 'baseProtectorTeams', 'baseProtectorPush', 'baseProtectorPushStrength', 'baseProtectorRange',
-  'enableBossSpawns', 'bossGroups', 'bossInitialDelay', 'bossSpawnCooldown', 'bossesCanGrow', 'bossesUsePortals',
+  'enableBossSpawns', 'bossGroups', 'bossInitialDelay', 'bossSpawnCooldown', 'bossesCanGrow', 'bossesUsePortals', 'bossStrengthEveryWay',
   'events', 'mapAreas'];
 function _nameCutAt(raw: string, max: number): number {
   const s = raw.replace(/[\u0000-\u001F\u007F]/g, '').replace(/\s+/g, ' ').trim();
@@ -543,6 +546,9 @@ const INT_PUSH_COS_ON = Math.cos(20 * Math.PI / 180), INT_PUSH_COS_HOLD = Math.c
 const INT_PICK_MS = 6000, INT_NEAR = 60;
 const MEV_FRAGILE_K = 1e-4;
 const ZOMBIE_PACK_CIRCLE = 0.5;
+const ZS_IN = 1.15, ZS_OUT0 = 0.6, ZS_OUTN = 0.45, ZS_ARRIVE = 0.45, ZS_NEAR = 2.5;
+const ZS_GATHER = 4;
+const ZS_PACE = 0.7, ZS_LAG_FAR = 1500;
 function _hordeOutranks(a: EnemyTank, b: EnemyTank): boolean {
   if (a.level !== b.level) return a.level > b.level;
   if (a.currentXp !== b.currentXp) return a.currentXp > b.currentXp;
@@ -1193,6 +1199,9 @@ const _areaNumRng = new Sfc32();
 const _NO_PORTALS: readonly PortalEntity[] = [];
 const AREA_BOSS_FOLDERS: ReadonlySet<string> = new Set(['Sentries', 'Elites', 'Mysticals', 'Nesters', 'Rogues', 'Rammers', 'Terrestrials', 'Eternals', 'Celestials',
   'Spawned Entities']);
+const KILL_BOSS_FOLDERS: ReadonlySet<string> = new Set([...AREA_BOSS_FOLDERS].filter(c => c !== 'Sentries'));
+const KK_NONE = 0, KK_TANK = 1, KK_BOSS = 2;
+const _NO_KILL_SHARES: Map<string, DamageContribution> = new Map();
 function _areaTouches(ca: CustomAreaRect, x: number, y: number, r: number): boolean {
   if (ca.poly != null) {
     if (x < ca.x0 - r || x > ca.x1 + r || y < ca.y0 - r || y > ca.y1 + r) return false;
@@ -1835,12 +1844,18 @@ function computeBulletTypeStats(
   maxPointsPerSkill: number,
   entityLevel: number,
   _gr: GrowthRules | undefined,
+  _sk?: StatK | null,
 ): typeof _btStats {
   const _s = _bulletTypeStatsAt(turret, motionType, upgrades, maxPointsPerSkill, computeSizeFactorForIStrongLevel(entityLevel || 0));
   if (_gr !== undefined) {
     _s.damage *= growthFactor(_gr, 'bulletDamage', entityLevel);
     _s.health *= growthFactor(_gr, 'bulletHealth', entityLevel);
     _s.penetration *= growthFactor(_gr, 'bulletPenetration', entityLevel);
+  }
+  if (_sk) {
+    _s.damage *= _sk.bulletDamage;
+    _s.health *= _sk.bulletHealth;
+    _s.penetration *= _sk.bulletPenetration;
   }
   return _s;
 }
@@ -3565,6 +3580,9 @@ function BotShell(this: EnemyTank, logic: GameLogic): void {
   this.nextUpgradeIndex = 0;
   this.arrasResist = 0;
   this.kills = 0;
+  this.tankKills = 0;
+  this.assists = 0;
+  this.bossKills = 0;
   this.team = 'enemy';
   this.aiBehavior = 'Enemy';
   this.upgradeLogic = 'OffensiveWeighted';
@@ -3608,6 +3626,7 @@ function BotShell(this: EnemyTank, logic: GameLogic): void {
   this.isAggro = false;
   this.totalPlayerDamage = 0;
   this.damageFromTanks = new Map<string, number>();
+  this.killShares = new Map<string, DamageContribution>();
   this.aggroTowards = new Set<string>();
   this.isSentryEnemy = false;
   this.isHealer = false;
@@ -3995,7 +4014,7 @@ function BotShell(this: EnemyTank, logic: GameLogic): void {
   this._mevColour = -1; this._mevInvis = -1; this._mevSpeedK = 1; this._mevHpK = 1; this._mevPushWas = -1; this._mevFollowOf = '';
   this._mevSightK = 1; this._mevSightSet = 0; this._mevUnitK = 1; this._mevStraight = false;
   this._sideLeft = false;
-  this._zMind = false; this._zAggWas = 0; this._zCourWas = 0; this._zChargeWas = false; this._hordeLed = false; this._hordeAt = 0; this._zPack = false; this._packTargetId = ''; this._packTargetPlayer = false;
+  this._zMind = false; this._zAggWas = 0; this._zCourWas = 0; this._zChargeWas = false; this._hordeLed = false; this._hordeAt = 0; this._zPack = false; this._packTargetId = ''; this._packTargetPlayer = false; this._zSwarmN = 0; this._zSwarmLag = 0;
   this._btBits = 0; this._btN = new Int8Array(11);
   this._ogTag = -1; this._ogRadius = 900; this._oaTag = -1; this._ogId = ''; this._ogX = 0; this._ogY = 0; this._ogLookAt = 0;
   this._ogFront = false; this._ogFrontShare = 0.92; this._ogFrontIs = -1; this._ogPendId = ''; this._ogPendAt = 0; this._ogHoldUntil = 0;
@@ -4039,6 +4058,7 @@ function BotShell(this: EnemyTank, logic: GameLogic): void {
   this.resistBase = undefined;
   this.toughKind = -1;
   this.healthK = 1;
+  this._statK = null;
   this._knShareX = undefined;
   this._knShareY = undefined;
   this._stepX0 = 0;
@@ -5281,6 +5301,7 @@ export class GameLogic {
   private _lastDmgBoss = false;
   private _lastDmgConfigId: string = '';
   private _lastDmgTankFrame = -10;
+  private readonly _plKillShares = new Map<string, DamageContribution>();
 
   public _forgetPlayerHit(): void { this._lastDmgTankFrame = -10; }
   public _forgetPlayerAttacker(): void {
@@ -5311,9 +5332,11 @@ export class GameLogic {
     if (SMALL_FIX.R962K !== 0 && this._mevOn && this.mevMatch.killsPay === 'risen') return;
     killer.kills++;
     if (killer.kills > this.state.topKills && this._countsForTopKills(killer)) this.state.topKills = killer.kills;
+    if (SMALL_FIX.R993 !== 0) this._countKill(rewardId, this._killKindOf(this.state.currentTankFileName ?? 'basic', false), this._plKillShares,
+      this.state.lastTankDamageTime, this.state.tankHP * this.getStatMultiplier('maxHealth'));
     const score = this.state.currentXp + _XP_BASE;
     if (this._mevOn && this.mevMatch.killsPay === 'risen') return;
-    this._addKillXpTo(rewardId, null, isManhuntMode(this.state.gameModeConfig.mode) ? score : getJackpot(score));
+    this._payKillOfPlayer(rewardId, isManhuntMode(this.state.gameModeConfig.mode) ? score : getJackpot(score));
   }
 
   private _notePlayerAttackerBullet(b: Bullet): void {
@@ -5492,6 +5515,8 @@ export class GameLogic {
   private _beginPlayerDeath(): void {
     if (this.tankDying) return;
     this.tankDying = true;
+    ksClear(this._plKillShares);
+    if (SMALL_FIX.R982 !== 0) { const _pid = this.state.playerId, es = this.state.enemyTanks; for (let i = 0; i < es.length; i++) ksDrop(es[i].killShares, _pid); }
     this._deathCamX = this.tankPos.x; this._deathCamY = this.tankPos.y;
     if (this._mevOn) this._mevNotePlayerDeath();
     const _wore703 = SMALL_FIX.G703 !== 0 ? this.playerColorTeamIndex() : -1;
@@ -7343,13 +7368,66 @@ export class GameLogic {
     if (root && root.active && !root.isDying) this.addEnemyXp(root, xp);
   }
 
+  private _ksNoteBot(e: EnemyTank, hp: number, hitterId: string, at: number): void {
+    if (!(hp > 0)) return;
+    const has = this._vampBotHpNow(e);
+    const got = hp < has ? hp : has;
+    if (!(got > 0)) return;
+    const rid = this._rewardRecipientId(hitterId);
+    if (rid !== e.id) ksNote(e.killShares, rid, got, at);
+  }
+  private _ksNotePlayer(hp: number, hitterId: string, at: number): void {
+    if (!(hp > 0)) return;
+    const has = this._vampPlayerHpNow();
+    const got = hp < has ? hp : has;
+    if (!(got > 0)) return;
+    const rid = this._rewardRecipientId(hitterId);
+    if (rid !== this.state.playerId) ksNote(this._plKillShares, rid, got, at);
+  }
+  private _ksPayable(id: string, actor: EnemyTank | null): boolean {
+    if (id === this.state.playerId) return !this.tankDying && !this.state.playerDead && !(SMALL_FIX.GH602 !== 0 && this._specId !== '');
+    if (actor !== null && actor.id === id) return true;
+    const e = this._enemyById.get(id);
+    return e !== undefined && e.active && !e.isDying;
+  }
+  private _payKill(victim: EnemyTank, killerId: string, actor: EnemyTank | null, xp: number): void {
+    const m = victim.killShares;
+    if (SMALL_FIX.R982 !== 0 && xp > 0 && m.size > 0) {
+      const now = victim.deathStartTime, floor = victim.maxHealth * getEnemyStatMultiplier(victim, 'maxHealth') * KILL_SHARE_FLOOR;
+      let sum = 0;
+      for (const c of m.values()) if (ksEarns(c, now, floor) && this._ksPayable(c.ownerId, actor)) sum += c.totalDamage;
+      if (sum > 0) {
+        for (const c of m.values()) if (ksEarns(c, now, floor) && this._ksPayable(c.ownerId, actor)) this._addKillXpTo(c.ownerId, actor, xp * (c.totalDamage / sum));
+        ksClear(m);
+        return;
+      }
+    }
+    ksClear(m);
+    this._addKillXpTo(killerId, actor, xp);
+  }
+  private _payKillOfPlayer(killerId: string, xp: number): void {
+    const m = this._plKillShares, st = this.state;
+    if (SMALL_FIX.R982 !== 0 && xp > 0 && m.size > 0) {
+      const now = st.lastTankDamageTime, floor = st.tankHP * this.getStatMultiplier('maxHealth') * KILL_SHARE_FLOOR;
+      let sum = 0;
+      for (const c of m.values()) if (ksEarns(c, now, floor) && this._ksPayable(c.ownerId, null)) sum += c.totalDamage;
+      if (sum > 0) {
+        for (const c of m.values()) if (ksEarns(c, now, floor) && this._ksPayable(c.ownerId, null)) this._addKillXpTo(c.ownerId, null, xp * (c.totalDamage / sum));
+        ksClear(m);
+        return;
+      }
+    }
+    ksClear(m);
+    this._addKillXpTo(killerId, null, xp);
+  }
+
   private _vampGrowthK(level: number, gr: GrowthRules | undefined = ACTIVE_GROWTH.rules): number {
     return gr === undefined ? 1 : growthFactor(gr, 'maxHealth', level);
   }
   private _vampPlayerHp(hp: number, hitterId: string | null): number {
     const st = this.state;
     if (st.gameModeConfig.vampirism !== true || !(hp > 0) || !(st.currentXp > 0)) return hp;
-    const base = st.tankHP * this._plHealthK() * this._vampGrowthK(st.level);
+    const base = st.tankHP * this._plHealthK() * (this._plStatK ? this._plStatK.maxHealth : 1) * this._vampGrowthK(st.level);
     if (!(base > 0)) return hp;
     const k = vampBarScore(st.gameModeConfig) / base, want = hp * k, xp = st.currentXp;
     const paid = want < xp ? want : xp;
@@ -7361,7 +7439,7 @@ export class GameLogic {
   private _vampBotHp(e: EnemyTank, hp: number, hitterId: string | null): number {
     if (this.state.gameModeConfig.vampirism !== true || !(hp > 0) || !(e.currentXp > 0)) return hp;
     const hk = e.healthK;
-    const base = e.maxHealth * (hk === undefined ? 1 : hk) * (SMALL_FIX.G686 !== 0 && (e._mevF & MF_NO_GROW) !== 0 ? 1 : this._vampGrowthK(e.level, growthRulesOf(e)));
+    const base = e.maxHealth * (hk === undefined ? 1 : hk) * (e._statK ? e._statK.maxHealth : 1) * (SMALL_FIX.G686 !== 0 && (e._mevF & MF_NO_GROW) !== 0 ? 1 : this._vampGrowthK(e.level, growthRulesOf(e)));
     if (!(base > 0)) return hp;
     const k = vampBarScore(this.state.gameModeConfig) / base, want = hp * k, xp = e.currentXp;
     const paid = want < xp ? want : xp;
@@ -7370,12 +7448,14 @@ export class GameLogic {
     if (levelForXp(e.currentXp) < e.level) this._vampLevelBot(e);
     return want < xp ? 0 : hp - paid / k;
   }
-  private _vampHitPlayer(hp: number, hitterId: string | null): void {
+  private _vampHitPlayer(hp: number, hitterId: string | null, at: number = NaN): void {
+    if (SMALL_FIX.R982 !== 0 && hitterId !== null && at === at) this._ksNotePlayer(hp, hitterId, at);
     const st = this.state, h0 = st.tankCurrentHealth;
     const rest = this._vampPlayerHp(hp, hitterId);
     st.tankCurrentHealth = (SMALL_FIX.GH390 ? st.tankCurrentHealth : h0) - rest;
   }
-  private _vampHitBot(e: EnemyTank, hp: number, hitterId: string | null): void {
+  private _vampHitBot(e: EnemyTank, hp: number, hitterId: string | null, at: number = NaN): void {
+    if (SMALL_FIX.R982 !== 0 && hitterId !== null && at === at) this._ksNoteBot(e, hp, hitterId, at);
     const h0 = e.currentHealth;
     const rest = this._vampBotHp(e, hp, hitterId);
     e.currentHealth = (SMALL_FIX.GH390 ? e.currentHealth : h0) - rest;
@@ -7383,13 +7463,13 @@ export class GameLogic {
   private _vampPlayerHpNow(): number {
     const st = this.state;
     if (st.gameModeConfig.vampirism !== true || !(st.currentXp > 0)) return st.tankCurrentHealth;
-    const base = st.tankHP * this._plHealthK() * this._vampGrowthK(st.level);
+    const base = st.tankHP * this._plHealthK() * (this._plStatK ? this._plStatK.maxHealth : 1) * this._vampGrowthK(st.level);
     return base > 0 ? st.tankCurrentHealth + st.currentXp * base / vampBarScore(st.gameModeConfig) : st.tankCurrentHealth;
   }
   private _vampBotHpNow(e: EnemyTank): number {
     if (this.state.gameModeConfig.vampirism !== true || !(e.currentXp > 0)) return e.currentHealth;
     const hk = e.healthK;
-    const base = e.maxHealth * (hk === undefined ? 1 : hk) * (SMALL_FIX.G686 !== 0 && (e._mevF & MF_NO_GROW) !== 0 ? 1 : this._vampGrowthK(e.level, growthRulesOf(e)));
+    const base = e.maxHealth * (hk === undefined ? 1 : hk) * (e._statK ? e._statK.maxHealth : 1) * (SMALL_FIX.G686 !== 0 && (e._mevF & MF_NO_GROW) !== 0 ? 1 : this._vampGrowthK(e.level, growthRulesOf(e)));
     return base > 0 ? e.currentHealth + e.currentXp * base / vampBarScore(this.state.gameModeConfig) : e.currentHealth;
   }
   private _vampGain(hitterId: string, amount: number): void {
@@ -7471,9 +7551,11 @@ export class GameLogic {
     }
     if ((victim._mevF & MF_NO_KILL) !== 0) return;
     if (SMALL_FIX.R962K !== 0 && this._mevOn && this.mevMatch.killsPay === 'risen' && (victim._mevF & MF_RISEN) === 0) return;
+    if (SMALL_FIX.R993 !== 0) this._countKill(killerId, this._killKindOf(this._areaTankKeyOf(victim), victim.isBossTier),
+      victim.isDying ? victim.killShares : _NO_KILL_SHARES, victim.deathStartTime, victim.maxHealth * getEnemyStatMultiplier(victim, 'maxHealth'));
     if (killerId === this.state.playerId) {
       this.state.kills++;
-      if (victim.isBossTier) this.state.bossKills++;
+      if (SMALL_FIX.R993 === 0 && victim.isBossTier) this.state.bossKills++;
       if (this.state.kills > this.state.topKills) this.state.topKills = this.state.kills;
       if (victim.isDying) {
         const _killSaid = this._killLineFor(victim);
@@ -7489,6 +7571,28 @@ export class GameLogic {
     if (victim.isDying && this._isSpecId(killerId)) {
       const _specSaid = this._killLineFor(victim);
       if (_specSaid !== '') this.pushMessage(_specSaid, victim.deathStartTime);
+    }
+  }
+
+  private _killKindOf(key: string | null, bossTier: boolean): number {
+    const it = key ? this.getTankLibraryMap().get(key) : undefined;
+    const cat = it ? it.fileData.category : undefined;
+    if (cat === undefined) return bossTier ? KK_BOSS : KK_TANK;
+    if (cat === 'Sentries') return KK_NONE;
+    return KILL_BOSS_FOLDERS.has(cat) ? KK_BOSS : KK_TANK;
+  }
+
+  private _countKill(killerId: string, kind: number, shares: Map<string, DamageContribution>, now: number, full: number): void {
+    if (kind === KK_NONE) return;
+    const st = this.state;
+    if (killerId === st.playerId) { if (kind === KK_BOSS) st.bossKills++; else st.tankKills++; }
+    else { const k = this._enemyById.get(killerId); if (k && k.active) { if (kind === KK_BOSS) k.bossKills++; else k.tankKills++; } }
+    if (shares.size === 0 || !(full > 0)) return;
+    const need = full * KILL_ASSIST_SHARE;
+    for (const c of shares.values()) {
+      if (c.ownerId === killerId || c.totalDamage < need || !ksFresh(c, now)) continue;
+      if (c.ownerId === st.playerId) st.assists++;
+      else { const e = this._enemyById.get(c.ownerId); if (e && e.active) e.assists++; }
     }
   }
 
@@ -7598,8 +7702,11 @@ export class GameLogic {
     enemy.arrasResist = computeArrasResistance(tankResistBaseOf(enemy.resistBase), getEnemyDerivedBrst(enemy));
   }
 
+  private _ksShapeLast: FloatingPolygon | null = null;
+  private _ksShapeLastId = '';
   private recordDamageToShape(shape: FloatingPolygon, ownerId: string, damage: number, hpPart: number = damage, striker: string = ownerId) {
     if (MISSING_MODES.ON !== 0 && this._mevOn && shape._mev >= 0 && this._carryHit(shape, ownerId, damage, hpPart, striker)) return;
+    if (SMALL_FIX.R982 !== 0) { this._ksShapeLast = shape; this._ksShapeLastId = ownerId; }
     const now = this.gameNow();
     const existing = shape.damageContributions.get(ownerId);
 
@@ -7900,8 +8007,8 @@ export class GameLogic {
     const pt = gun.projectileType;
     const mt = _deriveMotionType(gun.projectileBehaviors, pt?.motionType || 'glide');
     const bs = enemy === null
-      ? computeBulletTypeStats(gun, mt, this.state.upgrades, this.state.maxPointsPerSkill || 9, this._gunLevel(this.state.level || 0), ACTIVE_GROWTH.rules)
-      : computeBulletTypeStats(gun, mt, enemy.upgrades, enemy.maxPointsPerSkill || 9, this._gunLevel(enemy.level || 0), growthRulesOf(enemy));
+      ? computeBulletTypeStats(gun, mt, this.state.upgrades, this.state.maxPointsPerSkill || 9, this._gunLevel(this.state.level || 0), ACTIVE_GROWTH.rules, this._plStatK)
+      : computeBulletTypeStats(gun, mt, enemy.upgrades, enemy.maxPointsPerSkill || 9, this._gunLevel(enemy.level || 0), growthRulesOf(enemy), enemy._statK);
     const gss = typeof gun.gunStatScale === 'number' ? gun.gunStatScale : 1;
     T.damage = bs.damage * gss;
     T.penetration = bs.penetration * gss;
@@ -7972,14 +8079,23 @@ export class GameLogic {
 
     const _xpNow: number | undefined = this.cleanupExpiredDamageContributions(shape);
 
+    const _ks = SMALL_FIX.R982 !== 0;
+    const _ksFloor = _ks ? (shape.maxHp + (shape.maxShield > 0 ? shape.maxShield : 0)) * KILL_SHARE_FLOOR : 0;
+    let _ksOnly: DamageContribution | null = null, _ksAll = !_ks;
     let totalValidDamage = 0;
     for (const contribution of shape.damageContributions.values()) {
-      totalValidDamage += contribution.totalDamage;
+      if (_ksAll || (contribution.totalDamage >= _ksFloor && this._ksPayable(contribution.ownerId, null))) totalValidDamage += contribution.totalDamage;
+    }
+    if (_ks && totalValidDamage === 0) {
+      const k = this._ksShapeLast === shape ? shape.damageContributions.get(this._ksShapeLastId) : undefined;
+      if (k !== undefined) { _ksOnly = k; totalValidDamage = k.totalDamage; }
+      else { _ksAll = true; for (const contribution of shape.damageContributions.values()) totalValidDamage += contribution.totalDamage; }
     }
 
     if (totalValidDamage === 0) return;
 
     for (const contribution of shape.damageContributions.values()) {
+      if (_ksOnly !== null ? contribution !== _ksOnly : !(_ksAll || (contribution.totalDamage >= _ksFloor && this._ksPayable(contribution.ownerId, null)))) continue;
       const damagePercent = contribution.totalDamage / totalValidDamage;
       const xpReward = totalXp * damagePercent;
 
@@ -8159,6 +8275,61 @@ export class GameLogic {
       st.tankCurrentHealth = st.tankDisplayHealth = hpF * st.tankHP * this.getStatMultiplier('maxHealth');
       st.tankCurrentShield = st.tankDisplayShield = shF * st.tankShieldCapacity * this.getStatMultiplier('shieldCapacity');
     }
+  }
+  private _strengthCfg(): MapConfig {
+    return this.areaBounds.length > 0 ? this._mapConfigForAreaIdFast(this.playerAreaId) : this.state.mapConfig;
+  }
+  private _sgGroups: readonly BossGroupConfig[] | null = null;
+  private _sgLib: LibraryItem[] | null = null;
+  private _sgRev = -1;
+  private readonly _sgWords = new Map<string, number>();
+  private _sgBuild(groups: readonly BossGroupConfig[], lib: LibraryItem[]): void {
+    this._sgGroups = groups; this._sgLib = lib; this._sgRev = this.libraryRev;
+    this._sgWords.clear();
+    let libMap: Map<string, LibraryItem> | null = null, keysOf: Map<string, string[]> | null = null;
+    const words = new Set<string>();
+    for (let gi = 0; gi < groups.length; gi++) {
+      const t = groups[gi].tanks;
+      if (!Array.isArray(t)) continue;
+      for (let i = 0; i < t.length; i++) {
+        words.clear();
+        words.add(t[i]);
+        const item = lib && lib.length > 0 ? findByShownNameOrFileKey(lib, t[i], false) : null;
+        if (item) {
+          if (libMap === null || keysOf === null) { libMap = this.getTankLibraryMap(); keysOf = this._libKeysByFile(libMap); }
+          wordsOfFileInto(lib, item, false, libMap, words);
+          const more = keysOf.get(item.id);
+          if (more) for (let j = 0; j < more.length; j++) words.add(more[j]);
+        }
+        words.forEach(w => { if (!this._sgWords.has(w)) this._sgWords.set(w, gi); });
+      }
+    }
+  }
+  private _strengthOfWord(word: string | null | undefined, cfg: MapConfig = this._strengthCfg()): StatK | null {
+    if (STAT_SHARES.ON === 0 || STAT_SHARES.EVERY_WAY === 0 || !word || !bossStrengthEveryWay(cfg)) return null;
+    const groups = bossStrengthGroupsOf(cfg), lib = this.state.tankLibrary;
+    if (groups !== this._sgGroups || lib !== this._sgLib || this.libraryRev !== this._sgRev) this._sgBuild(groups, lib);
+    const gi = this._sgWords.get(word);
+    const s = gi === undefined ? undefined : groups[gi].stats;
+    return s ? statKOf(s) : null;
+  }
+  private _plStatK: StatK | null = null;
+  private _plSkWord: string | null | undefined = undefined;
+  private _plSkCfg: MapConfig | null = null;
+  private _plSkLib: LibraryItem[] | null = null;
+  private _plSkRev = -1;
+  private _plStatKSync(): void {
+    const st = this.state, word = st.currentTankFileName, cfg = this._strengthCfg(), lib = st.tankLibrary;
+    if (word === this._plSkWord && cfg === this._plSkCfg && lib === this._plSkLib && this.libraryRev === this._plSkRev) return;
+    this._plSkWord = word; this._plSkCfg = cfg; this._plSkLib = lib; this._plSkRev = this.libraryRev;
+    const k = this._strengthOfWord(word, cfg);
+    if (k === this._plStatK) return;
+    const hpMax0 = st.tankHP * this.getStatMultiplier('maxHealth'), shMax0 = st.tankShieldCapacity * this.getStatMultiplier('shieldCapacity');
+    const hpF = hpMax0 > 0 ? st.tankCurrentHealth / hpMax0 : 1, shF = shMax0 > 0 ? st.tankCurrentShield / shMax0 : 1;
+    this._plStatK = k;
+    st.tankCurrentHealth = st.tankDisplayHealth = hpF * st.tankHP * this.getStatMultiplier('maxHealth');
+    st.tankCurrentShield = st.tankDisplayShield = shF * st.tankShieldCapacity * this.getStatMultiplier('shieldCapacity');
+    this._syncPlayerChildren();
   }
   private _plKindLast = -1;
   private _tgRefs: (readonly TankGroup[] | undefined)[] = [];
@@ -10110,18 +10281,18 @@ export class GameLogic {
     if (!(hitAB > 1e-6)) return -1;
     const mxA = a.maxHealth * getEnemyStatMultiplier(a, 'maxHealth'), capA = a.maxShield * getEnemyStatMultiplier(a, 'shieldCapacity');
     let hpA = a.currentHealth, shA = a.currentShield;
-    const grA = growthRulesOf(a), defA = defenseOnBody(a.resistBase) || (a._mevF & MF_STAGE) !== 0, rgA = enemyRegenCurve(a), gkA = grA === undefined ? 1 : growthFactor(grA, 'shieldRegen', a.level), srA = this._enemyHumpK(a);
+    const grA = growthRulesOf(a), defA = defenseOnBody(a.resistBase) || (a._mevF & MF_STAGE) !== 0, rgA = enemyRegenCurve(a), gkA = (grA === undefined ? 1 : growthFactor(grA, 'shieldRegen', a.level)) * (a._statK ? a._statK.shieldRegen : 1), srA = this._enemyHumpK(a);
     let mxB: number, capB: number, hpB: number, shB: number, defB: boolean, rgB: number, gkB: number, srB: number;
     if (t === null) {
       mxB = this.state.tankHP * this.getStatMultiplier('maxHealth'); capB = this.state.tankShieldCapacity * this.getStatMultiplier('shieldCapacity');
       hpB = this.state.tankCurrentHealth; shB = this.state.tankCurrentShield;
       const grP = ACTIVE_GROWTH.rules;
-      defB = defenseOnBody(this._plResist()); rgB = this._playerRegenCurve(); gkB = grP === undefined ? 1 : growthFactor(grP, 'shieldRegen', this.state.level); srB = this._playerHumpK();
+      defB = defenseOnBody(this._plResist()); rgB = this._playerRegenCurve(); gkB = (grP === undefined ? 1 : growthFactor(grP, 'shieldRegen', this.state.level)) * (this._plStatK ? this._plStatK.shieldRegen : 1); srB = this._playerHumpK();
     } else {
       mxB = t.maxHealth * getEnemyStatMultiplier(t, 'maxHealth'); capB = t.maxShield * getEnemyStatMultiplier(t, 'shieldCapacity');
       hpB = t.currentHealth; shB = t.currentShield;
       const grB = growthRulesOf(t);
-      defB = defenseOnBody(t.resistBase) || (t._mevF & MF_STAGE) !== 0; rgB = enemyRegenCurve(t); gkB = grB === undefined ? 1 : growthFactor(grB, 'shieldRegen', t.level); srB = this._enemyHumpK(t);
+      defB = defenseOnBody(t.resistBase) || (t._mevF & MF_STAGE) !== 0; rgB = enemyRegenCurve(t); gkB = (grB === undefined ? 1 : growthFactor(grB, 'shieldRegen', t.level)) * (t._statK ? t._statK.shieldRegen : 1); srB = this._enemyHumpK(t);
     }
     if (hpK < 1) { if (hpB > hpK * mxB) hpB = hpK * mxB; shB = 0; }
     if (!(hitBA > 1e-6)) return mxA > 0 && hpA > 0 ? (hpA / mxA > 1e-6 ? hpA / mxA : 1e-6) : 1;
@@ -11561,6 +11732,7 @@ export class GameLogic {
     _bhStat = this.state.tankBodyDamage || 0;
     const _bhGr = ACTIVE_GROWTH.rules;
     _bhAtk = _bhGr === undefined ? bodyHitAtk(aBd) : bodyHitAtk(aBd) * growthFactor(_bhGr, 'bodyDamage', this.state.level);
+    if (this._plStatK) _bhAtk *= this._plStatK.bodyDamage;
     _bhRes = bodyHitResist(tankResistBaseOf(this._plResist()), aHp, aBd);
     _bhPen = tankPairPen(tankPenetrationBaseOf(this.state.tankPenetrationBase), aBd, aHp);
     _bhIn = bodyHitInK(tankResistBaseOf(this._plResist()), aHp, aBd);
@@ -12299,6 +12471,7 @@ export class GameLogic {
     _bhStat = enemy.bodyDamage || 0;
     const _bhGr = growthRulesOf(enemy);
     _bhAtk = _bhGr === undefined ? bodyHitAtk(aBd) : bodyHitAtk(aBd) * growthFactor(_bhGr, 'bodyDamage', enemy.level);
+    if (enemy._statK) _bhAtk *= enemy._statK.bodyDamage;
     _bhRes = bodyHitResist(tankResistBaseOf(enemy.resistBase), aHp, aBd);
     _bhPen = tankPairPen(tankPenetrationBaseOf(enemy.penetrationBase), aBd, aHp);
     _bhIn = bodyHitInK(tankResistBaseOf(enemy.resistBase), aHp, aBd);
@@ -12318,18 +12491,19 @@ export class GameLogic {
   private _syncPlayerChildren(): void {
     this._syncChildrenSkillsOf(this.state.playerId, this.state.turrets, this.state.upgrades,
       this.state.maxPointsPerSkill || 9, this._gunLevel(this.state.level || 0),
-      this.getStatMultiplier('bulletSpeed'), this.getStatMultiplier('reload'), ACTIVE_GROWTH.rules);
+      this.getStatMultiplier('bulletSpeed'), this.getStatMultiplier('reload'), ACTIVE_GROWTH.rules, this._plStatK);
   }
 
   private _syncEnemyChildren(e: EnemyTank): void {
     this._syncChildrenSkillsOf(e.id, e.turrets, e.upgrades,
       e.maxPointsPerSkill || 9, this._gunLevel(e.level || 0),
-      getEnemyStatMultiplier(e, 'bulletSpeed'), getEnemyStatMultiplier(e, 'reload'), growthRulesOf(e));
+      getEnemyStatMultiplier(e, 'bulletSpeed'), getEnemyStatMultiplier(e, 'reload'), growthRulesOf(e), e._statK);
   }
 
   private _syncChildrenSkillsOf(
     ownerId: string, turrets: Turret[], up: Record<string, number>, cap: number, level: number,
     speedMult: number, rldMult: number, gr: GrowthRules | undefined,
+    sk?: StatK | null,
   ): void {
     let anySync = false;
     for (let ti = 0; ti < turrets.length && !anySync; ti++) {
@@ -12357,7 +12531,7 @@ export class GameLogic {
       }
       if (gun === null || !gun.syncsSkills) continue;
       const mt = _deriveMotionType(gun.projectileBehaviors, gun.projectileType?.motionType || 'glide');
-      const bs = computeBulletTypeStats(gun, mt, up, cap, level, gr);
+      const bs = computeBulletTypeStats(gun, mt, up, cap, level, gr, sk);
       const gss = mainGun && typeof gun.gunStatScale === 'number' ? gun.gunStatScale : 1;
       const nlm = b.necroLabyMult;
       const ratio = b.maxHealth > 0 ? b.health / b.maxHealth : 1;
@@ -12377,6 +12551,7 @@ export class GameLogic {
       b._skDam = skDam; b._skPen = skPen; b._skStr = skStr; b._skSpd = skSpd;
       b._skCap = cap; b._skRldMult = rldMult;
       this._snapGrowth(b, level, gr);
+      if (sk) this._snapShare(b, sk);
     }
   }
 
@@ -12474,7 +12649,9 @@ export class GameLogic {
 
   public getStatMultiplier(stat: UpgradeStat): number {
       const gr = ACTIVE_GROWTH.rules;
-      return gr === undefined ? this._statMult(stat) : this._statMult(stat) * growthFactor(gr, stat, this.state.level);
+      const m = gr === undefined ? this._statMult(stat) : this._statMult(stat) * growthFactor(gr, stat, this.state.level);
+      const sk = this._plStatK;
+      return sk ? m * sk[stat] : m;
   }
   private _statMult(stat: UpgradeStat): number {
       const statCap = this.state.skillCaps ? this.state.skillCaps[stat] : (this.state.maxPointsPerSkill || 10);
@@ -12513,7 +12690,8 @@ export class GameLogic {
     const statCap = this.state.skillCaps ? this.state.skillCaps.reload : (this.state.maxPointsPerSkill || 10);
     const e = arrasEngineMult(this.state.upgrades.reload, statCap || 10);
     const gr = ACTIVE_GROWTH.rules;
-    return gr === undefined ? e : e * growthFactor(gr, 'reload', this.state.level);
+    const e2 = gr === undefined ? e : e * growthFactor(gr, 'reload', this.state.level);
+    return this._plStatK ? e2 * this._plStatK.reload : e2;
   }
   private _playerDriveMult(): number {
     if (ARRAS_PARITY.BODY_DRIVE === 0) return this.getStatMultiplier('movementSpeed');
@@ -12568,7 +12746,8 @@ export class GameLogic {
       const caps = this.state.skillCaps;
       const k = defenseAtkVsRounds(this.skillCurve(this.state.upgrades['bodyDamage'], caps ? caps['bodyDamage'] : (this.state.maxPointsPerSkill || 10)));
       const gr = ACTIVE_GROWTH.rules;
-      return gr === undefined ? k : k * growthFactor(gr, 'bodyDamage', this.state.level);
+      const k2 = gr === undefined ? k : k * growthFactor(gr, 'bodyDamage', this.state.level);
+      return this._plStatK ? k2 * this._plStatK.bodyDamage : k2;
   }
   private _ramJudgeResist(e: EnemyTank | null): number {
       if (e === null) {
@@ -18404,6 +18583,7 @@ export class GameLogic {
     if (e._mevFollowOf !== '' && !e._hordeLed) return;
     const g = e.groupId;
     if (g === 0) return;
+    if (e._zPack && SMALL_FIX.R976 !== 0) { this._zSwarmLead(e, g); return; }
     const fov = e.fovRadius, fov2 = fov * fov, ex = e.position.x, ey = e.position.y;
     const list = this.state.enemyTanks;
     let best: EnemyTank | null = null;
@@ -18421,6 +18601,111 @@ export class GameLogic {
     const cur = this._enemyById.get(e._mevFollowOf);
     if (cur && cur.active && !cur.isDying && (SMALL_FIX.GH448 === 0 || cur.groupId === g) && _hordeOutranks(cur, e)) { const dx = cur.position.x - ex, dy = cur.position.y - ey; if (dx * dx + dy * dy <= 4 * fov2) return; }
     e._mevFollowOf = ''; e._hordeLed = false;
+  }
+  private _zSwarmLead(e: EnemyTank, g: number): void {
+    const list = this.state.enemyTanks, areas = this.areaBounds.length > 0;
+    e._zSwarmLag = 0;
+    if (e._hordeLed) {
+      const L = this._enemyById.get(e._mevFollowOf);
+      if (L !== undefined && L.active && !L.isDying && L.groupId === g && L._mevFollowOf === '' && (!areas || L.areaId === e.areaId)) { e._zSwarmN = L._zSwarmN; return; }
+    }
+    let n = 1;
+    for (let i = 0; i < list.length; i++) { const o = list[i]; if (o !== e && o.active && !o.isDying && o._hordeLed && o._mevFollowOf === e.id) n++; }
+    const er = this.getEffectiveEnemyRadius(e), kIn = ZS_IN + ZS_OUT0 + ZS_OUTN * Math.sqrt(n);
+    let best: EnemyTank = e, bestN = n;
+    for (let i = 0; i < list.length; i++) {
+      const o = list[i];
+      if (o === e || !o.active || o.isDying || o.groupId !== g || ((o._mevF & MF_HORDE) === 0 && !o._zPack)) continue;
+      if (areas && o.areaId !== e.areaId) continue;
+      if (o._mevFollowOf === '') {
+        const on = Math.max(1, o._zSwarmN);
+        if (on > bestN || (on === bestN && _hordeOutranks(o, best))) { best = o; bestN = on; }
+      }
+    }
+    if (best === e) {
+      let up: EnemyTank | null = null;
+      for (let i = 0; i < list.length; i++) {
+        const o = list[i];
+        if (o === e || !o.active || o.isDying || !o._hordeLed || o._mevFollowOf !== e.id || !o._zPack || !_hordeOutranks(o, up ?? e)) continue;
+        const dx = o.position.x - e.position.x, dy = o.position.y - e.position.y;
+        if (dx * dx + dy * dy <= e.fovRadius * e.fovRadius && !(this.dark.live && this._dkHides(e, o.position.x, o.position.y, o.size * 0.5))) up = o;
+      }
+      if (up !== null) { e._mevFollowOf = up.id; e._hordeLed = true; up._mevFollowOf = ''; up._hordeLed = false; up._zSwarmN = n; up._hordeAt = 0; e._zSwarmN = n; return; }
+    }
+    e._zSwarmN = best === e ? n : bestN;
+    if (best === e) {
+      if (e._hordeLed) { e._mevFollowOf = ''; e._hordeLed = false; }
+      const k = kIn + ZS_NEAR;
+      for (let i = 0; i < list.length; i++) {
+        const o = list[i];
+        if (o === e || !o.active || o.isDying || o._mevFollowOf !== e.id || !o._hordeLed) continue;
+        const dx = o.position.x - e.position.x, dy = o.position.y - e.position.y, d2 = dx * dx + dy * dy, ring = (er + this.getEffectiveEnemyRadius(o)) * k;
+        if (d2 > ring * ring && d2 < ZS_LAG_FAR * ZS_LAG_FAR) e._zSwarmLag++;
+      }
+      return;
+    }
+    e._mevFollowOf = best.id; e._hordeLed = true;
+  }
+  private _zSwarmGather(e: EnemyTank, navMs: MapState | null, ox: number, oy: number, bodyR: number, now: number, dtFactor: number): boolean {
+    const list = this.state.enemyTanks, k = ZS_IN + ZS_OUT0 + ZS_OUTN * Math.sqrt(Math.max(1, e._zSwarmN)) + ZS_GATHER;
+    let best: EnemyTank | null = null, bd = Infinity;
+    for (let i = 0; i < list.length; i++) {
+      const o = list[i];
+      if (o === e || !o.active || o.isDying || !o._hordeLed || o._mevFollowOf !== e.id || !o.isRegrouping) continue;
+      const dx = o.position.x - e.position.x, dy = o.position.y - e.position.y, d2 = dx * dx + dy * dy;
+      const gR = (this.getEffectiveEnemyRadius(o) + bodyR) * k;
+      if (d2 <= gR * gR || d2 >= bd) continue;
+      bd = d2; best = o;
+    }
+    if (best === null) return false;
+    return this._intDrive(e, best.position.x, best.position.y, navMs, ox, oy, bodyR, now, dtFactor, best.id);
+  }
+  private _zSwarmRoam(e: EnemyTank, navMs: MapState | null, ox: number, oy: number, bodyR: number, now: number, dtFactor: number): boolean {
+    const L = this._enemyById.get(e._mevFollowOf);
+    if (L === undefined || !L.active || L.isDying) return false;
+    const rr = this.getEffectiveEnemyRadius(L) + bodyR;
+    const h = hfIdNum(e.id) >>> 0;
+    const ang = (h % 3600) * (Math.PI / 1800), u = ((h >>> 12) % 1024) / 1024;
+    const depth = rr * (ZS_IN + Math.sqrt(u) * (ZS_OUT0 + ZS_OUTN * Math.sqrt(Math.max(1, e._zSwarmN))));
+    const ca = Math.cos(ang), sa = Math.sin(ang), slot = this._sgSlotOfBot(e);
+    let sx = L.position.x + ca * depth, sy = L.position.y + sa * depth;
+    if (navMs) {
+      let ok = isWalkable(navMs, sx - ox, sy - oy, ox, oy, bodyR) && !this._sgInBand(slot, sx, sy);
+      for (let k = 1; k <= 3 && !ok; k++) {
+        const dk = depth * (1 - k * 0.25);
+        sx = L.position.x + ca * dk; sy = L.position.y + sa * dk;
+        ok = isWalkable(navMs, sx - ox, sy - oy, ox, oy, bodyR) && !this._sgInBand(slot, sx, sy);
+      }
+      if (!ok) { sx = L.position.x; sy = L.position.y; }
+    }
+    let tx = 0, ty = 0, tid: string | null = null;
+    if (e._packTargetPlayer) { if (this._playerTargetable()) { tx = this.tankPos.x; ty = this.tankPos.y; tid = this.state.playerId; } }
+    else if (e._packTargetId !== '') { const t = this._enemyById.get(e._packTargetId); if (t !== undefined && t.active && !t.isDying) { tx = t.position.x; ty = t.position.y; tid = t.id; } }
+    const evx = e.velocity.x, evy = e.velocity.y;
+    const face = tid !== null ? Math.atan2(ty - e.position.y, tx - e.position.x) : evx * evx + evy * evy > 1 ? Math.atan2(evy, evx) : NaN;
+    const dx = sx - e.position.x, dy = sy - e.position.y, d = Math.sqrt(dx * dx + dy * dy);
+    if (d <= Math.max(6, bodyR * ZS_ARRIVE)) {
+      if (e.roamTarget) e.roamTarget.set(e.position.x, e.position.y); else e.roamTarget = new Vector(e.position.x, e.position.y);
+      e.navTravelDirX = 0; e.navTravelDirY = 0;
+      if (face === face) applyFacingType(e, face);
+      this._resetStuckWindow(e, now);
+    } else if (d < depth + rr * ZS_NEAR && (!navMs || navMs.walls.length === 0 || isPathClear(navMs, e.position.x - ox, e.position.y - oy, sx - ox, sy - oy, ox, oy, bodyR))) {
+      let dirX = dx / d, dirY = dy / d;
+      if (navMs && this._steerGate(e, dirX, dirY, navMs, ox, oy, bodyR)) { dirX = this._steerGateOut.dirX; dirY = this._steerGateOut.dirY; }
+      if (face === face) applyFacingType(e, face);
+      const spd = (getEnemyMoveSpeed(e) / this.movementZoom) * TANK_ACCEL * this._enemyThrustMult(e) * Math.min(1, d / (bodyR * 2));
+      e.velocity.x += dirX * spd * dtFactor;
+      e.velocity.y += dirY * spd * dtFactor;
+      e.navTravelDirX = dirX; e.navTravelDirY = dirY;
+      if (e.roamTarget) e.roamTarget.set(sx, sy); else e.roamTarget = new Vector(sx, sy);
+    } else if (tid !== null) {
+      this._intDrive(e, tx, ty, navMs, ox, oy, bodyR, now, dtFactor, tid);
+    } else {
+      this._intDrive(e, L.position.x, L.position.y, navMs, ox, oy, bodyR, now, dtFactor, L.id);
+    }
+    e.targetTurretAngle = e.targetAngle;
+    e.smoothedAimPos = null;
+    return true;
   }
   public _mevLeaveSides(e: EnemyTank): void {
     if (SMALL_FIX.GH396) this._leaveSquadAlive(e, true);
@@ -18519,6 +18804,7 @@ export class GameLogic {
       onLeaderboard: true, onMinimap: true, minimapAll: false, countsAsKill: true, inWalls: false, score: e === null ? s.currentXp + _XP_BASE : e.currentXp + _XP_BASE + e._mevScore, worthNothing: false, killLine: '',
       brain: 'full', orderIdx: -1, sight: 0, birthLook: 'none', crashersIgnore: false, canBeHealed: true, contact: 'tank', pushable: null, solid: null, health: 0,
       level: e === null ? s.level : e.level, skills, classWord: '', graceMs: 0, refill: 'none', placed: false, fromWave: false, noGrowth: false, home: -1,
+      statK: e === null ? this._plStatK : (e._statK ?? null),
       areaIdx: this.areaBounds.length > 0 ? this._areaIndexAtWorld(x, y) : -1,
       like: this._mevCopyLike(e),
       shape: null, touch: null,
@@ -18529,6 +18815,15 @@ export class GameLogic {
     const c = this.state.enemyConfigs.find(k => k.id === e.configId);
     return { autospin: !!e.forceAutospin, facing: e.facingType ?? 'primaryTurret', aimbot: Number.isFinite(e.aimbotStrength) ? e.aimbotStrength : 25,
       turn: c && Number.isFinite(c.turnSpeed) ? c.turnSpeed : 50, logic: c?.upgradeLogic ?? 'OffensiveWeighted' };
+  }
+  public _mevSetStatK(e: EnemyTank, k0: StatK | null | undefined): void {
+    const k = k0 !== undefined || STAT_SHARES.EVERY_WAY === 0 ? (k0 ?? null) : this._strengthOfWord(e._toughWord);
+    if (STAT_SHARES.ON === 0 || (e._statK ?? null) === k) return;
+    const h0 = e.maxHealth * getEnemyStatMultiplier(e, 'maxHealth'), s0 = e.maxShield * getEnemyStatMultiplier(e, 'shieldCapacity');
+    e._statK = k;
+    const h1 = e.maxHealth * getEnemyStatMultiplier(e, 'maxHealth'), s1 = e.maxShield * getEnemyStatMultiplier(e, 'shieldCapacity');
+    if (h0 > 0 && h1 > 0) { e.currentHealth *= h1 / h0; e.displayHp *= h1 / h0; }
+    if (s0 > 0 && s1 > 0) { e.currentShield *= s1 / s0; e.displayShield *= s1 / s0; }
   }
   public _mevCopyLife(src: EnemyTank | null, ne: EnemyTank): void {
     const grow = src === null ? this.state.playerGrowthScale : src.growthScale;
@@ -19722,6 +20017,10 @@ export class GameLogic {
     e.graceEndTime = now + TRIP_GRACE_MIN + Math.random() * (TRIP_GRACE_MAX - TRIP_GRACE_MIN);
   }
 
+  private _autoFireTrigger(): boolean {
+    return this.state.autoFire && !(SMALL_FIX.R992 !== 0 && this.state.gracePeriodActive);
+  }
+
   private endGracePeriod(): void {
     this.state.gracePeriodActive = false;
     this.state.godMode = SMALL_FIX.GH377 && this._mevPlayerGodUntil !== 0 ? true : this.state._preGraceGodMode;
@@ -20195,6 +20494,7 @@ export class GameLogic {
       mapConfig.bossSpawnCooldown = undefined;
       mapConfig.bossesCanGrow = undefined;
       mapConfig.bossesUsePortals = undefined;
+      mapConfig.bossStrengthEveryWay = undefined;
       if (config.preset) mapConfig.bossesCanGrow = buildPresetWorld(config.preset)?.map.bossesCanGrow;
       _bossBlockRan = true;
     }
@@ -20211,7 +20511,7 @@ export class GameLogic {
           ...a.mapConfig,
           enableBossSpawns: bossSpawnsDefaultFor(config.mode),
           bossGroups: modeBossGroups(config.mode, config.growth, isManhuntMode(config.mode)) ?? a.mapConfig.bossGroups,
-          bossInitialDelay: undefined, bossSpawnCooldown: undefined, bossesCanGrow: undefined, bossesUsePortals: undefined,
+          bossInitialDelay: undefined, bossSpawnCooldown: undefined, bossesCanGrow: undefined, bossesUsePortals: undefined, bossStrengthEveryWay: undefined,
         } }) };
       }
     }
@@ -20532,7 +20832,7 @@ export class GameLogic {
       for (const c of this.state.enemyConfigs) if (c.id === cid && c.maxSpawnCount < CMD_BOSS_MAX) c.maxSpawnCount = CMD_BOSS_MAX;
       if (SMALL_FIX.R765 !== 0) this._spawnPastRoom = true;
       let b: EnemyTank | null;
-      try { b = this._spawnBoss(name, cfg); } finally { this._spawnPastRoom = false; }
+      try { b = this._spawnBoss(name, cfg, bossStatsOf(cfg, name)); } finally { this._spawnPastRoom = false; }
       if (!b) { p.at = now + SPAWN_PLACE_RETRY_MS; continue; }
       for (const c of this.state.enemyConfigs) if (c.id === cid && c.maxSpawnCount < CMD_BOSS_MAX) c.maxSpawnCount = CMD_BOSS_MAX;
       this._cmdBossIds.add(b.id);
@@ -23853,10 +24153,12 @@ export class GameLogic {
 
   private _botsForgetPlayer(): void {
     const _pid = this.state.playerId;
+    ksClear(this._plKillShares);
     for (let i = 0; i < this.state.enemyTanks.length; i++) {
       const e = this.state.enemyTanks[i];
       if (!e.active) continue;
       e.damageFromTanks.delete(_pid);
+      ksDrop(e.killShares, _pid);
       e.aggroTowards.delete(_pid);
       if (e.fearSourceId === _pid) {
         e.fearHeat = 0;
@@ -23896,6 +24198,7 @@ export class GameLogic {
     const target = this._enemyById.get(enemyId) || this.state.enemyTanks.find(e => e.id === enemyId) || null;
     if (!target || !target.active || target.isDying || target.spawnedByEntityId
         || target.isSentryEnemy || target.isSpawning) return false;
+    ksClear(this._plKillShares); ksClear(target.killShares);
     if (target.isBaseProtector || (target._mevF & MF_STAGE) !== 0) return false;
 
     const targetConfig = this._resolveTankConfigForEnemy(target);
@@ -24288,6 +24591,8 @@ export class GameLogic {
 
         kills: 0,
         bossKills: 0,
+        tankKills: 0,
+        assists: 0,
         topKills: 0,
         foodKills: 0,
         playerDead: false,
@@ -24754,6 +25059,8 @@ export class GameLogic {
 
     this.state.kills = 0;
     this.state.bossKills = 0;
+    this.state.tankKills = 0;
+    this.state.assists = 0;
     this.state.foodKills = 0;
     this._resetLifeStats(now);
     this._wornName = null;
@@ -26414,7 +26721,9 @@ export class GameLogic {
       if (o === e) continue;
       o.lastBodyBurstFrom?.delete(recycledId);
       o.damageFromTanks?.delete(recycledId);
+      ksDrop(o.killShares, recycledId);
     }
+    ksDrop(this._plKillShares, recycledId); ksClear(e.killShares);
     e.active = false;
     this.enemyPool.push(e);
     if (this.onEnemyRecycled) this.onEnemyRecycled(recycledId);
@@ -27088,6 +27397,7 @@ export class GameLogic {
     enemy.penetrationBase = newConfig.tankPenetrationBase ?? ARRAS_TANK_BASE_PENETRATION;
     enemy.touchScale = newConfig.tankTouchScale ?? 1;
     enemy._toughWord = newTankName || '';
+    if (STAT_SHARES.ON !== 0 && STAT_SHARES.EVERY_WAY !== 0) { const _c980 = this._configOfBot(enemy); if (!_c980 || _c980._statK === undefined) enemy._statK = this._strengthOfWord(enemy._toughWord); }
     enemy.toughKind = tankKindOf(enemy._toughWord, newConfig.tankResistBase);
     enemy.healthK = debuffHealthK(this.state.gameModeConfig.tankDebuffs, enemy.toughKind);
     enemy._fileResist = newConfig.tankResistBase ?? 1;
@@ -27197,7 +27507,7 @@ export class GameLogic {
     if (SMALL_FIX.GH579 !== 0) enemy._koUntil = 0;
     enemy._wtAt = -1e9; enemy._wtPortal = null; enemy._wtSize = 0; enemy._wtSvX = 0; enemy._wtSvY = 0; enemy._wtOw = 0; enemy._wtOwPx = 0; enemy._wtOwPy = 0; enemy._wtOwPk = 0; enemy._wtStAge = 0; enemy._wtStX = 0; enemy._wtStY = 0; enemy._wtStMX = 0; enemy._wtStMY = 0;
     enemy._mevSightK = 1; enemy._mevSightSet = 0; enemy._mevUnitK = 1; enemy._mevStraight = false;
-    enemy._mevColour = -1; enemy._mevInvis = -1; enemy._mevSpeedK = 1; enemy._mevHpK = 1; enemy._mevPushWas = -1; enemy._mevFollowOf = ''; enemy._zMind = false; enemy._hordeLed = false; enemy._hordeAt = 0; enemy._zPack = false; enemy._packTargetId = ''; enemy._packTargetPlayer = false;
+    enemy._mevColour = -1; enemy._mevInvis = -1; enemy._mevSpeedK = 1; enemy._mevHpK = 1; enemy._mevPushWas = -1; enemy._mevFollowOf = ''; enemy._zMind = false; enemy._hordeLed = false; enemy._hordeAt = 0; enemy._zPack = false; enemy._packTargetId = ''; enemy._packTargetPlayer = false; enemy._zSwarmN = 0; enemy._zSwarmLag = 0;
     btResetLife(enemy);
     if (SMALL_FIX.GH335 !== 0) enemy.isBossTier = config.isBossTier ?? false;
     enemy.aiBehavior = config.aiBehavior;
@@ -27294,6 +27604,7 @@ export class GameLogic {
     enemy._toughWord = (SMALL_FIX.GH608 !== 0 && (config.sourceTankWord || this._openedTankWord.get(config))) || config.sourceLibraryName || config.enemyName || '';
     enemy.toughKind = tankKindOf(enemy._toughWord, tankConfig.tankResistBase);
     enemy.healthK = debuffHealthK(this.state.gameModeConfig.tankDebuffs, enemy.toughKind);
+    enemy._statK = STAT_SHARES.ON !== 0 ? (config._statK !== undefined || STAT_SHARES.EVERY_WAY === 0 ? (config._statK ?? null) : this._strengthOfWord(enemy._toughWord)) : null;
     enemy.maxShield = tankConfig.tankShieldCapacity;
     enemy.currentShield = tankConfig.tankShieldCapacity;
     enemy.displayShield = tankConfig.tankShieldCapacity;
@@ -27359,6 +27670,7 @@ export class GameLogic {
     enemy.level = baseLv;
     enemy.currentXp = baseLv > 0 ? XP_REQUIREMENTS[baseLv - 1] : 0;
     enemy.kills = 0;
+    enemy.tankKills = 0; enemy.assists = 0; enemy.bossKills = 0;
     GameLogic._botSkillStart(config.tankConfig, baseLv, this._gmOfBot(enemy), enemy);
     enemy.nextUpgradeIndex = 0;
 
@@ -27731,6 +28043,7 @@ export class GameLogic {
     enemy.isAggro = false;
     enemy.totalPlayerDamage = 0;
     enemy.damageFromTanks.clear();
+    ksClear(enemy.killShares);
     enemy.aggroTowards.clear();
     enemy.lastBodyBurstFrom.clear();
     if (enemy._hitSeen) enemy._hitSeen.clear(); if (enemy._hitNext) enemy._hitNext.clear();
@@ -28774,7 +29087,7 @@ export class GameLogic {
     if (name === null) { this._nextBossSpawnTime = now + bossSpawnCooldown(cfg); this._bossAnnounced = false; return; }
 
     const _bossSkips0 = this.spawnPlacementSkips;
-    const spawned = this._spawnBoss(name, cfg);
+    const spawned = this._spawnBoss(name, cfg, groups[gi].stats);
     if (!spawned) {
       if (this.spawnPlacementSkips !== _bossSkips0) this._nextBossSpawnTime = now + SPAWN_PLACE_RETRY_MS;
       else if (SMALL_FIX.CC014 !== 0 && !this._bossRosterResolves(groups, lib)) {
@@ -28837,7 +29150,7 @@ export class GameLogic {
     return ans;
   }
 
-  private _spawnBoss(tankName: string, cfg: MapConfig): EnemyTank | null {
+  private _spawnBoss(tankName: string, cfg: MapConfig, stats?: StatShares): EnemyTank | null {
     let _bossActive = 0;
     for (let i = 0; i < this.state.enemyTanks.length; i++) { const e = this.state.enemyTanks[i]; if (e.active && !e.isDying && !e.isBaseProtector && (e._mevF & MF_PLACED) === 0) _bossActive++; }
     if (_bossActive >= this.state.maxEnemies && !this._spawnPastRoom) return null;
@@ -28875,6 +29188,7 @@ export class GameLogic {
       enemyConfig.tankConfig = tankConfig;
       enemyConfig.enabled = true;
     }
+    enemyConfig._statK = statKOf(stats);
 
     const spawned = this.spawnEnemy(enemyConfig, false, true );
     if (!spawned) return null;
@@ -31718,7 +32032,11 @@ export class GameLogic {
             const _glDx = enemy.position.x - _glX;
             const _glDy = enemy.position.y - _glY;
             const _glDistSq = _glDx * _glDx + _glDy * _glDy;
-            if (enemy._zPack && (enemy._packTargetId !== '' || enemy._packTargetPlayer)) {
+            if (enemy._zPack && SMALL_FIX.R976 !== 0) {
+              const _zOn = (enemy._packTargetId !== '' && enemy.currentTargetType === 'enemy' && enemy.currentTargetId === enemy._packTargetId) ||
+                (enemy._packTargetPlayer && enemy.currentTargetType === 'player');
+              enemy.isRegrouping = !(_zOn && (enemy.aiState === 'attacking' || enemy.aiState === 'following'));
+            } else if (enemy._zPack && (enemy._packTargetId !== '' || enemy._packTargetPlayer)) {
               enemy.isRegrouping = false;
             } else if (!enemy.isRegrouping) {
               if (_glDistSq > _glR * _glR) enemy.isRegrouping = true;
@@ -31732,7 +32050,7 @@ export class GameLogic {
                 enemy.currentTargetType = null;
                 enemy.targetPosition = null;
               }
-              if (!enemy.roamTarget || now - enemy.lastRegroupRetargetTime > AI_CONSTANTS.GROUP_REGROUP_RETARGET_MS) {
+              if (!(enemy._zPack && SMALL_FIX.R976 !== 0) && (!enemy.roamTarget || now - enemy.lastRegroupRetargetTime > AI_CONSTANTS.GROUP_REGROUP_RETARGET_MS)) {
                 enemy.lastRegroupRetargetTime = now;
                 this._setRegroupRoamTarget(enemy, _glX, _glY, _glR);
               }
@@ -31747,6 +32065,7 @@ export class GameLogic {
             }
           } else if (SMALL_FIX.R65B !== 0) {
             enemy.isRegrouping = false;
+            if (enemy._zPack && SMALL_FIX.R976 !== 0) enemy._hordeAt = 0;
           }
         } else if (SMALL_FIX.R65B !== 0 && enemy.isRegrouping && enemy.groupId === 0) {
           enemy.isRegrouping = false;
@@ -32118,7 +32437,11 @@ export class GameLogic {
             break;
         }
       } else {
-        if (enemy.aiState === 'roaming' && enemy.roamTarget) {
+        if (enemy.aiState === 'roaming' && enemy._zPack && enemy._hordeLed && enemy.isRegrouping && SMALL_FIX.R976 !== 0 &&
+            this._zSwarmRoam(enemy, this._getEnemyNavMapState(enemy), this._navOffX, this._navOffY, this.getEffectiveEnemyRadius(enemy), now, dtFactor)) {
+        } else if (enemy.aiState === 'roaming' && enemy._zPack && enemy._mevFollowOf === '' && SMALL_FIX.R976 !== 0 &&
+            this._zSwarmGather(enemy, this._getEnemyNavMapState(enemy), this._navOffX, this._navOffY, this.getEffectiveEnemyRadius(enemy), now, dtFactor)) {
+        } else if (enemy.aiState === 'roaming' && enemy.roamTarget) {
           let tdx = enemy.roamTarget.x - enemy.position.x;
           let tdy = enemy.roamTarget.y - enemy.position.y;
           const tmag = Math.sqrt(tdx * tdx + tdy * tdy);
@@ -32649,6 +32972,7 @@ export class GameLogic {
     spread?(g: unknown): void;
     players?(key: string, g: unknown): number;
   } | null = null;
+  public static tripLoad: { start(key: string): void; end(): void } | null = null;
   public travel: TravelLedger | null = null;
   public tripping = false;
   private _trip: { phase: 'out' | 'build' | 'in'; t0: number; key: string; gen: Generator<void, void, void> | null } | null = null;
@@ -32732,10 +33056,12 @@ export class GameLogic {
     const plan = { key: t.key, record: rec, minutes: away, journeys, team: rec ? rec.playerTeam : 0 };
     t.phase = 'build';
     t.gen = h.tripBuild(this, plan, Math.random);
+    GameLogic.tripLoad?.start(t.key);
   }
   private _tripDone(): void {
     if (this._trip) { this._trip.phase = 'in'; this._trip.t0 = performance.now(); }
     this.tripping = false;
+    GameLogic.tripLoad?.end();
   }
   public _tripArrived(key: string, travellers: readonly string[], roomMin: number): void {
     this._tripRoomMin0 = roomMin; this._tripRealStart = performance.now();
@@ -33163,7 +33489,7 @@ export class GameLogic {
     const ang = Math.atan2(my - enemy.position.y, mx - enemy.position.x);
     applyFacingType(enemy, ang);
     enemy.targetTurretAngle = ang;
-    enemy.forceAutoshoot = (this.mousePressed && !this.state.selectMode) || this.state.autoFire;
+    enemy.forceAutoshoot = (this.mousePressed && !this.state.selectMode) || this._autoFireTrigger();
     if ((enemy._mevF & MF_STANDS) !== 0) return;
     const k = this.keys;
     let dx = 0, dy = 0;
@@ -33670,6 +33996,7 @@ export class GameLogic {
       if (SMALL_FIX.NH064 !== 0 && (o.isSpawning || o.graceActive)) continue;
       if (this._tankHidFrom(enemy, o, false)) continue;
       if (campsClash(enemy.camp, o.camp)) continue;
+      if (bossCampMates(enemy.camp, o.camp)) continue;
       const _dgSrc = excludeId || enemy.fear.fleeSourceId;
       if (_dgSrc && o.id === _dgSrc) continue;
       const ob = o.aiBehavior;
@@ -35383,6 +35710,8 @@ export class GameLogic {
     const _roamBodyR = this.getEffectiveEnemyRadius(enemy);
     const ab = this.areaBounds.length > 0 ? this._getEnemyAreaBounds(enemy.areaId) : null;
 
+    if (enemy._zPack && enemy._hordeLed && enemy.isRegrouping && SMALL_FIX.R976 !== 0 && this._zSwarmRoam(enemy, navMs, _roamOffX, _roamOffY, _roamBodyR, now, dtFactor)) return;
+    if (enemy._zPack && enemy._mevFollowOf === '' && SMALL_FIX.R976 !== 0 && this._zSwarmGather(enemy, navMs, _roamOffX, _roamOffY, _roamBodyR, now, dtFactor)) return;
     if ((enemy._btBits > 0 || (SMALL_FIX.R941 !== 0 && this._carried.length !== 0)) && this._btRoam(enemy, navMs, _roamOffX, _roamOffY, _roamBodyR, now, dtFactor)) return;
     if (enemy._intKind !== 0 && this._intRoam(enemy, navMs, _roamOffX, _roamOffY, _roamBodyR, now, dtFactor)) return;
     if (enemy.hf.gzUntil > now && this._hfKeepOff(enemy, navMs, _roamOffX, _roamOffY, _roamBodyR, now, dtFactor)) return;
@@ -36200,9 +36529,13 @@ export class GameLogic {
 
     const tp = enemy.targetPosition;
     if (!tp) return;
-    const dx = tp.x - enemy.position.x;
-    const dy = tp.y - enemy.position.y;
+    let dx = tp.x - enemy.position.x;
+    let dy = tp.y - enemy.position.y;
     if (dx * dx + dy * dy < 1e-6) return;
+    if (SMALL_FIX.R981 !== 0 && enemy.aimbotStrength > 0) {
+      const ip = this._guardLeadPoint(enemy, tp);
+      if (ip !== null) { dx = ip.x - enemy.position.x; dy = ip.y - enemy.position.y; }
+    }
     const aimWorld = Math.atan2(dy, dx);
     if (enemy.fgTwo) {
       const _gMs = this._getEnemyNavMapState(enemy);
@@ -36212,6 +36545,32 @@ export class GameLogic {
     applyFacingType(enemy, aimWorld);
     const _bpPrimary = enemy.turrets[enemy.primaryTurretIndex];
     enemy.targetTurretAngle = normalizeAngle(aimWorld - (_bpPrimary?.angle || 0));
+  }
+
+  private readonly _guardVel: Vector = new Vector(0, 0);
+  private _guardLeadPoint(enemy: EnemyTank, tp: Vector): Vector | null {
+    const v = this._guardVel;
+    if (enemy.currentTargetType === 'enemy' && enemy.currentTargetId) {
+      const t = this._enemyById.get(enemy.currentTargetId);
+      if (!t || !t.active) return null;
+      v.set(t.velocity.x, t.velocity.y);
+    } else if (enemy.currentTargetType === 'player') {
+      const sv = this.smoothedPlayerVelocity;
+      v.set(sv.x, sv.y);
+      if (AI_CONSTANTS.AIM_PLAYER_VEL_TRUTH !== 0) {
+        const k = (enemy.aimbotStrength > 100 ? 100 : enemy.aimbotStrength) / 100;
+        const rx = this.tankVelocity.x + this.knockbackVelocity.x, ry = this.tankVelocity.y + this.knockbackVelocity.y;
+        v.set(v.x + (rx - v.x) * k, v.y + (ry - v.y) * k);
+      }
+    } else return null;
+    const gun = enemy.turrets[enemy.primaryTurretIndex];
+    this._fillAimGun(enemy, gun);
+    const base = this._aiTurretBasePos;
+    this._aimTurretBaseInto(enemy, gun, base);
+    const origin = this._aimOriginFromMuzzle(enemy, gun, base.x, base.y, tp.x, tp.y);
+    const out = this._aiInterceptResult;
+    calculateInterceptPositionInto(out, origin, tp, v, this._aimGunSpeed, enemy.aimbotStrength, this._aimGunTsr, this._aimGunDamp);
+    return out;
   }
 
   private updateEnemyAttacking(enemy: EnemyTank, dtFactor: number) {
@@ -37004,6 +37363,7 @@ export class GameLogic {
       if (_chD > 0.001) {
         moveX = _chDx / _chD; moveY = _chDy / _chD;
         moveSpeed = (getEnemyMoveSpeed(enemy) / this.movementZoom) * TANK_ACCEL * this._enemyThrustMult(enemy);
+        if (enemy._zSwarmLag > 0 && enemy._zPack && enemy._mevFollowOf === '' && SMALL_FIX.R976 !== 0) moveSpeed *= ZS_PACE;
       }
     }
 
@@ -39632,7 +39992,7 @@ export class GameLogic {
     }
 
     const _emt1 = _deriveMotionType(turret.projectileBehaviors, turret.projectileType?.motionType || 'glide');
-    const _ebs1 = computeBulletTypeStats(turret, _emt1, enemy.upgrades, enemy.maxPointsPerSkill || 9, this._gunLevel(enemy.level || 0), growthRulesOf(enemy));
+    const _ebs1 = computeBulletTypeStats(turret, _emt1, enemy.upgrades, enemy.maxPointsPerSkill || 9, this._gunLevel(enemy.level || 0), growthRulesOf(enemy), enemy._statK);
     const _egss = typeof turret.gunStatScale === 'number' ? turret.gunStatScale : 1;
     b.damage = _ebs1.damage * _egss;
     b.penetration = _ebs1.penetration * _egss;
@@ -40061,7 +40421,7 @@ export class GameLogic {
     if (defenseOnBody(enemy.resistBase) || (enemy._mevF & MF_STAGE) !== 0) {
       const _rgGr = growthRulesOf(enemy);
       enemy.currentShield = defenseShieldStep(enemy.currentShield, shieldCap, enemyRegenCurve(enemy), dt,
-        _rgGr === undefined ? 1 : growthFactor(_rgGr, 'shieldRegen', enemy.level), this._enemyHumpK(enemy));
+        (_rgGr === undefined ? 1 : growthFactor(_rgGr, 'shieldRegen', enemy.level)) * (enemy._statK ? enemy._statK.shieldRegen : 1), this._enemyHumpK(enemy));
       enemy.currentHealth = defenseHealthStep(enemy.currentHealth, maxHp, dt, shieldCap > 0 && enemy.currentShield >= shieldCap);
     } else {
     if (shieldCap > 0 && enemy.currentShield < shieldCap) {
@@ -42214,6 +42574,7 @@ export class GameLogic {
     this.frameCounter++;
     if (this.state.gameModeConfig.tankDebuffs !== this._debuffsSeen) this._refreshTankDebuffs();
     if (this._tankGroupsChanged()) { const had = this._tgHadRules; this._rebuildTankGroups(); if (had || this._tgHadRules) this._refreshTankDebuffs(); }
+    if (STAT_SHARES.EVERY_WAY !== 0) this._plStatKSync();
     { const _gmc = this.state.gameModeConfig, _gr = _gmc.growth && _gmc.growthModel === 'rules' ? _gmc.growthRules : undefined; if (ACTIVE_GROWTH.rules !== _gr) ACTIVE_GROWTH.rules = _gr; }
     if (SMALL_FIX.GH302 !== 0) {
       this._stepPX0 = this.tankPos.x; this._stepPY0 = this.tankPos.y;
@@ -42307,7 +42668,7 @@ export class GameLogic {
           this.keys.has('KeyD') || this.keys.has('ArrowRight')) {
         shouldEnd = true;
       }
-      if ((this.mousePressed && !this.state.selectMode) || this.state.autoFire) {
+      if ((this.mousePressed && !this.state.selectMode) || (SMALL_FIX.R992 === 0 && this.state.autoFire)) {
         shouldEnd = true;
       }
       if (this.gameNow() - this.state.gracePeriodStartTime >= GRACE_PERIOD_DURATION) {
@@ -42695,7 +43056,7 @@ export class GameLogic {
       if (!this.tankDying && defenseOnBody(this._plResist())) {
           const _rgGr = ACTIVE_GROWTH.rules;
           this.state.tankCurrentShield = defenseShieldStep(this.state.tankCurrentShield, shieldCap, this._playerRegenCurve(), dt,
-            _rgGr === undefined ? 1 : growthFactor(_rgGr, 'shieldRegen', this.state.level), this._playerHumpK());
+            (_rgGr === undefined ? 1 : growthFactor(_rgGr, 'shieldRegen', this.state.level)) * (this._plStatK ? this._plStatK.shieldRegen : 1), this._playerHumpK());
           this.state.tankCurrentHealth = defenseHealthStep(this.state.tankCurrentHealth, maxHp, dt, shieldCap > 0 && this.state.tankCurrentShield >= shieldCap);
       } else if (!this.tankDying) {
           if (shieldCap > 0 && this.state.tankCurrentShield < shieldCap) {
@@ -42868,8 +43229,8 @@ export class GameLogic {
         let _droneMousePressed: boolean;
         if (isPlayerBullet) {
           _droneMousePressed = !this._sceneHeld && (b.permanent
-            ? (this.mousePressed || this.state.autoFire)
-            : (this.mousePressed || (this.state.autoFire && b.hasControllers)));
+            ? (this.mousePressed || this._autoFireTrigger())
+            : (this.mousePressed || (this._autoFireTrigger() && b.hasControllers)));
         } else {
           _droneMousePressed = ownerEnemy != null &&
             (this._hfThr(ownerEnemy) ||
@@ -43562,7 +43923,7 @@ export class GameLogic {
     let _othersRested = false;
     const isPlayerBulletOverride = (parent.ownerId === this.state.playerId && this.state.autoOverride)
       || this._bulletGhosted(parent);
-    const bLmb = !this._sceneHeld && ((this.mousePressed && !this.state.selectMode) || this.state.autoFire);
+    const bLmb = !this._sceneHeld && ((this.mousePressed && !this.state.selectMode) || this._autoFireTrigger());
     const bRmb = this.altHeld;
     const bHasManual = bLmb || bRmb;
     const bEffX = this.getEffectiveMouseWorldX();
@@ -43866,6 +44227,7 @@ export class GameLogic {
     b._skCap = this.state.maxPointsPerSkill || 9;
     b._skRldMult = this.getStatMultiplier('reload');
     this._snapGrowth(b, this._gunLevel(this.state.level || 0), ACTIVE_GROWTH.rules);
+    if (this._plStatK) this._snapShare(b, this._plStatK);
   }
 
   private _snapSkillFromEnemy(b: Bullet, e: EnemyTank): void {
@@ -43877,6 +44239,12 @@ export class GameLogic {
     b._skCap = e.maxPointsPerSkill || 9;
     b._skRldMult = getEnemyStatMultiplier(e, 'reload');
     this._snapGrowth(b, this._gunLevel(e.level || 0), growthRulesOf(e));
+    const sk = e._statK;
+    if (sk) this._snapShare(b, sk);
+  }
+
+  private _snapShare(b: Bullet, sk: StatK): void {
+    b._grDam *= sk.bulletDamage; b._grStr *= sk.bulletHealth; b._grPen *= sk.bulletPenetration; b._grSpd *= sk.bulletSpeed;
   }
 
   private _snapGrowth(b: Bullet, level: number, gr: GrowthRules | undefined): void {
@@ -45005,6 +45373,7 @@ export class GameLogic {
       if (other.isSentryEnemy) continue;
       if (this._tankHidFrom(enemy, other, false)) continue;
       if (campsClash(enemy.camp, other.camp)) continue;
+      if (bossCampMates(enemy.camp, other.camp)) continue;
       if (enemy.team !== 'sentry' && other.team === enemy.team) continue;
       if (enemy.spawnedByEntityId && other.id === enemy.spawnedByEntityId) continue;
       if (this._sgTargetSafe(_sgSentrySlot, other.position.x, other.position.y, AI_CONSTANTS.SAFEZONE_ACQUIRE_CELLS)) continue;
@@ -46011,6 +46380,7 @@ export class GameLogic {
         o.camp = CAMP_NONE; o.isPlayer = true; o.enemy = null; o.round = null; o.sentry = false; o.boss = false; o.guard = false;
         this._auraSkillOfList(list, st.upgrades, st.maxPointsPerSkill);
         this._auraGrowth(this._gunLevel(st.level || 0), ACTIVE_GROWTH.rules);
+        if (this._plStatK) _auraOwn.dam *= this._plStatK.bulletDamage;
         this._auraHits(from, this.tankPos.x, this.tankPos.y, ticks);
       }
     }
@@ -46027,6 +46397,7 @@ export class GameLogic {
       o.camp = e.camp; o.isPlayer = false; o.enemy = e; o.round = null; o.sentry = e.isSentryEnemy === true; o.boss = e.camp === CAMP_BOSS; o.guard = e.isBaseProtector === true;
       this._auraSkillOfList(list, e.upgrades, e.maxPointsPerSkill);
       this._auraGrowth(this._gunLevel(e.level || 0), growthRulesOf(e));
+      if (e._statK) _auraOwn.dam *= e._statK.bulletDamage;
       this._auraHits(from, e.position.x, e.position.y, ticks);
     }
 
@@ -46234,7 +46605,7 @@ export class GameLogic {
     if (o.round !== null) this._notePlayerAttackerBullet(o.round);
     else if (o.enemy !== null) this._notePlayerAttackerTank(o.enemy);
     this._stampPressDamage(o.id, o.tapRoot, st.playerId, now);
-    if (rest > 0) this._vampHitPlayer(rest, o.id);
+    if (rest > 0) this._vampHitPlayer(rest, o.id, now);
     st.lastTankDamageTime = now;
     this.tankDamageOverlay = flashOnHit(this.tankDamageOverlay);
   }
@@ -46258,7 +46629,7 @@ export class GameLogic {
     }
     if (rest > 0) {
       if (enemy.id === this._specId) { if (o.round !== null) this._spNoteRound(o.round); else if (o.enemy !== null) this._spNoteTank(o.enemy); }
-      this._vampHitBot(enemy, rest, o.id);
+      this._vampHitBot(enemy, rest, o.id, now);
       enemy.fearHeat = Math.min(100, enemy.fearHeat + (rest / aiHealthMax(enemy, HEALTH_BASIS.FEAR)) * AI_CONSTANTS.FEAR_HEAT_DAMAGE_SCALE);
       enemy.fearSourceId = o.id;
       enemy.fearSourceAt = now;
@@ -46291,14 +46662,14 @@ export class GameLogic {
       const xp = this.xpFromKill(enemy);
       const rewardId = this._rewardRecipientId(o.id);
       this.creditKill(rewardId, enemy);
-      this._addKillXpTo(rewardId, null, xp);
+      this._payKill(enemy, rewardId, null, xp);
     } else if (amount > 0) {
       enemy.damageOverlay = flashOnHit(enemy.damageOverlay);
     }
   }
 
   private updateAutoTurrets(dtFactor: number) {
-    const lmb = !this._sceneHeld && ((this.mousePressed && !this.state.selectMode) || this.state.autoFire);
+    const lmb = !this._sceneHeld && ((this.mousePressed && !this.state.selectMode) || this._autoFireTrigger());
     const rmb = this.altHeld;
     const hasManualInput = lmb || rmb;
 
@@ -47631,6 +48002,7 @@ export class GameLogic {
         if (AI_CONSTANTS.SEEN_RULE !== 0 ? this._tankHidAt(ownerX, ownerY, ownerR, e, e.id === turret.autoTargetId)
             : e.invisAlpha <= 0.5) continue;
         if (campsClash(_callerCamp, e.camp)) continue;
+        if (bossCampMates(_callerCamp, e.camp)) continue;
 
         if (e.isSentryEnemy) {
           if (skipSentryPhase) continue;
@@ -47931,7 +48303,7 @@ export class GameLogic {
     b.lifespanDistance = b.velocity.mag() * 60 * b.maxAge;
 
     const _mt3 = _deriveMotionType(sub.projectileBehaviors, sub.projectileType?.motionType || 'glide');
-    const _bs3 = computeBulletTypeStats(sub, _mt3, this.state.upgrades, this.state.maxPointsPerSkill || 9, this._gunLevel(this.state.level || 0), ACTIVE_GROWTH.rules);
+    const _bs3 = computeBulletTypeStats(sub, _mt3, this.state.upgrades, this.state.maxPointsPerSkill || 9, this._gunLevel(this.state.level || 0), ACTIVE_GROWTH.rules, this._plStatK);
     b.damage = _bs3.damage;
     b.penetration = _bs3.penetration;
     b.knockback = sub.knockback;
@@ -48329,7 +48701,7 @@ export class GameLogic {
     b.lifespanDistance = b.velocity.mag() * 60 * b.maxAge;
 
     const _emt3 = _deriveMotionType(sub.projectileBehaviors, sub.projectileType?.motionType || 'glide');
-    const _ebs3 = computeBulletTypeStats(sub, _emt3, enemy.upgrades, enemy.maxPointsPerSkill || 9, this._gunLevel(enemy.level || 0), growthRulesOf(enemy));
+    const _ebs3 = computeBulletTypeStats(sub, _emt3, enemy.upgrades, enemy.maxPointsPerSkill || 9, this._gunLevel(enemy.level || 0), growthRulesOf(enemy), enemy._statK);
     b.damage = _ebs3.damage;
     b.penetration = _ebs3.penetration;
     b.knockback = sub.knockback;
@@ -48606,7 +48978,7 @@ export class GameLogic {
     if (this._ctlBody !== null) return;
     if (this.state.gracePeriodActive) return;
     const _admNoFire = (this.admin.live && this.admin.blocksFire()) || this._sceneHeld || this._mevPlayerNoFire;
-    const globalFiring = !_admNoFire && ((this.mousePressed && !this.state.selectMode) || this.state.autoFire);
+    const globalFiring = !_admNoFire && ((this.mousePressed && !this.state.selectMode) || this._autoFireTrigger());
     const now = this._firingClock;
 
     const reloadMult = this.getStatMultiplier('reload');
@@ -49032,7 +49404,7 @@ export class GameLogic {
     b.lifespanDistance = b.velocity.mag() * 60 * b.maxAge;
 
     const _mt1 = _deriveMotionType(t.projectileBehaviors, t.projectileType?.motionType || 'glide');
-    const _bs1 = computeBulletTypeStats(t, _mt1, this.state.upgrades, this.state.maxPointsPerSkill || 9, this._gunLevel(this.state.level || 0), ACTIVE_GROWTH.rules);
+    const _bs1 = computeBulletTypeStats(t, _mt1, this.state.upgrades, this.state.maxPointsPerSkill || 9, this._gunLevel(this.state.level || 0), ACTIVE_GROWTH.rules, this._plStatK);
     const _gss = typeof t.gunStatScale === 'number' ? t.gunStatScale : 1;
     b.damage = _bs1.damage * _gss;
     b.penetration = _bs1.penetration * _gss;
@@ -52697,7 +53069,7 @@ export class GameLogic {
 
           if (remainingDmg > 0) {
             if (enemy.id === this._specId) this._spNoteRound(b);
-            this._vampHitBot(enemy, remainingDmg, b.ownerId);
+            this._vampHitBot(enemy, remainingDmg, b.ownerId, now);
             if (b.ownerId === this.state.playerId) {
               enemy.totalPlayerDamage += remainingDmg;
               updateDamageTracking(enemy, remainingDmg, now);
@@ -52761,7 +53133,7 @@ export class GameLogic {
             const xp = this.xpFromKill(enemy);
             const _rewardId = this._rewardRecipientId(b.ownerId);
             this.creditKill(_rewardId, enemy);
-            this._addKillXpTo(_rewardId, null, xp);
+            this._payKill(enemy, _rewardId, null, xp);
           } else if (bulletToEnemyDmg > 0) {
             enemy.damageOverlay = flashOnHit(enemy.damageOverlay);
           }
@@ -53027,7 +53399,7 @@ export class GameLogic {
             this._notePlayerAttackerBullet(b);
             this._stampPressDamage(b.ownerId, b._tapRootId, this.state.playerId, now);
             if (remainingDmg > 0) {
-              this._vampHitPlayer(remainingDmg, b.ownerId);
+              this._vampHitPlayer(remainingDmg, b.ownerId, now);
             }
 
             this.state.lastTankDamageTime = now;
@@ -53621,9 +53993,9 @@ export class GameLogic {
               const perm = Math.min(1, enemy.currentShield / ramEnemyMaxShield);
               const shieldAbsorb = Math.min(playerRamDmg * perm, enemy.currentShield);
               enemy.currentShield -= shieldAbsorb;
-              this._vampHitBot(enemy, playerRamDmg - shieldAbsorb, this.state.playerId);
+              this._vampHitBot(enemy, playerRamDmg - shieldAbsorb, this.state.playerId, now);
             } else {
-              this._vampHitBot(enemy, playerRamDmg, this.state.playerId);
+              this._vampHitBot(enemy, playerRamDmg, this.state.playerId, now);
             }
             enemy.lastDamageTime = now;
             enemy.totalPlayerDamage += playerRamDmg;
@@ -53640,7 +54012,7 @@ export class GameLogic {
             if (enemy.currentHealth <= 0 && !enemy.isDying) {
               this.killEnemy(enemy);
               this.creditKill(this.state.playerId, enemy);
-              this.addXp(this.xpFromKill(enemy));
+              this._payKill(enemy, this.state.playerId, null, this.xpFromKill(enemy));
             } else if (playerRamDmg > 0) {
               enemy.damageOverlay = (_bhPE ? flashOnTickHit : flashOnHit)(enemy.damageOverlay);
             }
@@ -53679,9 +54051,9 @@ export class GameLogic {
                 const perm = Math.min(1, this.state.tankCurrentShield / ramPlayerMaxShield);
                 const shieldAbsorb = Math.min(enemyRamDmg * perm, this.state.tankCurrentShield);
                 this.state.tankCurrentShield -= shieldAbsorb;
-                this._vampHitPlayer(enemyRamDmg - shieldAbsorb, enemy.id);
+                this._vampHitPlayer(enemyRamDmg - shieldAbsorb, enemy.id, now);
               } else {
-                this._vampHitPlayer(enemyRamDmg, enemy.id);
+                this._vampHitPlayer(enemyRamDmg, enemy.id, now);
               }
               if (_bhBoth0) this.state.tankCurrentHealth = bothDieKeep(this.state.tankCurrentHealth, this.state.tankHP * this.getStatMultiplier('maxHealth'));
               }
@@ -53891,18 +54263,18 @@ export class GameLogic {
             const perm = Math.min(1, e2.currentShield / e2MaxShield);
             const sa = Math.min(e1Dmg * perm, e2.currentShield);
             e2.currentShield -= sa;
-            this._vampHitBot(e2, e1Dmg - sa, e1.id);
+            this._vampHitBot(e2, e1Dmg - sa, e1.id, now);
           } else {
-            this._vampHitBot(e2, e1Dmg, e1.id);
+            this._vampHitBot(e2, e1Dmg, e1.id, now);
           }
           const e1MaxShield = e1.maxShield * getEnemyStatMultiplier(e1, 'shieldCapacity');
           if (e1.currentShield > 0 && e1MaxShield > 0) {
             const perm = Math.min(1, e1.currentShield / e1MaxShield);
             const sa = Math.min(e2Dmg * perm, e1.currentShield);
             e1.currentShield -= sa;
-            this._vampHitBot(e1, e2Dmg - sa, e2.id);
+            this._vampHitBot(e1, e2Dmg - sa, e2.id, now);
           } else {
-            this._vampHitBot(e1, e2Dmg, e2.id);
+            this._vampHitBot(e1, e2Dmg, e2.id, now);
           }
           if (_bhBoth0EE) {
             e1.currentHealth = bothDieKeep(e1.currentHealth, e1.maxHealth * getEnemyStatMultiplier(e1, 'maxHealth'));
@@ -53967,7 +54339,7 @@ export class GameLogic {
             this.killEnemy(e1);
             const _r2 = this._rewardRecipientId(e2.id);
             this.creditKill(_r2, e1);
-            this._addKillXpTo(_r2, e2, this.xpFromKill(e1));
+            this._payKill(e1, _r2, e2, this.xpFromKill(e1));
           } else if (e2Dmg > 0) {
             e1.damageOverlay = (_bhEE ? flashOnTickHit : flashOnHit)(e1.damageOverlay);
           }
@@ -53975,7 +54347,7 @@ export class GameLogic {
             this.killEnemy(e2);
             const _r1 = this._rewardRecipientId(e1.id);
             this.creditKill(_r1, e2);
-            this._addKillXpTo(_r1, e1, this.xpFromKill(e2));
+            this._payKill(e2, _r1, e1, this.xpFromKill(e2));
           } else if (e1Dmg > 0) {
             e2.damageOverlay = (_bhEE ? flashOnTickHit : flashOnHit)(e2.damageOverlay);
           }

@@ -593,6 +593,7 @@ class Compiler {
       id: this.hiddenId--, name: word, side: side ?? { team: 'againstPlayer' },
       forms: [{ id: this.hiddenId--, name: word, tank: word }],
       brain: body?.brain, bossTier: body?.bossTier, order: body?.order, worth: body?.worth, score: body?.score, killLine: body?.killLine, onLeaderboard: body?.onLeaderboard, onMinimap: body?.onMinimap, sight: body?.sight,
+      stats: body?.stats,
     };
     const fi = p.forms.length;
     p.forms.push({ idx: fi, local: 0, type: ti, id: def.forms[0].id, name: word, def: def.forms[0], side: def.side, tags: [], orderIdx: body?.order ? this.order(body.order, word) : -1, tankSlot: this.tank(word), onDeath: -1, after: -1, afterHow: 'morph' });

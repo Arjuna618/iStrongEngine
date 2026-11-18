@@ -189,6 +189,7 @@ export interface EntityType {
   madeLines?: Record<string, string>;
   birthLook?: 'none' | 'food';
   health?: number; level?: number; skills?: Record<string, number>;
+  stats?: Record<string, number>;
   pushable?: boolean;
   solid?: boolean;
   crashersIgnore?: boolean;
@@ -251,7 +252,8 @@ export interface SpawnGroup {
   showName?: boolean;
   tags?: Ref[];
   body?: { brain?: EntityType['brain']; bossTier?: boolean; order?: Row; worth?: EntityType['worth']; score?: number; killLine?: string;
-           onLeaderboard?: boolean; onMinimap?: boolean; sight?: number };
+           onLeaderboard?: boolean; onMinimap?: boolean; sight?: number;
+           stats?: Record<string, number> };
 }
 
 export interface SpecialWave {

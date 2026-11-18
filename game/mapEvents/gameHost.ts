@@ -63,6 +63,7 @@ export interface MevEngine {
   _mevFollow(e: EnemyTank, leader: EnemyTank | null): void;
   _mevCopyReq(e: EnemyTank | null, tank: string, side: string): SpawnReq;
   _mevCopyLife(src: EnemyTank | null, ne: EnemyTank): void;
+  _mevSetStatK(e: EnemyTank, k: import('../statShares').StatK | null | undefined): void;
   _mevStageProblems(): void;
   _mevGodHeld(e: EnemyTank): boolean;
   _mevRefillPlayer(refill: 'none' | 'shield' | 'all'): void;
@@ -284,7 +285,7 @@ export class GameMapEventsHost implements MapEventsHost {
 
   private configFor(req: SpawnReq): EnemyConfig | null {
     const lk = req.like;
-    const key = `${req.tank}|${SMALL_FIX.GH482 ? this.behaviorOf(req.team) : req.team}|${req.camp}|${req.bossTier ? 1 : 0}|${req.stands ? 1 : 0}|${req.size}|${req.health}|${req.level}|${req.colourUse}${req.colourSlot}|${req.pushable}|${req.solid}|${req.brain}|${req.sight}|${req.typeIdx}|${req.formIdx}|${req.skills ? JSON.stringify(req.skills) : ''}|${lk ? `${lk.autospin ? 1 : 0}${lk.facing}${lk.aimbot}/${lk.turn}${lk.logic}` : ''}`;
+    const key = `${req.tank}|${SMALL_FIX.GH482 ? this.behaviorOf(req.team) : req.team}|${req.camp}|${req.bossTier ? 1 : 0}|${req.stands ? 1 : 0}|${req.size}|${req.health}|${req.level}|${req.colourUse}${req.colourSlot}|${req.pushable}|${req.solid}|${req.brain}|${req.sight}|${req.typeIdx}|${req.formIdx}|${req.skills ? JSON.stringify(req.skills) : ''}|${req.statK ? req.statK.key : req.statK === undefined ? '~' : ''}|${lk ? `${lk.autospin ? 1 : 0}${lk.facing}${lk.aimbot}/${lk.turn}${lk.logic}` : ''}`;
     let cfg = this.configs.get(key);
     if (cfg) {
       if (!this.g.state.enemyConfigs.includes(cfg)) this.g.state.enemyConfigs.push(cfg);
@@ -330,6 +331,7 @@ export class GameMapEventsHost implements MapEventsHost {
       bossTeam: req.camp === 'boss' && !req.bossTier ? true : undefined,
       useHardcodedColor: req.colourUse === 'file' || req.colourUse === 'slot' ? true : undefined,
       sourceLibraryName: g.resolveTankDisplayName(req.tank),
+      _statK: req.statK,
       sourceTankWord: req.tank,
       fixedBody: SMALL_FIX.R965 !== 0 && req.pushable !== null ? !req.pushable : undefined,
       solidBody: SMALL_FIX.R965 !== 0 && req.solid !== null ? req.solid : undefined,
@@ -500,6 +502,7 @@ export class GameMapEventsHost implements MapEventsHost {
       else if (req.camp === 'boss' || req.bossTier) e.camp = CAMP_BOSS;
       else e.camp = CAMP_NONE;
       e.isBossTier = req.bossTier;
+      g._mevSetStatK(e, req.statK);
       if (req.team && this.sideOf(b) !== req.team) this.setSide(b, req.team);
     }
     e._mevBirthAt = -1;

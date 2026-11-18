@@ -18,7 +18,7 @@
         "yOffset": 0,
         "angle": 0,
         "bps": 0.46296296296296297,
-        "speed": -3.40625,
+        "speed": 5.947841,
         "delay": 0,
         "knockback": 20.571428571428577,
         "spread": 0.1,
@@ -68,7 +68,7 @@
           "bounciness": 0.9,
           "bouncy": true,
           "statCalculatorType": "bullet",
-          "topSpeedRatio": 2.861176470588235,
+          "topSpeedRatio": 0.236354,
           "necroInfect": false
         },
         "projectileBehaviors": [

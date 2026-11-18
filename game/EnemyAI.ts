@@ -15,7 +15,7 @@ import {
   _edgeRockClear, LOS_ROCK_BUFFER, exactFieldView, heldWallsReach,
 } from './Navigation';
 import { SMALL_FIX } from './smallFixSwitch';
-import { shouldSkipTeamCollision } from './teamCollision';
+import { shouldSkipTeamCollision, bossCampMates } from './teamCollision';
 import { HEALTH_BASIS } from './healthBasisSwitch';
 import { btNoFear, btStandsStill } from './botTactics';
 const ROAM_EXPLORE_CHANCE = 0.50;
@@ -819,7 +819,9 @@ function enemySkillCurve(raw: number, max: number): number {
 
 export function getEnemyStatMultiplier(enemy: EnemyTank, stat: UpgradeStat): number {
   const gr = growthRulesOf(enemy);
-  return gr === undefined ? _enemyStatMult(enemy, stat) : _enemyStatMult(enemy, stat) * growthFactor(gr, stat, enemy.level);
+  const m = gr === undefined ? _enemyStatMult(enemy, stat) : _enemyStatMult(enemy, stat) * growthFactor(gr, stat, enemy.level);
+  const sk = enemy._statK;
+  return sk ? m * sk[stat] : m;
 }
 function _enemyStatMult(enemy: EnemyTank, stat: UpgradeStat): number {
   const statCap = enemy.skillCaps ? enemy.skillCaps[stat] : enemy.maxPointsPerSkill;
@@ -862,7 +864,9 @@ export function enemyAtkVsRounds(enemy: EnemyTank): number {
   const sc = enemy.skillCaps;
   const k = defenseAtkVsRounds(enemySkillCurve(enemy.upgrades['bodyDamage'], (sc ? sc.bodyDamage : enemy.maxPointsPerSkill) || 10));
   const gr = growthRulesOf(enemy);
-  return gr === undefined ? k : k * growthFactor(gr, 'bodyDamage', enemy.level);
+  const sk = enemy._statK;
+  const k2 = gr === undefined ? k : k * growthFactor(gr, 'bodyDamage', enemy.level);
+  return sk ? k2 * sk.bodyDamage : k2;
 }
 export function enemyRegenCurve(enemy: EnemyTank): number {
   const sc = enemy.skillCaps;
@@ -887,7 +891,9 @@ export function enemyEngineMult(enemy: EnemyTank): number {
   const statCap = enemy.skillCaps ? enemy.skillCaps.reload : enemy.maxPointsPerSkill;
   const e = arrasEngineMult(enemy.upgrades.reload, statCap || 10);
   const gr = growthRulesOf(enemy);
-  return gr === undefined ? e : e * growthFactor(gr, 'reload', enemy.level);
+  const sk = enemy._statK;
+  const e2 = gr === undefined ? e : e * growthFactor(gr, 'reload', enemy.level);
+  return sk ? e2 * sk.reload : e2;
 }
 
 export function enemyDriveMult(enemy: EnemyTank): number {
@@ -1402,6 +1408,7 @@ function _findCorneredTargets(
         && !(t.id === enemy.currentTargetId && HF_HOOK.keeps !== null && HF_HOOK.keeps(enemy, t))) continue;
     if (DARK_HOOK.botHides !== null && DARK_HOOK.botHides(enemy, t, t.id === fleeSourceId || t.id === enemy.currentTargetId)) continue;
     if (campsClash(enemy.camp, t.camp)) continue;
+    if (bossCampMates(enemy.camp, t.camp)) continue;
     if (safeGround !== null && safeGround(enemy, t.position.x, t.position.y, false)) continue;
     if (apart !== null && apart(enemy, t.position.x, t.position.y)) continue;
     let _tIsTrappedSrc = false;
@@ -1668,11 +1675,13 @@ export function isTeamBehaviorOf(enemy: EnemyTank): boolean {
 
 export function isTankMate(enemy: EnemyTank, target: EnemyTank, isTeamBehavior: boolean): boolean {
   return (enemy.groupId !== 0 && target.groupId === enemy.groupId) ||
-    (isTeamBehavior && target.team === enemy.team);
+    (isTeamBehavior && target.team === enemy.team) ||
+    bossCampMates(enemy.camp, target.camp);
 }
 
 export function mayAttackTank(enemy: EnemyTank, target: EnemyTank, isTeamBehavior: boolean): boolean {
   if (campsClash(enemy.camp, target.camp)) return false;
+  if (bossCampMates(enemy.camp, target.camp)) return false;
   if (enemy.aiBehavior === 'FFA') {
     return true;
   } else if (isTeamBehavior) {

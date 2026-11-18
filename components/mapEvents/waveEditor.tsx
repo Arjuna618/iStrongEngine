@@ -18,6 +18,7 @@ import { closeMapEvents, runEngineTest } from './mapEventsStore';
 import { BodyTestField, CardsField, choicesOf, Facts, factsFrom, FieldControl, NumField, OrderField, PlaceRuleField, RefField, TakeOffTags, thingNamer, WaveTestField, wordOfNum, type EvCtx } from './fields';
 import { Plus, Trash2, Copy, ChevronRight, MevEvents, MevProblems, MevWaves } from '../ui/icons';
 import { Split, DetailHead } from './pages';
+import { StatSharesRow } from '../shared/StatShares';
 
 const num = (s: string): number | undefined => { const v = Number(s); return s.trim() !== '' && Number.isFinite(v) ? v : undefined; };
 type Tab = 'every' | 'grid' | 'special' | 'exact' | 'timing' | 'actions' | 'where' | 'preview';
@@ -80,6 +81,8 @@ const LineDetail: React.FC<{ g: SpawnGroup; path: Path; ctx: EvCtx }> = ({ g, pa
         <SelectRow label="Mind" help="Thinks For Itself: as any bot. Follows Its Order: walks by How They Move and shoots what it sees. None: it does nothing." value={g.body?.brain ?? ''} onChange={v => put('body', { ...g.body, brain: v || undefined })} options={[{ value: '', label: 'Thinks For Itself' }, { value: 'order', label: 'Follows Its Order' }, { value: 'none', label: 'None' }]} />
         <FieldRow stacked label="How They Move" help="A walking order. Stands Where It Is: none."><OrderField value={g.body?.order} path={[...path, 'body', 'order']} ctx={ctx} /></FieldRow>
         <ToggleRow label="Counts As A Boss" help="In kill counts and in how others decide to hunt it." checked={!!g.body?.bossTier} onChange={v => put('body', { ...g.body, bossTier: v || undefined })} />
+        <StatSharesRow value={g.body?.stats} onChange={v => put('body', { ...g.body, stats: v })} whose="Their" asFile="As Their Files"
+          help="How strong they are, stat by stat, in percent of their own files. 90 is a tenth weaker, 120 a fifth stronger. Their skill points still count as usual. A card with an Entity Type takes the Type's own." />
         <FieldRow label="Score" help="The score it carries. Empty: its file's."><NumberBox className="k-field k-ev-num" value={g.body?.score ?? ''} min={0} onChange={e => put('body', { ...g.body, score: num(e.target.value) })} /></FieldRow>
         <SelectRow label="Worth" help="What its killer gets: its score, or nothing." value={g.body?.worth ?? 'score'} onChange={v => put('body', { ...g.body, worth: v })} options={[{ value: 'score', label: 'Its Score' }, { value: 'none', label: 'Nothing' }]} />
         <FieldRow label="Sight" help="How far it sees, in world units. Empty: its file's."><NumberBox className="k-field k-ev-num" value={g.body?.sight ?? ''} min={0} onChange={e => put('body', { ...g.body, sight: num(e.target.value) })} /></FieldRow>

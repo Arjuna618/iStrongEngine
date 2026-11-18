@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="darkreader-lock" />
-    <style>:root { color-scheme: only light; }</style>
+    <style>:root { color-scheme: only light; forced-color-adjust: none; }</style>
     <script>(function(){function off(){var s=document.getElementById('dark-reader-style');if(s&&s.media!=='not all')s.media='not all'}off();try{new MutationObserver(off).observe(document.head,{childList:true})}catch(e){}document.addEventListener('DOMContentLoaded',off)})()</script>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, interactive-widget=resizes-visual" />
     <title>iStrongEngine</title>
@@ -174,6 +174,7 @@
         --k-font-display: var(--k-font);
         --k-font-mono: 'JetBrains Mono', ui-monospace, monospace;
       }
+      html { font-size: 16px; }
       body {
         margin: 0;
         overflow: hidden;
@@ -190,6 +191,12 @@
 
       ::selection { background: var(--selection-bg); }
       ::-moz-selection { background: var(--selection-bg); }
+      .k-hud {
+        -webkit-text-stroke: 0; paint-order: normal; -webkit-text-fill-color: currentColor; text-shadow: none;
+        letter-spacing: normal; word-spacing: normal; font-feature-settings: normal; font-variation-settings: normal; text-transform: none;
+      }
+      .k-hud::selection, .k-hud ::selection { background: rgba(23, 23, 23, 0.14); }
+      .k-hud::-moz-selection, .k-hud ::-moz-selection { background: rgba(23, 23, 23, 0.14); }
 
       :root {
         --cur-default: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2230%22%20height%3D%2230%22%20viewBox%3D%22-1.5%20-1.5%2027%2027%22%3E%3Cpath%20d%3D%22M5.10772%2014.3857L5.58594%207.91256C5.61875%207.46854%205.64642%207.05187%205.67232%206.66186C5.85017%203.98379%205.94481%202.55876%207.04807%202.10979C8.15132%201.66082%209.2022%202.61969%2011.1771%204.42168C11.4647%204.68413%2011.772%204.96446%2012.1018%205.26093L16.9102%209.58273C18.2626%2010.7983%2018.9389%2011.4062%2018.9934%2011.9885C19.0309%2012.3882%2018.9067%2012.7862%2018.6489%2013.0924C18.2733%2013.5385%2017.3734%2013.6473%2015.5737%2013.8647C14.8156%2013.9563%2014.4365%2014.0021%2014.2073%2014.2038C14.0479%2014.344%2013.9376%2014.5321%2013.8925%2014.7404C13.8277%2015.0399%2013.9707%2015.3964%2014.2567%2016.1095L15.7394%2019.8058C15.9107%2020.2328%2015.9963%2020.4464%2015.995%2020.6429C15.9932%2020.9078%2015.8865%2021.1609%2015.6986%2021.3462C15.5591%2021.4837%2015.3471%2021.57%2014.9232%2021.7425C14.4993%2021.915%2014.2873%2022.0013%2014.0921%2022C13.8292%2021.9982%2013.5778%2021.8907%2013.3939%2021.7015C13.2574%2021.561%2013.1717%2021.3475%2013.0004%2020.9204L11.5177%2017.2241C11.2317%2016.5111%2011.0887%2016.1545%2010.8355%2015.9844C10.6595%2015.8662%2010.4503%2015.8081%2010.239%2015.8187C9.935%2015.834%209.63074%2016.0663%209.02224%2016.5308C7.57763%2017.6337%206.85532%2018.1851%206.27746%2018.1269C5.88085%2018.0871%205.51701%2017.8877%205.26831%2017.574C4.90595%2017.1169%204.9732%2016.2065%205.10772%2014.3857Z%22%20fill%3D%22%23ffffff%22%20stroke%3D%22none%22%2F%3E%3Cpath%20d%3D%22M5.10772%2014.3857L5.58594%207.91256C5.61875%207.46854%205.64642%207.05187%205.67232%206.66186C5.85017%203.98379%205.94481%202.55876%207.04807%202.10979C8.15132%201.66082%209.2022%202.61969%2011.1771%204.42168C11.4647%204.68413%2011.772%204.96446%2012.1018%205.26093L16.9102%209.58273C18.2626%2010.7983%2018.9389%2011.4062%2018.9934%2011.9885C19.0309%2012.3882%2018.9067%2012.7862%2018.6489%2013.0924C18.2733%2013.5385%2017.3734%2013.6473%2015.5737%2013.8647C14.8156%2013.9563%2014.4365%2014.0021%2014.2073%2014.2038C14.0479%2014.344%2013.9376%2014.5321%2013.8925%2014.7404C13.8277%2015.0399%2013.9707%2015.3964%2014.2567%2016.1095L15.7394%2019.8058C15.9107%2020.2328%2015.9963%2020.4464%2015.995%2020.6429C15.9932%2020.9078%2015.8865%2021.1609%2015.6986%2021.3462C15.5591%2021.4837%2015.3471%2021.57%2014.9232%2021.7425C14.4993%2021.915%2014.2873%2022.0013%2014.0921%2022C13.8292%2021.9982%2013.5778%2021.8907%2013.3939%2021.7015C13.2574%2021.561%2013.1717%2021.3475%2013.0004%2020.9204L11.5177%2017.2241C11.2317%2016.5111%2011.0887%2016.1545%2010.8355%2015.9844C10.6595%2015.8662%2010.4503%2015.8081%2010.239%2015.8187C9.935%2015.834%209.63074%2016.0663%209.02224%2016.5308C7.57763%2017.6337%206.85532%2018.1851%206.27746%2018.1269C5.88085%2018.0871%205.51701%2017.8877%205.26831%2017.574C4.90595%2017.1169%204.9732%2016.2065%205.10772%2014.3857Z%22%20fill%3D%22none%22%20stroke%3D%22%230a0a0a%22%20stroke-width%3D%221.25%22%20stroke-linejoin%3D%22round%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E") 9 4, default;
@@ -410,6 +417,7 @@
       .k-curtain { position: fixed; inset: 0; z-index: 20000; background: var(--surface-canvas); }
       .k-curtain-cover { animation: k-fade-in 210ms var(--ease-default) both; }
       .k-curtain-reveal { animation: k-fade-out 280ms var(--ease-default) both; }
+      .k-loading { position: fixed; inset: 0; z-index: 20001; pointer-events: auto; user-select: none; }
       .k-swap-out { opacity: 0; transition: opacity 100ms var(--ease-default); pointer-events: none; }
       @keyframes k-swap-in { from { opacity: 0; } to { opacity: 1; } }
       .k-swap-in { animation: k-swap-in 140ms var(--ease-default) both; pointer-events: none; }
@@ -769,7 +777,7 @@
         caret-color: var(--accent);
         transition: background-color var(--duration-fast) var(--ease-default), border-color var(--duration-fast) var(--ease-default), box-shadow var(--duration-fast) var(--ease-default);
       }
-      :is(input:not([type]), input[type="text"], input[type="number"], textarea):not(.ct-search):not(.k-search-input):not(.k-search-bar):not(.k-numbox-in):focus {
+      :is(input:not([type]), input[type="text"], input[type="number"], textarea):not(.ct-search, .k-hud, .k-hud *):not(.k-search-input):not(.k-search-bar):not(.k-numbox-in):focus {
         border-color: var(--toggle-on) !important;
       }
       .k-numbox:focus-within { border-color: var(--toggle-on) !important; }
@@ -1735,7 +1743,7 @@
         color: var(--text-primary); background: var(--k-input-bg); border: var(--k-line, 1px) solid var(--k-input-border); box-shadow: var(--shadow-input);
       }
       .k-field::placeholder { color: var(--k-placeholder); }
-      :root :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], textarea, .k-value-field):not(.ct-search) { font-weight: 280; }
+      :root :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], textarea, .k-value-field):not(.ct-search, .k-hud, .k-hud *) { font-weight: 280; }
       :root :is(.k-value-box .k-value-text, .k-stepper .k-stepper-input) { font-weight: 280; }
       :where(input, textarea)::placeholder { color: var(--k-placeholder); opacity: 1; }
       .k-search { position: relative; }
@@ -2476,6 +2484,10 @@
       .k-play-rows > * + * { margin-top: 12px; }
       .k-play-row { display: flex; gap: 12px; }
       .k-play-row > .k-mode-card { flex: none; min-width: 0; }
+      .k-play-rows-win > * + * { margin-top: 0; }
+      .k-play-rows-win > .k-play-row { padding-bottom: 12px; }
+      .k-play-rows-win { margin-bottom: -12px; }
+      .k-play-rows-skel { background-image: linear-gradient(to bottom, var(--skel-a) 0, var(--skel-a) calc(var(--pr-row) - 12px), transparent calc(var(--pr-row) - 12px)); background-size: 100% var(--pr-row); background-repeat: repeat-y; }
       .k-mode-art.k-mode-art-sized { aspect-ratio: auto; }
       .k-mode-art-whole .k-play-img { object-fit: contain; }
       .k-play-card { text-align: left; }
@@ -2732,6 +2744,10 @@
       .k-ev-pop { width: 340px; max-height: 440px; overflow-y: auto; padding: 10px; }
       .k-ev-pop > * + * { margin-top: 8px; }
       .k-ev-pop-body { padding-top: 2px; }
+      .k-strength-pop { width: 340px; max-height: 440px; overflow-y: auto; padding: 12px; }
+      :root.ui-classic .k-menu.k-strength-pop { padding: 12px; background: var(--kc-well); }
+      .k-strength-cell { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; }
+      .k-strength-cell > .k-numbox { flex: 1 1 0; width: auto; min-width: 0; }
       .k-ev-menu-head { padding: 8px 8px 2px; font-size: 11px; font-weight: 500; color: var(--text-tertiary); }
       .k-ev-curve { grid-column: 1 / -1; }
       .k-ev-curve > * + * { margin-top: 6px; }
@@ -3091,13 +3107,13 @@
         paint-order: stroke fill;
         -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
       }
-      :root.ui-classic :is(input, textarea, select, [contenteditable="true"]):not(.k-hud) {
+      :root.ui-classic :is(input, textarea, select, [contenteditable="true"]):not(.k-hud, .k-hud *) {
         -webkit-text-stroke: 0;
         color: var(--kc-ink);
         -webkit-text-fill-color: currentColor;
         caret-color: var(--kc-ink);
       }
-      :root.ui-classic :is(input, textarea)::placeholder { color: var(--k-placeholder); -webkit-text-fill-color: var(--k-placeholder); }
+      :root.ui-classic :is(input, textarea):not(:where(.k-hud, .k-hud *))::placeholder { color: var(--k-placeholder); -webkit-text-fill-color: var(--k-placeholder); }
 
       :root.ui-classic *:not(.k-hud, .k-hud *, .rounded-full, .animate-spin),
       :root.ui-classic *:not(.k-hud, .k-hud *)::before,
@@ -3134,7 +3150,7 @@
       :root.ui-classic .dark .k-titled:not(.k-group .k-group),
       :root.ui-classic .k-titled:not(.k-group .k-group) { background-color: var(--kc-grey); }
       :root.ui-classic .k-info-card { background: var(--kc-grey); border: var(--kc-edge) solid var(--kc-ink); box-shadow: none; }
-      :root.ui-classic .k-list { border: var(--kc-edge) solid var(--kc-ink); }
+      :root.ui-classic .k-list { border: var(--kc-edge) solid var(--kc-ink); background: var(--kc-well); }
       :root.ui-classic .k-list-row + .k-list-row { border-top: var(--kc-edge) solid var(--kc-ink); }
       :root.ui-classic .k-list-row-on, :root.ui-classic .k-pick-on { background: rgba(0, 0, 0, 0.12); }
       :root.ui-classic .k-modal-head, :root.ui-classic .k-win-head { background-color: var(--kc-grey-dk); border-bottom: var(--kc-edge) solid var(--kc-ink); }
@@ -3273,6 +3289,7 @@
       :root.ui-classic :is(.k-ctx-item, .k-menu-item):active:not(:disabled) { background: var(--kc-grey-lo); }
       :root.ui-classic .k-ctx-sep { background: var(--kc-ink); height: var(--kc-edge); margin: 0; }
       :root.ui-classic .k-ctx.k-ctx-prompt { padding: 10px; }
+      :root.ui-classic .k-menu.k-ev-pop { padding: 10px; }
       :root.ui-classic .k-mb-title:hover:not(:disabled) { background: transparent; }
       :root.ui-classic .k-mb-title-on, :root.ui-classic .k-mb-title-on:hover:not(:disabled) { background: rgba(0, 0, 0, 0.12); }
 
@@ -3329,7 +3346,7 @@
         .k-widest > span):not(.k-hud *) {
         overflow: clip; overflow-clip-margin: 0.2em;
       }
-      :root.ui-classic .k-list-row > input[type="text"] { padding-inline: 0.12em; margin-inline: -0.12em; }
+      :root.ui-classic .k-list-row > input[type="text"] { padding-inline: 0 0.12em; text-indent: 0.16em; margin-inline: -0.16em -0.12em; }
       :root.ui-classic .k-area-ico { display: none; }
       :root.ui-classic [data-kfade]:not(input):not(.k-hud *) {
         -webkit-mask-image: linear-gradient(to right,
@@ -3383,8 +3400,8 @@
         background-color: var(--kc-grey); background-image: none; color: var(--kc-white); box-shadow: none;
       }
       :root.ui-classic .k-lib-tag-on > svg.lucide-check { display: none; }
-      :root.ui-classic.ui-classic :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], textarea):not(.ct-search):not(.k-search-input):not(.k-search-bar):not(.k-numbox-in):focus,
-      :root.ui-classic :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], textarea):focus,
+      :root.ui-classic.ui-classic :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], textarea):not(.ct-search, .k-hud, .k-hud *):not(.k-search-input):not(.k-search-bar):not(.k-numbox-in):focus,
+      :root.ui-classic :is(input:not([type]), input[type="text"], input[type="number"], input[type="search"], textarea):not(:where(.k-hud, .k-hud *)):focus,
       :root.ui-classic :is(.k-numbox, .k-stepper, .k-value-box):focus-within,
       :root.ui-classic .k-ev-cell:focus { border-color: var(--kc-ink) !important; box-shadow: none !important; }
       :root.ui-classic .k-layer-frame-box.k-layer-frame-box { box-shadow: 0 0 0 48px var(--kc-grey-dk), inset 0 -2px 0 0 var(--kc-grey-dk); }
@@ -3474,7 +3491,7 @@
       :root.ui-classic .k-rd-fab > svg.k-svg { width: 100%; height: 100%; filter: none; }
       :root.ui-classic :is(.k-gm-icon, .k-dv-media),
       :root.ui-classic .k-mode-pick > span[class*="bg-[var(--alpha-selected)]"] { background: transparent; }
-      :root.ui-classic :is(input, textarea)::selection { color: var(--kc-white); -webkit-text-fill-color: var(--kc-white); }
+      :root.ui-classic :is(input, textarea):not(:where(.k-hud, .k-hud *))::selection { color: var(--kc-white); -webkit-text-fill-color: var(--kc-white); }
       :root.ui-classic :is(.k-eps-icon, .k-eps-stat-icon) { display: none; }
       :root.ui-classic .k-eps-stat { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name step" "bar step"; }
       :root.ui-classic .k-mm-skel-action, :root.ui-classic .k-mm-loading .k-mm-fill { display: none; }
@@ -3503,7 +3520,7 @@
       :root.ui-classic .toolbar-icon-active { background: transparent; }
       :root.ui-classic .toolbar-icon::before { display: none; }
       @media (prefers-reduced-motion: reduce) { :root.ui-classic .k-rail-pick { transition: none; } }
-      :root.ui-classic .k-hist { border: var(--kc-edge) solid var(--kc-ink); }
+      :root.ui-classic .k-hist { border: var(--kc-edge) solid var(--kc-ink); background: var(--kc-well); }
       :root.ui-classic .k-hist .k-vl-row + .k-vl-row .k-hist-row { border-top: var(--kc-edge) solid var(--kc-ink); }
       :root.ui-classic .k-hist { box-sizing: content-box; margin: 0; padding: 0; }
       :root.ui-classic .k-hist .k-hist-row { border-radius: 0; padding: 0 10px; }

@@ -54,11 +54,12 @@ export function CollapsibleSection({ title, defaultOpen = false, children, count
   );
 }
 
-export function SliderRow({ label, value, onChange, min, max, step = 1, suffix = '', display, tooltip, onPreview }: {
+export function SliderRow({ label, value, onChange, min, max, step = 1, suffix = '', display, tooltip, onPreview, disabled }: {
   label: string; value: number; onChange: (v: number) => void;
   min: number; max: number; step?: number; suffix?: string;
   display?: string | ((v: number) => string);
   tooltip?: string;
+  disabled?: boolean;
   onPreview?: (v: number | null) => void;
 }) {
   const [dragValue, setDragValue] = useState<number | null>(null);
@@ -77,7 +78,7 @@ export function SliderRow({ label, value, onChange, min, max, step = 1, suffix =
   }
 
   return (
-    <div className="k-slider-row">
+    <div className={`k-slider-row${disabled ? ' k-row-disabled' : ''}`}>
       <div className="k-row">
         <span className="k-row-label">{tooltip && <span className="k-row-lead"><HelpTooltip text={tooltip} /></span>}<span className="k-row-label-text">{label}</span></span>
         <span className="k-value">
@@ -88,11 +89,12 @@ export function SliderRow({ label, value, onChange, min, max, step = 1, suffix =
             max={max}
             displayValue={displayText}
             step={step}
+            disabled={disabled}
             className="k-value-field"
           />
         </span>
       </div>
-      <input type="range" min={min} max={max} step={step} value={showValue}
+      <input type="range" min={min} max={max} step={step} value={showValue} disabled={disabled}
         onPointerDown={() => {
           isDragging.current = true;
           latestRef.current = value;

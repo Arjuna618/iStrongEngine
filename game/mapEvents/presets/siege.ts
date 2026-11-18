@@ -2,6 +2,7 @@ import type { AreaGroup, BodyTest, EntityType, Id, MapEventsDoc, Named, PlacedEn
 import { FINAL_TANKS, CELESTIAL_TANKS, TERRESTRIAL_TANKS, ELITE_CRASHER_TANKS, SHINY_TANKS, SIEGE_SCORES, siegeWavePlan } from './siegeWaves';
 import type { SiegeWaveRefs } from './siegeWaves';
 import { SMALL_FIX } from '../../smallFixSwitch';
+import { bossShares } from '../../statShares';
 
 export type SiegeMapId = 'citadel' | 'fortress' | 'blitz';
 export const SIEGE_MAP_IDS: readonly SiegeMapId[] = ['citadel', 'fortress', 'blitz'];
@@ -126,6 +127,7 @@ export function buildSiegeWorld(which: SiegeMapId): SiegeWorld {
   const bossType = (name: string, tank: EntityType['forms'][0]['tank'], o: { size?: number; score: number; killLine: string; order: () => Row; classWord?: string; shownName?: string; madeLines?: Record<string, string>; skills?: Record<string, number> }): EntityType => ({
     id: id(), name, folder: folderVisitors.id, side: BOSS_SIDE, brain: 'order', bossTier: true, order: o.order(), showName: false, onLeaderboard: true, onMinimap: true,
     score: o.score, killLine: o.killLine, classWord: o.classWord, madeLines: o.madeLines, skills: o.skills,
+    stats: bossShares(),
     names: o.classWord ? [name] : undefined,
     forms: [{ id: id(), name, tank, size: o.size, shownName: o.shownName }],
   });

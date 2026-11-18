@@ -327,6 +327,7 @@ function _spawnMatchup(logic: GameLogic, matchup: HarnessMatchup): void {
 
   if (entA.fire) {
     logic.state.autoFire = true;
+    if (logic.state.gracePeriodActive) (logic as unknown as { endGracePeriod(): void }).endGracePeriod();
   }
 
   const aimTimer = () => {

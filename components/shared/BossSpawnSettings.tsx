@@ -23,9 +23,12 @@ import { shownNameOfWord } from '../../game/tankByName';
 import {
   BOSS_MAX_GROUPS,
   BOSS_MIN_DELAY_MS, BOSS_MAX_DELAY_MS, BOSS_MIN_COOLDOWN_MS, BOSS_MAX_COOLDOWN_MS,
-  bossInitialDelay, bossSpawnCooldown, bossesCanGrow, bossesUsePortals, bossGroupsOf, bossGroupPercent,
-  bossGroupEligible, defaultBossGroups,
+  bossInitialDelay, bossSpawnCooldown, bossesCanGrow, bossesUsePortals, bossGroupsOf,
+  bossGroupEligible, defaultBossGroups, copyBossGroup,
+  bossGroupChances, bossGroupsWithChance, bossStrengthEveryWay,
 } from '../../game/BossSpawn';
+import { bossShares } from '../../game/statShares';
+import { StatSharesRow } from './StatShares';
 
 interface Props {
   config: MapConfig;
@@ -36,7 +39,7 @@ interface Props {
 }
 
 function withGroup(groups: readonly BossGroupConfig[], index: number, patch: Partial<BossGroupConfig>): BossGroupConfig[] {
-  const next = groups.map(g => ({ name: g.name, tanks: g.tanks.slice(), weight: g.weight }));
+  const next = groups.map(copyBossGroup);
   if (next[index]) next[index] = { ...next[index], ...patch };
   return next;
 }
@@ -72,8 +75,9 @@ const GroupCard: React.FC<{
   const cancelRename = useCallback(() => { cancelled.current = true; setRenaming(false); }, []);
   useEscapeOwner(cancelRename, renaming);
   const canBuild = SMALL_FIX.R803 && logic ? (x: BossGroupConfig) => logic.bossGroupBuildable(x) : undefined;
-  const pct = bossGroupPercent(groups, index, canBuild);
   const eligible = bossGroupEligible(g) && (!canBuild || canBuild(g));
+  const chance = bossGroupChances(groups, canBuild)[index] ?? 0;
+  const canChance = Array.isArray(g.tanks) && g.tanks.length > 0 && (!canBuild || canBuild(g));
 
   const removeTank = (name: string) => {
     updateConfig({ bossGroups: withGroup(groups, index, { tanks: g.tanks.filter(t => t !== name) }) });
@@ -107,20 +111,23 @@ const GroupCard: React.FC<{
           <button type="button" onClick={startRename} className="k-rename k-split-title -ml-1.5 min-w-0" title="Click to rename">{g.name}</button>
         )}
         <span className="flex items-center gap-1 shrink-0">
-        {eligible ? <span className="k-count tabular-nums shrink-0">{pct.toFixed(0)}%</span>
-          : g.tanks.length > 0 ? <span className="text-[11px] shrink-0 font-medium text-[var(--text-primary)]">never spawns</span>
-          : null}
+        {!eligible && g.tanks.length > 0 ? <span className="text-[11px] shrink-0 font-medium text-[var(--text-primary)]">never spawns</span> : null}
           <IconButton label="Delete group" size="sm" onClick={() => onDelete(index)}><Trash2 size={14} /></IconButton>
         </span>
       </div>
 
       <SliderRow
         label="Chance"
-        value={g.weight}
-        onChange={v => updateConfig({ bossGroups: withGroup(groups, index, { weight: v }) })}
-        min={0} max={100} step={1}
-        tooltip="How likely this group is compared to the others. It is a share, not a percentage, so the numbers never have to add up to 100. Set it to 0 to stop this group spawning."
+        value={chance}
+        disabled={!canChance}
+        onChange={v => updateConfig({ bossGroups: bossGroupsWithChance(groups, index, v, canBuild) })}
+        min={0} max={100} step={1} suffix="%"
+        tooltip="The chance that a boss comes from this group, in percent. All groups together make 100, so moving one moves the others. 0 stops this group. A group with no bosses has no chance until you add some."
       />
+
+      <StatSharesRow value={g.stats} onChange={stats => updateConfig({ bossGroups: withGroup(groups, index, { stats }) })}
+        whose="Its bosses'" asFile="As Their Files"
+        help="How strong the bosses of this group are, stat by stat, in percent of their own files. 90 is a tenth weaker, 120 a fifth stronger. Their skill points still count as usual. A boss already out keeps the strength it came with." />
 
       <Reveal when={g.tanks.length > 0}>
       <div className="k-list">
@@ -174,7 +181,7 @@ export const BossSpawnSettings: React.FC<Props> = ({ config, updateConfig, tankL
   const keysRef = useRef<number[]>([]);
   const nextKey = useRef(0);
   if (keysRef.current.length !== groups.length) keysRef.current = groups.map(() => nextKey.current++);
-  const copyGroups = () => groups.map(g => ({ name: g.name, tanks: g.tanks.slice(), weight: g.weight }));
+  const copyGroups = () => groups.map(copyBossGroup);
   const latestUpdate = useRef(updateConfig);
   latestUpdate.current = updateConfig;
   const placeNow = `${placeKey ?? ''}|${logic?.state.gameModeConfig?.mode ?? ''}|${logic?.projectEpoch ?? 0}`;
@@ -252,7 +259,7 @@ export const BossSpawnSettings: React.FC<Props> = ({ config, updateConfig, tankL
                 <MotionRow.Item key="new" grow><Button block size="sm" icon={<Plus size={14} />}
                   onClick={() => {
                     keysRef.current = [...keysRef.current, nextKey.current++];
-                    updateConfig({ bossGroups: [...copyGroups(), { name: SMALL_FIX.R802 ? firstFreeName('Group', groups.map(g => g.name)) : `Group ${groups.length + 1}`, tanks: [], weight: 1 }] });
+                    updateConfig({ bossGroups: [...copyGroups(), { name: SMALL_FIX.R802 ? firstFreeName('Group', groups.map(g => g.name)) : `Group ${groups.length + 1}`, tanks: [], weight: 1, stats: bossShares() }] });
                   }}>
                   New Group
                 </Button></MotionRow.Item>
@@ -271,6 +278,12 @@ export const BossSpawnSettings: React.FC<Props> = ({ config, updateConfig, tankL
           )}
 
 
+          <ToggleItem
+            label="Strength For Every Boss"
+            checked={bossStrengthEveryWay(config)}
+            onChange={v => updateConfig({ bossStrengthEveryWay: v })}
+            desc="A boss from these groups has its group's Strength however it comes: from the Spawn Tool, a command, a Map Events Entity Type with no Strength of its own, or a boss you take over and play. Off: only the bosses this system brings and $spawnboss calls."
+          />
           <ToggleItem
             label="Bosses Can Grow"
             checked={canGrow}

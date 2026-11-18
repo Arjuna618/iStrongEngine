@@ -67,7 +67,7 @@
           "bounciness": 0.9,
           "bouncy": true,
           "statCalculatorType": "swarm",
-          "topSpeedRatio": 1.125,
+          "topSpeedRatio": 1.80137,
           "necroInfect": false,
           "touchScale": 0.886227
         },

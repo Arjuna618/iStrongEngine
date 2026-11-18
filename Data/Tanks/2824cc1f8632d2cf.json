@@ -1059,6 +1059,10 @@
             "formulaDivisor": 4
           },
           {
+            "type": "independentProjectile",
+            "enabled": true
+          },
+          {
             "type": "motionMotor",
             "enabled": true,
             "acceptsFromTop": true,

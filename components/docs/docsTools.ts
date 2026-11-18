@@ -1247,7 +1247,7 @@ export const DOCS_TOOLS: DocCategory = {
         {
           id: 'boss-spawns',
           title: 'Boss Spawns',
-          keywords: ['boss', 'bosses', 'elite', 'mystical', 'delta', 'nester', 'nest keeper', 'rogue', 'rogues', 'rogue palisade', 'rogue armada', 'rogue alcazar', 'delta skimmer', 'thaumaturge', 'summoner', 'spawn', 'chance', 'weight', 'group', 'cooldown', 'visitor', 'coming', 'arrived', 'left', 'warning', 'boss name', 'names', 'athena', 'portals', 'bosses use portals', 'blacklist bosses'],
+          keywords: ['boss', 'bosses', 'elite', 'mystical', 'delta', 'nester', 'nest keeper', 'rogue', 'rogues', 'rogue palisade', 'rogue armada', 'rogue alcazar', 'delta skimmer', 'thaumaturge', 'summoner', 'spawn', 'chance', 'weight', 'group', 'cooldown', 'visitor', 'coming', 'arrived', 'left', 'warning', 'boss name', 'names', 'athena', 'portals', 'bosses use portals', 'blacklist bosses', 'strength', 'weaker', 'stronger', 'debuff', 'buff', 'strength for every boss', 'spawn tool', 'take over', 'percent'],
           blocks: [
             { t: 'p', text: 'A boss is a big tank that wanders into the map on its own, fights everything, and is worth a lot of XP when you kill it. These settings live in the **Boss Spawns** part of Map Features.' },
             { t: 'note', text: 'For bosses of your own timing and number, use a Wave Plan or a **Spawn** step of Map Events. **This Mode\'s Bosses** in Match Rules turns the bosses of this part off.' },
@@ -1278,22 +1278,25 @@ export const DOCS_TOOLS: DocCategory = {
               ['Rogues', 'Rogue Palisade, Rogue Armada and Rogue Alcazar. They come less often than the Deltas and more often than the Nesters.'],
               ['Nesters', 'The rarest of the five. Nest Keeper, Nest Champion and the other nest guards.'],
             ] },
-            { t: 'note', text: 'To start with, the chances work out to Elites 40 percent, Mysticals 20, Deltas 20, Rogues 12 and Nesters 8. In Growth Manhunt they are 28, 21, 21, 17 and 14, so the harder groups come more often there.' },
+            { t: 'note', text: 'To start with, the chances work out to Elites 40 percent, Mysticals 20, Deltas 20, Rogues 12 and Nesters 8. In Growth Manhunt they are 27, 21, 21, 17 and 14, so the harder groups come more often there. Each slider shows its group\'s chance.' },
             { t: 'kv', title: 'Working with a group', rows: [
-              ['Chance', 'How likely this group is compared to the others. It is a share, not a percentage, so the numbers never have to add up to 100. The real chance is shown at the top right of the group and updates as you drag.'],
+              ['Chance', 'The chance, in percent, that a boss comes from this group. All the groups together always make 100, so when you move one slider the others move to make room, each keeping its share of the rest. Set it to 0 to stop this group. A group with no bosses in it has no chance to set until you add some.'],
+              ['Strength', 'How strong the bosses of this group are, stat by stat, compared to their own files. The sliders button beside it opens a box for each of the ten stats, in percent: 90 is a tenth weaker, 150 is half as strong again, and an empty box keeps what the file has. Their skill points still count as usual on top. The tags beside it show what is set. A boss called with **$spawnboss** is as strong as the first group that holds it, and a boss already out keeps the strength it came with.'],
               ['The tank list', 'Every boss in this group. The trash icon on a row removes that one.'],
               ['Content Library', 'The button under a group adds bosses. It opens the Content Library with the tanks. Click tanks to add or remove them, then press **Confirm**. Any tank can be a boss, and the same tank can sit in more than one group.'],
               ['New Group', 'Makes an empty group of your own, so you can give one boss its own chance separate from the rest.'],
               ['Reset', 'Puts the five groups you started with back. **Ctrl Z** takes the reset back, and brings back a group you deleted.'],
             ] },
-            { t: 'tip', text: 'Because Chance is a share, you never have to do the maths. Give one group 90 and another 10 and it simply works. Delete a boss and the rest share out again on their own.' },
-            { t: 'note', text: 'A group with no bosses in it shows no share. A group with its Chance at 0, or with only bosses your library does not have, reads **never spawns**, and a boss your library does not have reads **(missing)**. Such a group is skipped when a boss is picked.' },
+            { t: 'tip', text: 'You never have to make the numbers add up yourself. Give one group 70 and the other groups share the last 30 in the same proportions as before. Delete a group and the rest share out again on their own.' },
+            { t: 'note', text: 'In every mode, every group starts with Max Health, Body Damage, Bullet Health, Bullet Penetration, Bullet Damage, Shield Regeneration and Shield Capacity at 90, so its bosses are a tenth weaker in those and keep their Bullet Speed, Reload and Movement Speed. That reaches everything a boss makes too: its bullets, drones, traps and minions. A new group starts the same way, and **Reset** brings it back. A map or project saved before this keeps its groups as they were, with bosses as strong as their files.' },
+            { t: 'note', text: 'A group with no bosses in it has its Chance greyed out. A group with its Chance at 0, or with only bosses your library does not have, reads **never spawns**, and a boss your library does not have reads **(missing)**. Such a group is skipped when a boss is picked.' },
             { t: 'h', text: 'Behavior' },
             { t: 'kv', rows: [
+              ['Strength For Every Boss', 'A boss from these groups has its group\'s **Strength** however it comes: one you make with the Spawn Tool or a command, one from a Map Events Entity Type that has no Strength of its own, and the boss you take over and play yourself. It is on in every mode to start with. Off, only the bosses that Boss Spawns brings and the ones **$spawnboss** calls have it. When a tank is in two groups, the first group counts. A mode that starts with Spawn Bosses off, like Sandbox, uses the five groups you start with.'],
               ['Bosses Can Grow', 'In growth modes, lets a boss get bigger as it earns score, the same as players do. It is off to start with, so a boss stays the size it arrived at.'],
               ['Bosses Use Portals', 'Lets bosses travel through portals and wormholes like other bots, choosing a portal by its Bot Odds. Even then a boss never heads for a portal inside a base that is not its own. It is off to start with: a boss keeps away from every portal, is pushed back out of one and never travels. A portal with **Blacklist Bosses** on keeps bosses out either way.'],
             ] },
-            { t: 'note', text: 'These rules are only for bosses that arrive through Boss Spawns. A boss tank you add with the Enemy Tool, or one you become, is an ordinary tank and uses portals like any other.' },
+            { t: 'note', text: 'Bosses Can Grow and Bosses Use Portals are only for bosses that arrive through Boss Spawns. A boss tank you add with the Enemy Tool, or one you become, is an ordinary tank and uses portals like any other. Its strength follows **Strength For Every Boss**.' },
             { t: 'h', text: 'What a boss always does' },
             { t: 'list', items: [
               'It roams and hunts exactly like any other tank. It uses the same pathfinding, the same fear, and the same rules. Nothing about it cheats.',
@@ -1914,7 +1917,7 @@ export const DOCS_TOOLS: DocCategory = {
         {
           id: 'entity-types',
           title: 'Entity Types and Forms',
-          keywords: ['entity type', 'form', 'become', 'change tank', 'walking order', 'mind', 'brain', 'skill points', 'kill line', 'score', 'worth', 'names', 'class', 'go there and circle', 'follow', 'chase'],
+          keywords: ['entity type', 'form', 'become', 'change tank', 'walking order', 'mind', 'brain', 'skill points', 'kill line', 'score', 'worth', 'names', 'class', 'go there and circle', 'follow', 'chase', 'strength', 'weaker', 'stronger'],
           blocks: [
             { t: 'p', text: 'An Entity Type says what a thing is: its tank, how it acts, and what it turns into. A wave line, a **Spawn** step and a Map Entity can all use one, so one change reaches all of them.' },
             { t: 'p', text: 'A **Form** is one shape of the type\'s life. A Sanctuary has two: **Standing** and **Fallen**. Most types have one.' },
@@ -1958,6 +1961,7 @@ export const DOCS_TOOLS: DocCategory = {
               ['When A Tank Rams It', '**As A Tank**: a ram hurts both as tanks do. **As A Food Shape**: as a shape is hit.'],
               ['Sight, Health and Level', 'Empty keeps what its file says.'],
               ['Skill Points', 'Its points in each of the ten stats. Empty keeps what its file says.'],
+              ['Strength', 'How strong it is, stat by stat, compared to its file: a box for each of the ten stats, in percent, where 90 is a tenth weaker and an empty box keeps what the file has. Its skill points still count as usual on top, and its bullets, drones, traps and minions follow it. A Change Tank into a form of another type takes that type\'s strength and keeps its share of health. The bosses of Siege stand at 90 in seven stats, like the groups of Boss Spawns. If every box is empty and its tank is in a Boss Spawns group, it takes that group\'s strength while the mode has **Strength For Every Boss** on.'],
             ] },
             { t: 'kv', title: 'Shape Settings', rows: [
               ['When it shows', 'Only for a type that stands as a shape or an Other, such as the Soccer ball. Every empty box keeps what the shape has itself.'],
@@ -2032,7 +2036,7 @@ export const DOCS_TOOLS: DocCategory = {
               ['Places', 'With several places, the count **Shared Among The Places** or **This Many In Each Place**.'],
               ['How They Come', 'As The Plan Says, Evenly or All At Once. **Over** and **From** set the time.'],
               ['Placement', 'As in Spawn Entities.'],
-              ['What They Are', 'Side, Mind, How They Move, Counts As A Boss, Score, Worth, Sight, Kill Line, where it shows, and Tags.'],
+              ['What They Are', 'Side, Mind, How They Move, Counts As A Boss, Strength, Score, Worth, Sight, Kill Line, where it shows, and Tags. **Strength** works as on an Entity Type, for the cards that name a tank; a card with an Entity Type takes the strength of its type.'],
             ] },
             { t: 'kv', title: 'Timing', rows: [
               ['Starts', '**With The Match**, or **When Told** by a Signal. **First Wave After** waits that long first.'],
@@ -2097,7 +2101,7 @@ export const DOCS_TOOLS: DocCategory = {
               ['Knockback Taken', 'An effect: it is pushed this share of the usual.'],
               ['Cannot Fire', 'An effect: nothing of it fires. Its guns, Always Shoot guns, auto turrets, drones, minions and the guns its rounds carry all hold, and drones already out stay by it.'],
               ['Cannot Turn', 'An effect: its body and its aim hold still. A tank that spins stops until the status ends.'],
-              ['Mind', 'An effect on a bot. **Charge**: it hunts tanks only and rams its target without stopping, with no fear and no personality of its own. **Zombie**: the same, and it keeps close behind the strongest of its side that it sees, and the whole pack goes for one target.'],
+              ['Mind', 'An effect on a bot. **Charge**: it hunts tanks only and rams its target without stopping, with no fear and no personality of its own. **Zombie**: the same, and it moves as one swarm with the others of its side: they all follow one leader, the strongest the leader can see, stay close round it and fight only the target it picks.'],
               ['Horde', 'An effect: it follows the strongest tank of its own side that it sees, if that one is stronger than it, the way a squad follows its leader.'],
               ['Sight', 'An effect: it sees this share of its own sight while the status lasts. A bot finds tanks and food farther away and you see farther, but walls still hide what is behind them. An Outbreak zombie sees 400.'],
               ['Drones And Turrets Reach', 'An effect: its resting drones and minions go for tanks this share farther around it, and its auto turrets see this share farther, though their rounds still fly only as far as they fly. With **Only In A Straight Line** on, a bot sends its drones and minions and fires only at a target it sees from where it stands, never round a wall or into one. An Outbreak zombie has 400, in a straight line.'],

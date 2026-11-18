@@ -11,6 +11,9 @@ import { LeaderboardUI } from './components/LeaderboardUI';
 import { GameLogic, PLAYER_NAME_MAX } from './game/GameLogic';
 import { installTravel } from './game/travelTrip';
 installTravel(GameLogic as unknown as { travelHooks: unknown });
+import { showLoading as showMatchLoading, loadingReady as matchLoadingReady, hideLoading as hideMatchLoading } from './utils/loadingScreen';
+import { ArrasLoadingScreen } from './components/ArrasLoadingScreen';
+GameLogic.tripLoad = { start: () => { void showMatchLoading(); }, end: () => matchLoadingReady() };
 import { INITIAL_GAME_STATE } from './types';
 import { EditPlayerStatsPopup } from './components/EditPlayerStatsPopup';
 import { DebugVisibilityPopup } from './components/DebugVisibilityPopup';
@@ -437,13 +440,17 @@ export default function App() {
   }, []);
   const agreedNow = useTermsAgreed();
 
-  const curtainGo = useRef<(switchScreen: () => void) => void>((f) => f());
   const launchPlayMode = useCallback((config: GameModeConfig) => {
     if (!logic || playLaunching) return;
     setPlayLaunching(true);
-    logic.beginPlaySession(config)
-      .then(() => curtainGo.current(() => { setScreen('engine'); setPlayLaunching(false); }))
-      .catch(err => { console.error('Play session start failed:', err); setPlayLaunching(false); });
+    showMatchLoading()
+      .then(() => {
+        const gl = logic.webglRenderer;
+        if (gl && !gl.isSoftware()) gl.initGeomProgram();
+        return logic.beginPlaySession(config);
+      })
+      .then(() => { setScreen('engine'); setPlayLaunching(false); matchLoadingReady(); })
+      .catch(err => { console.error('Play session start failed:', err); setPlayLaunching(false); hideMatchLoading(); });
   }, [logic, playLaunching]);
 
   const handlePlayMode = useCallback((config: GameModeConfig) => {
@@ -621,7 +628,6 @@ export default function App() {
   useEffect(() => { if (isTestMode) clearAllToasts(); }, [isTestMode]);
 
   const curtain = useScreenCurtain();
-  curtainGo.current = curtain.go;
   const screenFit = useScreenFit(chromeScale);
   const sizeGate = screen === 'engine' && !isTestMode && screenFit.tooSmall;
   const mapGlass = useFadePresence(!!logic?.isMapGenerating && screen === 'engine' && !isTestMode && !sizeGate, 700);
@@ -804,6 +810,8 @@ export default function App() {
       {sizeGate && <ScreenSizeGuard fit={screenFit} engineParts={engineParts} onTamper={lockEngine} />}
 
       <ScreenCurtain phase={curtain.phase} />
+
+      <ArrasLoadingScreen />
 
       <FullscreenButton onMenu={screen === 'menu' && !isTestMode} />
 

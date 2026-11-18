@@ -61,6 +61,7 @@ export const MAP_CONFIG_NON_GENERATION_KEYS: readonly string[] = [
   'baseProtectorPushStrength', 'baseProtectorRange', 'baseProtectorOnMinimap',
   'enableBossSpawns', 'bossInitialDelay', 'bossSpawnCooldown', 'bossGroups', 'bossesCanGrow',
   'bossesUsePortals',
+  'bossStrengthEveryWay',
   'events',
 ];
 
