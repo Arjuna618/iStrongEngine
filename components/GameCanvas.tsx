@@ -7,14 +7,14 @@ import { getEffectiveRenderScale, noteFrameInterval } from '../utils/renderQuali
 import { GRID_BOXES, gridBoxesOf } from '../utils/gridBoxes';
 import { StepAccumulator, runFixedStepFrame } from '../game/fixedStep';
 import { useHudScale, getHudScale } from '../utils/useGuiScale';
-import { GameLogic, GRID_SPACING, tankSizeFromSlider, AUTO_FOV_BASE_RANGE, WIFI_RANGE_MAX, snapAngleToGrid, snapAngleToFaceMidpoint, XP_LEVEL_OFFSET, XP_CURVE_COEFF, XP_SCORE_BASE, levelHeldIn } from '../game/GameLogic';
+import { GameLogic, GRID_SPACING, tankSizeFromSlider, AUTO_FOV_BASE_RANGE, WIFI_RANGE_MAX, snapAngleToGrid, snapAngleToFaceMidpoint, snapAngleToSides, snapPointsOf, XP_LEVEL_OFFSET, XP_CURVE_COEFF, XP_SCORE_BASE, hudLevelCapOf } from '../game/GameLogic';
 import { AT_ALL_TEAM_MINIMAP, DOT_R as ADMIN_DOT_R, type WallLook } from '../game/adminPanel';
 import { WALL_TYPES_4S, WALL_TEAM, wallLookAlpha, WALL_RULES } from '../game/wallTypes';
 import { HudEaseRecord, HudXpView, hudXpAdvance, hudXpView, hudScoreOfXp, roundHalfAway } from '../utils/hudEase';
 import {
     hudColors, hudSlot, HUD_SLOT, HUD_REF_W, HUD_REF_H, HUD_FONT_FAMILY, HUD_STROKE_F, HUD_STROKE_F_BIG, HUD_RING,
     HUD_BAR_LEVEL, HUD_BAR_SCORE, HUD_BAR_KILL, HUD_BAR_SCORE_ALONE, HUD_BAR_OUTLINE, HUD_NAME_Y, HUD_NAME_FONT,
-    hudBarShift, hudScoreFill, hudKillFill, hudScoreText, hudKillText,
+    hudBarShift, hudScoreFill, hudKillFill, hudScoreText, hudKillText, hudFitScale,
     HUD_SK_SEG, HUD_SK_CAP0, HUD_SK_TRACK_L, HUD_SK_OUTLINE_R, HUD_SK_TRACK_R, HUD_SK_RIM_R, HUD_SK_SEP_W, HUD_SK_KEY_END,
     HUD_SK_NAME_FONT, HUD_SK_KEY_FONT, HUD_SK_PLUS_FONT, HUD_SK_COUNT_FONT, HUD_SK_COUNT_ABOVE,
     hudSkillColors, hudSkillHideDist, hudSkillRowY, hudSkillFillCap, hudSkillPreview, hudInRevealZone, hudSlideStep,
@@ -76,12 +76,18 @@ import { gameModeTitleOf } from '../game/gameModeTitles';
 import { presetTitle } from '../game/mapEvents/presets/index';
 import { mapEditorClickMoved, mapEditorPointerDown, mapEditorPointerMove, mapEditorPointerUp, mapEditorRightPointerDown, mapEditorRightPointerUp, refreshMapEditorVisuals, dragHideInfo, selectionOutline, effectiveMapEditorTool, toolRockKind, noteMapEditorMods } from '../game/MapEditorInput';
 import { drawMapEditorOverlay, drawMapEditorHint, setMapEditorOverlayGpu, mapEditorHoverColor, mapEditorInk, mapEditorMuted, GHOST_ALPHA, mapRockAt, mapRockTurnAt, mapObjectLabels } from './shared/mapEditorOverlay';
+import { drawCanvasGesture, canvasGestureCursor, drawMatchHitAreas } from './shared/canvasGestureOverlay';
+import { openCanvasMenu } from './shell/canvasMenuBridge';
 import { setGameDarkMode, canvasBg, gridBg, gridStroke, strokeHex, wallDefault, wallFill, turretGrey, turretFill, healerCrossFill, healthBarColor, shieldBarColor, bodyFill, shapeFill, isGameDark } from '../utils/gameColors';
 import { CM, CM_USE, CM_FREE, cmHex, cmRgb } from '../utils/colorMap';
 import { AURA_RING_SLOT } from '../utils/aura';
 import { lookList, lookUnit, lookReach, CROSS_LOOK_ID } from '../utils/placedLook';
 import { drawOtherDesign, drawOtherList, otherDrawList, type OtherDrawList } from '../utils/otherDraw';
-import { layerOutlineOf, traceLayerOutline, strokeFillLayerOutline, layerOutlineReach } from '../utils/layerOutline';
+import { layerOutlineOf, traceLayerOutline, strokeFillLayerOutline, layerOutlineReach, layerSolidOf, strokeFillLayerSolid } from '../utils/layerOutline';
+import { partOpacityOf, designHasSeeThroughPart, PartScratch } from '../utils/partOpacity';
+import { layerIsPlaced, layerPlaceInto, layerPlaceReach } from '../utils/canvasParts';
+import { sortInPlace } from '../utils/sortInPlace';
+const _lpOut: number[] = [0, 0];
 import { makeShapeLook, type ShapeLook } from '../utils/shapeLook';
 import { SPAWN_GHOST_ALPHA } from '../game/spawnTool';
 import { guardNoteFrame } from '../game/crashGuard';
@@ -89,7 +95,7 @@ import { pumpkinRocksOf } from '../utils/halloween';
 import { pushEyes, pushEyeVeils, pushOtherList, pumpkinTurn, rockTurn, eyeRowToDraw, rockWearsPumpkin, eyeAlpha, eyeAimOf, placeEye, EYE_LINE, EYE_STRIDE, E_UNIT, E_X, E_Y, E_TURN, HW_VEIL, type EyeTable, type GeomPusher } from '../utils/halloween';
 import { halloweenLook, hwBeginEyes, hwEyeTable, hwEyeTargets, hwEyeRgb, hwWallRgb, hwPumpkinRgb, hwQueuePumpkin, hwFlushPumpkins, hwQueueEye, hwFlushEyes, EYE_MIN_PX, PUMPKIN_FULL_PX } from './shared/halloweenLook';
 import { updateAnimatedColors, getAnimatedColor, updateWorldAnimatedColors, getWorldAnimatedColor, labyDownscale, RARITY_MULTIPLIERS, effectiveShapeColor, effectiveShapeColorMap, polyhedronExtent } from '../game/ShapeRegistry';
-import { solidOf, solidPath, SOLID_STROKE_OF_BORDER, SOLID_STILL_X, SOLID_STILL_Y, type ArrasSolid } from '../utils/solidArras';
+import { solidOf, solidPath, SOLID_STROKE_OF_BORDER, SOLID_STILL_X, SOLID_STILL_Y, solidStill, type ArrasSolid } from '../utils/solidArras';
 import type { FoodShapeDesign, PlacedLook } from '../types';
 import { dreadTeamId, dreadBehavior, TEAM_IDX_DREAD } from '../types';
 import { Vector } from '../utils/MathUtils';
@@ -150,6 +156,25 @@ function _hexToRGB(hex: string, out: Float64Array, off: number): void {
     out[off + 2] = (n & 0xFF) / 255;
 }
 const _gColor = new Float64Array(3);
+const PICK_INK_K = 0.45;
+const PICK_INK_K_DARK = 0.25;
+const _pickInkK = (): number => (_isDarkMode ? PICK_INK_K_DARK : PICK_INK_K);
+const _pickRgb = new Float64Array(3);
+const _pickCache: Record<string, string> = {};
+function _pickStroke(own: string): string {
+    const key = _isDarkMode ? own + '|d' : own;
+    const hit = _pickCache[key];
+    if (hit !== undefined) return hit;
+    let r: number, g: number, b: number;
+    const m = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(own);
+    if (m !== null) { r = +m[1]; g = +m[2]; b = +m[3]; }
+    else { _hexToRGB(own, _pickRgb, 0); r = _pickRgb[0] * 255; g = _pickRgb[1] * 255; b = _pickRgb[2] * 255; }
+    const ir = _isDarkMode ? 252 : 23, ib = _isDarkMode ? 253 : 24;
+    const k = _pickInkK();
+    const out = `rgb(${Math.round(r + (ir - r) * k)},${Math.round(g + (ir - g) * k)},${Math.round(b + (ib - b) * k)})`;
+    _pickCache[key] = out;
+    return out;
+}
 const _lookColor = new Float64Array(3);
 let _turretGreyR = 0.655;
 let _turretGreyG = 0.655;
@@ -163,6 +188,35 @@ const _GEO_DEPTH_SPACING = 0.000012;
 let _geoUseBulletDepth = false;
 let _prevRL = -129;
 let _rlHasGeom = false;
+const AUTO_BASE_WHOLE: number = 1;
+let _rlDiscs = new Float64Array(3 * 64);
+let _rlDiscN = 0;
+let _rlMultiN = 0;
+function _rlMultiBatch(t: Turret): boolean {
+    return t.turretType === 'auto' || t.look !== undefined || (t.visualLayers !== undefined && t.visualLayers.length > 0);
+}
+function _rlStep(t: Turret, rl: number, cx: number, cy: number, ang: number, sz: number): boolean {
+    let flush = false;
+    if (!_rlHasGeom) { _rlDiscN = 0; _rlMultiN = 0; }
+    else if (rl !== _prevRL) { flush = true; _rlDiscN = 0; _rlMultiN = 0; }
+    if (AUTO_BASE_WHOLE === 0) return flush;
+    const multi = _rlMultiBatch(t);
+    const off = Math.sqrt(t.xOffset * t.xOffset + t.yOffset * t.yOffset) * 0.5;
+    const r = (_gunReachOf(t) - off) * sz;
+    const c = Math.cos(ang), sn = Math.sin(ang);
+    const mx = t.xOffset * sz / 2, my = t.yOffset * sz / 2;
+    const x = cx + mx * c - my * sn, y = cy + mx * sn + my * c;
+    if (!flush && _rlDiscN > 0 && (multi || _rlMultiN > 0)) {
+        for (let i = 0; i < _rlDiscN; i++) {
+            const dx = x - _rlDiscs[i * 3], dy = y - _rlDiscs[i * 3 + 1], rr = r + _rlDiscs[i * 3 + 2];
+            if (dx * dx + dy * dy < rr * rr) { flush = true; _rlDiscN = 0; _rlMultiN = 0; break; }
+        }
+    }
+    if ((_rlDiscN + 1) * 3 > _rlDiscs.length) { const g = new Float64Array(_rlDiscs.length * 2); g.set(_rlDiscs); _rlDiscs = g; }
+    _rlDiscs[_rlDiscN * 3] = x; _rlDiscs[_rlDiscN * 3 + 1] = y; _rlDiscs[_rlDiscN * 3 + 2] = r; _rlDiscN++;
+    if (multi) _rlMultiN++;
+    return flush;
+}
 
 let _geoForceDepth = -1;
 let _wantAboveRoundSlot = false;
@@ -195,7 +249,9 @@ function _geoEmit(
     alpha: number = 1.0
 ): void {
     const depth = _nextGeoDepth();
-    webgl.pushGeomInstance(batchKey, worldX, worldY, rotation, scaleX, scaleY, r, g, b, _geoHl ? dmgOverlay + 2 : dmgOverlay, depth, aspect, alpha);
+    if (_puOpen) { _puRecord(batchKey, worldX, worldY, rotation, scaleX, scaleY, r, g, b, _geoHl ? dmgOverlay + 2 : dmgOverlay, depth, aspect, _puShare * (_entityAlpha > 0 ? alpha / _entityAlpha : 1)); return; }
+    webgl.pushGeomInstance(batchKey, worldX, worldY, rotation, scaleX, scaleY, r, g, b, _geoHl ? dmgOverlay + 2 : dmgOverlay, depth, aspect,
+        _puNow ? _puShare * (_entityAlpha > 0 ? alpha / _entityAlpha : 1) : _puShare === 1 ? alpha : alpha * _puShare);
 }
 let _geoHl = false;
 function _edPicked(t: Turret): boolean {
@@ -257,7 +313,13 @@ function _geoEmitLook(
 ): void {
     const la = look.alpha;
     if (la === undefined || !(la < 1)) { _pushLookParts(webgl, look, cx, cy, facing, sizePx, dmgOverlay, _entityAlpha); return; }
-    if (!_lookDeferOn) {
+    if (!_lookDeferOn || _puOpen) {
+        if (_mlPasteOpen()) {
+            const tok = _partBegin(webgl, la);
+            _pushLookParts(webgl, look, cx, cy, facing, sizePx, dmgOverlay, _entityAlpha);
+            _partEnd(tok, webgl);
+            return;
+        }
         _pushLookParts(webgl, look, cx, cy, facing, sizePx, dmgOverlay, _entityAlpha * (webgl.alphaIsSpread() ? Math.sqrt(la) : la));
         return;
     }
@@ -303,6 +365,123 @@ function _drainLookUnits(
     }
     _lookDeferCount = 0;
 }
+
+let _puOpen = false;
+let _puShare = 1;
+let _puCap = 64;
+let _puKey: string[] = new Array(_puCap).fill('');
+let _puNum = new Float64Array(_puCap * 12);
+let _puN = 0;
+let _puUnitCap = 16;
+let _puUnitStart = new Int32Array(_puUnitCap + 1);
+let _puUnitA = new Float64Array(_puUnitCap);
+let _puUnits = 0;
+let _mlCtx: CanvasRenderingContext2D | null = null;
+let _puNow = false;
+let _puNowA = 1;
+let _puNowShare = 1;
+export const SEE_THROUGH_ROUTE = { ON: 1, ONE: 1 };
+if (typeof location !== 'undefined' && /[?&]stab(?:[=&]|$)/.test(location.search)) (globalThis as any).__seeThroughRoute = SEE_THROUGH_ROUTE;
+function _mlPasteOpen(): boolean { return _mlCtx !== null && !_puOpen && !_puNow && _geoUnitDepthOn === 1 && !_geoUseBulletDepth; }
+function _bodyOnePiece(): boolean { return !_rd.isHealer && !(Math.floor(_rd.sides) >= 3 && _rd.shapeDepth > 0); }
+function _layerOnePiece(layer: BodyLayer): boolean {
+    return layer.copies <= 1 && !layer.showHealerCross && layerSolidOf(layer) === null && layerOutlineOf(layer) === null
+        && !(layer.sides >= 3 && layer.starDepth > 0);
+}
+let _puInShare = 1;
+function _partBegin(webgl: import('../game/WebGLRenderer').WebGLBulletRenderer, op: number | undefined, one: boolean = false): number {
+    if (op === undefined || !(op < 1)) return _puShare;
+    const a = op > 0 ? op : 0;
+    if (_lookDeferOn && !_puOpen) {
+        if (_puUnits >= _puUnitCap) {
+            const cap = _puUnitCap * 2, st = new Int32Array(cap + 1), al = new Float64Array(cap);
+            st.set(_puUnitStart); al.set(_puUnitA); _puUnitStart = st; _puUnitA = al; _puUnitCap = cap;
+        }
+        _puUnitStart[_puUnits] = _puN; _puUnitA[_puUnits] = a * _entityAlpha;
+        _puOpen = true;
+        return -1;
+    }
+    if (one && SEE_THROUGH_ROUTE.ONE !== 0 && _mlPasteOpen()) {
+        webgl.flushGeom(); webgl.beginGeomFrame();
+        const spread = webgl.alphaIsSpread();
+        if (spread) webgl.setSampleAlphaToCoverage(false);
+        _puInShare = _puShare; _puShare = _puShare * a;
+        return spread ? -4 : -3;
+    }
+    if (_mlPasteOpen()) {
+        webgl.flushGeom();
+        _mlCtx!.save(); _mlCtx!.setTransform(1, 0, 0, 1, 0, 0); _compositeWorld(_mlCtx!, webgl); _mlCtx!.restore();
+        webgl.clearColorOnly(); webgl.beginGeomFrame();
+        webgl.setDepthFunc(false); webgl.setDepthMask(false);
+        _puNow = true; _puNowA = a * _entityAlpha; _puNowShare = _puShare; _puShare = 1;
+        return -2;
+    }
+    const prev = _puShare;
+    _puShare = prev * (webgl.alphaIsSpread() ? Math.sqrt(a) : a);
+    return prev;
+}
+function _partNowEnd(webgl: import('../game/WebGLRenderer').WebGLBulletRenderer): void {
+    webgl.flushGeom();
+    const c = _mlCtx!;
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = _puNowA; _compositeWorld(c, webgl); c.globalAlpha = 1; c.restore();
+    webgl.clearColorOnly(); webgl.beginGeomFrame();
+    webgl.setDepthFunc(ML_ENTITY_UNIT_DEPTH ? false : true); webgl.setDepthMask(false);
+    _puNow = false; _puShare = _puNowShare;
+}
+function _partEnd(tok: number, webgl?: import('../game/WebGLRenderer').WebGLBulletRenderer): void {
+    if (tok === -2) { if (webgl) _partNowEnd(webgl); return; }
+    if (tok === -3 || tok === -4) {
+        if (webgl) { webgl.flushGeom(); webgl.beginGeomFrame(); if (tok === -4) webgl.setSampleAlphaToCoverage(true); }
+        _puShare = _puInShare;
+        return;
+    }
+    if (tok < 0) { _puOpen = false; _puUnits++; _puUnitStart[_puUnits] = _puN; return; }
+    _puShare = tok;
+}
+function _puRecord(key: string, x: number, y: number, rot: number, sx: number, sy: number, r: number, g: number, b: number, dm: number, depth: number, aspect: number, alpha: number): void {
+    if (_puN >= _puCap) {
+        const cap = _puCap * 2, num = new Float64Array(cap * 12), keys: string[] = new Array(cap).fill('');
+        num.set(_puNum); for (let i = 0; i < _puCap; i++) keys[i] = _puKey[i];
+        _puNum = num; _puKey = keys; _puCap = cap;
+    }
+    const o = _puN * 12;
+    _puKey[_puN] = key;
+    _puNum[o] = x; _puNum[o + 1] = y; _puNum[o + 2] = rot; _puNum[o + 3] = sx; _puNum[o + 4] = sy; _puNum[o + 5] = r; _puNum[o + 6] = g;
+    _puNum[o + 7] = b; _puNum[o + 8] = dm; _puNum[o + 9] = depth; _puNum[o + 10] = aspect; _puNum[o + 11] = alpha;
+    _puN++;
+}
+function _partUnitsReset(): void { _puOpen = false; _puShare = 1; _puN = 0; _puUnits = 0; _puNow = false; _mlCtx = null; }
+function _drainPartUnits(
+    webgl: import('../game/WebGLRenderer').WebGLBulletRenderer,
+    ctx: CanvasRenderingContext2D, logic: GameLogic, width: number, height: number
+): void {
+    for (let u = 0; u < _puUnits; u++) {
+        const s = _puUnitStart[u], e = _puUnitStart[u + 1];
+        if (e <= s) continue;
+        webgl.clearColorOnly();
+        webgl.beginGeomFrame();
+        webgl.setDepthFunc(false);
+        webgl.setDepthMask(true);
+        for (let i = s; i < e; i++) {
+            const o = i * 12;
+            webgl.pushGeomInstance(_puKey[i], _puNum[o], _puNum[o + 1], _puNum[o + 2], _puNum[o + 3], _puNum[o + 4], _puNum[o + 5], _puNum[o + 6],
+                _puNum[o + 7], _puNum[o + 8], _puNum[o + 9], _puNum[o + 10], _puNum[o + 11]);
+        }
+        const has = webgl.hasGeomContent();
+        webgl.flushGeom();
+        if (has) {
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.globalAlpha = _puUnitA[u];
+            _compositeMiniFlush(ctx, webgl);
+            ctx.globalAlpha = 1.0;
+            ctx.restore();
+            _restoreCameraTransform(ctx, logic, width, height);
+        }
+    }
+    _partUnitsReset();
+}
+const LOOK_LAYERED_ORDER: number = 1;
 function _pushLookParts(
     webgl: import('../game/WebGLRenderer').WebGLBulletRenderer,
     look: PlacedLook, cx: number, cy: number, facing: number, sizePx: number, dmgOverlay: number, alpha: number
@@ -311,10 +490,15 @@ function _pushLookParts(
     const memo = _lookMemoOf(look.design, items.length);
     const unit = lookUnit(look, sizePx);
     const cF = Math.cos(facing), sF = Math.sin(facing);
+    const own = LOOK_LAYERED_ORDER !== 0 && _geoUnitDepthOn === 1 && !_puOpen && items.length > 1;
+    if (own) { webgl.flushGeom(); webgl.beginGeomFrame(); }
+    let prevKey = '';
     for (let i = 0; i < items.length; i++) {
         const it = items[i], p = it.part;
         const key = webgl.lookBatchKey(p, memo[i]);
         if (key === '') continue;
+        if (own && prevKey !== '' && key !== prevKey) { webgl.flushGeom(); webgl.beginGeomFrame(); }
+        prevKey = key;
         const x = cx + (it.lx * cF - it.ly * sF) * unit;
         const y = cy + (it.lx * sF + it.ly * cF) * unit;
         const R = p.radius * unit;
@@ -324,6 +508,7 @@ function _pushLookParts(
         else _geoEmit(webgl, key, x, y, p.kind === 'circle' ? 0 : facing + it.rot, R, R,
             _lookColor[0], _lookColor[1], _lookColor[2], dmgOverlay, 1.0, alpha);
     }
+    if (own) { webgl.flushGeom(); webgl.beginGeomFrame(); }
 }
 
 let _lookCap = 256;
@@ -372,6 +557,17 @@ function _look2dFill(color: string, colorMap: number, team?: boolean): string { 
 function _look2dLine(fill: string): string { return darkenColor(fill, 0.598); }
 
 function _geoEmitBarrel(
+    webgl: import('../game/WebGLRenderer').WebGLBulletRenderer, t: Turret, entityX: number, entityY: number, bodyAngle: number, aimAngle: number,
+    sizePx: number, dmgOverlay: number, isTestMode: boolean, layerSpinAngle: number, bodyScaleFactor: number, posSz: number, sideCorr: number,
+    isAutoSub: boolean, parentRotation?: number
+): void {
+    if (_rdHid(t.id)) return;
+    if (t.opacity === undefined || !(t.opacity < 1)) { _geoEmitBarrelOne(webgl, t, entityX, entityY, bodyAngle, aimAngle, sizePx, dmgOverlay, isTestMode, layerSpinAngle, bodyScaleFactor, posSz, sideCorr, isAutoSub, parentRotation); return; }
+    const tok = _partBegin(webgl, t.opacity, t.look === undefined);
+    _geoEmitBarrelOne(webgl, t, entityX, entityY, bodyAngle, aimAngle, sizePx, dmgOverlay, isTestMode, layerSpinAngle, bodyScaleFactor, posSz, sideCorr, isAutoSub, parentRotation);
+    _partEnd(tok, webgl);
+}
+function _geoEmitBarrelOne(
     webgl: import('../game/WebGLRenderer').WebGLBulletRenderer,
     t: Turret,
     entityX: number, entityY: number,
@@ -472,6 +668,17 @@ function _drawAuraRings2D(ctx: CanvasRenderingContext2D, logic: GameLogic): void
 }
 
 function _geoEmitAutoTurret(
+    webgl: import('../game/WebGLRenderer').WebGLBulletRenderer, t: Turret, entityX: number, entityY: number, bodyAngle: number, aimAngle: number,
+    sizePx: number, dmgOverlay: number, isTestMode: boolean, layerSpinAngle: number, bodyScaleFactor: number, posSz: number, sideCorr: number,
+    bodyColorR: number, bodyColorG: number, bodyColorB: number
+): void {
+    if (_rdHid(t.id)) return;
+    if (t.opacity === undefined || !(t.opacity < 1)) { _geoEmitAutoTurretOne(webgl, t, entityX, entityY, bodyAngle, aimAngle, sizePx, dmgOverlay, isTestMode, layerSpinAngle, bodyScaleFactor, posSz, sideCorr, bodyColorR, bodyColorG, bodyColorB); return; }
+    const tok = _partBegin(webgl, t.opacity);
+    _geoEmitAutoTurretOne(webgl, t, entityX, entityY, bodyAngle, aimAngle, sizePx, dmgOverlay, isTestMode, layerSpinAngle, bodyScaleFactor, posSz, sideCorr, bodyColorR, bodyColorG, bodyColorB);
+    _partEnd(tok, webgl);
+}
+function _geoEmitAutoTurretOne(
     webgl: import('../game/WebGLRenderer').WebGLBulletRenderer,
     t: Turret,
     entityX: number, entityY: number,
@@ -504,7 +711,7 @@ function _geoEmitAutoTurret(
     if (_subsAll && _subsAll.length > 1) {
         _geoSubSortBuf.length = _subsAll.length;
         for (let i = 0; i < _subsAll.length; i++) _geoSubSortBuf[i] = _subsAll[i];
-        _geoSubSortBuf.sort(_turretLayerCmp);
+        sortInPlace(_geoSubSortBuf, _turretLayerCmp);
         _subs = _geoSubSortBuf;
     }
     const _baseAng = (_edTankGL !== null && !isTestMode) ? bodyAngle : worldAutoAngle;
@@ -549,6 +756,7 @@ function _geoEmitAutoTurret(
             const above = sub.aboveBase === true;
             if (pass === 0 && above) { _anyAboveBase = true; continue; }
             if (pass === 1 && !above) continue;
+            if (_rdHid(sub.id)) continue;
             const subMountX = sub.xOffset * subPosSz / 2;
             const subMountY = sub.yOffset * subPosSz / 2;
             const cosAuto = Math.cos(worldAutoAngle);
@@ -572,9 +780,11 @@ function _geoEmitAutoTurret(
             }
 
             _geoHl = _edTankGL !== null && _edPicked(sub);
-            if (sub.look !== undefined) { _geoEmitLook(webgl, sub.look, subWx, subWy, (isTestMode && sub.turnsLate === true && sub._lateTurn !== undefined) ? worldSubAngle + sub._lateTurn : worldSubAngle, sizePx, dmgOverlay); _geoHl = false; continue; }
-
-            if (sub.colorMap === undefined) {
+            const _sOp = sub.opacity !== undefined && sub.opacity < 1;
+            const _sTok = _sOp ? _partBegin(webgl, sub.opacity, sub.look === undefined) : 1;
+            if (sub.look !== undefined) {
+                _geoEmitLook(webgl, sub.look, subWx, subWy, (isTestMode && sub.turnsLate === true && sub._lateTurn !== undefined) ? worldSubAngle + sub._lateTurn : worldSubAngle, sizePx, dmgOverlay);
+            } else if (sub.colorMap === undefined) {
                 _geoEmit(webgl, 'barrel', subBx, subBy, worldSubAngle, subLen, subWid,
                     _turretGreyR, _turretGreyG, _turretGreyB, dmgOverlay, sub.aspect, _entityAlpha);
             } else {
@@ -582,6 +792,7 @@ function _geoEmitAutoTurret(
                 _geoEmit(webgl, 'barrel', subBx, subBy, worldSubAngle, subLen, subWid,
                     _tColor[0], _tColor[1], _tColor[2], dmgOverlay, sub.aspect, _entityAlpha);
             }
+            if (_sOp) _partEnd(_sTok, webgl);
             _geoHl = false;
         }
     }
@@ -628,7 +839,8 @@ function _addTankGeometry(
         }
     }
     if (_edHookOn) _edBelowDone();
-    if (!_rd.showTurretsOnly) {
+    if (!_rd.showTurretsOnly && !_rdHid('main')) {
+        const _bTok = _rd.bodyOpacity < 1 ? _partBegin(webgl, _rd.bodyOpacity, _bodyOnePiece()) : 1;
         const intSides = Math.floor(_rd.sides);
         const fracRotation = (_rd.sides % 1) * Math.PI * 2;
         const baseSpin = _rd.baseBodyAngle || 0;
@@ -654,6 +866,7 @@ function _addTankGeometry(
             _geoEmit(webgl, 'healer_cross', entityX, entityY, bodyAngle + baseSpin,
                 crossR, crossR, _gColor[0], _gColor[1], _gColor[2], dmg, 1.0, _entityAlpha);
         }
+        if (_rd.bodyOpacity < 1) _partEnd(_bTok, webgl);
     }
 
     if (_wantAboveRoundSlot) { _aboveRoundDepth = _nextGeoDepth(); _geoSubSlot += _ABOVE_ROUND_SLOTS - 1; }
@@ -687,7 +900,7 @@ function _geoEmitBodyLayers(
 
     _innerBodyLayerSortBuf.length = layers.length;
     for (let i = 0; i < layers.length; i++) _innerBodyLayerSortBuf[i] = layers[i];
-    if (layers.length > 1) _innerBodyLayerSortBuf.sort(_bodyLayerCmp);
+    if (layers.length > 1) sortInPlace(_innerBodyLayerSortBuf, _bodyLayerCmp);
 
     for (let li = 0; li < _innerBodyLayerSortBuf.length; li++) {
         const layer = _innerBodyLayerSortBuf[li];
@@ -701,29 +914,37 @@ function _geoEmitBodyLayers(
 
         const effectiveAngle = layer.stationary ? -bodyAngle : layer._currentAngle;
         const layerWorldAngle = bodyAngle + effectiveAngle;
+        let lcx = entityX, lcy = entityY;
+        if (layerIsPlaced(layer)) { layerPlaceInto(_lpOut, layer, sizePx / 2, Math.cos(bodyAngle), Math.sin(bodyAngle)); lcx += _lpOut[0]; lcy += _lpOut[1]; }
         const layerSideCorr = computeSideCorr(layer.sides, _rd.sides);
         const barrelEffSizePx = layerSizePx;
         for (let ti = 0; ti < turrets.length; ti++) {
             if (turrets[ti].aboveTankBody || _turretLayerRef[ti] !== layer) continue;
             const t = turrets[ti];
             if (t.turretType === 'auto') {
-                _geoEmitAutoTurret(webgl, t, entityX, entityY, layerWorldAngle, aimAngle, layerSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, bodyR, bodyG, bodyB);
+                _geoEmitAutoTurret(webgl, t, lcx, lcy, layerWorldAngle, aimAngle, layerSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, bodyR, bodyG, bodyB);
             } else {
-                _geoEmitBarrel(webgl, t, entityX, entityY, layerWorldAngle, layerWorldAngle, barrelEffSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, false);
+                _geoEmitBarrel(webgl, t, lcx, lcy, layerWorldAngle, layerWorldAngle, barrelEffSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, false);
             }
         }
         if (_edHookOn) _edLayer(layer, 0);
-        if (!_rd.showTurretsOnly) {
+        if (!_rd.showTurretsOnly && !_rdHid(layer.id)) {
+            const _lpTok = layer.opacity !== undefined && layer.opacity < 1 ? _partBegin(webgl, layer.opacity, _layerOnePiece(layer)) : 1;
             const layerHalf = layerSizePx / 2;
             _geoHl = _edTankGL !== null && _rd.pickedBody === layer.id;
             const layerInitAngle = layer.initialAngle || 0;
             const _loKey = layerOutlineOf(layer) !== null ? webgl.outlineLayerBatchKey(layer.outline!) : '';
+            const _slSolid = layerSolidOf(layer);
 
-            if (_loKey !== '') {
+            if (_slSolid !== null) {
+                const _slKey = webgl.solidLayerBatchKey(_slSolid);
+                const _slN = layer.copies > 1 ? layer.copies : 1;
+                if (_slKey !== '') for (let c = 0; c < _slN; c++) _geoEmit(webgl, _slKey, lcx, lcy, layerWorldAngle + layerInitAngle + (Math.PI * 2 * c) / _slN, layerHalf, layerHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
+            } else if (_loKey !== '') {
                 const _loN = layer.copies > 1 ? layer.copies : 1;
-                for (let c = 0; c < _loN; c++) _geoEmit(webgl, _loKey, entityX, entityY, layerWorldAngle + layerInitAngle + (Math.PI * 2 * c) / _loN, layerHalf, layerHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
+                for (let c = 0; c < _loN; c++) _geoEmit(webgl, _loKey, lcx, lcy, layerWorldAngle + layerInitAngle + (Math.PI * 2 * c) / _loN, layerHalf, layerHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
             } else if (layer.sides < 3) {
-                _geoEmit(webgl, 'circle', entityX, entityY, layerWorldAngle, layerHalf, layerHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
+                _geoEmit(webgl, 'circle', lcx, lcy, layerWorldAngle, layerHalf, layerHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
             } else if (layer.copies > 1) {
                 const visualHalf = layerHalf * getRealSizeFactor(layer.sides);
                 const batchKey = layer.starDepth > 0
@@ -731,34 +952,35 @@ function _geoEmitBodyLayers(
                     : (layer.sides <= 16 ? POLY_BATCH_KEY[layer.sides] : 'circle');
                 for (let c = 0; c < layer.copies; c++) {
                     const copyRot = layerWorldAngle + (Math.PI * 2 * c) / layer.copies + layerInitAngle;
-                    _geoEmit(webgl, batchKey, entityX, entityY, copyRot, visualHalf, visualHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
+                    _geoEmit(webgl, batchKey, lcx, lcy, copyRot, visualHalf, visualHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
                 }
             } else if (layer.starDepth > 0) {
                 const visualHalf = layerHalf * getRealSizeFactor(layer.sides);
                 const starKey = webgl.getOrCreateStarBatch(layer.sides, layer.starDepth, layer.starCurved);
-                _geoEmit(webgl, starKey, entityX, entityY, layerWorldAngle + layerInitAngle, visualHalf, visualHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
+                _geoEmit(webgl, starKey, lcx, lcy, layerWorldAngle + layerInitAngle, visualHalf, visualHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
             } else {
                 const visualHalf = layerHalf * getRealSizeFactor(layer.sides);
                 const batchKey = layer.sides <= 16 ? POLY_BATCH_KEY[layer.sides] : 'circle';
-                _geoEmit(webgl, batchKey, entityX, entityY, layerWorldAngle + layerInitAngle, visualHalf, visualHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
+                _geoEmit(webgl, batchKey, lcx, lcy, layerWorldAngle + layerInitAngle, visualHalf, visualHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
             }
 
             _geoHl = false;
             if (layer.showHealerCross) {
                 const crossR = _HEALER_CROSS_SCALE * layerSizePx;
                 _hexToRGB(healerCrossFill(), _gColor, 0);
-                _geoEmit(webgl, 'healer_cross', entityX, entityY, layerWorldAngle + layerInitAngle,
+                _geoEmit(webgl, 'healer_cross', lcx, lcy, layerWorldAngle + layerInitAngle,
                     crossR, crossR, _gColor[0], _gColor[1], _gColor[2], dmg, 1.0, _entityAlpha);
             }
+            if (layer.opacity !== undefined && layer.opacity < 1) _partEnd(_lpTok, webgl);
         }
 
         for (let ti = 0; ti < turrets.length; ti++) {
             if (!turrets[ti].aboveTankBody || _turretLayerRef[ti] !== layer) continue;
             const t = turrets[ti];
             if (t.turretType === 'auto') {
-                _geoEmitAutoTurret(webgl, t, entityX, entityY, layerWorldAngle, aimAngle, layerSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, bodyR, bodyG, bodyB);
+                _geoEmitAutoTurret(webgl, t, lcx, lcy, layerWorldAngle, aimAngle, layerSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, bodyR, bodyG, bodyB);
             } else {
-                _geoEmitBarrel(webgl, t, entityX, entityY, layerWorldAngle, layerWorldAngle, barrelEffSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, false);
+                _geoEmitBarrel(webgl, t, lcx, lcy, layerWorldAngle, layerWorldAngle, barrelEffSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, false);
             }
         }
         if (_edHookOn) _edLayer(layer, 1);
@@ -781,13 +1003,13 @@ function _emitTurrettedBulletGeometry(
     const sPosX = _rd.posX, sPosY = _rd.posY;
     const sBodyAngle = _rd.bodyAngle, sAimAngle = _rd.aimAngle;
     const sSizePx = _rd.sizePx, sSides = _rd.sides;
-    const sShapeDepth = _rd.shapeDepth, sShapeCurved = _rd.shapeCurved;
+    const sShapeDepth = _rd.shapeDepth, sShapeCurved = _rd.shapeCurved, sBodyOp = _rd.bodyOpacity;
     const sColor = _rd.color, sColorMap = _rd.colorMap, sDmg = _rd.damageOverlay, sKick = _rd.kickSpeed;
     const sTurrets = _rd.turrets, sLayers = _rd.bodyLayers;
     const sTest = _rd.isTestMode, sHealer = _rd.isHealer;
     const sBaseSpin = _rd.baseBodyAngle;
     const sTeamOvr = _rd.teamColorOverride, sLtf = _rd.layerTeamFill, sShowTO = _rd.showTurretsOnly;
-    const sSelTurret = _rd.selectedTurretId, sSelAuto = _rd.selectedAutoParentId, sPick = _rd.pickedBody; _rd.pickedBody = '';
+    const sSelTurret = _rd.selectedTurretId, sSelAuto = _rd.selectedAutoParentId, sPick = _rd.pickedBody, sHid = _rd.hidden; _rd.pickedBody = ''; _rd.hidden = null;
     const sEditing = _rd.editingTurret;
     const sAlpha = _rd.alpha;
 
@@ -800,7 +1022,7 @@ function _emitTurrettedBulletGeometry(
     _rd.sizePx = b.size * b.growth;
     _rd.sides = b.shapeSides;
     _rd.shapeDepth = b.trapDepth ?? 0;
-    _rd.shapeCurved = b.trapCurved ?? false;
+    _rd.shapeCurved = b.trapCurved ?? false; _rd.bodyOpacity = 1;
     _rd.color = b.color; _rd.colorMap = b.colorMap;
     _rd.damageOverlay = b.damageOverlay; _rd.kickSpeed = roundKickSpeed(b);
     _rd.isTestMode = true;
@@ -839,13 +1061,13 @@ function _emitTurrettedBulletGeometry(
     _rd.posX = sPosX; _rd.posY = sPosY;
     _rd.bodyAngle = sBodyAngle; _rd.aimAngle = sAimAngle;
     _rd.sizePx = sSizePx; _rd.sides = sSides;
-    _rd.shapeDepth = sShapeDepth; _rd.shapeCurved = sShapeCurved;
+    _rd.shapeDepth = sShapeDepth; _rd.shapeCurved = sShapeCurved; _rd.bodyOpacity = sBodyOp;
     _rd.color = sColor; _rd.colorMap = sColorMap; _rd.damageOverlay = sDmg; _rd.kickSpeed = sKick;
     _rd.turrets = sTurrets; _rd.bodyLayers = sLayers;
     _rd.isTestMode = sTest; _rd.isHealer = sHealer;
     _rd.baseBodyAngle = sBaseSpin;
     _rd.teamColorOverride = sTeamOvr; _rd.layerTeamFill = sLtf; _rd.showTurretsOnly = sShowTO;
-    _rd.selectedTurretId = sSelTurret; _rd.selectedAutoParentId = sSelAuto; _rd.pickedBody = sPick;
+    _rd.selectedTurretId = sSelTurret; _rd.selectedAutoParentId = sSelAuto; _rd.pickedBody = sPick; _rd.hidden = sHid;
     _rd.editingTurret = sEditing;
     _rd.alpha = sAlpha;
 }
@@ -858,13 +1080,13 @@ function _emitTurrettedBulletBelow(
     const sPosX = _rd.posX, sPosY = _rd.posY;
     const sBodyAngle = _rd.bodyAngle, sAimAngle = _rd.aimAngle;
     const sSizePx = _rd.sizePx, sSides = _rd.sides;
-    const sShapeDepth = _rd.shapeDepth, sShapeCurved = _rd.shapeCurved;
+    const sShapeDepth = _rd.shapeDepth, sShapeCurved = _rd.shapeCurved, sBodyOp = _rd.bodyOpacity;
     const sColor = _rd.color, sColorMap = _rd.colorMap, sDmg = _rd.damageOverlay, sKick = _rd.kickSpeed;
     const sTurrets = _rd.turrets, sLayers = _rd.bodyLayers;
     const sTest = _rd.isTestMode, sHealer = _rd.isHealer;
     const sBaseSpin = _rd.baseBodyAngle;
     const sTeamOvr = _rd.teamColorOverride, sLtf = _rd.layerTeamFill, sShowTO = _rd.showTurretsOnly;
-    const sSelTurret = _rd.selectedTurretId, sSelAuto = _rd.selectedAutoParentId, sPick = _rd.pickedBody; _rd.pickedBody = '';
+    const sSelTurret = _rd.selectedTurretId, sSelAuto = _rd.selectedAutoParentId, sPick = _rd.pickedBody, sHid = _rd.hidden; _rd.pickedBody = ''; _rd.hidden = null;
     const sEditing = _rd.editingTurret;
     const sAlpha = _rd.alpha;
     const sEntityAlpha = _entityAlpha;
@@ -878,7 +1100,7 @@ function _emitTurrettedBulletBelow(
     _rd.sizePx = b.size * b.growth;
     _rd.sides = b.shapeSides;
     _rd.shapeDepth = b.trapDepth ?? 0;
-    _rd.shapeCurved = b.trapCurved ?? false;
+    _rd.shapeCurved = b.trapCurved ?? false; _rd.bodyOpacity = 1;
     _rd.color = b.color; _rd.colorMap = b.colorMap;
     _rd.damageOverlay = b.damageOverlay; _rd.kickSpeed = roundKickSpeed(b);
     _rd.isTestMode = true;
@@ -944,13 +1166,13 @@ function _emitTurrettedBulletBelow(
     _rd.posX = sPosX; _rd.posY = sPosY;
     _rd.bodyAngle = sBodyAngle; _rd.aimAngle = sAimAngle;
     _rd.sizePx = sSizePx; _rd.sides = sSides;
-    _rd.shapeDepth = sShapeDepth; _rd.shapeCurved = sShapeCurved;
+    _rd.shapeDepth = sShapeDepth; _rd.shapeCurved = sShapeCurved; _rd.bodyOpacity = sBodyOp;
     _rd.color = sColor; _rd.colorMap = sColorMap; _rd.damageOverlay = sDmg; _rd.kickSpeed = sKick;
     _rd.turrets = sTurrets; _rd.bodyLayers = sLayers;
     _rd.isTestMode = sTest; _rd.isHealer = sHealer;
     _rd.baseBodyAngle = sBaseSpin;
     _rd.teamColorOverride = sTeamOvr; _rd.layerTeamFill = sLtf; _rd.showTurretsOnly = sShowTO;
-    _rd.selectedTurretId = sSelTurret; _rd.selectedAutoParentId = sSelAuto; _rd.pickedBody = sPick;
+    _rd.selectedTurretId = sSelTurret; _rd.selectedAutoParentId = sSelAuto; _rd.pickedBody = sPick; _rd.hidden = sHid;
     _rd.editingTurret = sEditing;
     _rd.alpha = sAlpha;
     _entityAlpha = sEntityAlpha;
@@ -964,13 +1186,13 @@ function _emitTurrettedBulletBody(
     const sPosX = _rd.posX, sPosY = _rd.posY;
     const sBodyAngle = _rd.bodyAngle, sAimAngle = _rd.aimAngle;
     const sSizePx = _rd.sizePx, sSides = _rd.sides;
-    const sShapeDepth = _rd.shapeDepth, sShapeCurved = _rd.shapeCurved;
+    const sShapeDepth = _rd.shapeDepth, sShapeCurved = _rd.shapeCurved, sBodyOp = _rd.bodyOpacity;
     const sColor = _rd.color, sColorMap = _rd.colorMap, sDmg = _rd.damageOverlay, sKick = _rd.kickSpeed;
     const sTurrets = _rd.turrets, sLayers = _rd.bodyLayers;
     const sTest = _rd.isTestMode, sHealer = _rd.isHealer;
     const sBaseSpin = _rd.baseBodyAngle;
     const sTeamOvr = _rd.teamColorOverride, sLtf = _rd.layerTeamFill, sShowTO = _rd.showTurretsOnly;
-    const sSelTurret = _rd.selectedTurretId, sSelAuto = _rd.selectedAutoParentId, sPick = _rd.pickedBody; _rd.pickedBody = '';
+    const sSelTurret = _rd.selectedTurretId, sSelAuto = _rd.selectedAutoParentId, sPick = _rd.pickedBody, sHid = _rd.hidden; _rd.pickedBody = ''; _rd.hidden = null;
     const sEditing = _rd.editingTurret;
     const sAlpha = _rd.alpha;
     const sEntityAlpha = _entityAlpha;
@@ -984,7 +1206,7 @@ function _emitTurrettedBulletBody(
     _rd.sizePx = b.size * b.growth;
     _rd.sides = b.shapeSides;
     _rd.shapeDepth = b.trapDepth ?? 0;
-    _rd.shapeCurved = b.trapCurved ?? false;
+    _rd.shapeCurved = b.trapCurved ?? false; _rd.bodyOpacity = 1;
     _rd.color = b.color; _rd.colorMap = b.colorMap;
     _rd.damageOverlay = b.damageOverlay; _rd.kickSpeed = roundKickSpeed(b);
     _rd.isTestMode = true;
@@ -1055,13 +1277,13 @@ function _emitTurrettedBulletBody(
     _rd.posX = sPosX; _rd.posY = sPosY;
     _rd.bodyAngle = sBodyAngle; _rd.aimAngle = sAimAngle;
     _rd.sizePx = sSizePx; _rd.sides = sSides;
-    _rd.shapeDepth = sShapeDepth; _rd.shapeCurved = sShapeCurved;
+    _rd.shapeDepth = sShapeDepth; _rd.shapeCurved = sShapeCurved; _rd.bodyOpacity = sBodyOp;
     _rd.color = sColor; _rd.colorMap = sColorMap; _rd.damageOverlay = sDmg; _rd.kickSpeed = sKick;
     _rd.turrets = sTurrets; _rd.bodyLayers = sLayers;
     _rd.isTestMode = sTest; _rd.isHealer = sHealer;
     _rd.baseBodyAngle = sBaseSpin;
     _rd.teamColorOverride = sTeamOvr; _rd.layerTeamFill = sLtf; _rd.showTurretsOnly = sShowTO;
-    _rd.selectedTurretId = sSelTurret; _rd.selectedAutoParentId = sSelAuto; _rd.pickedBody = sPick;
+    _rd.selectedTurretId = sSelTurret; _rd.selectedAutoParentId = sSelAuto; _rd.pickedBody = sPick; _rd.hidden = sHid;
     _rd.editingTurret = sEditing;
     _rd.alpha = sAlpha;
     _entityAlpha = sEntityAlpha;
@@ -1075,13 +1297,13 @@ function _emitTurrettedBulletAbove(
     const sPosX = _rd.posX, sPosY = _rd.posY;
     const sBodyAngle = _rd.bodyAngle, sAimAngle = _rd.aimAngle;
     const sSizePx = _rd.sizePx, sSides = _rd.sides;
-    const sShapeDepth = _rd.shapeDepth, sShapeCurved = _rd.shapeCurved;
+    const sShapeDepth = _rd.shapeDepth, sShapeCurved = _rd.shapeCurved, sBodyOp = _rd.bodyOpacity;
     const sColor = _rd.color, sColorMap = _rd.colorMap, sDmg = _rd.damageOverlay, sKick = _rd.kickSpeed;
     const sTurrets = _rd.turrets, sLayers = _rd.bodyLayers;
     const sTest = _rd.isTestMode, sHealer = _rd.isHealer;
     const sBaseSpin = _rd.baseBodyAngle;
     const sTeamOvr = _rd.teamColorOverride, sLtf = _rd.layerTeamFill, sShowTO = _rd.showTurretsOnly;
-    const sSelTurret = _rd.selectedTurretId, sSelAuto = _rd.selectedAutoParentId, sPick = _rd.pickedBody; _rd.pickedBody = '';
+    const sSelTurret = _rd.selectedTurretId, sSelAuto = _rd.selectedAutoParentId, sPick = _rd.pickedBody, sHid = _rd.hidden; _rd.pickedBody = ''; _rd.hidden = null;
     const sEditing = _rd.editingTurret;
     const sAlpha = _rd.alpha;
     const sEntityAlpha = _entityAlpha;
@@ -1095,7 +1317,7 @@ function _emitTurrettedBulletAbove(
     _rd.sizePx = b.size * b.growth;
     _rd.sides = b.shapeSides;
     _rd.shapeDepth = b.trapDepth ?? 0;
-    _rd.shapeCurved = b.trapCurved ?? false;
+    _rd.shapeCurved = b.trapCurved ?? false; _rd.bodyOpacity = 1;
     _rd.color = b.color; _rd.colorMap = b.colorMap;
     _rd.damageOverlay = b.damageOverlay; _rd.kickSpeed = roundKickSpeed(b);
     _rd.isTestMode = true;
@@ -1161,13 +1383,13 @@ function _emitTurrettedBulletAbove(
     _rd.posX = sPosX; _rd.posY = sPosY;
     _rd.bodyAngle = sBodyAngle; _rd.aimAngle = sAimAngle;
     _rd.sizePx = sSizePx; _rd.sides = sSides;
-    _rd.shapeDepth = sShapeDepth; _rd.shapeCurved = sShapeCurved;
+    _rd.shapeDepth = sShapeDepth; _rd.shapeCurved = sShapeCurved; _rd.bodyOpacity = sBodyOp;
     _rd.color = sColor; _rd.colorMap = sColorMap; _rd.damageOverlay = sDmg; _rd.kickSpeed = sKick;
     _rd.turrets = sTurrets; _rd.bodyLayers = sLayers;
     _rd.isTestMode = sTest; _rd.isHealer = sHealer;
     _rd.baseBodyAngle = sBaseSpin;
     _rd.teamColorOverride = sTeamOvr; _rd.layerTeamFill = sLtf; _rd.showTurretsOnly = sShowTO;
-    _rd.selectedTurretId = sSelTurret; _rd.selectedAutoParentId = sSelAuto; _rd.pickedBody = sPick;
+    _rd.selectedTurretId = sSelTurret; _rd.selectedAutoParentId = sSelAuto; _rd.pickedBody = sPick; _rd.hidden = sHid;
     _rd.editingTurret = sEditing;
     _rd.alpha = sAlpha;
     _entityAlpha = sEntityAlpha;
@@ -1494,6 +1716,7 @@ const _rd = {
   sides: 0,
   shapeDepth: 0,
   shapeCurved: false,
+  bodyOpacity: 1,
   sizePx: 0,
   color: '',
   colorMap: CM_FREE as number | undefined,
@@ -1507,6 +1730,7 @@ const _rd = {
   selectedTurretId: null as string | null,
   selectedAutoParentId: null as string | null,
   pickedBody: '' as string,
+  hidden: null as ReadonlySet<string> | null,
   editingTurret: null as Omit<Turret, 'id' | 'angle' | 'animProgress'> | null,
   teamColorOverride: false,
   layerTeamFill: '',
@@ -1515,6 +1739,7 @@ const _rd = {
   canFade: false,
 };
 let _entityAlpha = 1.0;
+function _rdHid(id: string): boolean { return _rd.hidden !== null && _rd.hidden.has(id); }
 
 function _layerFill(layer: BodyLayer): string {
     const w = layerColourOf(layer, _rd.teamColorOverride, _rd.layerTeamFill !== '');
@@ -1552,6 +1777,7 @@ const ZERO_ROUND_BELOW = 0.1;
 const _bulletSubCmp = (a: any, b: any) => ((a.turretData?.renderLayer ?? 0) - (b.turretData?.renderLayer ?? 0));
 
 const _bodyLayerSortBuf: BodyLayer[] = [];
+const _NO_BODY_LAYERS: BodyLayer[] = [];
 
 const _portalLabelText: string[] = [];
 function _portalThemeFill(portal: PortalEntity, logic: GameLogic): string {
@@ -1858,13 +2084,13 @@ function _drainDyingBulletUnits(
         const sPosX = _rd.posX, sPosY = _rd.posY;
         const sBodyAngle = _rd.bodyAngle, sAimAngle = _rd.aimAngle;
         const sSizePx = _rd.sizePx, sSides = _rd.sides;
-        const sShapeDepth = _rd.shapeDepth, sShapeCurved = _rd.shapeCurved;
+        const sShapeDepth = _rd.shapeDepth, sShapeCurved = _rd.shapeCurved, sBodyOp = _rd.bodyOpacity;
         const sColor = _rd.color, sColorMap = _rd.colorMap, sDmg = _rd.damageOverlay, sKick = _rd.kickSpeed;
         const sTurrets = _rd.turrets, sLayers = _rd.bodyLayers;
         const sTest = _rd.isTestMode, sHealer = _rd.isHealer;
         const sBaseSpin = _rd.baseBodyAngle;
         const sTeamOvr = _rd.teamColorOverride, sLtf = _rd.layerTeamFill, sShowTO = _rd.showTurretsOnly;
-        const sSelTurret = _rd.selectedTurretId, sSelAuto = _rd.selectedAutoParentId, sPick = _rd.pickedBody; _rd.pickedBody = '';
+        const sSelTurret = _rd.selectedTurretId, sSelAuto = _rd.selectedAutoParentId, sPick = _rd.pickedBody, sHid = _rd.hidden; _rd.pickedBody = ''; _rd.hidden = null;
         const sEditing = _rd.editingTurret;
         const sAlpha = _rd.alpha;
         const sBulletDepth = _geoUseBulletDepth;
@@ -1878,7 +2104,7 @@ function _drainDyingBulletUnits(
         _rd.sizePx = _db.size * _db.growth;
         _rd.sides = _db.shapeSides;
         _rd.shapeDepth = _db.trapDepth ?? 0;
-        _rd.shapeCurved = _db.trapCurved ?? false;
+        _rd.shapeCurved = _db.trapCurved ?? false; _rd.bodyOpacity = 1;
         _rd.color = _db.color; _rd.colorMap = _db.colorMap;
         _rd.damageOverlay = _db.damageOverlay; _rd.kickSpeed = roundKickSpeed(_db);
         _rd.isTestMode = true;
@@ -1943,13 +2169,13 @@ function _drainDyingBulletUnits(
         _rd.posX = sPosX; _rd.posY = sPosY;
         _rd.bodyAngle = sBodyAngle; _rd.aimAngle = sAimAngle;
         _rd.sizePx = sSizePx; _rd.sides = sSides;
-        _rd.shapeDepth = sShapeDepth; _rd.shapeCurved = sShapeCurved;
+        _rd.shapeDepth = sShapeDepth; _rd.shapeCurved = sShapeCurved; _rd.bodyOpacity = sBodyOp;
         _rd.color = sColor; _rd.colorMap = sColorMap; _rd.damageOverlay = sDmg; _rd.kickSpeed = sKick;
         _rd.turrets = sTurrets; _rd.bodyLayers = sLayers;
         _rd.isTestMode = sTest; _rd.isHealer = sHealer;
         _rd.baseBodyAngle = sBaseSpin;
         _rd.teamColorOverride = sTeamOvr; _rd.layerTeamFill = sLtf; _rd.showTurretsOnly = sShowTO;
-        _rd.selectedTurretId = sSelTurret; _rd.selectedAutoParentId = sSelAuto; _rd.pickedBody = sPick;
+        _rd.selectedTurretId = sSelTurret; _rd.selectedAutoParentId = sSelAuto; _rd.pickedBody = sPick; _rd.hidden = sHid;
         _rd.editingTurret = sEditing;
         _rd.alpha = sAlpha;
         _geoUseBulletDepth = sBulletDepth;
@@ -2169,11 +2395,10 @@ function _renderMultiLayerEntity(
     _hexToRGB(turretGrey(), _gColor, 0);
     _turretGreyR = _gColor[0]; _turretGreyG = _gColor[1]; _turretGreyB = _gColor[2];
 
-    const layers = _rd.bodyLayers!;
+    const layers = _rd.bodyLayers ?? _NO_BODY_LAYERS;
     _bodyLayerSortBuf.length = layers.length;
     for (let i = 0; i < layers.length; i++) _bodyLayerSortBuf[i] = layers[i];
-    if (layers.length > 1) _bodyLayerSortBuf.sort(_bodyLayerCmp);
-
+    if (layers.length > 1) sortInPlace(_bodyLayerSortBuf, _bodyLayerCmp);
     webgl.clearColorOnly();
     webgl.setDepthMask(false);
     for (let li = 0; li < _bodyLayerSortBuf.length; li++) {
@@ -2188,6 +2413,8 @@ function _renderMultiLayerEntity(
 
         const effectiveAngle = layer.stationary ? -bodyAngle : layer._currentAngle;
         const layerWorldAngle = bodyAngle + effectiveAngle;
+        let lcx = entityX, lcy = entityY;
+        if (layerIsPlaced(layer)) { layerPlaceInto(_lpOut, layer, sizePx / 2, Math.cos(bodyAngle), Math.sin(bodyAngle)); lcx += _lpOut[0]; lcy += _lpOut[1]; }
         const layerSideCorr = computeSideCorr(layer.sides, _rd.sides);
         const barrelEffSizePx = layerSizePx;
         if (_hasLayerBullets) {
@@ -2212,7 +2439,7 @@ function _renderMultiLayerEntity(
             for (let ti = 0; ti < sorted.length; ti++) {
                 if (sorted[ti].aboveTankBody || _turretLayerRef[ti] !== layer) continue;
                 const rl = sorted[ti].renderLayer ?? 0;
-                if (rl !== _prevRL && _rlHasGeom) {
+                if (_rlStep(sorted[ti], rl, lcx, lcy, layerWorldAngle, layerSizePx)) {
                     webgl.flushGeom();
                     webgl.beginGeomFrame();
                     webgl.setDepthFunc(ML_ENTITY_UNIT_DEPTH ? false : true);
@@ -2221,9 +2448,9 @@ function _renderMultiLayerEntity(
                 _prevRL = rl; _rlHasGeom = true;
                 const t = sorted[ti];
                 if (t.turretType === 'auto') {
-                    _geoEmitAutoTurret(webgl, t, entityX, entityY, layerWorldAngle, aimAngle, layerSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, bodyR, bodyG, bodyB);
+                    _geoEmitAutoTurret(webgl, t, lcx, lcy, layerWorldAngle, aimAngle, layerSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, bodyR, bodyG, bodyB);
                 } else {
-                    _geoEmitBarrel(webgl, t, entityX, entityY, layerWorldAngle, layerWorldAngle, barrelEffSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, false);
+                    _geoEmitBarrel(webgl, t, lcx, lcy, layerWorldAngle, layerWorldAngle, barrelEffSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, false);
                 }
             }
             if (_rlHasGeom) webgl.flushGeom();
@@ -2231,16 +2458,22 @@ function _renderMultiLayerEntity(
 
         if (!_rd.showTurretsOnly) {
             webgl.beginGeomFrame();
+            const _lpTok = layer.opacity !== undefined && layer.opacity < 1 ? _partBegin(webgl, layer.opacity, _layerOnePiece(layer)) : 1;
             webgl.setDepthFunc(ML_ENTITY_UNIT_DEPTH ? false : true);
             webgl.setDepthMask(false);
             const layerHalf = layerSizePx / 2;
             const layerInitAngle = layer.initialAngle || 0;
             const _loKey = layerOutlineOf(layer) !== null ? webgl.outlineLayerBatchKey(layer.outline!) : '';
-            if (_loKey !== '') {
+            const _slSolid = layerSolidOf(layer);
+            if (_slSolid !== null) {
+                const _slKey = webgl.solidLayerBatchKey(_slSolid);
+                const _slN = layer.copies > 1 ? layer.copies : 1;
+                if (_slKey !== '') for (let c = 0; c < _slN; c++) _geoEmit(webgl, _slKey, lcx, lcy, layerWorldAngle + layerInitAngle + (Math.PI * 2 * c) / _slN, layerHalf, layerHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
+            } else if (_loKey !== '') {
                 const _loN = layer.copies > 1 ? layer.copies : 1;
-                for (let c = 0; c < _loN; c++) _geoEmit(webgl, _loKey, entityX, entityY, layerWorldAngle + layerInitAngle + (Math.PI * 2 * c) / _loN, layerHalf, layerHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
+                for (let c = 0; c < _loN; c++) _geoEmit(webgl, _loKey, lcx, lcy, layerWorldAngle + layerInitAngle + (Math.PI * 2 * c) / _loN, layerHalf, layerHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
             } else if (layer.sides < 3) {
-                _geoEmit(webgl, 'circle', entityX, entityY, layerWorldAngle, layerHalf, layerHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
+                _geoEmit(webgl, 'circle', lcx, lcy, layerWorldAngle, layerHalf, layerHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
             } else if (layer.copies > 1) {
                 const visualHalf = layerHalf * getRealSizeFactor(layer.sides);
                 const batchKey = layer.starDepth > 0
@@ -2248,23 +2481,24 @@ function _renderMultiLayerEntity(
                     : (layer.sides <= 16 ? POLY_BATCH_KEY[layer.sides] : 'circle');
                 for (let c = 0; c < layer.copies; c++) {
                     const copyRot = layerWorldAngle + (Math.PI * 2 * c) / layer.copies + layerInitAngle;
-                    _geoEmit(webgl, batchKey, entityX, entityY, copyRot, visualHalf, visualHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
+                    _geoEmit(webgl, batchKey, lcx, lcy, copyRot, visualHalf, visualHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
                 }
             } else if (layer.starDepth > 0) {
                 const visualHalf = layerHalf * getRealSizeFactor(layer.sides);
                 const starKey = webgl.getOrCreateStarBatch(layer.sides, layer.starDepth, layer.starCurved);
-                _geoEmit(webgl, starKey, entityX, entityY, layerWorldAngle + layerInitAngle, visualHalf, visualHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
+                _geoEmit(webgl, starKey, lcx, lcy, layerWorldAngle + layerInitAngle, visualHalf, visualHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
             } else {
                 const visualHalf = layerHalf * getRealSizeFactor(layer.sides);
                 const batchKey = layer.sides <= 16 ? POLY_BATCH_KEY[layer.sides] : 'circle';
-                _geoEmit(webgl, batchKey, entityX, entityY, layerWorldAngle + layerInitAngle, visualHalf, visualHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
+                _geoEmit(webgl, batchKey, lcx, lcy, layerWorldAngle + layerInitAngle, visualHalf, visualHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
             }
             if (layer.showHealerCross) {
                 const crossR = _HEALER_CROSS_SCALE * layerSizePx;
                 _hexToRGB(healerCrossFill(), _gColor, 0);
-                _geoEmit(webgl, 'healer_cross', entityX, entityY, layerWorldAngle + layerInitAngle,
+                _geoEmit(webgl, 'healer_cross', lcx, lcy, layerWorldAngle + layerInitAngle,
                     crossR, crossR, _gColor[0], _gColor[1], _gColor[2], dmg, 1.0, _entityAlpha);
             }
+            if (layer.opacity !== undefined && layer.opacity < 1) _partEnd(_lpTok, webgl);
             webgl.flushGeom();
         }
 
@@ -2283,7 +2517,7 @@ function _renderMultiLayerEntity(
             for (let ti = 0; ti < sorted.length; ti++) {
                 if (!sorted[ti].aboveTankBody || _turretLayerRef[ti] !== layer) continue;
                 const rl = sorted[ti].renderLayer ?? 0;
-                if (rl !== _prevRL && _rlHasGeom) {
+                if (_rlStep(sorted[ti], rl, lcx, lcy, layerWorldAngle, layerSizePx)) {
                     webgl.flushGeom();
                     webgl.beginGeomFrame();
                     webgl.setDepthFunc(ML_ENTITY_UNIT_DEPTH ? false : true);
@@ -2292,9 +2526,9 @@ function _renderMultiLayerEntity(
                 _prevRL = rl; _rlHasGeom = true;
                 const t = sorted[ti];
                 if (t.turretType === 'auto') {
-                    _geoEmitAutoTurret(webgl, t, entityX, entityY, layerWorldAngle, aimAngle, layerSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, bodyR, bodyG, bodyB);
+                    _geoEmitAutoTurret(webgl, t, lcx, lcy, layerWorldAngle, aimAngle, layerSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, bodyR, bodyG, bodyB);
                 } else {
-                    _geoEmitBarrel(webgl, t, entityX, entityY, layerWorldAngle, layerWorldAngle, barrelEffSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, false);
+                    _geoEmitBarrel(webgl, t, lcx, lcy, layerWorldAngle, layerWorldAngle, barrelEffSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, false);
                 }
             }
             if (_rlHasGeom) webgl.flushGeom();
@@ -2361,7 +2595,7 @@ function _renderMultiLayerEntity(
         for (let i = 0; i < sorted.length; i++) {
             if (!sorted[i].aboveTankBody && !_turretOnLayerFlags[i]) {
                 const rl = sorted[i].renderLayer ?? 0;
-                if (rl !== _prevRL && _rlHasGeom) {
+                if (_rlStep(sorted[i], rl, entityX, entityY, bodyAngle, sizePx)) {
                     webgl.flushGeom();
                     webgl.beginGeomFrame();
                     webgl.setDepthFunc(ML_ENTITY_UNIT_DEPTH ? false : true);
@@ -2381,6 +2615,7 @@ function _renderMultiLayerEntity(
 
     if (!_rd.showTurretsOnly) {
         webgl.beginGeomFrame();
+        const _bTok = _rd.bodyOpacity < 1 ? _partBegin(webgl, _rd.bodyOpacity, _bodyOnePiece()) : 1;
         webgl.setDepthFunc(ML_ENTITY_UNIT_DEPTH ? false : true);
         webgl.setDepthMask(false);
         const intSides = Math.floor(_rd.sides);
@@ -2404,6 +2639,7 @@ function _renderMultiLayerEntity(
             _geoEmit(webgl, 'healer_cross', entityX, entityY, bodyAngle + ((_rd.baseBodyAngle) || 0),
                 crossR, crossR, _gColor[0], _gColor[1], _gColor[2], dmg, 1.0, _entityAlpha);
         }
+        if (_rd.bodyOpacity < 1) _partEnd(_bTok, webgl);
         webgl.flushGeom();
     }
 
@@ -2463,7 +2699,7 @@ function _renderMultiLayerEntity(
         for (let i = 0; i < sorted.length; i++) {
             if (sorted[i].aboveTankBody && !_turretOnLayerFlags[i]) {
                 const rl = sorted[i].renderLayer ?? 0;
-                if (rl !== _prevRL && _rlHasGeom) {
+                if (_rlStep(sorted[i], rl, entityX, entityY, bodyAngle, sizePx)) {
                     webgl.flushGeom();
                     webgl.beginGeomFrame();
                     webgl.setDepthFunc(ML_ENTITY_UNIT_DEPTH ? false : true);
@@ -2493,6 +2729,8 @@ function _renderMultiLayerEntity(
 
         const effectiveAngle = layer.stationary ? -bodyAngle : layer._currentAngle;
         const layerWorldAngle = bodyAngle + effectiveAngle;
+        let lcx = entityX, lcy = entityY;
+        if (layerIsPlaced(layer)) { layerPlaceInto(_lpOut, layer, sizePx / 2, Math.cos(bodyAngle), Math.sin(bodyAngle)); lcx += _lpOut[0]; lcy += _lpOut[1]; }
         const layerSideCorr = computeSideCorr(layer.sides, _rd.sides);
         const barrelEffSizePx = layerSizePx;
         if (_hasLayerBullets) {
@@ -2517,7 +2755,7 @@ function _renderMultiLayerEntity(
             for (let ti = 0; ti < sorted.length; ti++) {
                 if (sorted[ti].aboveTankBody || _turretLayerRef[ti] !== layer) continue;
                 const rl = sorted[ti].renderLayer ?? 0;
-                if (rl !== _prevRL && _rlHasGeom) {
+                if (_rlStep(sorted[ti], rl, lcx, lcy, layerWorldAngle, layerSizePx)) {
                     webgl.flushGeom();
                     webgl.beginGeomFrame();
                     webgl.setDepthFunc(ML_ENTITY_UNIT_DEPTH ? false : true);
@@ -2526,9 +2764,9 @@ function _renderMultiLayerEntity(
                 _prevRL = rl; _rlHasGeom = true;
                 const t = sorted[ti];
                 if (t.turretType === 'auto') {
-                    _geoEmitAutoTurret(webgl, t, entityX, entityY, layerWorldAngle, aimAngle, layerSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, bodyR, bodyG, bodyB);
+                    _geoEmitAutoTurret(webgl, t, lcx, lcy, layerWorldAngle, aimAngle, layerSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, bodyR, bodyG, bodyB);
                 } else {
-                    _geoEmitBarrel(webgl, t, entityX, entityY, layerWorldAngle, layerWorldAngle, barrelEffSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, false);
+                    _geoEmitBarrel(webgl, t, lcx, lcy, layerWorldAngle, layerWorldAngle, barrelEffSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, false);
                 }
             }
             if (_rlHasGeom) webgl.flushGeom();
@@ -2536,16 +2774,22 @@ function _renderMultiLayerEntity(
 
         if (!_rd.showTurretsOnly) {
             webgl.beginGeomFrame();
+            const _lpTok = layer.opacity !== undefined && layer.opacity < 1 ? _partBegin(webgl, layer.opacity, _layerOnePiece(layer)) : 1;
             webgl.setDepthFunc(ML_ENTITY_UNIT_DEPTH ? false : true);
             webgl.setDepthMask(false);
             const layerHalf = layerSizePx / 2;
             const layerInitAngle = layer.initialAngle || 0;
             const _loKey = layerOutlineOf(layer) !== null ? webgl.outlineLayerBatchKey(layer.outline!) : '';
-            if (_loKey !== '') {
+            const _slSolid = layerSolidOf(layer);
+            if (_slSolid !== null) {
+                const _slKey = webgl.solidLayerBatchKey(_slSolid);
+                const _slN = layer.copies > 1 ? layer.copies : 1;
+                if (_slKey !== '') for (let c = 0; c < _slN; c++) _geoEmit(webgl, _slKey, lcx, lcy, layerWorldAngle + layerInitAngle + (Math.PI * 2 * c) / _slN, layerHalf, layerHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
+            } else if (_loKey !== '') {
                 const _loN = layer.copies > 1 ? layer.copies : 1;
-                for (let c = 0; c < _loN; c++) _geoEmit(webgl, _loKey, entityX, entityY, layerWorldAngle + layerInitAngle + (Math.PI * 2 * c) / _loN, layerHalf, layerHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
+                for (let c = 0; c < _loN; c++) _geoEmit(webgl, _loKey, lcx, lcy, layerWorldAngle + layerInitAngle + (Math.PI * 2 * c) / _loN, layerHalf, layerHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
             } else if (layer.sides < 3) {
-                _geoEmit(webgl, 'circle', entityX, entityY, layerWorldAngle, layerHalf, layerHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
+                _geoEmit(webgl, 'circle', lcx, lcy, layerWorldAngle, layerHalf, layerHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
             } else if (layer.copies > 1) {
                 const visualHalf = layerHalf * getRealSizeFactor(layer.sides);
                 const batchKey = layer.starDepth > 0
@@ -2553,23 +2797,24 @@ function _renderMultiLayerEntity(
                     : (layer.sides <= 16 ? POLY_BATCH_KEY[layer.sides] : 'circle');
                 for (let c = 0; c < layer.copies; c++) {
                     const copyRot = layerWorldAngle + (Math.PI * 2 * c) / layer.copies + layerInitAngle;
-                    _geoEmit(webgl, batchKey, entityX, entityY, copyRot, visualHalf, visualHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
+                    _geoEmit(webgl, batchKey, lcx, lcy, copyRot, visualHalf, visualHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
                 }
             } else if (layer.starDepth > 0) {
                 const visualHalf = layerHalf * getRealSizeFactor(layer.sides);
                 const starKey = webgl.getOrCreateStarBatch(layer.sides, layer.starDepth, layer.starCurved);
-                _geoEmit(webgl, starKey, entityX, entityY, layerWorldAngle + layerInitAngle, visualHalf, visualHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
+                _geoEmit(webgl, starKey, lcx, lcy, layerWorldAngle + layerInitAngle, visualHalf, visualHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
             } else {
                 const visualHalf = layerHalf * getRealSizeFactor(layer.sides);
                 const batchKey = layer.sides <= 16 ? POLY_BATCH_KEY[layer.sides] : 'circle';
-                _geoEmit(webgl, batchKey, entityX, entityY, layerWorldAngle + layerInitAngle, visualHalf, visualHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
+                _geoEmit(webgl, batchKey, lcx, lcy, layerWorldAngle + layerInitAngle, visualHalf, visualHalf, lr, lg, lb, dmg, 1.0, _entityAlpha);
             }
             if (layer.showHealerCross) {
                 const crossR = _HEALER_CROSS_SCALE * layerSizePx;
                 _hexToRGB(healerCrossFill(), _gColor, 0);
-                _geoEmit(webgl, 'healer_cross', entityX, entityY, layerWorldAngle + layerInitAngle,
+                _geoEmit(webgl, 'healer_cross', lcx, lcy, layerWorldAngle + layerInitAngle,
                     crossR, crossR, _gColor[0], _gColor[1], _gColor[2], dmg, 1.0, _entityAlpha);
             }
+            if (layer.opacity !== undefined && layer.opacity < 1) _partEnd(_lpTok, webgl);
             webgl.flushGeom();
         }
 
@@ -2588,7 +2833,7 @@ function _renderMultiLayerEntity(
             for (let ti = 0; ti < sorted.length; ti++) {
                 if (!sorted[ti].aboveTankBody || _turretLayerRef[ti] !== layer) continue;
                 const rl = sorted[ti].renderLayer ?? 0;
-                if (rl !== _prevRL && _rlHasGeom) {
+                if (_rlStep(sorted[ti], rl, lcx, lcy, layerWorldAngle, layerSizePx)) {
                     webgl.flushGeom();
                     webgl.beginGeomFrame();
                     webgl.setDepthFunc(ML_ENTITY_UNIT_DEPTH ? false : true);
@@ -2597,9 +2842,9 @@ function _renderMultiLayerEntity(
                 _prevRL = rl; _rlHasGeom = true;
                 const t = sorted[ti];
                 if (t.turretType === 'auto') {
-                    _geoEmitAutoTurret(webgl, t, entityX, entityY, layerWorldAngle, aimAngle, layerSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, bodyR, bodyG, bodyB);
+                    _geoEmitAutoTurret(webgl, t, lcx, lcy, layerWorldAngle, aimAngle, layerSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, bodyR, bodyG, bodyB);
                 } else {
-                    _geoEmitBarrel(webgl, t, entityX, entityY, layerWorldAngle, layerWorldAngle, barrelEffSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, false);
+                    _geoEmitBarrel(webgl, t, lcx, lcy, layerWorldAngle, layerWorldAngle, barrelEffSizePx, dmg, isTestMode, effectiveAngle, layer.sizeRatio, layerSizePx, 1.0, false);
                 }
             }
             if (_rlHasGeom) webgl.flushGeom();
@@ -2699,6 +2944,7 @@ function _layerTeamFillOf(index: number): string {
 }
 
 let _mdDragging = false;
+let _cePan = false, _cePanX = 0, _cePanY = 0;
 let _mdDragStartX = 0;
 let _mdDragStartY = 0;
 let _mdCamStartX = 0;
@@ -2892,7 +3138,9 @@ function playerRenderSizePx(logic: GameLogic): number {
   return tankSizeFromSlider(logic.state.tankSize) * logic.state.playerGrowthScale;
 }
 
-function _layerReach(bl: { sides: number; outline?: [number, number][] }): number {
+function _layerReach(bl: { sides: number; outline?: [number, number][]; solidId?: string }): number {
+  const sl = layerSolidOf(bl);
+  if (sl !== null) return solidStill(sl).reach;
   if (SMALL_FIX.G728 !== 0) {
     const o = layerOutlineOf(bl);
     if (o !== null) { let m = 0; for (let i = 0; i < o.length; i++) { const d = o[i][0] * o[i][0] + o[i][1] * o[i][1]; if (d > m) m = d; } return Math.sqrt(m); }
@@ -2904,6 +3152,7 @@ function playerBodyRadiusPx(logic: GameLogic): number {
   let visualRadius = entityRadius * getRealSizeFactor(logic.state.tankSides);
   for (let _li = 0; _li < logic.state.bodyLayers.length; _li++) {
     const _bl = logic.state.bodyLayers[_li];
+    if (layerIsPlaced(_bl)) continue;
     const _lr = entityRadius * _bl.sizeRatio * _layerReach(_bl);
     if (_lr > visualRadius) visualRadius = _lr;
   }
@@ -2934,6 +3183,7 @@ function fillPlayerRenderData(logic: GameLogic) {
   _rd.sides = logic.state.tankSides;
   _rd.shapeDepth = logic.state.tankShapeDepth ?? 0;
   _rd.shapeCurved = logic.state.tankShapeCurved ?? false;
+  _rd.bodyOpacity = partOpacityOf(logic.state.tankOpacity);
   const _pci = logic.playerBodyColorTeamIndex();
   if (logic.admin.colorsOn && logic.admin.playerSlot() >= 0) {
     _rd.color = bodyFill('', logic.admin.playerSlot()); _rd.colorMap = CM_FREE;
@@ -2984,12 +3234,14 @@ function fillPlayerRenderData(logic: GameLogic) {
     _rd.selectedTurretId = null;
     _rd.selectedAutoParentId = null;
   }
-  _rd.pickedBody = (!logic.state.isTestMode && logic.state.canvasEntityKind === 'tank' && logic.isTankToolActive && logic.layerPickMode)
+  _rd.pickedBody = (!logic.state.isTestMode && logic.state.canvasEntityKind === 'tank' && ((logic.isTankToolActive && logic.layerPickMode)
+      || (logic.isTurretPlacementEnabled && !logic.turretPlacing && logic.partPicked && !logic.state.selectedTurretId && !logic.state.autoSubTurretEditMode)))
     ? (logic.state.activeBodyLayerId ?? 'main') : '';
+  _rd.hidden = (!logic.state.isTestMode && logic.state.canvasEntityKind === 'tank' && logic.isTurretPlacementEnabled && logic.partHides.size > 0) ? logic.partHides : null;
   if (logic.state.inheritMode || logic.state.autoSubTurretInheritMode) {
     _rd.selectedTurretId = null;
   }
-  _rd.editingTurret = (!logic.state.isTestMode && logic.state.canvasEntityKind !== 'shape' && !logic.state.selectMode && logic.isTurretPlacementEnabled)
+  _rd.editingTurret = (!logic.state.isTestMode && logic.state.canvasEntityKind !== 'shape' && !logic.state.selectMode && logic.isTurretPlacementEnabled && logic.turretPlacing)
     ? logic.state.editingTurret : null;
   _rd.showTurretsOnly = logic.showTurretsOnly && toolStore.get() === 'import-export' && !(SMALL_FIX.R814 && logic.state.isTestMode);
   _computeInheritHighlights(logic);
@@ -3029,11 +3281,13 @@ function fillEnemyRenderData(enemy: EnemyTank, logic: GameLogic) {
   _rd.bodyAngle = enemy.angle;
   _rd.aimAngle = enemy.angle;
   _rd.turrets = enemy.turrets;
+  _rd.hidden = null;
   const _eBirthMs = enemy._mevBirthAt >= 0 ? logic.gameNow() - enemy._mevBirthAt : -1;
   _rd.sizePx = _eBirthMs >= 0 ? enemy.size * foodBirthGrowth(_eBirthMs) : enemy.size;
   _rd.sides = enemy.sides;
   _rd.shapeDepth = enemy.shapeDepth ?? 0;
   _rd.shapeCurved = enemy.shapeCurved ?? false;
+  _rd.bodyOpacity = enemy.bodyOpacity ?? 1;
   const _elf = _liveBotFill(logic, enemy);
   if (_elf !== '') {
     _rd.color = _elf; _rd.colorMap = CM_FREE;
@@ -3181,7 +3435,8 @@ export const GameCanvas: React.FC<Props> = React.memo(({ gameState, onInit, acti
         if (currentLogic.state.isTestMode && mobileActive()) return;
         if (e.target !== canvas && !currentLogic.state.isTestMode
             && !currentLogic.mapEditor.dragArmed && !currentLogic.mapEditor.zoneDragActive && currentLogic.mapEditor.vtxDrag === -1
-            && !currentLogic.mapEditor.placeStrokeActive && !currentLogic.mapEditor.eraseStrokeActive) return;
+            && !currentLogic.mapEditor.placeStrokeActive && !currentLogic.mapEditor.eraseStrokeActive
+            && currentLogic.ce.phase === 0 && !_cePan) return;
         const rect = canvas.getBoundingClientRect();
         const dpr = getEffectiveDPR();
         const mx = (e.clientX - rect.left) * dpr;
@@ -3194,6 +3449,8 @@ export const GameCanvas: React.FC<Props> = React.memo(({ gameState, onInit, acti
             currentLogic.mapDesignerCamY = _mdCamStartY - dy;
             return;
         }
+        currentLogic.ceShift = e.shiftKey; currentLogic.ceAlt = e.altKey; currentLogic.ceCtrl = e.ctrlKey || e.metaKey;
+        if (_cePan) { currentLogic.editorPanBy(mx - _cePanX, my - _cePanY); _cePanX = mx; _cePanY = my; }
         currentLogic.handleMouseMove(mx, my);
         if (currentLogic.isMapDesignerActive && !currentLogic.state.isTestMode) {
             const worldX = (mx - canvas.width / 2) / currentLogic.mapDesignerZoom + currentLogic.mapDesignerCamX;
@@ -3218,6 +3475,14 @@ export const GameCanvas: React.FC<Props> = React.memo(({ gameState, onInit, acti
             currentLogic.handleMouseRightDown();
             return;
         }
+        if (!currentLogic.state.isTestMode && !currentLogic.isMapDesignerActive && currentLogic.ceActiveView()
+            && (e.button === 1 || (e.button === 0 && currentLogic.keys.has('Space')))) {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const dpr = getEffectiveDPR();
+            _cePan = true; _cePanX = (e.clientX - rect.left) * dpr; _cePanY = (e.clientY - rect.top) * dpr;
+            return;
+        }
         if (e.button !== 0) return;
         if (currentLogic.isMapDesignerActive && e.button === 0) {
             const rect = canvas.getBoundingClientRect();
@@ -3239,9 +3504,11 @@ export const GameCanvas: React.FC<Props> = React.memo(({ gameState, onInit, acti
             _mdCamStartY = currentLogic.mapDesignerCamY;
             return;
         }
+        currentLogic.ceShift = e.shiftKey; currentLogic.ceAlt = e.altKey; currentLogic.ceCtrl = e.ctrlKey || e.metaKey;
         currentLogic.handleMouseDown();
     };
     const onMouseUp = (e: MouseEvent) => {
+        if (_cePan && (e.button === 1 || e.button === 0)) { _cePan = false; return; }
         if (currentLogic.state.isTestMode && mobileActive()) return;
         if (e.button === 2) {
             if (currentLogic.isMapDesignerActive && !currentLogic.state.isTestMode) {
@@ -3272,6 +3539,13 @@ export const GameCanvas: React.FC<Props> = React.memo(({ gameState, onInit, acti
     };
     const onWheel = (e: WheelEvent) => {
         if (currentLogic.state.isTestMode && currentLogic.spawnerHolding()) { e.preventDefault(); currentLogic.spawnerTurn(e.deltaY > 0 ? 1 : -1); return; }
+        if (!currentLogic.state.isTestMode && !currentLogic.isMapDesignerActive && currentLogic.ceActiveView()) {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const dpr = getEffectiveDPR();
+            currentLogic.editorWheel((e.clientX - rect.left) * dpr, (e.clientY - rect.top) * dpr, e.deltaY);
+            return;
+        }
         if (!currentLogic.isMapDesignerActive) return;
         e.preventDefault();
         const rect = canvas.getBoundingClientRect();
@@ -3280,9 +3554,18 @@ export const GameCanvas: React.FC<Props> = React.memo(({ gameState, onInit, acti
         const my = (e.clientY - rect.top) * dpr;
         currentLogic.handleMapDesignerWheel(mx, my, e.deltaY, canvas.width, canvas.height);
     };
-    const onContextMenu = (e: MouseEvent) => e.preventDefault();
+    const onContextMenu = (e: MouseEvent) => {
+        e.preventDefault();
+        if (currentLogic.state.isTestMode || currentLogic.isMapDesignerActive || !currentLogic.ceActive()) return;
+        openCanvasMenu(e);
+    };
+    const onDblClick = (e: MouseEvent) => {
+        if (e.button !== 0 || currentLogic.state.isTestMode || currentLogic.isMapDesignerActive) return;
+        if (currentLogic.ceDoubleClick()) e.preventDefault();
+    };
     const onWindowBlur = () => {
         _mdDragging = false;
+        _cePan = false;
         if (logicRef.current) {
             if (logicRef.current.endMapEditStroke() && SMALL_FIX.GH589 !== 0 && logicRef.current.onStateChange) logicRef.current.onStateChange(logicRef.current.state);
             cancelMapEditInteraction(logicRef.current.mapEditor);
@@ -3300,6 +3583,7 @@ export const GameCanvas: React.FC<Props> = React.memo(({ gameState, onInit, acti
     canvas.addEventListener('mousedown', onMouseDown);
     window.addEventListener('mouseup', onMouseUp);
     canvas.addEventListener('contextmenu', onContextMenu);
+    canvas.addEventListener('dblclick', onDblClick);
     canvas.addEventListener('wheel', onWheel, { passive: false });
     window.addEventListener('blur', onWindowBlur);
     _touch.attach(canvas, () => logicRef.current);
@@ -3429,6 +3713,7 @@ export const GameCanvas: React.FC<Props> = React.memo(({ gameState, onInit, acti
       canvas.removeEventListener('mousedown', onMouseDown);
       window.removeEventListener('mouseup', onMouseUp);
       canvas.removeEventListener('contextmenu', onContextMenu);
+      canvas.removeEventListener('dblclick', onDblClick);
       canvas.removeEventListener('wheel', onWheel);
       window.removeEventListener('blur', onWindowBlur);
       _touch.detach(); _unsubMobScale();
@@ -3495,9 +3780,9 @@ const HudBar: React.FC<{ g: HudBarGeom; scale: number; fillColor: string; ink: s
             </div>
             <div ref={refs.text} style={{
                 position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontFamily: HUD_FONT_FAMILY, fontWeight: 'bold', fontSize: g.font * scale, lineHeight: 1,
+                fontFamily: HUD_FONT_FAMILY, fontWeight: 'bold', fontSize: `calc(${g.font * scale}px * var(--hud-fit, 1))`, lineHeight: 1,
                 color: textColor, whiteSpace: 'pre', letterSpacing: 'normal',
-                WebkitTextStroke: `${HUD_STROKE_F * g.font * scale}px ${ink}`, paintOrder: 'stroke fill',
+                WebkitTextStrokeWidth: `calc(${HUD_STROKE_F * g.font * scale}px * var(--hud-fit, 1))`, WebkitTextStrokeColor: ink, paintOrder: 'stroke fill',
             }} />
         </div>
     );
@@ -3522,6 +3807,7 @@ interface XpBarAnim {
     kill: HudBarRefs;
     name: string | null;
     lvFill: HudSlot; lvText: HudSlot; lvName: string | null;
+    lvFit: number;
     scFill: HudSlot; scText: HudSlot;
     klFill: HudSlot; klText: HudSlot; klBoss: number; klAs: number;
     subj: string;
@@ -3530,13 +3816,16 @@ interface XpBarAnim {
 function _hudXpOf(logic: GameLogic): number { const w = logic.spectatedTank(); return w !== null ? w.currentXp : logic.state.currentXp; }
 
 function paintHudBars(a: XpBarAnim, st: GameState, logic: GameLogic): void {
-    const cap = isManhuntMode(st.gameModeConfig.mode) ? Infinity : levelHeldIn(st.gameModeConfig) && st.gameModeConfig.vampirism !== true ? 0 : (st.gameModeConfig.levelCap ?? 45);
+    const cap = hudLevelCapOf(st.gameModeConfig);
     hudXpView(a.v, XP_CURVE_COEFF, XP_LEVEL_OFFSET, cap, a.view);
     if (a.view.level > cap) a.view.level = cap;
     _paintShift(a.lvFill, a.level.fill.current, hudBarShift(HUD_BAR_LEVEL, a.view.pct / 100));
     const lt = a.level.text.current;
     if (lt && (lt !== a.lvText.el || a.view.level !== a.lvText.v || a.name !== a.lvName)) {
-        lt.textContent = `Level ${a.view.level} ${a.name ?? ''}`;
+        const ltx = `Level ${a.view.level} ${a.name ?? ''}`;
+        lt.textContent = ltx;
+        const fit = SMALL_FIX.R994 !== 0 ? hudFitScale(ltx, HUD_BAR_LEVEL) : 1;
+        if (lt !== a.lvText.el || fit !== a.lvFit) { lt.style.setProperty('--hud-fit', String(fit)); a.lvFit = fit; }
         a.lvText.el = lt; a.lvText.v = a.view.level; a.lvName = a.name;
     }
     const sv = roundHalfAway(a.v) - XP_SCORE_BASE;
@@ -3610,7 +3899,7 @@ const InGameHUD: React.FC<{ logic: GameLogic }> = ({ logic }) => {
             score: { fill: scoreFillRef, text: scoreTextRef },
             kill: { fill: killFillRef, text: killTextRef },
             name: null,
-            lvFill: _newSlot(), lvText: _newSlot(), lvName: null,
+            lvFill: _newSlot(), lvText: _newSlot(), lvName: null, lvFit: NaN,
             scFill: _newSlot(), scText: _newSlot(),
             klFill: _newSlot(), klText: _newSlot(), klBoss: NaN, klAs: NaN,
             subj: logic.spectatedTank()?.id ?? '',
@@ -4600,19 +4889,22 @@ function _emitAIVectorGeom(
         if (mainTurret) {
             let _mtAngle = enemy.angle;
             let _mtSize = enemy.size;
+            let _mtL: BodyLayer | null = null;
             for (let _li = 0; _li < enemy.bodyLayers.length; _li++) {
                 const _L = enemy.bodyLayers[_li];
                 if (_L.turretIds.indexOf(mainTurret.id) === -1) continue;
                 _mtAngle = enemy.angle + (_L.stationary ? -enemy.angle : _L._currentAngle);
                 _mtSize = enemy.size * _L.sizeRatio;
+                _mtL = _L;
                 break;
             }
             const rawOffX = mainTurret.xOffset * _mtSize / 2;
             const rawOffY = mainTurret.yOffset * _mtSize / 2;
             const cosA = Math.cos(_mtAngle);
             const sinA = Math.sin(_mtAngle);
-            const turretBaseX = enemy.position.x + rawOffX * cosA - rawOffY * sinA;
-            const turretBaseY = enemy.position.y + rawOffX * sinA + rawOffY * cosA;
+            let turretBaseX = enemy.position.x + rawOffX * cosA - rawOffY * sinA;
+            let turretBaseY = enemy.position.y + rawOffX * sinA + rawOffY * cosA;
+            if (_mtL !== null && layerIsPlaced(_mtL)) { layerPlaceInto(_lpOut, _mtL, enemy.size / 2, Math.cos(enemy.angle), Math.sin(enemy.angle)); turretBaseX += _lpOut[0]; turretBaseY += _lpOut[1]; }
             const tLen = _mapVal(mainTurret.length, 1, 100, _mtSize * 0.01, _mtSize / 2 + _mtSize * 10);
             const visualTurretAngle = mainTurret.turretType === 'auto'
                 ? mainTurret.autoCurrentAngle
@@ -5315,6 +5607,11 @@ function _layersRatio(layers: BodyLayer[] | null): number {
     if (layers !== null) for (let i = 0; i < layers.length; i++) { const r = Math.abs(layers[i].sizeRatio) * (SMALL_FIX.G766 !== 0 ? layerOutlineReach(layers[i]) : 1); if (r > m) m = r; }
     return m;
 }
+function _layersPlaceK(layers: BodyLayer[] | null | undefined): number {
+    let m = 0;
+    if (layers) for (let i = 0; i < layers.length; i++) { const r = layerPlaceReach(layers[i]) * 0.5; if (r > m) m = r; }
+    return m;
+}
 const _cullKByTurrets = new WeakMap<Turret[], { layers: BodyLayer[]; k: number }>();
 function _tankCullR(enemy: EnemyTank): number {
     const ts = enemy.turrets;
@@ -5323,7 +5620,8 @@ function _tankCullR(enemy: EnemyTank): number {
         let g = 0;
         for (let i = 0; i < ts.length; i++) { const r = _gunReachOf(ts[i]); if (r > g) g = r; }
         const ratio = _layersRatio(enemy.bodyLayers.length > 0 ? enemy.bodyLayers : null);
-        const k0 = (g > 0.6 ? g : 0.6) * ratio;
+        const pk = _layersPlaceK(enemy.bodyLayers);
+        const k0 = pk > 0 ? (g > 0.6 ? g : 0.6) * ratio + pk : (g > 0.6 ? g : 0.6) * ratio;
         const k = k0 > 2 ? k0 : 2;
         if (rec === undefined) { rec = { layers: enemy.bodyLayers, k }; _cullKByTurrets.set(ts, rec); }
         else { rec.layers = enemy.bodyLayers; rec.k = k; }
@@ -5335,7 +5633,8 @@ function _roundCullR(b: Bullet): number {
     const st = b.subTurrets;
     let g = 0;
     if (st) for (let i = 0; i < st.length; i++) { const td = st[i].turretData; const r = td ? _gunReachOf(td) : 11; if (r > g) g = r; }
-    const k = (g > 0.6 ? g : 0.6) * _layersRatio(b._bulletBodyLayers);
+    const pk = _layersPlaceK(b._bulletBodyLayers);
+    const k = pk > 0 ? (g > 0.6 ? g : 0.6) * _layersRatio(b._bulletBodyLayers) + pk : (g > 0.6 ? g : 0.6) * _layersRatio(b._bulletBodyLayers);
     return S * (k > 1 ? k : 1);
 }
 
@@ -6199,6 +6498,7 @@ function _edSegBegin(): void {
     gl.setDepthMask(true);
     gl.setSampleAlphaToCoverage(true);
     _lookDeferOn = true;
+    _partUnitsReset();
     _edSegOpen = true;
 }
 function _edSegEnd(): void {
@@ -6219,18 +6519,24 @@ function _edSegEnd(): void {
         _drainLookUnits(gl, ctx, _edLogic!, _edW, _edH);
         ctx.restore();
     }
+    if (_puUnits > 0) {
+        ctx.save();
+        _drainPartUnits(gl, ctx, _edLogic!, _edW, _edH);
+        ctx.restore();
+    }
 }
 function _edOverlayBreak(): void {
     if (!_edHookOn || _edOverlaysBroke) return;
     _edOverlaysBroke = true;
     _edSegEnd();
 }
-function _edGhosts(pass: 'below' | 'above', both: boolean): void {
+function _edGhosts(pass: 'below' | 'above', both: boolean, layer: BodyLayer | null = null): void {
     const ctx = _edCtx!, logic = _edLogic!;
     _edSegEnd();
     ctx.save();
     ctx.translate(_rd.posX, _rd.posY);
     ctx.rotate(_rd.bodyAngle);
+    if (layer !== null && layerIsPlaced(layer)) { layerPlaceInto(_lpOut, layer, _rd.sizePx / 2, 1, 0); ctx.translate(_lpOut[0], _lpOut[1]); }
     _ghostOn = true;
     drawPreviewTurret(ctx, logic, pass, true);
     if (both) drawPresetPreview(ctx, logic, pass, true);
@@ -6249,7 +6555,7 @@ function _edSlotEnd(pass: number): void {
 }
 function _edLayer(layer: BodyLayer, which: number): void {
     if (_previewInjectLayerId !== null && layer.id === _previewInjectLayerId && _previewInjectLogic !== null) {
-        _edGhosts(which === 0 ? 'below' : 'above', true);
+        _edGhosts(which === 0 ? 'below' : 'above', true, layer);
     }
 }
 function _edBelowDone(): void {
@@ -6371,8 +6677,7 @@ function _drawEditorTankGL(ctx: CanvasRenderingContext2D, logic: GameLogic, webg
     webgl.setDepthTestEnabled(true);
     webgl.setStrokeScale(Math.max(MIN_STROKE_SCREEN_PX / z, FIXED_STROKE_WIDTH) / FIXED_STROKE_WIDTH);
     _hexToRGB(_isDarkMode ? '#fcfcfd' : '#171718', _gColor, 0);
-    webgl.setInk(_gColor[0], _gColor[1], _gColor[2]);
-
+    webgl.setInk(_gColor[0], _gColor[1], _gColor[2], _pickInkK());
     _edRLBelow = -1; _edRLAbove = -1; _edRLBelowDone = true; _edRLAboveDone = true;
     if (_previewInjectLogic !== null && _previewInjectLayerId === null) {
         _edRLBelow = _getPreviewRenderLayerForPass(_previewInjectLogic, 'below'); _edRLBelowDone = _edRLBelow < 0;
@@ -7185,6 +7490,7 @@ function render(ctx: CanvasRenderingContext2D, logic: GameLogic, dt: number, act
     _lookAnimLogic = logic;
     _lookDeferOn = false;
     if (_lookDeferCount > 0) { for (let i = 0; i < _lookDeferCount; i++) _lookDeferRef[i] = null; _lookDeferCount = 0; }
+    _partUnitsReset();
     _edTankGL = null; _edCtx = null; _edLogic = null; _edHookOn = false; _ghostOn = false; _edSegOpen = false; _geoHl = false;
 
     _diagDrawOps = 0;
@@ -7890,7 +8196,7 @@ function render(ctx: CanvasRenderingContext2D, logic: GameLogic, dt: number, act
         webgl.beginGeomFrame();
     }
     _lookDeferOn = _wglUnifiedPassActive;
-
+    _partUnitsReset();
     if (logic.state.isTestMode && logic.mapState && logic.mapState.portals.length > 0) {
       const _rsPortals = logic.mapState.portals;
       const _rsCamX = logic.cameraX;
@@ -7933,8 +8239,9 @@ function render(ctx: CanvasRenderingContext2D, logic: GameLogic, dt: number, act
     if (logic.state.isTestMode) {
         const _pLayerCount = logic.state.bodyLayers.length;
         const _pTurretCount = logic.state.turrets.length;
+        const _pSeeThroughRes = SEE_THROUGH_ROUTE.ON !== 0 && designHasSeeThroughPart(logic.state.tankOpacity, logic.state.bodyLayers, logic.state.turrets);
         const _mlEnemyBudget = enemyQueueBudget(
-            _MAX_ML_ENTITIES, playerReservesMultiLayerSlot(_pLayerCount, _pTurretCount));
+            _MAX_ML_ENTITIES, playerReservesMultiLayerSlot(_pLayerCount, _pTurretCount, _pSeeThroughRes));
         const _invisEnemyBudget = enemyQueueBudget(
             _MAX_INVIS_DEFER, playerReservesInvisibleSlot(
                 _pLayerCount,
@@ -8055,8 +8362,9 @@ function render(ctx: CanvasRenderingContext2D, logic: GameLogic, dt: number, act
                             const _eLayerCount = _eHasLayers ? _rd.bodyLayers!.length : 0;
                             const _eTurretCount = _rd.turrets ? _rd.turrets.length : 0;
                             const _eOneUnit = fadesAsOneUnit(_rd.canFade, _eLayerCount, _eTurretCount);
+                            const _eSeeThrough = !_rd.canFade && SEE_THROUGH_ROUTE.ON !== 0 && designHasSeeThroughPart(_rd.bodyOpacity, _rd.bodyLayers, _rd.turrets);
                             const _eNeedsML = !_eOneUnit && needsLayerInterleaveSlot(
-                                _eLayerCount, _eTurretCount);
+                                _eLayerCount, _eTurretCount, _eSeeThrough);
                             if (_eNeedsML && _mlCount < _mlEnemyBudget) {
                                 _mlVisibleIdx[_mlCount] = _wglVisibleEntityIdx;
                                 _mlBulletSlot[_mlCount] = _eHasBullets ? _eSlot! : -2;
@@ -8182,8 +8490,9 @@ function render(ctx: CanvasRenderingContext2D, logic: GameLogic, dt: number, act
                 const _pFillLayers = _pHasLayers ? _rd.bodyLayers!.length : 0;
                 const _pFillTurrets = _rd.turrets ? _rd.turrets.length : 0;
                 const _pOneUnit = fadesAsOneUnit(_rd.canFade, _pFillLayers, _pFillTurrets);
+                const _pSeeThrough = !_rd.canFade && SEE_THROUGH_ROUTE.ON !== 0 && designHasSeeThroughPart(_rd.bodyOpacity, _rd.bodyLayers, _rd.turrets);
                 const _pNeedsML = !_pOneUnit && needsLayerInterleaveSlot(
-                    _pFillLayers, _pFillTurrets);
+                    _pFillLayers, _pFillTurrets, _pSeeThrough);
                 if (_pNeedsML && _mlCount < _MAX_ML_ENTITIES) {
                     _mlVisibleIdx[_mlCount] = _wglVisibleEntityIdx;
                     _mlBulletSlot[_mlCount] = -1;
@@ -8290,11 +8599,12 @@ function render(ctx: CanvasRenderingContext2D, logic: GameLogic, dt: number, act
             _restoreCameraTransform(ctx, logic, width, height);
         }
 
-        if (_lookDeferCount > 0) _drainLookUnits(webgl, ctx, logic, width, height);
-
         if (FADE_KEEPS_ALIVE_Z && _dyingBulletDeferCount > 0) {
             _drainDyingBulletUnits(webgl, ctx, logic, width, height, _camOffX, _camOffY, true);
         }
+
+        if (_lookDeferCount > 0) _drainLookUnits(webgl, ctx, logic, width, height);
+        if (_puUnits > 0) _drainPartUnits(webgl, ctx, logic, width, height);
 
         if (_mlCount > 0) {
             const _mlGhost = logic.state.ghostMode;
@@ -8311,10 +8621,12 @@ function render(ctx: CanvasRenderingContext2D, logic: GameLogic, dt: number, act
                         - (_mlVisibleIdx[mi] + 0.5) * _bodyRangePerEntity;
                     _geoUnitDepthOn = 1;
                 }
+                _mlCtx = ctx;
                 _renderMultiLayerEntity(webgl, ctx, _mlVisibleIdx[mi], _bulletsArr,
                     _mlBulletSlot[mi], _mlIsPlayer[mi] !== 0,
                     viewportBounds, _mlGhost, _mlPlayerId, width, height, logic);
                 _geoUnitDepthOn = 0;
+                _mlCtx = null;
 
                 webgl.clearColorOnly();
                 if (ML_CROSS_ENTITY_DEPTH_STAMP) {
@@ -8642,7 +8954,7 @@ function render(ctx: CanvasRenderingContext2D, logic: GameLogic, dt: number, act
             for (let i = 0; i < _nShapes; i++) {
                 const poly = i < _nPolys ? _polys[i] : i < _nPuffEnd ? _puffs[i - _nPolys] : _props[i - _nPuffEnd];
                 if (!poly.isPolyhedron || !poly.active || poly.opacity <= 0) continue;
-                if (!isInViewport(poly.position.x, poly.position.y, poly.size * poly.growth * 1.1, viewportBounds)) continue;
+                if (!isInViewport(poly.position.x, poly.position.y, _solidCullRadius(poly), viewportBounds)) continue;
                 const pAlpha = poly.opacity / 255;
                 drawPolygonWithScratch(ctx, logic, poly, pAlpha);
             }
@@ -8738,7 +9050,8 @@ function render(ctx: CanvasRenderingContext2D, logic: GameLogic, dt: number, act
             const poly = i < _nPolys ? _polys[i] : i < _nPuffEnd ? _puffs[i - _nPolys] : _props[i - _nPuffEnd];
 
             if (!poly.active || poly.opacity <= 0) continue;
-            const polyRadius = poly.look !== null ? Math.max(poly.size, poly.size * poly.look.reach / 2) * poly.growth : poly.size * poly.growth;
+            const polyRadius = poly.look !== null ? Math.max(poly.size, poly.size * poly.look.reach / 2) * poly.growth
+                : poly.isPolyhedron ? _solidCullRadius(poly) : poly.size * poly.growth;
             if (!isInViewport(poly.position.x, poly.position.y, polyRadius, viewportBounds)) continue;
 
             const alpha = poly.opacity / 255;
@@ -9188,6 +9501,8 @@ function render(ctx: CanvasRenderingContext2D, logic: GameLogic, dt: number, act
     }
 
     drawMapEditorHint(ctx, logic, width, _isDarkMode);
+    drawCanvasGesture(ctx, logic, width, height, _isDarkMode);
+    if (logic.state.isTestMode && logic.state.debugMode && logic.state.dbgShowHitAreas && !_photoHide) drawMatchHitAreas(ctx, logic, width, height, _isDarkMode);
 
     if (logic.isMapDesignerActive && !logic.state.isTestMode) {
         const _me = logic.mapEditor;
@@ -9196,8 +9511,9 @@ function render(ctx: CanvasRenderingContext2D, logic: GameLogic, dt: number, act
             : _me.tool === 'none' ? (_me.hasHover ? 'var(--cur-pointer)' : 'var(--cur-default)')
             : 'var(--cur-crosshair)';
         if (ctx.canvas.style.cursor !== _want) ctx.canvas.style.cursor = _want;
-    } else if (ctx.canvas.style.cursor !== '') {
-        ctx.canvas.style.cursor = '';
+    } else {
+        const _cw = canvasGestureCursor(logic);
+        if (ctx.canvas.style.cursor !== _cw) ctx.canvas.style.cursor = _cw;
     }
 
     if (logic.state.isTestMode) {
@@ -10578,7 +10894,7 @@ function drawTurrettedBulletWithScratch(targetCtx: CanvasRenderingContext2D, log
     if (SMALL_FIX.CC004 !== 0 && hasBodyLayers && bLayers!.length > 1) {
         _scratchRoundLayerBuf.length = bLayers!.length;
         for (let _li = 0; _li < bLayers!.length; _li++) _scratchRoundLayerBuf[_li] = bLayers![_li];
-        _scratchRoundLayerBuf.sort(_bodyLayerCmp);
+        sortInPlace(_scratchRoundLayerBuf, _bodyLayerCmp);
         bOrd = _scratchRoundLayerBuf;
     }
 
@@ -10623,6 +10939,7 @@ function drawTurrettedBulletWithScratch(targetCtx: CanvasRenderingContext2D, log
             }
         }
     }
+    if (hasBodyLayers) { const _pk = _layersPlaceK(bLayers); if (_pk > 0) maxExtent += _pk * sz; }
     const bufSize = Math.ceil(maxExtent * 2 + strokeWidth * 2 + 8);
     const cs = scratchScale(bufSize, _MAX_SCRATCH_PX, _currentCacheScale);
     const scaledBuf = Math.ceil(bufSize * cs);
@@ -10663,6 +10980,7 @@ function drawTurrettedBulletWithScratch(targetCtx: CanvasRenderingContext2D, log
 
             sCtx.save();
             const _blAngle = _bl.stationary ? -bodyRotation : _bl._currentAngle;
+            if (layerIsPlaced(_bl)) { layerPlaceInto(_lpOut, _bl, sizePx / 2, 1, 0); sCtx.translate(_lpOut[0], _lpOut[1]); }
             sCtx.rotate(_blAngle);
 
             for (let _si = 0; _si < sortedBSubs.length; _si++) {
@@ -10680,7 +10998,10 @@ function drawTurrettedBulletWithScratch(targetCtx: CanvasRenderingContext2D, log
             sCtx.lineWidth = strokeWidth;
             sCtx.beginPath();
             const _blo0 = layerOutlineOf(_bl);
-            if (_blo0 !== null) {
+            const _bls0 = layerSolidOf(_bl);
+            if (_bls0 !== null) {
+                strokeFillLayerSolid(sCtx, _bls0, _blSizePx / 2, _blInitAngle0, (_bl.copies || 1), _blStroke0, strokeWidth, _blFill);
+            } else if (_blo0 !== null) {
                 strokeFillLayerOutline(sCtx, _blo0, _blSizePx / 2, _blInitAngle0, (_bl.copies || 1), _blStroke0, strokeWidth, _blFill);
             } else if (_bl.sides < 3) {
                 sCtx.arc(0, 0, _blSizePx / 2, 0, Math.PI * 2);
@@ -10785,6 +11106,7 @@ function drawTurrettedBulletWithScratch(targetCtx: CanvasRenderingContext2D, log
 
             sCtx.save();
             const _blAngle = _bl.stationary ? -bodyRotation : _bl._currentAngle;
+            if (layerIsPlaced(_bl)) { layerPlaceInto(_lpOut, _bl, sizePx / 2, 1, 0); sCtx.translate(_lpOut[0], _lpOut[1]); }
             sCtx.rotate(_blAngle);
 
             for (let _si = 0; _si < sortedBSubs.length; _si++) {
@@ -10802,7 +11124,10 @@ function drawTurrettedBulletWithScratch(targetCtx: CanvasRenderingContext2D, log
             sCtx.lineWidth = strokeWidth;
             sCtx.beginPath();
             const _blo1 = layerOutlineOf(_bl);
-            if (_blo1 !== null) {
+            const _bls1 = layerSolidOf(_bl);
+            if (_bls1 !== null) {
+                strokeFillLayerSolid(sCtx, _bls1, _blSizePx / 2, _blInitAngle1, (_bl.copies || 1), _blStroke1, strokeWidth, _blFill);
+            } else if (_blo1 !== null) {
                 strokeFillLayerOutline(sCtx, _blo1, _blSizePx / 2, _blInitAngle1, (_bl.copies || 1), _blStroke1, strokeWidth, _blFill);
             } else if (_bl.sides < 3) {
                 sCtx.arc(0, 0, _blSizePx / 2, 0, Math.PI * 2);
@@ -10863,6 +11188,10 @@ function _drawSolid(c: CanvasRenderingContext2D, solid: ArrasSolid, wx: number, 
     c.stroke();
 }
 
+function _solidCullRadius(poly: FloatingPolygon): number {
+    return poly.size * poly.growth * Math.max(1.1, 0.55 * polyhedronExtent(poly.polyhedronType));
+}
+
 function drawPolygonWithScratch(targetCtx: CanvasRenderingContext2D, logic: GameLogic, poly: FloatingPolygon, alpha: number) {
     const sz = poly.size * poly.growth;
     if (poly.isPolyhedron && alpha >= 0.99) {
@@ -10876,7 +11205,7 @@ function drawPolygonWithScratch(targetCtx: CanvasRenderingContext2D, logic: Game
     const maxStroke = Math.max(MIN_STROKE_SCREEN_PX / logic.zoom, FIXED_STROKE_WIDTH);
     const bufSize = Math.ceil(visualDiameter + maxStroke * 2 + 20);
 
-    if (bufSize > _MAX_SCRATCH_PX) {
+    if (bufSize > _MAX_SCRATCH_PX && alpha >= 0.99) {
         targetCtx.save();
         targetCtx.translate(poly.position.x, poly.position.y);
         targetCtx.globalAlpha = alpha;
@@ -10886,7 +11215,7 @@ function drawPolygonWithScratch(targetCtx: CanvasRenderingContext2D, logic: Game
         return;
     }
 
-    const cs = Math.min(_currentCacheScale, Math.max(1, Math.floor(_MAX_SCRATCH_PX / bufSize)));
+    const cs = scratchScale(bufSize, _MAX_SCRATCH_PX, _currentCacheScale);
     const scaledBuf = Math.ceil(bufSize * cs);
     getScratch(bufSize, bufSize, cs);
     const sc = scratchCanvas!;
@@ -11167,6 +11496,7 @@ function drawTankWithScratch(targetCtx: CanvasRenderingContext2D, scale: number,
             }
         }
     }
+    { const _pk = _layersPlaceK(_scratchLayers); if (_pk > 0) maxTurretLen += _pk * sizePx; }
     const maxStroke = Math.max(MIN_STROKE_SCREEN_PX / _rd.zoom, FIXED_STROKE_WIDTH);
     const bufSize = Math.ceil((maxTurretLen * scale) * 2.2 + maxStroke * 2);
 
@@ -11211,7 +11541,7 @@ function _sortTurrets(turrets: any[]): any[] {
     _lastSortedTurretsLen = len;
     _turretSortBuf.length = len;
     for (let i = 0; i < len; i++) _turretSortBuf[i] = turrets[i];
-    _turretSortBuf.sort(_turretLayerCmp);
+    sortInPlace(_turretSortBuf, _turretLayerCmp);
     return _turretSortBuf;
 }
 
@@ -11219,7 +11549,7 @@ function _sortSubTurrets(turrets: any[]): any[] {
     const len = turrets.length;
     _subTurretSortBuf.length = len;
     for (let i = 0; i < len; i++) _subTurretSortBuf[i] = turrets[i];
-    _subTurretSortBuf.sort(_turretLayerCmp);
+    sortInPlace(_subTurretSortBuf, _turretLayerCmp);
     return _subTurretSortBuf;
 }
 
@@ -11227,7 +11557,7 @@ function _sortBulletSubs(subs: any[]): any[] {
     const len = subs.length;
     _bulletSubSortBuf.length = len;
     for (let i = 0; i < len; i++) _bulletSubSortBuf[i] = subs[i];
-    _bulletSubSortBuf.sort(_bulletSubCmp);
+    sortInPlace(_bulletSubSortBuf, _bulletSubCmp);
     return _bulletSubSortBuf;
 }
 
@@ -11238,7 +11568,7 @@ const _lookFillOf2D = (color: string, map: number): string => {
     const f = _lookAnimFill !== '' ? _lookAnimFill : bodyFill(color, map);
     return _lookFlash > 0 ? mixColorToWhite(f, _lookFlash) : f;
 };
-const _lookLineSel = (): string => (_isDarkMode ? '#fcfcfd' : '#171718');
+const _lookLineSel = (fill: string): string => _pickStroke(_otherLineOf(fill));
 let _lookUnitCanvas: HTMLCanvasElement | null = null;
 let _lookUnitCtx: CanvasRenderingContext2D | null = null;
 const _LOOK_UNIT_MAX_PX = 2048;
@@ -11292,7 +11622,14 @@ function _drawLook2D(ctx: CanvasRenderingContext2D, look: PlacedLook, sizePx: nu
     _lookAnimFill = '';
 }
 
-function _drawSingleTurret(ctx: CanvasRenderingContext2D, sizePx: number, aimOffset: number, t: Turret, overrideAim?: number, parentRotation?: number, layerSpinAngle = 0, bodyScaleFactor = 1.0, positionSizePx = 0, sideCorr = 1.0) {
+function _drawSingleTurret(ctx: CanvasRenderingContext2D, sizePx: number, aimOffset: number, t: Turret, overrideAim?: number, parentRotation?: number, layerSpinAngle = 0, bodyScaleFactor = 1.0, positionSizePx = 0, sideCorr = 1.0): void {
+    if (_rdHid(t.id)) return;
+    if (t.opacity === undefined || !(t.opacity < 1)) { _drawSingleTurretOne(ctx, sizePx, aimOffset, t, overrideAim, parentRotation, layerSpinAngle, bodyScaleFactor, positionSizePx, sideCorr); return; }
+    const sc = _plainPartBegin(ctx);
+    _drawSingleTurretOne(sc, sizePx, aimOffset, t, overrideAim, parentRotation, layerSpinAngle, bodyScaleFactor, positionSizePx, sideCorr);
+    _plainPartPaste(ctx, sc, t.opacity);
+}
+function _drawSingleTurretOne(ctx: CanvasRenderingContext2D, sizePx: number, aimOffset: number, t: Turret, overrideAim?: number, parentRotation?: number, layerSpinAngle = 0, bodyScaleFactor = 1.0, positionSizePx = 0, sideCorr = 1.0) {
 
     ctx.save();
     const isAuto = t.turretType === 'auto';
@@ -11375,7 +11712,7 @@ function _drawSingleTurret(ctx: CanvasRenderingContext2D, sizePx: number, aimOff
         const _tFill = turretFill(t.color, t.colorMap);
         const barrelDispColor = _rd.damageOverlay > 0 ? mixColorToWhite(_tFill, _rd.damageOverlay) : _tFill;
         const _barrelHighlighted = !_rd.isTestMode && (_rd.selectedTurretId === t.id || _inheritHighlightIds.has(t.id));
-        ctx.strokeStyle = _barrelHighlighted ? (_isDarkMode ? '#fcfcfd' : '#171718') : darkenColor(barrelDispColor, 0.598);
+        ctx.strokeStyle = _barrelHighlighted ? _pickStroke(darkenColor(barrelDispColor, 0.598)) : darkenColor(barrelDispColor, 0.598);
         ctx.lineWidth = Math.max(MIN_STROKE_SCREEN_PX / _rd.zoom, FIXED_STROKE_WIDTH);
         ctx.stroke();
         ctx.fillStyle = barrelDispColor;
@@ -11406,7 +11743,7 @@ function _drawSingleTurret(ctx: CanvasRenderingContext2D, sizePx: number, aimOff
             const circleBaseColor = t.autoCircleColorMatch ? _rd.color : turretFill(t.color, t.colorMap);
             const circleDispColor = _rd.damageOverlay > 0 ? mixColorToWhite(circleBaseColor, _rd.damageOverlay) : circleBaseColor;
             const _circleHighlighted = !_rd.isTestMode && (_rd.selectedTurretId === t.id || _inheritHighlightIds.has(t.id));
-            ctx.strokeStyle = _circleHighlighted ? (_isDarkMode ? '#fcfcfd' : '#171718') : darkenColor(circleDispColor, 0.598);
+            ctx.strokeStyle = _circleHighlighted ? _pickStroke(darkenColor(circleDispColor, 0.598)) : darkenColor(circleDispColor, 0.598);
             ctx.lineWidth = strokeWidth;
             ctx.stroke();
             ctx.fillStyle = circleDispColor;
@@ -11505,13 +11842,65 @@ function _buildTurretLayerFlags(turrets: Turret[], layers: BodyLayer[] | null) {
     }
 }
 
+const _plainScratch = new PartScratch();
+function _plainPartBegin(ctx: CanvasRenderingContext2D): CanvasRenderingContext2D { return _plainScratch.begin(ctx); }
+function _plainPartPaste(ctx: CanvasRenderingContext2D, sc: CanvasRenderingContext2D, op: number): void { _plainScratch.paste(ctx, sc, op); }
+function _drawLayerShape(ctx: CanvasRenderingContext2D, layer: BodyLayer, layerSizePx: number, layerHalf: number, layerColor: string): void {
+        const bodyDispColor = _rd.damageOverlay > 0 ? mixColorToWhite(layerColor, _rd.damageOverlay) : layerColor;
+        const _layerInitAngle = layer.initialAngle || 0;
+        ctx.lineJoin = 'round';
+        const _lyOutline = layerOutlineOf(layer);
+        const _lySolid = layerSolidOf(layer);
+        if (_lySolid !== null) {
+            const _slStroke = darkenColor(bodyDispColor, 0.598);
+            strokeFillLayerSolid(ctx, _lySolid, layerHalf, _layerInitAngle, layer.copies, _rd.pickedBody === layer.id ? _pickStroke(_slStroke) : _slStroke,
+                Math.max(MIN_STROKE_SCREEN_PX / _rd.zoom, FIXED_STROKE_WIDTH), (_isDarkMode && layer.intangible) ? _slStroke : bodyDispColor);
+        } else if (_lyOutline !== null && layer.copies > 1) {
+            const _loStroke = darkenColor(bodyDispColor, 0.598);
+            strokeFillLayerOutline(ctx, _lyOutline, layerHalf, _layerInitAngle, layer.copies, _rd.pickedBody === layer.id ? _pickStroke(_loStroke) : _loStroke,
+                Math.max(MIN_STROKE_SCREEN_PX / _rd.zoom, FIXED_STROKE_WIDTH), (_isDarkMode && layer.intangible) ? _loStroke : bodyDispColor);
+        } else if (_lyOutline !== null) {
+            traceLayerOutline(ctx, _lyOutline, 0, 0, layerHalf, _layerInitAngle);
+        } else if (layer.sides < 3) {
+            ctx.beginPath();
+            ctx.arc(0, 0, layerHalf, 0, Math.PI * 2);
+            ctx.closePath();
+        } else {
+            const visualHalf = layerHalf * getRealSizeFactor(layer.sides);
+            ctx.beginPath();
+            if (layer.copies > 1) {
+                const _cpStroke = _rd.pickedBody === layer.id ? _pickStroke(darkenColor(bodyDispColor, 0.598)) : darkenColor(bodyDispColor, 0.598);
+                _strokeFillPolygonCopies(ctx, layer.sides, layer.copies, visualHalf, _layerInitAngle,
+                    _cpStroke, Math.max(MIN_STROKE_SCREEN_PX / _rd.zoom, FIXED_STROKE_WIDTH),
+                    (_isDarkMode && layer.intangible) ? (SMALL_FIX.CC003 !== 0 ? darkenColor(bodyDispColor, 0.598) : _cpStroke) : bodyDispColor,
+                    layer.starDepth, layer.starCurved);
+                ctx.beginPath();
+            } else if (layer.starDepth > 0) {
+                const innerR = visualHalf * (1 - layer.starDepth);
+                roundedStarPath(ctx, layer.sides, visualHalf, innerR, _layerInitAngle, layer.starCurved);
+            } else {
+                roundedPolygonPath(ctx, layer.sides, visualHalf, _layerInitAngle);
+            }
+        }
+        const _layerStroke = darkenColor(bodyDispColor, 0.598);
+        ctx.strokeStyle = _rd.pickedBody === layer.id ? _pickStroke(_layerStroke) : _layerStroke;
+        ctx.lineWidth = Math.max(MIN_STROKE_SCREEN_PX / _rd.zoom, FIXED_STROKE_WIDTH);
+        ctx.stroke();
+        ctx.fillStyle = (_isDarkMode && layer.intangible) ? _layerStroke : bodyDispColor;
+        ctx.fill();
+
+        if (layer.showHealerCross) {
+            _drawHealerCross(ctx, layerSizePx);
+        }
+}
+
 function _drawBodyLayers(ctx: CanvasRenderingContext2D, sizePx: number, turrets: Turret[], aboveBody = false) {
     const layers = _rd.bodyLayers;
     if (!layers || layers.length === 0) return;
 
     _bodyLayerSortBuf.length = layers.length;
     for (let i = 0; i < layers.length; i++) _bodyLayerSortBuf[i] = layers[i];
-    if (layers.length > 1) _bodyLayerSortBuf.sort(_bodyLayerCmp);
+    if (layers.length > 1) sortInPlace(_bodyLayerSortBuf, _bodyLayerCmp);
 
     for (let li = 0; li < _bodyLayerSortBuf.length; li++) {
         const layer = _bodyLayerSortBuf[li];
@@ -11533,6 +11922,7 @@ function _drawBodyLayers(ctx: CanvasRenderingContext2D, sizePx: number, turrets:
 
         ctx.save();
         const effectiveAngle = layer.stationary ? -_rd.bodyAngle : layer._currentAngle;
+        if (layerIsPlaced(layer)) { layerPlaceInto(_lpOut, layer, sizePx / 2, 1, 0); ctx.translate(_lpOut[0], _lpOut[1]); }
         ctx.rotate(effectiveAngle);
 
         if (_hasLayerBullets && _layerBulletRender.enabled) {
@@ -11554,49 +11944,11 @@ function _drawBodyLayers(ctx: CanvasRenderingContext2D, sizePx: number, turrets:
             ctx.restore();
         }
 
-        if (!_rd.showTurretsOnly) {
-        const bodyDispColor = _rd.damageOverlay > 0 ? mixColorToWhite(layerColor, _rd.damageOverlay) : layerColor;
-        const _layerInitAngle = layer.initialAngle || 0;
-        ctx.lineJoin = 'round';
-        const _lyOutline = layerOutlineOf(layer);
-        if (_lyOutline !== null && layer.copies > 1) {
-            const _loStroke = darkenColor(bodyDispColor, 0.598);
-            strokeFillLayerOutline(ctx, _lyOutline, layerHalf, _layerInitAngle, layer.copies, _rd.pickedBody === layer.id ? _lookLineSel() : _loStroke,
-                Math.max(MIN_STROKE_SCREEN_PX / _rd.zoom, FIXED_STROKE_WIDTH), (_isDarkMode && layer.intangible) ? _loStroke : bodyDispColor);
-        } else if (_lyOutline !== null) {
-            traceLayerOutline(ctx, _lyOutline, 0, 0, layerHalf, _layerInitAngle);
-        } else if (layer.sides < 3) {
-            ctx.beginPath();
-            ctx.arc(0, 0, layerHalf, 0, Math.PI * 2);
-            ctx.closePath();
-        } else {
-            const visualHalf = layerHalf * getRealSizeFactor(layer.sides);
-            ctx.beginPath();
-            if (layer.copies > 1) {
-                const _cpStroke = _rd.pickedBody === layer.id ? (_isDarkMode ? '#fcfcfd' : '#171718') : darkenColor(bodyDispColor, 0.598);
-                _strokeFillPolygonCopies(ctx, layer.sides, layer.copies, visualHalf, _layerInitAngle,
-                    _cpStroke, Math.max(MIN_STROKE_SCREEN_PX / _rd.zoom, FIXED_STROKE_WIDTH),
-                    (_isDarkMode && layer.intangible) ? (SMALL_FIX.CC003 !== 0 ? darkenColor(bodyDispColor, 0.598) : _cpStroke) : bodyDispColor,
-                    layer.starDepth, layer.starCurved);
-                ctx.beginPath();
-            } else if (layer.starDepth > 0) {
-                const innerR = visualHalf * (1 - layer.starDepth);
-                roundedStarPath(ctx, layer.sides, visualHalf, innerR, _layerInitAngle, layer.starCurved);
-            } else {
-                roundedPolygonPath(ctx, layer.sides, visualHalf, _layerInitAngle);
-            }
+        if (!_rd.showTurretsOnly && !_rdHid(layer.id)) {
+            if (layer.opacity !== undefined && layer.opacity < 1) { const _sc = _plainPartBegin(ctx); _drawLayerShape(_sc, layer, layerSizePx, layerHalf, layerColor); _plainPartPaste(ctx, _sc, layer.opacity); }
+            else _drawLayerShape(ctx, layer, layerSizePx, layerHalf, layerColor);
         }
-        const _layerStroke = darkenColor(bodyDispColor, 0.598);
-        ctx.strokeStyle = _rd.pickedBody === layer.id ? (_isDarkMode ? '#fcfcfd' : '#171718') : _layerStroke;
-        ctx.lineWidth = Math.max(MIN_STROKE_SCREEN_PX / _rd.zoom, FIXED_STROKE_WIDTH);
-        ctx.stroke();
-        ctx.fillStyle = (_isDarkMode && layer.intangible) ? _layerStroke : bodyDispColor;
-        ctx.fill();
 
-        if (layer.showHealerCross) {
-            _drawHealerCross(ctx, layerSizePx);
-        }
-        }
         if (_hasLayerBullets && _layerBulletRender.enabled) {
             _renderLayerBulletsForOrder(ctx, layer.renderOrder, layer.id, 1);
         }
@@ -11945,14 +12297,17 @@ function drawTankAndTurrets(ctx: CanvasRenderingContext2D, localCoords = false, 
     if (!_rd.isTestMode) _drawTurretRangeOverlays(ctx, sizePx, turrets);
     }
 
-    if ((passes & _PASS_BODY) && !_rd.showTurretsOnly) {
+    if ((passes & _PASS_BODY) && !_rd.showTurretsOnly && !_rdHid('main')) {
+    const _bodyOp = _rd.bodyOpacity < 1 ? _rd.bodyOpacity : 1;
+    const _bodyCtx = ctx;
+    if (_bodyOp < 1) ctx = _plainPartBegin(_bodyCtx);
     const _hasBaseSpin = _rd.baseBodyAngle !== 0;
     if (_hasBaseSpin) { ctx.save(); ctx.rotate(_rd.baseBodyAngle); }
 
     _drawBodyPath(ctx, sizePx);
 
     const bodyDispColor = _rd.damageOverlay > 0 ? mixColorToWhite(_rd.color, _rd.damageOverlay) : _rd.color;
-    ctx.strokeStyle = _rd.pickedBody === 'main' ? (_isDarkMode ? '#fcfcfd' : '#171718') : darkenColor(bodyDispColor, 0.598);
+    ctx.strokeStyle = _rd.pickedBody === 'main' ? _pickStroke(darkenColor(bodyDispColor, 0.598)) : darkenColor(bodyDispColor, 0.598);
     ctx.lineWidth = Math.max(MIN_STROKE_SCREEN_PX / _rd.zoom, FIXED_STROKE_WIDTH);
     ctx.stroke();
     ctx.fillStyle = bodyDispColor;
@@ -11961,6 +12316,7 @@ function drawTankAndTurrets(ctx: CanvasRenderingContext2D, localCoords = false, 
     if (_rd.isHealer) _drawHealerCross(ctx, sizePx);
 
     if (_hasBaseSpin) { ctx.restore(); }
+    if (_bodyOp < 1) { _plainPartPaste(_bodyCtx, ctx, _bodyOp); ctx = _bodyCtx; }
     }
 
     if (passes & _PASS_ABOVE) {
@@ -12005,6 +12361,7 @@ function drawEnemyHPBar(ctx: CanvasRenderingContext2D, logic: GameLogic, enemy: 
     let visualRadius = entityRadius * getRealSizeFactor(enemy.sides);
     for (let _li = 0; _li < enemy.bodyLayers.length; _li++) {
         const _bl = enemy.bodyLayers[_li];
+        if (layerIsPlaced(_bl)) continue;
         const _lr = entityRadius * _bl.sizeRatio * _layerReach(_bl);
         if (_lr > visualRadius) visualRadius = _lr;
     }
@@ -12028,7 +12385,7 @@ function _getPreviewRenderLayerForPass(logic: GameLogic, pass: 'below' | 'above'
     if (logic.state.selectMode) return -1;
     if (logic.state.autoSubTurretEditMode) return -1;
     if (!logic.isTurretPlacementEnabled) return -1;
-
+    if (!logic.turretPlacing && logic.state.presetPreviewTurrets.length === 0) return -1;
     const presetTurrets = logic.state.presetPreviewTurrets;
     if (presetTurrets.length > 0) {
         let minRL = Number.POSITIVE_INFINITY;
@@ -12068,6 +12425,7 @@ function drawPreviewTurret(ctx: CanvasRenderingContext2D, logic: GameLogic, pass
     }
 
     if (!logic.isTurretPlacementEnabled) return;
+    if (!logic.turretPlacing) return;
     if (logic.state.selectMode || logic.state.isTestMode) return;
     if (logic.state.presetPreviewTurrets.length > 0) return;
 
@@ -12077,13 +12435,14 @@ function drawPreviewTurret(ctx: CanvasRenderingContext2D, logic: GameLogic, pass
     if (pass === 'below' && isAbove) return;
     if (pass === 'above' && !isAbove) return;
 
-    const mx = (logic.mouseX - logic.width/2)/logic.zoom + (logic.cameraX - logic.tankPos.x);
-    const my = (logic.mouseY - logic.height/2)/logic.zoom + (logic.cameraY - logic.tankPos.y);
+    let mx = (logic.mouseX - logic.width/2)/logic.zoom + (logic.cameraX - logic.tankPos.x);
+    let my = (logic.mouseY - logic.height/2)/logic.zoom + (logic.cameraY - logic.tankPos.y);
+    if (tankLocal && logic.editorLayerPlace(logic.activeBodyLayer())) { mx -= logic.edLayerPlace[0]; my -= logic.edLayerPlace[1]; }
     let desiredAngle = Math.atan2(my, mx);
     const activeSides = logic.getActiveLayerSides();
     if (logic.state.snapPlacement) {
         if (activeSides >= 3) {
-            desiredAngle = snapAngleToFaceMidpoint(desiredAngle, activeSides, logic.tankAngle, logic.getActiveFaceOffset(activeSides));
+            desiredAngle = snapAngleToSides(desiredAngle, activeSides, logic.tankAngle, logic.getActiveFaceOffset(activeSides), logic.state.snapTarget);
         } else {
             desiredAngle = snapAngleToGrid(desiredAngle, SNAP_COUNTS[logic.state.snapPlacementCount]);
         }
@@ -12104,7 +12463,8 @@ function drawPreviewTurret(ctx: CanvasRenderingContext2D, logic: GameLogic, pass
 
     const bodyScale = sizeRatio;
 
-    const _ratioSideCorr = (logic.state.snapPlacement && activeSides >= 3 && !isAuto)
+    const _csOn = logic.customSnapLayer() !== null;
+    const _ratioSideCorr = (logic.state.snapPlacement && activeSides >= 3 && !isAuto && !_csOn)
       ? sideCorr
       : 1.0;
 
@@ -12308,6 +12668,7 @@ function drawPreviewTurret(ctx: CanvasRenderingContext2D, logic: GameLogic, pass
                         && activeSides >= 3
                         && logic.state.snapPlacement
                         && !isAuto
+                        && !_csOn
                         && _w18Layer1.sides >= 3);
     let layerShift: number;
     if (_w18UseW18) {
@@ -12331,18 +12692,24 @@ function drawPreviewTurret(ctx: CanvasRenderingContext2D, logic: GameLogic, pass
         : 0;
     }
 
+    if (_csOn) {
+        const n = logic.customSnapPlan(), P = logic.csPlan;
+        for (let i = 0; i < n; i++) drawOneAtOffset(P.a[i], P.x[i], P.y[i]);
+        return;
+    }
     if (logic.state.autoPlacement) {
         const isCombo = logic.state.snapPlacement && activeSides >= 3;
 
         if (isCombo) {
-            const count = Math.min(logic.state.autoPlacementCount, activeSides);
-            const faceAngles = logic.getSideSnapAngles(count, activeSides, logic.getActiveFaceOffset(activeSides));
+            const count = Math.min(logic.state.autoPlacementCount, snapPointsOf(activeSides, logic.state.snapTarget));
+            const faceAngles = logic.getSnapAngles(count, activeSides, logic.getActiveFaceOffset(activeSides), logic.state.snapTarget);
             const presetMag = Math.sqrt(t.xOffset * t.xOffset + prevEffY * prevEffY);
 
             for (let i = 0; i < faceAngles.length; i++) {
                 const faceAngle = faceAngles[i];
                 if (isAuto) {
-                    const rawDist = presetMag || logic.computeFaceEdgeOffset(activeSides, t.autoCircleSize ?? 25);
+                    const rawDist = presetMag || (logic.snapPlaceIsCorner(i) ? logic.computeCornerEdgeOffset(activeSides, t.autoCircleSize ?? 25)
+                      : logic.computeFaceEdgeOffset(activeSides, t.autoCircleSize ?? 25));
                     drawOneAtOffset(faceAngle, rawDist * Math.cos(faceAngle), rawDist * Math.sin(faceAngle));
                 } else {
                     const shiftedDist = presetMag + layerShift;
@@ -12830,16 +13197,16 @@ function drawAutoSubTurretPreview(ctx: CanvasRenderingContext2D, logic: GameLogi
     const parentOffY = parent.yOffset * sizePx / 2;
     const cosA = Math.cos(logic.tankAngle);
     const sinA = Math.sin(logic.tankAngle);
-    const circleCX = parentOffX * cosA - parentOffY * sinA;
-    const circleCY = parentOffX * sinA + parentOffY * cosA;
-
+    let circleCX = parentOffX * cosA - parentOffY * sinA;
+    let circleCY = parentOffX * sinA + parentOffY * cosA;
+    if (logic.editorLayerPlace(logic.getLayerForTurret(parentId))) { circleCX += logic.edLayerPlace[0]; circleCY += logic.edLayerPlace[1]; }
     const mx = (logic.mouseX - logic.width / 2) / logic.zoom + (logic.cameraX - logic.tankPos.x);
     const my = (logic.mouseY - logic.height / 2) / logic.zoom + (logic.cameraY - logic.tankPos.y);
     let desiredAngle = Math.atan2(my - circleCY, mx - circleCX);
 
     if (logic.state.autoSubTurretSnapPlacement) {
         if (logic.state.tankSides >= 3) {
-            desiredAngle = snapAngleToFaceMidpoint(desiredAngle, logic.state.tankSides, logic.tankAngle);
+            desiredAngle = snapAngleToSides(desiredAngle, logic.state.tankSides, logic.tankAngle, undefined, logic.state.autoSubTurretSnapTarget);
         } else {
             desiredAngle = snapAngleToGrid(desiredAngle, SNAP_COUNTS[logic.state.autoSubTurretSnapPlacementCount]);
         }
@@ -12964,15 +13331,15 @@ function drawAutoSubTurretPresetPreview(ctx: CanvasRenderingContext2D, logic: Ga
     const parentOffY = parent.yOffset * sizePx / 2;
     const cosA = Math.cos(logic.tankAngle);
     const sinA = Math.sin(logic.tankAngle);
-    const circleCX = parentOffX * cosA - parentOffY * sinA;
-    const circleCY = parentOffX * sinA + parentOffY * cosA;
-
+    let circleCX = parentOffX * cosA - parentOffY * sinA;
+    let circleCY = parentOffX * sinA + parentOffY * cosA;
+    if (logic.editorLayerPlace(logic.getLayerForTurret(parentId))) { circleCX += logic.edLayerPlace[0]; circleCY += logic.edLayerPlace[1]; }
     const mx = (logic.mouseX - logic.width / 2) / logic.zoom + (logic.cameraX - logic.tankPos.x);
     const my = (logic.mouseY - logic.height / 2) / logic.zoom + (logic.cameraY - logic.tankPos.y);
     let desiredAngle = Math.atan2(my - circleCY, mx - circleCX);
     if (logic.state.autoSubTurretSnapPlacement) {
         if (logic.state.tankSides >= 3) {
-            desiredAngle = snapAngleToFaceMidpoint(desiredAngle, logic.state.tankSides, logic.tankAngle);
+            desiredAngle = snapAngleToSides(desiredAngle, logic.state.tankSides, logic.tankAngle, undefined, logic.state.autoSubTurretSnapTarget);
         } else {
             desiredAngle = snapAngleToGrid(desiredAngle, SNAP_COUNTS[logic.state.autoSubTurretSnapPlacementCount]);
         }
@@ -13154,3 +13521,47 @@ export function renderSceneDone(): void {
   if (SMALL_FIX.G660 !== 0) { _layerBulletRender.logic = null; _layerBulletRender.bulletsArr = null; _layerBulletRender.viewportBounds = null; }
   if (SMALL_FIX.G723 !== 0) { _fog.reset(); _fogMatch = -1; }
 }
+
+export const __canvasPartsHooks = {
+    rd: _rd,
+    fillPlayerRenderData,
+    buildTurretLayerFlags: _buildTurretLayerFlags,
+    drawBodyLayers: _drawBodyLayers,
+    drawBodyPath: _drawBodyPath,
+    pickStroke: _pickStroke,
+    PICK_INK_K,
+    PICK_INK_K_DARK,
+    setDark: (d: boolean) => { _isDarkMode = d; },
+    rlStep: _rlStep,
+    rlReset: () => { _prevRL = -129; _rlHasGeom = false; },
+    rlMark: (rl: number) => { _prevRL = rl; _rlHasGeom = true; },
+    AUTO_BASE_WHOLE,
+};
+export const __partOpacityHooks = {
+    begin: _partBegin, end: _partEnd, emit: _geoEmit, drain: _drainPartUnits, reset: _partUnitsReset,
+    emitBarrel: _geoEmitBarrel, emitAutoTurret: _geoEmitAutoTurret, emitLook: _geoEmitLook,
+    setPass: (on: boolean, entityAlpha: number, entityIdx: number) => { _lookDeferOn = on; _entityAlpha = entityAlpha; _geoEntityIdx = entityIdx; _geoSubSlot = 0; },
+    setLayered: (c: CanvasRenderingContext2D | null) => { _mlCtx = c; _geoUnitDepthOn = c ? 1 : 0; _geoUnitDepthBuf[0] = 0.3; },
+    state: () => ({ open: _puOpen, share: _puShare, n: _puN, units: _puUnits, unitAlpha: _puUnitUnitAlpha(0), lookDeferred: _lookDeferCount }),
+    lookDeferReset: () => { for (let i = 0; i < _lookDeferCount; i++) _lookDeferRef[i] = null; _lookDeferCount = 0; },
+    route: SEE_THROUGH_ROUTE,
+    plainBegin: _plainPartBegin, plainPaste: _plainPartPaste, drawLayerShape: _drawLayerShape,
+    dyingQueue: (b: Bullet, depth: number, alpha: number) => {
+        _dyingBulletDeferRef[0] = b; _dyingBulletDeferAlpha[0] = alpha; _dyingBulletDeferScale[0] = 1;
+        _dyingBulletDeferPosX[0] = b.position.x; _dyingBulletDeferPosY[0] = b.position.y; _dyingBulletDeferDepth[0] = depth; _dyingBulletDeferCount = 1;
+    },
+    dyingDrain: _drainDyingBulletUnits,
+    renderLayered: _renderMultiLayerEntity,
+};
+function _puUnitUnitAlpha(u: number): number { return u < _puUnitCap ? _puUnitA[u] : -1; }
+export const __layerSortHooks = {
+    sortTurrets: _sortTurrets, sortSubTurrets: _sortSubTurrets, sortBulletSubs: _sortBulletSubs,
+    bodyLayerCmp: _bodyLayerCmp, turretLayerCmp: _turretLayerCmp, bulletSubCmp: _bulletSubCmp,
+    drawRoundScratch: drawTurrettedBulletWithScratch,
+};
+export const __solidPartsHooks = {
+    geoEmitBodyLayers: _geoEmitBodyLayers,
+    solidCullRadius: _solidCullRadius,
+    layerReach: _layerReach,
+    setEntity: (alpha: number, idx: number) => { _entityAlpha = alpha; _geoEntityIdx = idx; _geoSubSlot = 0; },
+};

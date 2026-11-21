@@ -8,6 +8,7 @@ import { Undo2 } from './ui/icons';
 import { X, ChevronDown, User, UserCog, Bot, ShieldAlert, Cross, Rabbit, ShieldOff, Crosshair, Recycle, FastForward, ShieldPlus, Shield, Heart, Drama, Dna, Ghost, Minus, Plus, SlidersHorizontal, HdBrainCircuit, HdGeometricShapes01, HdScanEye } from './ui/icons';
 import { GameLogic, DEBUG_SKILL_POINTS_MAX } from '../game/GameLogic';
 import type { EditStatsBoxes, EditStatsPreview } from '../game/GameLogic';
+import { SMALL_FIX } from '../game/smallFixSwitch';
 import { boxesOf, noTypedEdits, typeLevel, typeSkillPoints, typeStat } from './shared/editStatsBoxes';
 import type { EditStatsTyped } from './shared/editStatsBoxes';
 import { UpgradeStat, LibraryItem, TankConfig, EnemyTank, AIBehavior, StatNamesType, getStatLabel, isSmasherStatNames, AI_CONSTANTS, teamOverrideColor, isTeamMode } from '../types';
@@ -237,7 +238,7 @@ export const EditPlayerStatsPopup: React.FC<Props> = ({ logic, onClose: onCloseN
       id: logic.state.playerId,
       name: myName || 'You',
       isPlayer: true,
-      level: logic.state.level,
+      level: SMALL_FIX.R994 !== 0 ? logic.shownLevelOf(null) : logic.state.level,
       behavior: gm && isTeamMode(gm.mode) && gm.playerTeam >= 1 && gm.playerTeam <= 4 ? (`Team${gm.playerTeam}` as AIBehavior) : 'FFA',
       tier: logic.getStrengthTierName('player'),
       tankType: logic.playerTankDisplayName() ?? logic.resolveTankDisplayName(null) ?? undefined,
@@ -254,7 +255,7 @@ export const EditPlayerStatsPopup: React.FC<Props> = ({ logic, onClose: onCloseN
           id: enemy.id,
           name: baseName,
           isPlayer: false,
-          level: enemy.level,
+          level: SMALL_FIX.R994 !== 0 ? logic.shownLevelOf(enemy) : enemy.level,
           behavior: enemy.aiBehavior,
           tier: logic.getStrengthTierName(enemy),
           tankConfigName: config?.tankConfig ?

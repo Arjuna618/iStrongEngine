@@ -16,6 +16,7 @@ import type { HfState, BotFeelConfig } from "@/game/humanFeel";
 import type { GrowthRules } from "@/game/growthRules";
 
 export const SNAP_COUNTS = [4, 8, 16, 32, 64] as const;
+export type SnapTarget = 'faces' | 'corners' | 'both';
 
 export interface Point {
   x: number;
@@ -518,6 +519,7 @@ export interface Turret {
   aboveTankBody: boolean;
 
   renderLayer: number;
+  opacity?: number;
 
   autoFire: boolean;
 
@@ -2342,6 +2344,13 @@ export interface BodyLayer {
   starDepth: number;
   starCurved: boolean;
   outline?: [number, number][];
+  outlinePath?: [number, number, number, number, number, number][];
+  solidId?: string;
+  opacity?: number;
+  hits?: 'none' | 'circle' | 'exact';
+  hitSize?: number;
+  x?: number;
+  y?: number;
   intangible: boolean;
   showHealerCross: boolean;
   stationary: boolean;
@@ -2356,6 +2365,7 @@ export interface TankConfig {
   tankSides: number;
   tankShapeDepth?: number;
   tankShapeCurved?: boolean;
+  tankOpacity?: number;
   tankSize: number;
   tankColor: string;
   tankColorMap?: number;
@@ -2531,11 +2541,19 @@ export interface OtherDesign {
 
 export interface ExportFile {
   version: string;
-  type: 'Tank' | 'TurretPreset' | 'CustomTurret' | 'CustomProjectile' | 'Map' | 'MultiAreaMap' | 'FoodShape' | 'Other' | 'GameMode';
+  type: 'Tank' | 'TurretPreset' | 'CustomTurret' | 'CustomProjectile' | 'Map' | 'MultiAreaMap' | 'FoodShape' | 'Other' | 'GameMode' | 'Solid';
   name: string;
   timestamp: number;
   category?: string;
-  data: TankConfig | TurretPreset | CustomProjectileDesign | MapConfig | MultiAreaMapConfig | FoodShapeDesign | OtherDesign;
+  data: TankConfig | TurretPreset | CustomProjectileDesign | MapConfig | MultiAreaMapConfig | FoodShapeDesign | OtherDesign | SolidDesign;
+}
+
+export interface SolidDesign {
+  _designVersion: 1;
+  solidId: string;
+  name: string;
+  verts: number[];
+  faces: number[][];
 }
 
 export interface GameModeFile { gameModeFile: 1; config: GameModeConfig; map: MapConfig; areas?: MultiAreaMapConfig; }
@@ -3009,6 +3027,7 @@ export interface EnemyTank {
   sides: number;
   shapeDepth?: number;
   shapeCurved?: boolean;
+  bodyOpacity?: number;
   color: string;
   colorMap: number | undefined;
   keepOwnColor: boolean;
@@ -3642,6 +3661,7 @@ export interface GameState {
   tankSides: number;
   tankShapeDepth: number;
   tankShapeCurved: boolean;
+  tankOpacity?: number;
   tankSize: number;
   tankColor: string;
   tankColorMap?: number;
@@ -3727,6 +3747,7 @@ export interface GameState {
   dbgHudDrawOps: boolean;
   dbgHudWaves: boolean;
   dbgShowAreaMarks: boolean;
+  dbgShowHitAreas: boolean;
   dbgHudOverlayCost: boolean;
   dbgHudAimError: boolean;
   dbgHudAimReact: boolean;
@@ -3843,6 +3864,7 @@ export interface GameState {
   selectedTurretId: string | null;
   snapPlacement: boolean;
   snapPlacementCount: number;
+  snapTarget: SnapTarget;
   presetPreviewTurrets: Turret[];
   presetPreviewXform: { x: number; y: number; turn: number; size: number };
 
@@ -3857,6 +3879,7 @@ export interface GameState {
 
   tankLibrary: LibraryItem[];
   otherLibrary: LibraryItem[];
+  solidLibrary: LibraryItem[];
 
   projectileDesigns: CustomProjectileDesign[];
   turretPresets: TurretPreset[];
@@ -3874,6 +3897,7 @@ export interface GameState {
   autoSubTurretMirrorMode: boolean;
   autoSubTurretSnapPlacement: boolean;
   autoSubTurretSnapPlacementCount: number;
+  autoSubTurretSnapTarget: SnapTarget;
   autoSubTurretAutoPlacement: boolean;
   autoSubTurretAutoPlacementCount: number;
   autoSubTurretInheritMode: boolean;
@@ -4076,6 +4100,7 @@ export const INITIAL_GAME_STATE: GameState = {
   dbgHudDrawOps: false,
   dbgHudWaves: false,
   dbgShowAreaMarks: false,
+  dbgShowHitAreas: false,
   dbgHudOverlayCost: false,
   dbgHudAimError: false,
   dbgHudAimReact: false,
@@ -4193,6 +4218,7 @@ export const INITIAL_GAME_STATE: GameState = {
   selectedTurretId: null,
   snapPlacement: false,
   snapPlacementCount: 0,
+  snapTarget: 'faces',
   presetPreviewTurrets: [],
   presetPreviewXform: { x: 0, y: 0, turn: 0, size: 1 },
 
@@ -4208,6 +4234,7 @@ export const INITIAL_GAME_STATE: GameState = {
 
   tankLibrary: [],
   otherLibrary: [],
+  solidLibrary: [],
 
   projectileDesigns: [],
   turretPresets: [],
@@ -4226,6 +4253,7 @@ export const INITIAL_GAME_STATE: GameState = {
   autoSubTurretMirrorMode: false,
   autoSubTurretSnapPlacement: false,
   autoSubTurretSnapPlacementCount: 0,
+  autoSubTurretSnapTarget: 'faces',
   autoSubTurretAutoPlacement: false,
   autoSubTurretAutoPlacementCount: 1,
   autoSubTurretInheritMode: false,

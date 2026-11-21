@@ -1,6 +1,6 @@
 import React from 'react';
 import { MousePointer2 } from '../ui/icons';
-import { SNAP_COUNTS } from '../../types';
+import { SNAP_COUNTS, type SnapTarget } from '../../types';
 import { ButtonTooltip } from './HelpTooltip';
 import { AURA_DEFAULT, AURA_RANGE, AURA_TYPES } from '../../utils/aura';
 import { ToggleRow, SliderRow, SelectRow, FieldRow, Segmented, Button } from '../kit/kit';
@@ -25,6 +25,8 @@ interface Props {
   autoPlacementCount: number;
   snapPlacement: boolean;
   snapPlacementCount: number;
+  snapTarget?: SnapTarget;
+  onSetSnapTarget?: (v: SnapTarget) => void;
   aboveTankBody: boolean;
   bodySides: number;
   syncsSkillsToggle?: boolean;
@@ -112,6 +114,7 @@ export const TurretActionBar: React.FC<Props> = ({
   autoPlacementCount,
   snapPlacement,
   snapPlacementCount,
+  snapTarget,
   aboveTankBody,
   bodySides,
   syncsSkillsToggle,
@@ -163,6 +166,8 @@ export const TurretActionBar: React.FC<Props> = ({
 }) => {
   const isComboMode = autoPlacement && snapPlacement && bodySides >= 3;
   const compassMax = bodySides >= 3 ? bodySides : 8;
+  const _snapPts = snapTarget === 'both' ? bodySides * 2 : bodySides;
+  const _snapWords = snapTarget === 'corners' ? 'corners' : snapTarget === 'both' ? 'faces and corners' : 'face midpoints';
   const targetName = instructionContext === 'projectile' ? 'projectile preview' : 'canvas';
 
   switch (part) {
@@ -189,11 +194,11 @@ export const TurretActionBar: React.FC<Props> = ({
           : !selectMode ? (
             autoPlacement
               ? isComboMode
-                ? `Click ${targetName} to place ${Math.min(autoPlacementCount, bodySides)} turret${Math.min(autoPlacementCount, bodySides) > 1 ? 's' : ''} on face midpoints.`
+                ? `Click ${targetName} to place ${Math.min(autoPlacementCount, _snapPts)} turret${Math.min(autoPlacementCount, _snapPts) > 1 ? 's' : ''} on ${_snapWords}.`
                 : `Click ${targetName} to place ${autoPlacementCount} turrets evenly.`
               : snapPlacement
               ? bodySides >= 3
-                ? `Click ${targetName} to place. Snapping to ${bodySides} face midpoints.`
+                ? `Click ${targetName} to place. Snapping to ${_snapPts} ${_snapWords}.`
                 : `Click ${targetName} to place. Snapping to ${SNAP_COUNTS[snapPlacementCount]} directions.`
               : instructionContext === 'projectile'
               ? 'Click projectile preview to place. Hold Shift to snap angle.'
@@ -202,7 +207,7 @@ export const TurretActionBar: React.FC<Props> = ({
               : 'Click canvas to place. Hold Shift to snap angle.'
           ) : instructionContext === 'auto-turret'
             ? 'Click a sub turret on the circle to edit it.'
-            : `Click a turret on the ${instructionContext === 'projectile' ? 'projectile' : 'tank'} to edit it.`}
+            : `Click a part of the ${instructionContext === 'projectile' ? 'projectile' : 'tank'} to edit it.`}   { }
       </p>
     );
 

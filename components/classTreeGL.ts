@@ -1,8 +1,9 @@
 import {
   GEOM_VERT_SIZE, _triangulatePolygonWithStroke, _triangulateBarrelWithStroke, _triangulateStarWithStroke,
   _triangulateCurvedStarWithStroke, _triangulateHealerCrossWithStroke, _triangulateOutlineWithStroke, _triangulateLineStroke,
-  _triangulateExactCircle, GEOM_FRAG_SRC, CIRCLE_FRAG_SRC, CIRCLE_GLSL, RIM_GLSL,
+  _triangulateExactCircle, _triangulateSolidStill, GEOM_FRAG_SRC, CIRCLE_FRAG_SRC, CIRCLE_GLSL, RIM_GLSL,
 } from '../game/WebGLRenderer';
+import { solidStill } from '../utils/solidArras';
 import { CT_CELL, CT_TILE, CT_RING_UNITS, CT_LINE_UNITS } from '../utils/classTreeArras';
 import {
   CT_MESH_BARREL, CT_MESH_CIRCLE, CT_MESH_POLY0, CT_MESH_POLY_MAX_SIDES, CT_MESH_CROSS, CT_MESH_STAR0,
@@ -298,6 +299,7 @@ export function meshData(id: number, exact = false): Float32Array {
   if (id === CT_MESH_CROSS) return _triangulateHealerCrossWithStroke(exact);
   if (id >= CT_MESH_POLY0 && id < CT_MESH_POLY0 + CT_MESH_POLY_MAX_SIDES - 2) return _triangulatePolygonWithStroke(id - CT_MESH_POLY0 + 3, exact);
   const st = ctStarMeshes[id - CT_MESH_STAR0];
+  if (st && st.solid) return _triangulateSolidStill(solidStill(st.solid), exact, st.solidLines ? 2 : 1);
   if (st && st.outline) return _triangulateOutlineWithStroke(st.outline, exact);
   if (st && st.line) return _triangulateLineStroke(exact);
   return st.curved ? _triangulateCurvedStarWithStroke(st.sides, 1 - st.depth, exact) : _triangulateStarWithStroke(st.sides, 1 - st.depth, exact);

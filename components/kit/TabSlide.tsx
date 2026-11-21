@@ -1,6 +1,6 @@
 import React, { useLayoutEffect, useRef, useSyncExternalStore } from 'react';
 import { uiThemeId, subscribeUiTheme } from '../../utils/uiTheme';
-import { GlideSvg, glideBoxKey, glideBoxOf, glideTo } from './glideFrame';
+import { GlideSvg, glideBoxKey, glideBoxOf, glideTo, type GlideBox } from './glideFrame';
 
 const classicNow = () => uiThemeId() === 'classic';
 
@@ -11,22 +11,23 @@ export const TabSlide: React.FC<{ pick: string }> = ({ pick }) => {
     const box = ref.current;
     const row = box?.parentElement;
     if (!classic || !box || !row) return;
-    let shown = false, at = '';
+    let shown = false, at: GlideBox | null = null;
+    const same = (a: GlideBox, b: GlideBox) => Math.abs(a.left - b.left) < 0.5 && Math.abs(a.top - b.top) < 0.5 && Math.abs(a.width - b.width) < 0.5 && Math.abs(a.height - b.height) < 0.5;
     const place = () => {
       const t = row.querySelector<HTMLElement>(pick);
       if (!t || t.offsetParent !== row) {
         if (shown) { box.style.opacity = '0'; shown = false; }
         return;
       }
-      const key = glideBoxKey(glideBoxOf(box, t));
-      if (key === at && shown) return;
-      at = key;
+      const now = glideBoxOf(box, t);
+      if (shown && at !== null && same(now, at)) return;
+      at = now;
       glideTo(box, t, shown ? 'current' : 'instant');
       box.style.opacity = '1';
       shown = true;
     };
     place();
-    const mo = new MutationObserver(place);
+    const mo = new MutationObserver(recs => { for (let i = 0; i < recs.length; i++) if (!box.contains(recs[i].target)) { place(); return; } });
     mo.observe(row, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'aria-selected', 'aria-pressed', 'aria-checked'] });
     const ro = new ResizeObserver(place);
     ro.observe(row);
@@ -79,6 +80,7 @@ export const PickGlide: React.FC<{ pick: string; group?: string; look?: 'tool' |
       if (!src) { stop(); return; }
       const onward = gliding && dest !== null && gone.indexOf(dest) >= 0;
       const from = onward ? 'current' as const : glideBoxOf(box, src);
+      for (const g of gone) { const was = g.style.transition; g.style.transition = 'none'; void g.offsetWidth; g.style.transition = was; }
       stop();
       box.style.opacity = '1';
       dest = to;

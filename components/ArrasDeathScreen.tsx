@@ -72,7 +72,7 @@ export const ArrasDeathScreen: React.FC<Props> = ({ logic, onRespawn, onExit, fr
       stamp: deathStamp(Date.now() - Math.max(0, now - logic.tankDeathStartTime)),
       score: Math.max(0, Math.floor(s.currentXp)) + logic.shownScoreStartOf(null),
       title: deathScoreTitle(logic.playerShownName()),
-      level: `Level ${s.deathLevel}`,
+      level: `Level ${SMALL_FIX.R994 !== 0 ? logic.shownLevelOf(null) : s.deathLevel}`,
       tank: logic.playerTankDisplayName() ?? logic.resolveTankDisplayName(null),
       lines,
     };

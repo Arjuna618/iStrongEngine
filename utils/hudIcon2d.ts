@@ -1,16 +1,17 @@
 import type { TankConfig } from '../types';
 import {
-  ctIconParts, CT_ICON_FACING, CT_PART_STRIDE, CT_MESH_BARREL, CT_MESH_CIRCLE, CT_MESH_POLY0,
+  ctIconParts, ctSolidsOf, ctSolidsSame, CT_ICON_FACING, CT_PART_STRIDE, CT_MESH_BARREL, CT_MESH_CIRCLE, CT_MESH_POLY0,
   CT_MESH_POLY_MAX_SIDES, CT_MESH_CROSS, CT_MESH_STAR0, ctStarMeshes,
 } from './classTreeIcon';
 import { HEALER_CROSS_X, HEALER_CROSS_Y, roundedStarPath } from '../components/shared/tankIconRenderer';
 import { hudCss, hudIconOutline } from './hudArras';
-
+import { solidPath, SOLID_STILL_X, SOLID_STILL_Y, SOLID_STROKE_OF_BORDER } from './solidArras';
 export interface HudIcon {
   parts: Float64Array;
   count: number;
   fill: string[];
   stroke: string[];
+  solids: ReturnType<typeof ctSolidsOf>;
 }
 
 export function hudBuildIcon(config: TankConfig, dark: boolean, bodyOverride: string | undefined): HudIcon {
@@ -27,7 +28,11 @@ export function hudBuildIcon(config: TankConfig, dark: boolean, bodyOverride: st
     fill[i] = hudCss(rgb);
     stroke[i] = hudCss(hudIconOutline(rgb, dark));
   }
-  return { parts: Float64Array.from(out), count, fill, stroke };
+  return { parts: Float64Array.from(out), count, fill, stroke, solids: ctSolidsOf(config.bodyLayers) };
+}
+
+export function hudIconCurrent(icon: HudIcon, config: TankConfig): boolean {
+  return ctSolidsSame(config.bodyLayers, icon.solids);
 }
 
 export function hudDrawIcon(ctx: CanvasRenderingContext2D, icon: HudIcon, cx: number, cy: number,
@@ -72,6 +77,13 @@ export function hudDrawIcon(ctx: CanvasRenderingContext2D, icon: HudIcon, cx: nu
     } else {
       const st = ctStarMeshes[mesh - CT_MESH_STAR0];
       if (!st) continue;
+      if (st.solid) {
+        const so = st.solid;
+        solidPath(ctx, so, SOLID_STILL_X, SOLID_STILL_Y, 0, 0, so.circumradius > 0 ? sx / so.circumradius : sx);
+        if (st.solidLines) { ctx.lineWidth = lw * SOLID_STROKE_OF_BORDER; ctx.strokeStyle = icon.stroke[i]; ctx.stroke(); }
+        else { ctx.fillStyle = icon.fill[i]; ctx.fill(); }
+        continue;
+      }
       if (st.outline) {
         const pts = st.outline;
         ctx.moveTo(pts[0][0] * sx, pts[0][1] * sx);

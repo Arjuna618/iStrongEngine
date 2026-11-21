@@ -1,4 +1,41 @@
 import { getEffectiveDPR } from '../../utils/zoomCompensation';
+import { uiThemeId } from '../../utils/uiTheme';
+import { CM, CM_USE, cmHex } from '../../utils/colorMap';
+
+const _classicInk: { dark: boolean | null; pill: string; ink: string; words: string } = { dark: null, pill: '', ink: '', words: '' };
+function drawClassicTip(ctx: CanvasRenderingContext2D, text: string, anchorX: number, anchorY: number, maxRight: number, s: number, isDark: boolean, minLeft: number): void {
+  if (_classicInk.dark !== isDark) {
+    const G = CM_USE.GENERAL, ink = cmHex(CM.BORDERS, isDark, G);
+    const n = parseInt(ink.slice(1), 16);
+    _classicInk.dark = isDark; _classicInk.ink = ink; _classicInk.words = cmHex(CM.TEXT, isDark, G);
+    _classicInk.pill = `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, 0.5)`;
+  }
+  const size = 15 * s;
+  ctx.save();
+  ctx.font = `700 ${size}px Ubuntu, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+  const th = 20 * s, tw = ctx.measureText(text).width + 20 * s, gap = 6 * s, margin = 8 * s;
+  let tx = anchorX - tw / 2;
+  if (tx + tw > maxRight - margin) tx = maxRight - margin - tw;
+  if (tx < minLeft + margin) tx = minLeft + margin;
+  const canvasH = ctx.canvas.height;
+  let ty = anchorY - th - gap;
+  if (ty < margin) ty = anchorY + gap;
+  if (ty + th > canvasH - margin) ty = canvasH - margin - th;
+  if (ty < margin) ty = margin;
+  ctx.beginPath();
+  ctx.roundRect(tx, ty, tw, th, th / 2);
+  ctx.fillStyle = _classicInk.pill;
+  ctx.fill();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 0.2 * size;
+  ctx.strokeStyle = _classicInk.ink;
+  ctx.fillStyle = _classicInk.words;
+  ctx.strokeText(text, tx + tw / 2, ty + th / 2);
+  ctx.fillText(text, tx + tw / 2, ty + th / 2);
+  ctx.restore();
+}
 
 export function drawCanvasTooltip(
   ctx: CanvasRenderingContext2D,
@@ -12,7 +49,8 @@ export function drawCanvasTooltip(
 ) {
   const dpr = getEffectiveDPR();
   const s = dpr * chromeScale;
-  const font = `${12 * s}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+  if (uiThemeId() === 'classic') { drawClassicTip(ctx, text, anchorX, anchorY, maxRight, s, isDark, minLeft); return; }
+  const font =`${12 * s}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
   ctx.save();
   ctx.font = font;
   const metrics = ctx.measureText(text);

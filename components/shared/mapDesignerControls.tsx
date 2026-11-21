@@ -49,7 +49,7 @@ export function CollapsibleSection({ title, defaultOpen = false, children, count
           <ChevronDown size={14} className={`k-chevron${isOpen ? ' k-chevron-open' : ''}`} />
         </span>
       </button>
-      <Collapse open={isOpen} onBusyChange={b => { foldBusy.current = b; }}><div className="k-group-main k-group-body"><CardNestContext.Provider value={true}>{children}</CardNestContext.Provider></div></Collapse>
+      <Collapse open={isOpen} container onBusyChange={b => { foldBusy.current = b; }}><div className="k-group-main k-group-body"><CardNestContext.Provider value={true}>{children}</CardNestContext.Provider></div></Collapse>
     </section>
   );
 }

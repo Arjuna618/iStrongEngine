@@ -8,13 +8,13 @@ import { bookTreeFileKey } from '../../game/bookTrees';
 import { SENTRY_TANK_CONFIGS, SENTINEL_TANK_CONFIGS, SENTRY_ENEMY_CONFIGS } from '../../game/SentryConfigs';
 import { catalogFacts, addDesignOfName, designKindFrom, designOfName, ROUND, FACT, CATALOG_FORMAT, type CatalogFacts, type BuiltCatalog, type DesignKindOf, type DesignOfName } from './catalogCore';
 
-export type LibKind = 'tank' | 'turret' | 'projectile' | 'other' | 'shape' | 'sentry';
-export const LIB_KIND_ORDER: readonly LibKind[] = ['tank', 'turret', 'projectile', 'other', 'shape', 'sentry'];
+export type LibKind = 'tank' | 'turret' | 'projectile' | 'other' | 'shape' | 'solid' | 'sentry';
+export const LIB_KIND_ORDER: readonly LibKind[] = ['tank', 'turret', 'projectile', 'other', 'shape', 'solid', 'sentry'];
 export const LIB_KIND_LABEL: Record<LibKind, string> = {
-  tank: 'Tanks', turret: 'Turrets', projectile: 'Projectiles', other: 'Others', shape: 'Food Shapes', sentry: 'Sentries',
+  tank: 'Tanks', turret: 'Turrets', projectile: 'Projectiles', other: 'Others', shape: 'Food Shapes', solid: 'Solids', sentry: 'Sentries',
 };
 export const LIB_KIND_ONE: Record<LibKind, string> = {
-  tank: 'tank', turret: 'turret', projectile: 'projectile', other: 'Other', shape: 'food shape', sentry: 'sentry',
+  tank: 'tank', turret: 'turret', projectile: 'projectile', other: 'Other', shape: 'food shape', solid: 'solid', sentry: 'sentry',
 };
 
 export interface FilterOption { id: string; label: string; }
@@ -105,6 +105,11 @@ export const KIND_GROUPS: Record<LibKind, FilterGroup[]> = {
     { id: 'rarity', label: 'Rarity', options: [o('normal', 'Normal'), o('shiny', 'Shiny'), o('legendary', 'Legendary'), o('shadow', 'Shadow'), o('rainbow', 'Rainbow'), o('trans', 'Trans')] },
     { id: 'size', label: 'Size', options: [o('normal', 'Normal'), o('beta', 'Beta'), o('alpha', 'Alpha')] },
     { id: 'gem', label: 'Gem', options: [o('amethyst', 'Amethyst'), o('sapphire', 'Sapphire'), o('ruby', 'Ruby'), o('topaz', 'Topaz'), o('emerald', 'Emerald'), o('citrine', 'Citrine'), o('none', 'No gem')], showWith: 'relic' },
+  ],
+  solid: [
+    { id: 'collection', label: 'Group', options: [o('mine', 'My Content'), o('otherCol', 'Other')] },
+    SHOW_GROUP,
+    { id: 'faces', label: 'Faces', options: [o('f4', 'Four to six'), o('f7', 'Seven to twelve'), o('f13', 'More than twelve')] },
   ],
   sentry: [
     { id: 'collection', label: 'Group', options: [o('sentry', 'Sentries'), o('sentinel', 'Sentinels')] },
@@ -261,6 +266,7 @@ function tagEntry(e: LibEntry): void {
       }
       case 'carries': m = bit((flags & FACT.CARRIES_TURRETS) ? 'yes' : 'no'); break;
       case 'parts': m = bit(sides <= 1 ? 'p1' : sides <= 5 ? 'p2' : sides <= 20 ? 'p6' : 'p21'); break;
+      case 'faces': m = bit(sides <= 6 ? 'f4' : sides <= 12 ? 'f7' : 'f13'); break;
       case 'sides': {
         const s = e.shape;
         m = s && s.isPolyhedron ? bit('solid') : bit(sidesBit(s ? s.sides : 0));
@@ -339,11 +345,14 @@ export function builtCatalogNow(): BuiltCatalog | null { return _built; }
 export interface CatalogInputs {
   tankLibrary: readonly LibraryItem[];
   otherLibrary: readonly LibraryItem[];
+  solidLibrary?: readonly LibraryItem[];
   projectileDesigns: readonly CustomProjectileDesign[];
   rev?: number;
 }
 
-let _cache: { lib: readonly LibraryItem[]; libLen: number; other: readonly LibraryItem[]; otherLen: number; designs: number; rev: number; reg: number; built: boolean; cat: LibCatalog;
+const NO_SOLIDS: readonly LibraryItem[] = Object.freeze([]);
+const solidsOf = (inp: CatalogInputs): readonly LibraryItem[] => (inp.solidLibrary && inp.solidLibrary.length > 0 ? inp.solidLibrary : NO_SOLIDS);
+let _cache: { lib: readonly LibraryItem[]; libLen: number; other: readonly LibraryItem[]; otherLen: number; solid: readonly LibraryItem[]; solidLen: number; designs: number; rev: number; reg: number; built: boolean; cat: LibCatalog;
   designRefs: readonly CustomProjectileDesign[] | null } | null = null;
 
 function shippedFileKey(item: LibraryItem): string | null {
@@ -357,7 +366,8 @@ function cachedCatalog(inp: CatalogInputs): LibCatalog | null {
   const reg = getShapeRegistryVersion();
   const c = _cache;
   if (c && c.lib === inp.tankLibrary && c.libLen === inp.tankLibrary.length && c.other === inp.otherLibrary
-      && c.otherLen === inp.otherLibrary.length && c.designs === inp.projectileDesigns.length && c.rev === (inp.rev ?? 0) && c.reg === reg && c.built === (_built !== null)
+      && c.otherLen === inp.otherLibrary.length && c.solid === solidsOf(inp) && c.solidLen === solidsOf(inp).length
+      && c.designs === inp.projectileDesigns.length && c.rev === (inp.rev ?? 0) && c.reg === reg && c.built === (_built !== null)
     && (c.designRefs === null || sameDesigns(c.designRefs, inp.projectileDesigns))) {
     return c.cat;
   }
@@ -371,6 +381,7 @@ function sameDesigns(a: readonly CustomProjectileDesign[], b: readonly CustomPro
 function keepCatalog(inp: CatalogInputs, cat: LibCatalog, reg: number, built: boolean, lens?: CatalogLens): void {
   const _dn = lens ? lens.designs : inp.projectileDesigns.length;
   _cache = { designRefs: SMALL_FIX.G690 !== 0 ? inp.projectileDesigns.slice(0, _dn) : null, lib: inp.tankLibrary, libLen: lens ? lens.lib : inp.tankLibrary.length, other: inp.otherLibrary, otherLen: lens ? lens.other : inp.otherLibrary.length,
+    solid: solidsOf(inp), solidLen: lens ? lens.solid : solidsOf(inp).length,
     designs: lens ? lens.designs : inp.projectileDesigns.length, rev: lens ? lens.rev : (inp.rev ?? 0), reg, built, cat };
 }
 
@@ -385,7 +396,7 @@ export function getCatalog(inp: CatalogInputs): LibCatalog {
 
 let _lastSlices = 0, _lastSteps = 0;
 export function lastCatalogSlicesForTests(): { slices: number; steps: number } { return { slices: _lastSlices, steps: _lastSteps }; }
-interface CatalogLens { lib: number; other: number; designs: number; rev: number }
+interface CatalogLens { lib: number; other: number; solid: number; designs: number; rev: number }
 let _slicing: { inp: CatalogInputs; lens: CatalogLens; reg: number; built: boolean; promise: Promise<LibCatalog>; urgent: () => void } | null = null;
 const SLICE_MS = 40;
 
@@ -395,12 +406,13 @@ export function getCatalogSliced(inp: CatalogInputs, when: 'now' | 'idle' = 'now
   const reg = getShapeRegistryVersion(), built = _built !== null;
   const p = _slicing;
   if (p && p.inp.tankLibrary === inp.tankLibrary && p.inp.otherLibrary === inp.otherLibrary && p.lens.lib === inp.tankLibrary.length
-      && p.lens.other === inp.otherLibrary.length && p.lens.designs === inp.projectileDesigns.length && p.lens.rev === (inp.rev ?? 0) && p.reg === reg && p.built === built) {
+      && p.lens.other === inp.otherLibrary.length && solidsOf(p.inp) === solidsOf(inp) && p.lens.solid === solidsOf(inp).length
+      && p.lens.designs === inp.projectileDesigns.length && p.lens.rev === (inp.rev ?? 0) && p.reg === reg && p.built === built) {
     if (when === 'now') p.urgent();
     return p.promise;
   }
   const steps = buildCatalogSteps(inp);
-  const lens: CatalogLens = { lib: inp.tankLibrary.length, other: inp.otherLibrary.length, designs: inp.projectileDesigns.length, rev: inp.rev ?? 0 };
+  const lens: CatalogLens = { lib: inp.tankLibrary.length, other: inp.otherLibrary.length, solid: solidsOf(inp).length, designs: inp.projectileDesigns.length, rev: inp.rev ?? 0 };
   let mode: 'now' | 'idle' = when;
   let resolveFn: (c: LibCatalog) => void = () => {};
   const promise = new Promise<LibCatalog>(r => { resolveFn = r; });
@@ -454,7 +466,7 @@ function* buildCatalogSteps(inp: CatalogInputs): Generator<void, LibCatalog, voi
   const kindOf: DesignKindOf = (n, carried) => (designsByName.has(n) ? liveKindOf(n, carried) : built?.designKinds[n]);
 
   const entries: LibEntry[] = [];
-  const byKind: Record<LibKind, LibEntry[]> = { tank: [], turret: [], projectile: [], other: [], shape: [], sentry: [] };
+  const byKind: Record<LibKind, LibEntry[]> = { tank: [], turret: [], projectile: [], other: [], shape: [], solid: [], sentry: [] };
   const byKey = new Map<string, LibEntry>();
   const byFileKey = new Map<string, LibEntry>();
   const firedBy = new Map<string, string[]>();
@@ -516,6 +528,10 @@ function* buildCatalogSteps(inp: CatalogInputs): Generator<void, LibCatalog, voi
     add(e);
     if ((++pace & 15) === 0) yield;
   }
+  for (const item of solidsOf(inp)) {
+    add(baseEntry('solid', item, 'otherCol', '', 'solid'));
+    if ((++pace & 15) === 0) yield;
+  }
   const userRows = new Map<string, LibraryItem>();
   for (const it of inp.tankLibrary) if (it.fileData.type === 'FoodShape') userRows.set(it.id, it);
   const SHAPE_CATS: ShapeCategory[] = ['base', 'rarity', 'laby', 'scaled', 'special', 'crasher', 'polyhedron'];
@@ -551,7 +567,7 @@ function* buildCatalogSteps(inp: CatalogInputs): Generator<void, LibCatalog, voi
 
   return {
     entries, byKind, byKey, byFileKey, parents: trees.parents, children: trees.children, firedBy,
-    version: `${inp.tankLibrary.length}:${inp.otherLibrary.length}:${getShapeRegistryVersion()}:${built ? 1 : 0}`,
+    version: `${inp.tankLibrary.length}:${inp.otherLibrary.length}:${solidsOf(inp).length}:${getShapeRegistryVersion()}:${built ? 1 : 0}`,
   };
 }
 

@@ -144,6 +144,8 @@ export function catalogFacts(type: string, data: any, designKindOf: DesignKindOf
     sides = data.body && typeof data.body === 'object' ? otherPartCount(data.body) : 0;
   } else if (type === 'FoodShape') {
     sides = Math.floor(typeof data.sides === 'number' ? data.sides : 0);
+  } else if (type === 'Solid') {
+    sides = Array.isArray(data.faces) ? data.faces.length : 0;
   }
   return [tally.rounds, tally.flags, tally.barrels, sides];
 }

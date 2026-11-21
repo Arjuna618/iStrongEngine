@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import type { Tool } from './engineTools';
 
-let current: Tool = 'tank';
+let current: Tool = 'turret';
 const subs = new Set<() => void>();
 
 export const toolStore = {

@@ -432,6 +432,10 @@ export const SHAPE_COLOR_MAP: Readonly<Record<string, number | undefined>> = Obj
 
 export function polyhedronExtent(key: string): number { return solidOf(key)?.circumradius ?? 1; }
 
+export function isSolidBodyKey(key: string | null | undefined): boolean {
+  return typeof key === 'string' && key !== '' && (POLYHEDRA_DEFS[key] !== undefined || solidOf(key) !== undefined);
+}
+
 export type AnimationType = 'none' | 'rainbow' | 'trans'
   | 'flashBlueRed' | 'flashBlueGrey' | 'flashGreyBlue' | 'flashRedGrey' | 'flashGreyRed';
 
@@ -920,7 +924,7 @@ export function effectiveShapeColorMap(design: Pick<FoodShapeDesign, 'rarity' | 
 }
 
 export function userShapeMass(design: Pick<FoodShapeDesign, 'size' | 'polyhedronType' | 'isCrasher'>): number {
-  const cat: ShapeCategory = design.polyhedronType && POLYHEDRA_DEFS[design.polyhedronType] ? 'polyhedron'
+  const cat: ShapeCategory = isSolidBodyKey(design.polyhedronType) ? 'polyhedron'
     : design.isCrasher ? 'crasher' : 'user';
   return autoMass(design.size, cat);
 }
@@ -928,7 +932,7 @@ export function userShapeMass(design: Pick<FoodShapeDesign, 'size' | 'polyhedron
 export function buildUserShapeDef(design: FoodShapeDesign): ShapeDefinition {
   const rm = RARITY_MULTIPLIERS[design.rarity];
   const isCrasher = design.isCrasher === true;
-  const poly = design.polyhedronType && POLYHEDRA_DEFS[design.polyhedronType] ? design.polyhedronType : null;
+  const poly = isSolidBodyKey(design.polyhedronType) ? design.polyhedronType as string : null;
   return {
     id: design.shapeId,
     displayName: design.name,
@@ -1027,6 +1031,13 @@ export function designFromShapeDef(def: ShapeDefinition): FoodShapeDesign {
     ...(def.ramHealthScale !== undefined ? { ramHealthScale: def.ramHealthScale } : null),
     ...(def.look ? { look: { body: def.look.body } } : null),
   };
+}
+
+export function foodShapeOfSolid(solidId: string, name: string): FoodShapeDesign {
+  const cube = SHAPE_DEFINITIONS.get('cube');
+  if (!cube) throw new Error('foodShapeOfSolid: the registry holds no Cube.');
+  const nm = name.trim() || 'Solid';
+  return { ...designFromShapeDef(cube), _designVersion: 1, name: nm, shapeId: makeUserShapeId(nm), polyhedronType: solidId };
 }
 
 export function inverseReversedJackpot(y: number): number {

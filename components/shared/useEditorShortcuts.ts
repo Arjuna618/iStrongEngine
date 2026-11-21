@@ -8,6 +8,7 @@ import { toolStore } from '../shell/toolStore';
 import { flushDesignHistory } from '../shell/historyRecorder';
 import { turretListMarks } from './InstalledTurretsList';
 import { undoActionIn, canUndoActionIn } from '../shell/undoActions';
+import { shortcutKey } from '../../utils/shortcutKey';
 
 interface EditorShortcutDeps {
   logic: GameLogic | null;
@@ -37,6 +38,8 @@ export function editorDelete(logic: GameLogic): boolean {
   const activeTool = toolStore.get();
   if (activeTool === 'turret') {
     if (!logic.state.isTestMode && logic.state.canvasEntityKind !== 'tank') return false;
+    if (logic.pen.on) { logic.penBack(); return true; }
+    if (logic.pe.on) return logic.pointEditDelete();
     const scope = logic.state.autoSubTurretEditMode ? 'base:' + logic.state.autoSubTurretParentId : (logic.state.activeBodyLayerId ?? 'main');
     const marks = turretListMarks.get(scope) ?? [];
     const edited = logic.state.autoSubTurretEditMode ? logic.state.autoSubTurretSelectedId : (logic.state.selectMode ? logic.state.selectedTurretId : null);
@@ -47,6 +50,7 @@ export function editorDelete(logic: GameLogic): boolean {
       logic.removeAutoSubTurret(logic.state.autoSubTurretSelectedId);
     } else if (logic.state.selectMode && logic.state.selectedTurretId) {
       logic.removeTurret(logic.state.selectedTurretId);
+    } else if (!logic.state.autoSubTurretEditMode && logic.removePickedLayer()) {
     } else did = false;
     if (logic.onStateChange) logic.onStateChange(logic.state);
     return did;
@@ -65,9 +69,17 @@ export function editorEditState(logic: GameLogic): { canUndo: boolean; canRedo: 
   const canRedo = t === 'map-designer' && logic.canRedoMapEdit();
   const s = logic.state;
   const canDelete = t === 'turret'
-    ? tankShown && ((s.autoSubTurretEditMode && !!s.autoSubTurretSelectedId) || (s.selectMode && !!s.selectedTurretId) || (turretListMarks.get(s.autoSubTurretEditMode ? 'base:' + s.autoSubTurretParentId : (s.activeBodyLayerId ?? 'main'))?.length ?? 0) > 0)
+    ? tankShown && ((s.autoSubTurretEditMode && !!s.autoSubTurretSelectedId) || (s.selectMode && !!s.selectedTurretId) || (turretListMarks.get(s.autoSubTurretEditMode ? 'base:' + s.autoSubTurretParentId : (s.activeBodyLayerId ?? 'main'))?.length ?? 0) > 0
+        || (!s.autoSubTurretEditMode && logic.partPicked && s.activeBodyLayerId !== null))
     : t === 'map-designer' && logic.mapEditor.hasSelection;
   return { canUndo, canRedo, canDelete };
+}
+
+function holdsArrows(el: Element | null): boolean {
+  if (!el) return false;
+  const tag = el.tagName;
+  if (tag === 'INPUT') { const ty = (el as HTMLInputElement).type; return ty === 'range' || ty === 'radio'; }
+  return tag === 'SELECT' || el.getAttribute('role') === 'slider';
 }
 
 function isTextInput(el: Element | null): boolean {
@@ -100,6 +112,7 @@ export function useEditorShortcuts({ logic, setTool, isTestMode, enabled, onEsca
 
     const handler = (e: KeyboardEvent) => {
       if (isTestMode) return;
+      const sk = shortcutKey(e);
       if (!enabled) return;
       if (document.querySelector('[aria-modal="true"]')) return;
       if (e.defaultPrevented || document.querySelector('.k-drop, .k-ctx')) return;
@@ -108,7 +121,7 @@ export function useEditorShortcuts({ logic, setTool, isTestMode, enabled, onEsca
       const focused = document.activeElement;
       const typing = isTextInput(focused);
 
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z') && e.shiftKey) {
+      if ((e.ctrlKey || e.metaKey) && sk === 'z' && e.shiftKey) {
         if (typing) return;
         if (activeTool === 'map-designer') {
           e.preventDefault();
@@ -117,7 +130,7 @@ export function useEditorShortcuts({ logic, setTool, isTestMode, enabled, onEsca
         return;
       }
 
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      if ((e.ctrlKey || e.metaKey) && sk === 'z' && !e.shiftKey) {
         if (typing) return;
         e.preventDefault();
         editorUndo(logic);
@@ -138,10 +151,11 @@ export function useEditorShortcuts({ logic, setTool, isTestMode, enabled, onEsca
           e.preventDefault();
           editorDelete(logic);
         }
-        return;
+        if (!(activeTool === 'turret' && e.key === 'Backspace')) return;
       }
 
       if (e.key === 'Escape') {
+        if (logic.ce.phase !== 0) { logic.ceCancel(); if (logic.onStateChange) logic.onStateChange(logic.state); return; }
         if (logic.isMapDesignerActive) {
           const me = logic.mapEditor;
           if (me.dragArmed || me.dragActive || me.zoneDragActive || me.vtxDrag !== -1 || me.freeActive
@@ -184,6 +198,13 @@ export function useEditorShortcuts({ logic, setTool, isTestMode, enabled, onEsca
           if (logic.onStateChange) logic.onStateChange(logic.state);
           return;
         }
+        if (activeTool === 'turret' && logic.state.canvasEntityKind === 'tank') {
+          if (logic.pen.on) { logic.setPen(false); return; }
+          if (logic.pe.on) { logic.setPointEdit(false); return; }
+          if (logic.state.autoSubTurretEditMode) { logic.exitAutoSubTurretMode(); if (logic.onStateChange) logic.onStateChange(logic.state); return; }
+          if (logic.turretPlacing && logic.isTurretPlacementEnabled) { logic.setTurretPlacing(false); return; }
+          if (logic.partPicked) { logic.pickPart(logic.state.activeBodyLayerId, true); return; }
+        }
         if (logic.isMapDesignerActive && logic.mapEditor.tool === 'select') {
           logic.mapEditor.tool = 'none';
           logic.endMapEditStroke();
@@ -200,7 +221,17 @@ export function useEditorShortcuts({ logic, setTool, isTestMode, enabled, onEsca
         const step = e.shiftKey ? 1 : 0.25;
         const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0, dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
         if ((dx !== 0 || dy !== 0) && nudgePickedPoints(logic, dx, dy)) { e.preventDefault(); return; }
-        if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A') && pickAllPoints(logic)) { e.preventDefault(); return; }
+        if ((e.ctrlKey || e.metaKey) && sk === 'a' && pickAllPoints(logic)) { e.preventDefault(); return; }
+      }
+
+      const _arrow = e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown';
+      if (activeTool === 'turret' && !typing && !(_arrow && holdsArrows(focused)) && logic.canvasEditKey(sk, e.ctrlKey || e.metaKey, e.shiftKey)) { e.preventDefault(); return; }
+      if (activeTool === 'turret' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey && sk === 'v' && logic.turretPlacing
+          && logic.isTurretPlacementEnabled && logic.state.canvasEntityKind === 'tank') {
+        e.preventDefault();
+        if (logic.state.presetPreviewTurrets.length > 0) logic.cancelPresetPreview();
+        logic.setTurretPlacing(false);
+        return;
       }
 
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {

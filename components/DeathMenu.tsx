@@ -12,6 +12,7 @@ import { anyForcedTeamLayer } from '../game/teamColourSwitch';
 import { isTouchScreen } from '../utils/device';
 import { useMenuScale, useModalMaxHeight, useModalMaxWidth } from '../utils/useMenuScale';
 import { useClassicUi, fitWrapStyle } from './shared/useClassicUi';
+import { SMALL_FIX } from '../game/smallFixSwitch';
 
 const DEATH_WIDE_W = 600;
 const DEATH_WIDE_RATIO = 1.15;
@@ -84,7 +85,7 @@ export const DeathMenu: React.FC<Props> = ({
   const scrimRef = useRef<HTMLDivElement>(null);
   useLeave(scrimRef, leaving, 'fade');
   useLeave(cardRef, leaving, 'pop');
-  const respawnLevel = logic.respawnLevelNow();
+  const respawnLevel = logic.respawnShownLevelNow();
   const [tickN, _tick] = useState(0);
   const cooldownMs = logic.respawnCooldownRemainingMs();
   const respawnHeld = cooldownMs > 0;
@@ -167,7 +168,7 @@ export const DeathMenu: React.FC<Props> = ({
               <span className="k-death-name truncate">{logic.getPlayerDisplayName()}</span>
               <span className="k-death-meta">
                 <span className="k-death-tank truncate">{tankTypeName}</span>
-                <span className="k-count">Level {s.deathLevel}</span>
+                <span className="k-count">Level {SMALL_FIX.R994 !== 0 ? logic.shownLevelOf(null) : s.deathLevel}</span>
                 {logic.mevWaveReached() > 0 ? <span className="k-count">Wave {logic.mevWaveReached()}</span> : null}
               </span>
             </div>

@@ -1,4 +1,6 @@
 import React, { useRef, useEffect, useLayoutEffect, useState } from 'react';
+import { partOpacityOf, PartScratch } from '../utils/partOpacity';
+import { sortInPlace } from '../utils/sortInPlace';
 import { useGameDark, useGameThemeVersion } from '../utils/useGameTheme';
 import { gameDark, gameThemeVersion } from '../utils/gameTheme';
 import { TankConfig, Turret, BodyLayer } from '../types';
@@ -9,11 +11,14 @@ import { polyAngleOffset } from './shared/ShapePreviewComponents';
 import { turretFill, setGameDarkMode, isGameDark, mapBodyColor, bodyFill, healerCrossFill } from '../utils/gameColors';
 import { cmMapOf } from '../utils/colorMap';
 import { drawOtherList } from '../utils/otherDraw';
-import { layerOutlineOf, strokeFillLayerOutline } from '../utils/layerOutline';
+import { layerOutlineOf, strokeFillLayerOutline, layerSolidOf, strokeFillLayerSolid } from '../utils/layerOutline';
+import { layerIsPlaced, layerPlaceInto, layerPlaceReach } from '../utils/canvasParts';
+const _tpLp: number[] = [0, 0];
+const _tpScratch = new PartScratch();
 import { lookList, lookUnit, lookReach } from '../utils/placedLook';
 import { autoBaseDepth, autoBaseTurn } from '../utils/autoBaseShape';
 import { layerColourOf, LAYER_BODY, LAYER_TEAM } from '../game/teamColourSwitch';
-import { CT_ICON_FACING } from '../utils/classTreeIcon';
+import { CT_ICON_FACING, ctSolidKey } from '../utils/classTreeIcon';
 
 interface Props {
   tankConfig: TankConfig;
@@ -47,7 +52,7 @@ function _tpSortTurrets(turrets: any[]): any[] {
     const len = turrets.length;
     _tpTurretSortBuf.length = len;
     for (let i = 0; i < len; i++) _tpTurretSortBuf[i] = turrets[i];
-    _tpTurretSortBuf.sort(_tpTurretCmp);
+    sortInPlace(_tpTurretSortBuf, _tpTurretCmp);
     return _tpTurretSortBuf;
 }
 
@@ -56,7 +61,7 @@ function _tpSortSubTurrets(turrets: any[]): any[] {
     const len = turrets.length;
     _tpSubSortBuf.length = len;
     for (let i = 0; i < len; i++) _tpSubSortBuf[i] = turrets[i];
-    _tpSubSortBuf.sort(_tpTurretCmp);
+    sortInPlace(_tpSubSortBuf, _tpTurretCmp);
     return _tpSubSortBuf;
 }
 
@@ -65,14 +70,17 @@ const _tpBodyLayerCmp = (a: BodyLayer, b: BodyLayer) => a.renderOrder - b.render
 
 let _tpTurretOnLayer = new Uint8Array(64);
 let _tpTurretLayerOrder = new Int8Array(64);
+let _tpTurretLayerRef: (BodyLayer | null)[] = new Array(64).fill(null);
 
 function _tpBuildTurretLayerFlags(turrets: Turret[], layers: BodyLayer[] | undefined): void {
     if (_tpTurretOnLayer.length < turrets.length) {
         _tpTurretOnLayer = new Uint8Array(Math.max(turrets.length, 64));
         _tpTurretLayerOrder = new Int8Array(Math.max(turrets.length, 64));
+        _tpTurretLayerRef = new Array(Math.max(turrets.length, 64)).fill(null);
     }
     _tpTurretOnLayer.fill(0, 0, turrets.length);
     _tpTurretLayerOrder.fill(-128, 0, turrets.length);
+    _tpTurretLayerRef.fill(null, 0, turrets.length);
     if (!layers || layers.length === 0) return;
     for (let li = 0; li < layers.length; li++) {
         const ids = layers[li].turretIds;
@@ -82,6 +90,7 @@ function _tpBuildTurretLayerFlags(turrets: Turret[], layers: BodyLayer[] | undef
                 if (turrets[ti].id === ids[ii]) {
                     _tpTurretOnLayer[ti] = 1;
                     _tpTurretLayerOrder[ti] = order;
+                    _tpTurretLayerRef[ti] = layers[li];
                     break;
                 }
             }
@@ -101,6 +110,8 @@ function computeMaxExtent(
 ): number {
     const bodyRadius = tankSizePx / 2 * (tankSides >= 3 ? getRealSizeFactor(tankSides) : 1);
     let maxExtent = bodyRadius;
+    let _pk = 0;
+    if (bodyLayers) for (let li = 0; li < bodyLayers.length; li++) { const r = layerPlaceReach(bodyLayers[li]) * tankSizePx / 2; if (r > _pk) _pk = r; }
 
     if (bodyLayers && bodyLayers.length > 0) {
         for (let li = 0; li < bodyLayers.length; li++) {
@@ -111,7 +122,7 @@ function computeMaxExtent(
         }
     }
 
-    if (!turrets || turrets.length === 0) return maxExtent;
+    if (!turrets || turrets.length === 0) return _pk > 0 ? maxExtent + _pk : maxExtent;
 
     for (let i = 0; i < turrets.length; i++) {
         const t = turrets[i];
@@ -143,7 +154,7 @@ function computeMaxExtent(
         }
     }
 
-    return maxExtent;
+    return _pk > 0 ? maxExtent + _pk : maxExtent;
 }
 
 const _ccPoints: [number, number][] = [];
@@ -208,10 +219,11 @@ export function computeCircumcircle(
             const layer = bodyLayers[li];
             const layerHalf = bodyHalf * layer.sizeRatio;
             const lSides = layer.sides;
+            const plx = layerIsPlaced(layer) ? (layer.x || 0) * bodyHalf : 0, ply = layerIsPlaced(layer) ? (layer.y || 0) * bodyHalf : 0;
             if (lSides < 3) {
                 for (let i = 0; i < _SAMPLE_SIDES; i++) {
                     const theta = (Math.PI * 2 / _SAMPLE_SIDES) * i;
-                    _ccPoints.push([Math.cos(theta) * layerHalf, Math.sin(theta) * layerHalf]);
+                    _ccPoints.push([Math.cos(theta) * layerHalf + plx, Math.sin(theta) * layerHalf + ply]);
                 }
             } else {
                 const intS = Math.floor(lSides);
@@ -219,18 +231,20 @@ export function computeCircumcircle(
                 const initAngle = layer.initialAngle || 0;
                 for (let i = 0; i < intS; i++) {
                     const theta = (Math.PI * 2 * i) / intS + initAngle;
-                    _ccPoints.push([Math.cos(theta) * vH, Math.sin(theta) * vH]);
+                    _ccPoints.push([Math.cos(theta) * vH + plx, Math.sin(theta) * vH + ply]);
                 }
             }
         }
     }
 
     const _turretLayerRatio = new Map<string, number>();
+    const _turretLayerOf = new Map<string, BodyLayer>();
     if (bodyLayers) {
         for (let li = 0; li < bodyLayers.length; li++) {
             const layer = bodyLayers[li];
             for (let ti = 0; ti < layer.turretIds.length; ti++) {
                 _turretLayerRatio.set(layer.turretIds[ti], layer.sizeRatio);
+                _turretLayerOf.set(layer.turretIds[ti], layer);
             }
         }
     }
@@ -240,8 +254,10 @@ export function computeCircumcircle(
             const isAuto = t.turretType === 'auto';
             const layerRatio = _turretLayerRatio.get(t.id) ?? 1;
             const effSizePx = tankSizePx * layerRatio;
-            const offX = t.xOffset * effSizePx / 2;
-            const offY = t.yOffset * effSizePx / 2;
+            const _tl = _turretLayerOf.get(t.id);
+            const _tlp = _tl !== undefined && layerIsPlaced(_tl);
+            const offX = _tlp ? t.xOffset * effSizePx / 2 + (_tl!.x || 0) * bodyHalf : t.xOffset * effSizePx / 2;
+            const offY = _tlp ? t.yOffset * effSizePx / 2 + (_tl!.y || 0) * bodyHalf : t.yOffset * effSizePx / 2;
             const hasSubTurrets = isAuto && t.autoSubTurrets && t.autoSubTurrets.length > 0;
 
             if (hasSubTurrets) {
@@ -496,6 +512,7 @@ const TankPreview2D: React.FC<Props> = ({ tankConfig, size = 100, animate = true
   const cacheDarkRef = useRef<number | null>(null);
   const htmlDark = useGameDark();
   const themeV = useGameThemeVersion();
+  const solidKey = ctSolidKey(tankConfig?.bodyLayers);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -608,8 +625,17 @@ const TankPreview2D: React.FC<Props> = ({ tankConfig, size = 100, animate = true
       let lookHost = 0;
       const lookFill = (c: string, m: number): string => bodyFill(c, m);
       const lookLine = (f: string): string => darkenColor(f, 0.598);
+      const pageCtx = ctx;
       const drawTurret = (t: Turret, overrideSizePx?: number, parentRotation?: number,
-          sideCorr = 1.0) => {
+          sideCorr = 1.0, ctx: CanvasRenderingContext2D = pageCtx) => {
+        if (t.opacity !== undefined && t.opacity < 1) {
+          const sc = _tpScratch.begin(ctx);
+          drawTurretOne(t, overrideSizePx, parentRotation, sideCorr, sc);
+          _tpScratch.paste(ctx, sc, partOpacityOf(t.opacity));
+        } else drawTurretOne(t, overrideSizePx, parentRotation, sideCorr, ctx);
+      };
+      const drawTurretOne = (t: Turret, overrideSizePx: number | undefined, parentRotation: number | undefined,
+          sideCorr: number, ctx: CanvasRenderingContext2D) => {
         const effSizePx = overrideSizePx ?? tankSizePx;
         const isAuto = t.turretType === 'auto';
 
@@ -645,7 +671,7 @@ const TankPreview2D: React.FC<Props> = ({ tankConfig, size = 100, animate = true
           lookHost = effSizePx;
           for (let si = 0; si < sortedSubs.length; si++) {
             if (sortedSubs[si].aboveBase === true) continue;
-            drawTurret(sortedSubs[si], subSizePx, t.angle);
+            drawTurret(sortedSubs[si], subSizePx, t.angle, 1.0, ctx);
           }
           lookHost = 0;
           ctx.restore();
@@ -723,7 +749,7 @@ const TankPreview2D: React.FC<Props> = ({ tankConfig, size = 100, animate = true
               ctx.rotate(t.angle);
               const subsAbove = _tpSortSubTurrets(t.autoSubTurrets!);
               lookHost = effSizePx;
-              for (let si = 0; si < subsAbove.length; si++) if (subsAbove[si].aboveBase === true) drawTurret(subsAbove[si], circleR * 2, t.angle);
+              for (let si = 0; si < subsAbove.length; si++) if (subsAbove[si].aboveBase === true) drawTurret(subsAbove[si], circleR * 2, t.angle, 1.0, ctx);
               lookHost = 0;
               ctx.restore();
             }
@@ -743,31 +769,17 @@ const TankPreview2D: React.FC<Props> = ({ tankConfig, size = 100, animate = true
       if (hasBodyLayers) {
         _tpBodyLayerSortBuf.length = bLayers!.length;
         for (let bli = 0; bli < bLayers!.length; bli++) _tpBodyLayerSortBuf[bli] = bLayers![bli];
-        if (bLayers!.length > 1) _tpBodyLayerSortBuf.sort(_tpBodyLayerCmp);
+        if (bLayers!.length > 1) sortInPlace(_tpBodyLayerSortBuf, _tpBodyLayerCmp);
       }
 
-      if (hasBodyLayers) {
-        for (let bli = 0; bli < _tpBodyLayerSortBuf.length; bli++) {
-          const bLayer = _tpBodyLayerSortBuf[bli];
-          if (bLayer.renderOrder < 0) continue;
-
-          const layerSizePx = tankSizePx * bLayer.sizeRatio;
-          const layerHalf = layerSizePx / 2;
-          const _lw = layerColourOf(bLayer, !!colorOverride, !!layerTeamColor);
-          const layerColor = _lw === LAYER_BODY ? bodyColor : _lw === LAYER_TEAM ? mapBodyColor(layerTeamColor!) : bodyFill(bLayer.color, cmMapOf(bLayer.colorMap));
-
-          ctx.save();
-          if (sortedT) {
-          for (let ti = 0; ti < sortedT.length; ti++) {
-            if (!sortedT[ti].aboveTankBody && _tpTurretLayerOrder[ti] === bLayer.renderOrder) {
-              drawTurret(sortedT[ti], layerSizePx);
-            }
-          }
-          }
-
+      const drawLayerShape = (ctx: CanvasRenderingContext2D, bLayer: BodyLayer, layerSizePx: number, layerHalf: number, layerColor: string) => {
           ctx.lineJoin = 'round';
           const _tpOutline = layerOutlineOf(bLayer);
-          if (_tpOutline !== null) {
+          const _tpSolid = layerSolidOf(bLayer);
+          if (_tpSolid !== null) {
+            const _slStroke = darkenColor(layerColor, 0.598);
+            strokeFillLayerSolid(ctx, _tpSolid, layerHalf, bLayer.initialAngle || 0, bLayer.copies, _slStroke, screenStroke, (isDark && bLayer.intangible) ? _slStroke : layerColor);
+          } else if (_tpOutline !== null) {
             const _loStroke = darkenColor(layerColor, 0.598);
             strokeFillLayerOutline(ctx, _tpOutline, layerHalf, bLayer.initialAngle || 0, bLayer.copies, _loStroke, screenStroke, (isDark && bLayer.intangible) ? _loStroke : layerColor);
           } else if (bLayer.sides < 3) {
@@ -800,10 +812,37 @@ const TankPreview2D: React.FC<Props> = ({ tankConfig, size = 100, animate = true
           if (bLayer.showHealerCross) {
             _tpDrawHealerCross(ctx, layerSizePx, screenStroke);
           }
+      };
+      const drawLayer = (bLayer: BodyLayer, layerSizePx: number, layerHalf: number, layerColor: string) => {
+        const op = partOpacityOf(bLayer.opacity);
+        if (op < 1) { const sc = _tpScratch.begin(pageCtx); drawLayerShape(sc, bLayer, layerSizePx, layerHalf, layerColor); _tpScratch.paste(pageCtx, sc, op); }
+        else drawLayerShape(pageCtx, bLayer, layerSizePx, layerHalf, layerColor);
+      };
 
+      if (hasBodyLayers) {
+        for (let bli = 0; bli < _tpBodyLayerSortBuf.length; bli++) {
+          const bLayer = _tpBodyLayerSortBuf[bli];
+          if (bLayer.renderOrder < 0) continue;
+
+          const layerSizePx = tankSizePx * bLayer.sizeRatio;
+          const layerHalf = layerSizePx / 2;
+          const _lw = layerColourOf(bLayer, !!colorOverride, !!layerTeamColor);
+          const layerColor = _lw === LAYER_BODY ? bodyColor : _lw === LAYER_TEAM ? mapBodyColor(layerTeamColor!) : bodyFill(bLayer.color, cmMapOf(bLayer.colorMap));
+
+          ctx.save();
+          if (layerIsPlaced(bLayer)) { layerPlaceInto(_tpLp, bLayer, tankSizePx / 2, 1, 0); ctx.translate(_tpLp[0], _tpLp[1]); }
           if (sortedT) {
           for (let ti = 0; ti < sortedT.length; ti++) {
-            if (sortedT[ti].aboveTankBody && _tpTurretLayerOrder[ti] === bLayer.renderOrder) {
+            if (!sortedT[ti].aboveTankBody && _tpTurretLayerRef[ti] === bLayer) {
+              drawTurret(sortedT[ti], layerSizePx);
+            }
+          }
+          }
+
+          drawLayer(bLayer, layerSizePx, layerHalf, layerColor);
+          if (sortedT) {
+          for (let ti = 0; ti < sortedT.length; ti++) {
+            if (sortedT[ti].aboveTankBody && _tpTurretLayerRef[ti] === bLayer) {
               drawTurret(sortedT[ti], layerSizePx);
             }
           }
@@ -819,7 +858,7 @@ const TankPreview2D: React.FC<Props> = ({ tankConfig, size = 100, animate = true
         }
       }
 
-      const drawBody = () => {
+      const drawBody = (ctx: CanvasRenderingContext2D = pageCtx) => {
         const half = tankSizePx / 2;
         const rawSides = tankConfig.tankSides;
         if (rawSides < 3) {
@@ -842,27 +881,32 @@ const TankPreview2D: React.FC<Props> = ({ tankConfig, size = 100, animate = true
         }
       };
 
+      const drawMainBody = (ctx: CanvasRenderingContext2D) => {
       if (useStrokeThenFill) {
         ctx.strokeStyle = darkenColor(bodyColor, 0.598);
         ctx.lineWidth = screenStroke;
-        drawBody();
+        drawBody(ctx);
         ctx.stroke();
         ctx.fillStyle = bodyColor;
-        drawBody();
+        drawBody(ctx);
         ctx.fill();
       } else {
         ctx.fillStyle = bodyColor;
-        drawBody();
+        drawBody(ctx);
         ctx.fill();
         ctx.strokeStyle = darkenColor(bodyColor, 0.598);
         ctx.lineWidth = screenStroke;
-        drawBody();
+        drawBody(ctx);
         ctx.stroke();
       }
 
       if (tankConfig.isHealer) {
         _tpDrawHealerCross(ctx, tankSizePx, screenStroke);
       }
+      };
+      const _bop = partOpacityOf(tankConfig.tankOpacity);
+      if (_bop < 1) { const sc = _tpScratch.begin(ctx); drawMainBody(sc); _tpScratch.paste(ctx, sc, _bop); }
+      else drawMainBody(ctx);
 
       if (sortedT) {
         for (let i = 0; i < sortedT.length; i++) {
@@ -881,53 +925,19 @@ const TankPreview2D: React.FC<Props> = ({ tankConfig, size = 100, animate = true
           const layerColor = _lw === LAYER_BODY ? bodyColor : _lw === LAYER_TEAM ? mapBodyColor(layerTeamColor!) : bodyFill(bLayer.color, cmMapOf(bLayer.colorMap));
 
           ctx.save();
+          if (layerIsPlaced(bLayer)) { layerPlaceInto(_tpLp, bLayer, tankSizePx / 2, 1, 0); ctx.translate(_tpLp[0], _tpLp[1]); }
           if (sortedT) {
           for (let ti = 0; ti < sortedT.length; ti++) {
-            if (!sortedT[ti].aboveTankBody && _tpTurretLayerOrder[ti] === bLayer.renderOrder) {
+            if (!sortedT[ti].aboveTankBody && _tpTurretLayerRef[ti] === bLayer) {
               drawTurret(sortedT[ti], layerSizePx);
             }
           }
           }
 
-          ctx.lineJoin = 'round';
-          const _tpOutline = layerOutlineOf(bLayer);
-          if (_tpOutline !== null) {
-            const _loStroke = darkenColor(layerColor, 0.598);
-            strokeFillLayerOutline(ctx, _tpOutline, layerHalf, bLayer.initialAngle || 0, bLayer.copies, _loStroke, screenStroke, (isDark && bLayer.intangible) ? _loStroke : layerColor);
-          } else if (bLayer.sides < 3) {
-            ctx.beginPath();
-            ctx.arc(0, 0, layerHalf, 0, Math.PI * 2);
-            ctx.closePath();
-          } else {
-            const visualHalf = layerHalf * getRealSizeFactor(bLayer.sides);
-            const layerInitAngle = bLayer.initialAngle || 0;
-            ctx.beginPath();
-            if (bLayer.copies > 1) {
-              const _cpStroke = darkenColor(layerColor, 0.598);
-              _tpStrokeFillPolygonCopies(ctx, bLayer.sides, bLayer.copies, visualHalf, layerInitAngle,
-                _cpStroke, screenStroke, (isDark && bLayer.intangible) ? _cpStroke : layerColor,
-                bLayer.starDepth, bLayer.starCurved);
-              ctx.beginPath();
-            } else if (bLayer.starDepth > 0) {
-              const innerR = visualHalf * (1 - bLayer.starDepth);
-              _tpRoundedStarPath(ctx, bLayer.sides, visualHalf, innerR, layerInitAngle, bLayer.starCurved);
-            } else {
-              roundedPolygonPath(ctx, bLayer.sides, visualHalf, layerInitAngle);
-            }
-          }
-          ctx.strokeStyle = darkenColor(layerColor, 0.598);
-          ctx.lineWidth = screenStroke;
-          ctx.stroke();
-          ctx.fillStyle = (isDark && bLayer.intangible) ? ctx.strokeStyle : layerColor;
-          ctx.fill();
-
-          if (bLayer.showHealerCross) {
-            _tpDrawHealerCross(ctx, layerSizePx, screenStroke);
-          }
-
+          drawLayer(bLayer, layerSizePx, layerHalf, layerColor);
           if (sortedT) {
           for (let ti = 0; ti < sortedT.length; ti++) {
-            if (sortedT[ti].aboveTankBody && _tpTurretLayerOrder[ti] === bLayer.renderOrder) {
+            if (sortedT[ti].aboveTankBody && _tpTurretLayerRef[ti] === bLayer) {
               drawTurret(sortedT[ti], layerSizePx);
             }
           }
@@ -975,7 +985,7 @@ const TankPreview2D: React.FC<Props> = ({ tankConfig, size = 100, animate = true
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [tankConfig, size, animate, colorOverride, layerTeamColor, boundsFit, animate ? null : htmlDark, animate ? null : themeV]);
+  }, [tankConfig, size, animate, colorOverride, layerTeamColor, boundsFit, animate ? null : htmlDark, animate ? null : themeV, solidKey]);
 
   return (
     <canvas
@@ -1035,13 +1045,14 @@ const TankPreviewGL: React.FC<Props> = ({ tankConfig, size = 100, animate = true
     wakePreviews();
   }, [size, boundsFit]);
 
+  const solidKey = ctSolidKey(tankConfig?.bodyLayers);
   useLayoutEffect(() => {
     const it = itemRef.current;
     if (!it) return;
     it.pic = previewPicture(tankConfig, dark, colorOverride, layerTeamColor);
     it.need = true;
     wakePreviews();
-  }, [tankConfig, dark, themeV, colorOverride, layerTeamColor]);
+  }, [tankConfig, dark, themeV, colorOverride, layerTeamColor, solidKey]);
 
   useLayoutEffect(() => {
     const it = itemRef.current;
@@ -1065,3 +1076,5 @@ export const TankPreview: React.FC<Props> = (props) => {
   );
   return <TankPreview2D {...props} />;
 };
+
+export const __tankPreviewHooks = { TankPreview2D, sortTurrets: _tpSortTurrets, sortSubTurrets: _tpSortSubTurrets, turretCmp: _tpTurretCmp, bodyLayerCmp: _tpBodyLayerCmp };

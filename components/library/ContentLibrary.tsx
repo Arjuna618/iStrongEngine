@@ -1,9 +1,10 @@
+import { shortcutKey } from '../../utils/shortcutKey';
 import React, { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { TEXT_LIMITS } from '../kit/textLimits';
 import { createPortal } from 'react-dom';
-import { ContentLibraryIcon, Search, SearchX, X, Upload, FolderOpen, Star, Check, ChevronDown, ArrowUpDown, Lock, PanelRightClose, MessageSquareWarning, EMPTY_LINE, SlidersHorizontal } from '../ui/icons';
+import { ContentLibraryIcon, Search, SearchX, X, Upload, FolderOpen, Star, Check, ChevronDown, ArrowUpDown, Lock, PanelRightClose, MessageSquareWarning, EMPTY_LINE, SlidersHorizontal, Plus } from '../ui/icons';
 import type { GameLogic } from '../../game/GameLogic';
-import type { TankConfig, CustomProjectileDesign, OtherDesign, TurretPreset } from '../../types';
+import type { TankConfig, CustomProjectileDesign, OtherDesign, TurretPreset, SolidDesign } from '../../types';
 import { useEscapeOwner } from '../shared/escapeStack';
 import { useBackdropClose } from '../shared/useBackdropClose';
 import { getMenuScale, usePortalMenuScale, useFitScale, PHONE_EDGE } from '../../utils/useMenuScale';
@@ -218,6 +219,11 @@ function factRows(e: LibEntry, logic: GameLogic): [string, string][] {
       rows.push(['Shapes', String(sides)], ['Width', num(d.size)]);
       break;
     }
+    case 'solid': {
+      const d = e.item!.fileData.data as SolidDesign;
+      rows.push(['Corners', String(Math.floor(d.verts.length / 3))], ['Faces', String(d.faces.length)]);
+      break;
+    }
     case 'shape': {
       const s = e.shape!;
       try {
@@ -293,18 +299,19 @@ export const ContentLibrary: React.FC<Props> = ({ logic, mode, onClose }) => {
   useEffect(() => { let live = true; loadBuiltCatalog().then(() => { if (live) setBuiltReady(true); }); return () => { live = false; }; }, []);
   const libSize = logic.state.tankLibrary.length * 1e6 + logic.state.otherLibrary.length * 1e3 + logic.state.projectileDesigns.length;
   const libRev = logic.libraryRev;
+  const solidN = logic.state.solidLibrary.length;
   const bodyReady = useAfterFirstPaint();
   useEffect(() => {
     if (!builtReady || !bodyReady) return;
     let live = true;
-    getCatalogSliced({ tankLibrary: logic.state.tankLibrary, otherLibrary: logic.state.otherLibrary, projectileDesigns: logic.state.projectileDesigns, rev: logic.libraryRev }).then(c => {
+    getCatalogSliced({ tankLibrary: logic.state.tankLibrary, otherLibrary: logic.state.otherLibrary, solidLibrary: logic.state.solidLibrary, projectileDesigns: logic.state.projectileDesigns, rev: logic.libraryRev }).then(c => {
       if (!live) return;
       forgetPictures(c.byKey);
       store.pruneDeadImports(c.byKey);
       setCat(c);
     });
     return () => { live = false; };
-  }, [builtReady, bodyReady, libVersion, libSize, libRev, logic]);
+  }, [builtReady, bodyReady, libVersion, libSize, libRev, solidN, logic]);
 
   const kinds = mode.kinds;
   const [kind, setKindState] = useState<LibKind>(() => {
@@ -571,7 +578,9 @@ export const ContentLibrary: React.FC<Props> = ({ logic, mode, onClose }) => {
     if (ev.key !== 'Escape') ev.stopPropagation();
     const t = ev.target as HTMLElement;
     const inField = t.tagName === 'INPUT' || t.tagName === 'TEXTAREA';
-    if ((ev.key === 'k' && (ev.ctrlKey || ev.metaKey)) || (ev.key === '/' && !inField)) { ev.preventDefault(); searchRef.current?.focus(); searchRef.current?.select(); return; }
+    const sk = shortcutKey(ev);
+    if ((sk === 'k' && (ev.ctrlKey || ev.metaKey)) || (sk === '/' && !inField)) { ev.preventDefault(); searchRef.current?.focus(); searchRef.current?.select(); return; }
+    if (mode.undoRemove && (ev.ctrlKey || ev.metaKey) && !ev.shiftKey && !ev.altKey && sk === 'z' && !inField) { ev.preventDefault(); mode.undoRemove(); return; }
     const g = gridRef.current;
     if (!g) return;
     if (inField && t !== searchRef.current) return;
@@ -635,7 +644,7 @@ export const ContentLibrary: React.FC<Props> = ({ logic, mode, onClose }) => {
   const resultN = result ? result.list.length : 0;
   const extraH = typeof mode.extraH === 'function' ? mode.extraH(kind) : (mode.extraH ?? 0);
   const status = typeof mode.status === 'function' ? mode.status(kind) : mode.status;
-
+  const newBtn = mode.newOf ? mode.newOf(kind) : null;
   const searchBlock = (
     <div className="k-search-host relative flex-1 max-w-[560px] mx-auto">
       <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--k-search-icon)] pointer-events-none" />
@@ -820,6 +829,12 @@ export const ContentLibrary: React.FC<Props> = ({ logic, mode, onClose }) => {
                   ]} />
                 </div>
                 {shortLib && !stackSearch ? <div className="shrink-0">{sizeToggle}</div> : null}
+                {newBtn ? (
+                  <button type="button" onClick={() => { if (newBtn.run() === true) close(); }} title={newBtn.tip} className="k-btn k-btn-secondary k-btn-md shrink-0">
+                    <span className="k-btn-icon"><Plus size={13} /></span>
+                    <span className="truncate">{newBtn.label}</span>
+                  </button>
+                ) : null}
                 <div className="relative shrink-0">
                   <button type="button" ref={sortMenu.triggerRef as React.RefObject<HTMLButtonElement>} onClick={e => sortMenu.toggle(e.currentTarget.getBoundingClientRect())}
                     aria-haspopup="menu" aria-expanded={menuOpen(sortMenu)} className="k-btn k-btn-secondary k-btn-md">

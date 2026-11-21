@@ -19,13 +19,16 @@ import { CM_USE, cmHex, cmMapOf, cmTurretColorSafe } from '@/utils/colorMap';
 import { roundCanNest, autoSubCanNest } from './roundLayers';
 import { EXPLODE_MAX_COUNT, EXPLODE_MAX_RINGS } from './explode';
 import { SMALL_FIX } from './smallFixSwitch';
+import { LEVEL_LIMIT } from './levelLimit';
 import { clampBossGroups } from './BossSpawn';
 import { MAX_TURRETS_PER_LIST, MAX_TURRET_GROUPS } from './turretLimits';
 import { AURA_RANGE } from '@/utils/aura';
 import { clampEventsDoc, keepZoneWords } from './mapEvents/clamp';
 import { clampTankDebuffs } from './tankDebuffs';
 import { cleanHalloweenLook } from '../utils/halloween';
-import { cleanLayerOutline } from '../utils/layerOutline';
+import { cleanLayerOutline, cleanLayerSolid } from '../utils/layerOutline';
+import { cleanLayerPath, pathMatchesOutline } from '../utils/layerPath';
+import { cleanLayerPlace } from '../utils/canvasParts';
 import { clampGrowthRules } from './growthRules';
 import { STARTING_SCORE_MAX } from './vampirism';
 import { cleanMagicMazeField } from './magicMaze';
@@ -64,6 +67,7 @@ function clampFields(obj: any, ranges: Record<string, Range>): void {
 }
 
 const TURRET_RANGES: Record<string, Range> = {
+  opacity:             { min: 0, max: 1, fallback: 1 },
   length:              { min: -CANVAS_EXTENT, max: CANVAS_EXTENT, fallback: 9.5 },
   width:               { min: 0,             max: CANVAS_EXTENT, fallback: 21  },
   xOffset:             { min: -CANVAS_EXTENT, max: CANVAS_EXTENT, fallback: 0   },
@@ -133,6 +137,7 @@ const VISUAL_LAYER_RANGES: Record<string, Range> = {
 };
 
 const TANK_CONFIG_RANGES: Record<string, Range> = {
+  tankOpacity: { min: 0, max: 1, fallback: 1 },
   tankSides:          { min: 0,   max: MAX_POLY_SIDES, fallback: 0 },
   snapPlacementCount: { min: 0,   max: SNAP_COUNTS.length - 1, fallback: 0 },
   tankSize:           { min: -7.99, max: 512, fallback: 9 },
@@ -156,6 +161,8 @@ const TANK_CONFIG_RANGES: Record<string, Range> = {
 };
 
 const BODY_LAYER_RANGES: Record<string, Range> = {
+  opacity:     { min: 0,   max: 1, fallback: 1 },
+  hitSize:     { min: 1,   max: 400, fallback: 100 },
   sides:       { min: 0,   max: MAX_POLY_SIDES, fallback: 5 },
   copies:      { min: 1,   max: 64,  fallback: 1   },
   sizeRatio:   { min: -Infinity, max: 100, fallback: 1.4 },
@@ -338,6 +345,10 @@ function clampBodyLayer(l: any): void {
   clampAngleField(l, 'initialAngle', true);
   clampAngleField(l, '_currentAngle');
   if (l.outline !== undefined) { const o = cleanLayerOutline(l.outline); if (o) l.outline = o; else delete l.outline; }
+  if (l.solidId !== undefined) { const sv = cleanLayerSolid(l.solidId); if (sv !== undefined) l.solidId = sv; else delete l.solidId; }
+  if (l.hits !== undefined && l.hits !== 'none' && l.hits !== 'circle' && l.hits !== 'exact') delete l.hits;
+  if (l.outlinePath !== undefined) { const p = l.outline ? cleanLayerPath(l.outlinePath) : undefined; if (p && pathMatchesOutline(p, l.outline)) l.outlinePath = p; else delete l.outlinePath; }
+  for (const k of ['x', 'y']) if (l[k] !== undefined) { const v = cleanLayerPlace(l[k]); if (v !== undefined) l[k] = v; else delete l[k]; }
   if (l.label !== undefined && typeof l.label !== 'string') delete l.label;
   if (l.tag !== undefined && typeof l.tag !== 'string') delete l.tag;
   if (l.color !== undefined && typeof l.color !== 'string') delete l.color;
@@ -1281,7 +1292,7 @@ function clampModeOfFile(c: GameModeConfig): void {
   delete c.overlay;
   c.teams = Math.max(2, Math.min(4, Math.round(Number(c.teams)) || 2));
   c.playerTeam = Math.max(1, Math.min(4, Math.round(Number(c.playerTeam)) || 1));
-  c.levelCap = Math.max(1, Math.min(1000, Math.round(Number(c.levelCap)) || 45));
+  c.levelCap = Math.max(1, Math.min(SMALL_FIX.R994 !== 0 ? LEVEL_LIMIT : 1000, Math.round(Number(c.levelCap)) || 45));
   c.growth = c.growth === true;
   c.armsRace = c.armsRace === true ? true : undefined;
   if (c.maxTanksAlive !== undefined) c.maxTanksAlive = Math.max(1, Math.min(600, Math.round(Number(c.maxTanksAlive)) || 50));
@@ -1314,6 +1325,7 @@ export function sanitizeImport(file: ExportFile): ExportFile {
     case 'MultiAreaMap':      clampMultiAreaMapConfig(data);      break;
     case 'FoodShape':         clampFoodShapeDesign(data);         break;
     case 'Other':             evenOtherColours((data as any).body, 0); break;
+    case 'Solid':             break;
     default:
       break;
   }

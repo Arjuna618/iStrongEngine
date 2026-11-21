@@ -131,7 +131,7 @@ export const GameModesWindow: React.FC<Props> = ({ current, onPick, onClose }) =
                       <div className="flex flex-wrap gap-1.5">
                         <span className="k-play-tag tabular-nums">{getPlayEntry(pickedCard.key)?.sides ?? stats.teamsLabel}</span>
                         <span className="k-play-tag tabular-nums">{stats.playersLabel}</span>
-                        <span className="k-play-tag tabular-nums">{`Level Cap ${pickedCap}`}</span>
+                        {SMALL_FIX.R994 !== 0 ? null : <span className="k-play-tag tabular-nums">{`Level Cap ${pickedCap}`}</span>}
                       </div>
                     ) : null}
                   </div>
@@ -143,7 +143,7 @@ export const GameModesWindow: React.FC<Props> = ({ current, onPick, onClose }) =
                 <button type="button" className="k-btn k-btn-primary k-btn-lg w-full" disabled={!canUse} onClick={() => { if (canUse) use(pickedCard!.key); }}>
                   <SwapText>{pickedCard?.key === current ? 'Current Mode' : 'Use This Mode'}</SwapText>
                 </button>
-                <p className="k-hint">Growth, level cap and teams are set in the game mode tool</p>
+                <p className="k-hint">{SMALL_FIX.R994 !== 0 ? 'Growth, max power level and teams are set in the game mode tool' : 'Growth, level cap and teams are set in the game mode tool'}</p>
               </div>
             </aside>
           </div>

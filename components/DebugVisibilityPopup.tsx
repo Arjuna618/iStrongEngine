@@ -9,7 +9,7 @@ import {
   DvFarmAim, DvCornerFire, DvGunMountAim, DvCornerStand, DvCornerSidestep, DvGhostMode, DvPathBlocked,
   DvChaseGivenUp, DvGunRangeStandoff, DvStandAside, DvShotBack, DvShieldHits, DvAimReaction, DvAimError,
   DvHuntedFlee, DvFleeReroute, DvDeadEndEscape, DvFearRearm, DvFleeStand, DvFleeCommit, DvBorderSqueeze,
-  DvRoleRepairs, DvOverlayCost, DvSpawnStats, DvRarityWarning,
+  DvRoleRepairs, DvOverlayCost, DvSpawnStats, DvRarityWarning, Crosshair,
 } from './ui/icons';
 import { GameLogic } from '../game/GameLogic';
 import { GameState } from '../types';
@@ -43,6 +43,7 @@ const WORLD_ROWS: RowDef[] = [
   { key: 'showAllMinimap', label: 'Show All Minimap', icon: DvShowAllMinimap, hint: 'Reveals every tank on the minimap.' },
   { key: 'debugShowAllNames', label: 'Show All Names', icon: DvShowAllNames, hint: 'Shows every name, even of hidden things: stealth tanks and invisible black holes and wormholes. It works even with player names turned off.' },
   { key: 'dbgDarkNoFog', label: 'Hide The Fog', icon: EyeOff, hint: 'You see the whole map with no fog. The bots and every rule still play in the dark, so you can watch how they behave. Only in a match with darkness.', dark: true, noMaster: true },
+  { key: 'dbgShowHitAreas', label: 'Hit Areas', icon: Crosshair, hint: 'Dashed outlines of the body layers moved off the middle of a tank. Each one is a body of its own: walls, food, tanks and shots meet it there.' },
 ];
 
 const HUD_ROWS: RowDef[] = [

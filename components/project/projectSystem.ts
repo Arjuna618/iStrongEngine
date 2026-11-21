@@ -59,7 +59,8 @@ class ProjectSystem {
       apply: (p) => {
         applyProjectMarks(p.values[LIBRARY_MARKS]);
         panelMemory.apply(p);
-        if ((TOOL_ORDER as readonly string[]).includes(p.tool)) this.onTool?.(p.tool as Tool);
+        const tool = p.tool === 'tank' ? 'turret' : p.tool;
+        if ((TOOL_ORDER as readonly string[]).includes(tool)) this.onTool?.(tool as Tool);
       },
       busy: handBusy,
     };

@@ -13,7 +13,8 @@ import { Reveal, SwapInPlace, SwapText, revealFold, type FoldHandle } from './ki
 import { ImportButton } from './shared/ImportButton';
 import { ScrollArea } from './ui/ScrollArea';
 import { fireTip } from '../utils/tips';
-import { keepExportCopy, routeProjectFiles, isProjectFileName, APP_FILE_ACCEPT } from './project/projectActions';
+import { routeProjectFiles, isProjectFileName, APP_FILE_ACCEPT } from './project/projectActions';
+import { writeExportFile } from './exportFile';
 import { usePanelMemory, isText, isOneOf } from './kit/panelMemory';
 import { exportKindDoor, whenToolShown, type ExportKind } from './shell/doors';
 import { gameModeExportFile } from './shared/gameModeFile';
@@ -181,27 +182,7 @@ export const ImportExportUI: React.FC<Props> = ({ logic, dataRegistry, className
       };
     }
 
-    if (dataRegistry) {
-      const saveResult = await dataRegistry.smartExport(fileContent, fullFileName);
-      if (saveResult === 'saved') {
-        showToast('success', `Exported "${fullFileName}"`);
-        keepExportCopy(fileContent);
-        return;
-      }
-      if (saveResult === 'cancelled') return;
-    }
-
-    const blob = new Blob([JSON.stringify(fileContent, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fullFileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    showToast('success', `Downloaded "${fullFileName}"`);
-    keepExportCopy(fileContent);
+    await writeExportFile(fileContent, fullFileName, showToast, dataRegistry ? (f, n) => dataRegistry.smartExport(f, n) : null);
   };
 
   const handleImportClick = async () => {

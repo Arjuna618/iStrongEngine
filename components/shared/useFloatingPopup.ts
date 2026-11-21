@@ -44,6 +44,19 @@ const reducedMotion = motionOff;
 const CLASSIC_DROP_MS = 700;
 const CLASSIC_DROP_BUSY_MS = 280;
 const classicDrop = () => uiThemeId() === 'classic';
+function classicQ(x: number): number {
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  const ax = 3 * 0.22 - 3 * 0.36 + 1, bx = 3 * 0.36 - 6 * 0.22, cx = 3 * 0.22;
+  const ay = 3 * 1 - 3 * 1 + 1, by = 3 * 1 - 6 * 1, cy = 3 * 1;
+  let t = x;
+  for (let i = 0; i < 8; i++) {
+    const fx = ((ax * t + bx) * t + cx) * t - x, d = (3 * ax * t + 2 * bx) * t + cx;
+    if (Math.abs(fx) < 1e-6 || d === 0) break;
+    t = Math.min(1, Math.max(0, t - fx / d));
+  }
+  return ((ay * t + by) * t + cy) * t;
+}
 const CLASSIC_EDGE = 3;
 const enterBusyMs = () => (classicDrop() ? CLASSIC_DROP_BUSY_MS : DROP_ENTER_MS);
 const exitMs = () => (classicDrop() ? CLASSIC_DROP_MS : DROP_EXIT_MS);
@@ -167,6 +180,30 @@ export function useFloatingPopup(options: UseFloatingPopupOptions) {
   const popupZoomRef = useRef(1);
   const [entered, setEntered] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const stepRaf = useRef(0);
+  useLayoutEffect(() => {
+    const el = popupRef.current;
+    if (!entered || leaving || !el || !classicDrop() || reducedMotion()) return;
+    const up = el.classList.contains('k-drop-up') && !el.classList.contains('k-cp');
+    if (!up && el.classList.contains('k-cp')) return;
+    const set = (y: number) => {
+      if (up) el.style.setProperty('--k-drop-cut', `${(100 - y * 100).toFixed(3)}%`);
+      else { const v = `100% ${(y * 100).toFixed(3)}%`; el.style.setProperty('mask-size', v); el.style.setProperty('-webkit-mask-size', v); }
+    };
+    const clear = () => { el.style.removeProperty('transition'); el.style.removeProperty('mask-size'); el.style.removeProperty('-webkit-mask-size'); el.style.removeProperty('--k-drop-cut'); };
+    el.style.setProperty('transition', 'none');
+    set(0);
+    let last = performance.now(), x = 0;
+    const tick = (now: number) => {
+      const dt = Math.max(0, Math.min(now - last, 1000 / 60));
+      last = now;
+      x = Math.min(1, x + dt / CLASSIC_DROP_MS);
+      set(classicQ(x));
+      if (x < 1) stepRaf.current = requestAnimationFrame(tick); else { stepRaf.current = 0; clear(); }
+    };
+    stepRaf.current = requestAnimationFrame(tick);
+    return () => { cancelAnimationFrame(stepRaf.current); stepRaf.current = 0; clear(); };
+  }, [entered, leaving]);
   const leaveTimer = useRef(0);
   const enterRaf = useRef(0);
   const openRef = useRef(false);
@@ -289,6 +326,7 @@ export function useFloatingPopup(options: UseFloatingPopupOptions) {
     const actualWidth = (pw > 0 ? pw : 0) || estimatedWidth || (tRect.right - tRect.left);
     const pos = computeBestFitPosition(tRect, actualHeight, gapNow(), edgeMargin, actualWidth, popupZoomRef.current, align);
     if (pos.flipped && pos.maxH != null && classicDrop()) pos.maxH = wholeRowsCut(popup, pos.maxH);
+    if (popup.classList.contains('k-drop-up') !== pos.flipped) { popup.style.setProperty('transition', 'none'); flipTo.current = pos.flipped ? 1 : 0; }
     setPopupPos(prev => {
       if (prev && prev.top === pos.top && prev.bottom === pos.bottom
           && prev.left === pos.left && prev.flipped === pos.flipped && (prev.maxH ?? null) === (pos.maxH ?? null)) {
@@ -297,6 +335,15 @@ export function useFloatingPopup(options: UseFloatingPopupOptions) {
       return pos;
     });
   }, [isOpen, gapAsked, hangs, edgeMargin, estimatedWidth, estimatedHeight, popupZoom, align]);
+  const flipTo = useRef(-1);
+  useLayoutEffect(() => {
+    const el = popupRef.current;
+    if (flipTo.current < 0 || !el) return;
+    if (el.classList.contains('k-drop-up') !== (flipTo.current === 1)) return;
+    flipTo.current = -1;
+    void el.offsetHeight;
+    el.style.removeProperty('transition');
+  }, [popupPos?.flipped]);
 
   useEffect(() => {
     if (!isOpen) return;

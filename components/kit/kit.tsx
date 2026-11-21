@@ -13,6 +13,7 @@ import { cardStartsOpen } from './panelFolds';
 import { CustomSelect, type SelectOption, type SelectGroup } from '../shared/CustomSelect';
 import { sliderDomain, sliderFillStyle, type SliderStep } from '../shared/sliderMath';
 import { NumberInput } from '../shared/NumberInput';
+import { onNameWords } from '../../utils/pointOnText';
 import { EMPTY_LINE, ChevronDown, ChevronRight, Search, X, Lock, type AppIcon } from '../ui/icons';
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ');
@@ -154,7 +155,7 @@ export const Group: React.FC<GroupProps> = ({ title, foldKey, icon, count, right
         ? <button type="button" className="k-group-toggle" aria-expanded={isOpen} onClick={toggle}>{head}</button>
         : head))}
       {children != null && (collapsible
-        ? <Collapse open={isOpen} onBusyChange={b => { foldBusy.current = b; }}><div className={cx('k-group-main', !flush && 'k-group-body')}><CardNestContext.Provider value={true}>{children}</CardNestContext.Provider></div></Collapse>
+        ? <Collapse open={isOpen} container onBusyChange={b => { foldBusy.current = b; }}><div className={cx('k-group-main', !flush && 'k-group-body')}><CardNestContext.Provider value={true}>{children}</CardNestContext.Provider></div></Collapse>
         : <div className={cx('k-group-main', !flush && 'k-group-body')}><CardNestContext.Provider value={true}>{children}</CardNestContext.Provider></div>)}
     </section>
   );
@@ -261,8 +262,10 @@ interface SliderRowProps extends RowTextProps {
   inputMax?: number;
   action?: React.ReactNode;
   logScale?: boolean;
+  fillFrom?: number;
+  dragSnap?: (v: number) => number;
 }
-export const SliderRow: React.FC<SliderRowProps> = ({ value, onChange, min, max, keepFraction, step = 1, disabled: off, unit, display, minLabel, maxLabel, onCommit, deferred, onLive, format, inputMin, inputMax, action, hidden, logScale, ...textIn }: SliderRowProps) => {
+export const SliderRow: React.FC<SliderRowProps> = ({ value, onChange, min, max, keepFraction, step = 1, disabled: off, unit, display, minLabel, maxLabel, onCommit, deferred, onLive, format, inputMin, inputMax, action, hidden, logScale, fillFrom, dragSnap, ...textIn }: SliderRowProps) => {
   const classicUi = useClassicUi();
   const unitInLabel = classicUi && !!unit && typeof textIn.label === 'string';
   const text = unitInLabel ? { ...textIn, label: labelWithUnit(textIn.label as string, unit as string) } : textIn;
@@ -275,6 +278,10 @@ export const SliderRow: React.FC<SliderRowProps> = ({ value, onChange, min, max,
   const tr = (x: number) => (logScale ? Math.log(Math.max(1e-9, x)) : x);
   const un = (x: number) => (logScale ? Math.exp(x) : x);
   const tStep: SliderStep = logScale ? 0.01 : step;
+  const pointing = useRef(false);
+  const fromTrack = (raw: string) => { const v = un(parseFloat(raw)); return dragSnap && pointing.current ? dragSnap(v) : v; };
+  const pointOn = () => { pointing.current = true; };
+  const pointOff = () => { pointing.current = false; };
   const endDrag = () => {
     if (!dragging.current) return;
     dragging.current = false;
@@ -296,16 +303,17 @@ export const SliderRow: React.FC<SliderRowProps> = ({ value, onChange, min, max,
       </div>
       {deferred ? (
         <input type="range" min={tr(lo)} max={tr(hi)} step={tStep} value={tr(shown)} disabled={disabled}
-          onPointerDown={() => { dragging.current = true; latest.current = value; setDrag(value); }}
-          onChange={e => { const v = un(parseFloat(e.target.value)); if (dragging.current) { latest.current = v; setDrag(v); onLive?.(v); } else onChange(v); }}
-          onPointerUp={endDrag} onLostPointerCapture={endDrag}
-          style={sliderFillStyle(tr(shown), tr(lo), tr(hi))} className="w-full" />
+          onPointerDown={() => { pointOn(); dragging.current = true; latest.current = value; setDrag(value); }}
+          onChange={e => { const v = fromTrack(e.target.value); if (dragging.current) { latest.current = v; setDrag(v); onLive?.(v); } else onChange(v); }}
+          onPointerUp={() => { endDrag(); pointOff(); }} onLostPointerCapture={() => { endDrag(); pointOff(); }} onKeyDown={dragSnap ? pointOff : undefined}
+          style={sliderFillStyle(tr(shown), tr(lo), tr(hi), fillFrom === undefined ? undefined : tr(fillFrom))} className="w-full" />
       ) : (
         <input type="range" min={tr(lo)} max={tr(hi)} step={tStep} value={tr(value)} disabled={disabled}
-          onChange={e => onChange(un(parseFloat(e.target.value)))}
-          onPointerUp={onCommit ? (e) => onCommit(un(parseFloat((e.target as HTMLInputElement).value))) : undefined}
-          onKeyUp={onCommit ? (e) => { if (/^(Arrow|Home|End|Page)/.test(e.key)) onCommit(un(parseFloat((e.target as HTMLInputElement).value))); } : undefined}
-          style={sliderFillStyle(tr(value), tr(lo), tr(hi))} className="w-full" />
+          onChange={e => onChange(fromTrack(e.target.value))}
+          onPointerDown={dragSnap ? pointOn : undefined} onLostPointerCapture={dragSnap ? pointOff : undefined} onKeyDown={dragSnap ? pointOff : undefined}
+          onPointerUp={onCommit ? (e) => { onCommit(fromTrack((e.target as HTMLInputElement).value)); pointOff(); } : dragSnap ? pointOff : undefined}
+          onKeyUp={onCommit ? (e) => { if (/^(Arrow|Home|End|Page)/.test(e.key)) onCommit(fromTrack((e.target as HTMLInputElement).value)); } : undefined}
+          style={sliderFillStyle(tr(value), tr(lo), tr(hi), fillFrom === undefined ? undefined : tr(fillFrom))} className="w-full" />
       )}
       {(minLabel || maxLabel) && <div className="k-slider-ends"><span>{minLabel}</span><span>{maxLabel}</span></div>}
     </div>
@@ -374,8 +382,9 @@ interface PickRowProps { title: React.ReactNode; meta?: React.ReactNode; selecte
   facts?: { key: string; text: string }[] }
 export const PickRow: React.FC<PickRowProps> = ({ title, meta, selected, onPick, actions, icon, onContextMenu, tags, onRename, renaming, facts }) => {
   return (
-    <div role="button" tabIndex={0} aria-pressed={!!selected} className={cx('k-pick', selected && 'k-pick-on')} onClick={onPick} onContextMenu={onContextMenu}
-      onDoubleClick={onRename ? (e => { if ((e.target as Element).closest('.k-pick-title')) onRename(); }) : undefined}
+    <div role="button" tabIndex={0} aria-pressed={!!selected} className={cx('k-pick', selected && 'k-pick-on')}
+      onClick={e => { if (onRename && selected && onNameWords(e, '.k-pick-title')) return; onPick(); }} onContextMenu={onContextMenu}
+      onDoubleClick={onRename ? (e => { if (onNameWords(e, '.k-pick-title')) onRename(); }) : undefined}
       onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onPick(); } }}>
       {icon && <span className="k-pick-icon">{icon}</span>}
       <span className="k-pick-text">

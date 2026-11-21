@@ -6,7 +6,8 @@ export const RESERVE_PLAYER_INVIS_SLOT = 1;
 
 export const FADE_LAYERED_AS_ONE_UNIT = 1;
 
-export function needsLayerInterleaveSlot(bodyLayerCount: number, turretCount: number): boolean {
+export function needsLayerInterleaveSlot(bodyLayerCount: number, turretCount: number, seeThroughPart = false): boolean {
+    if (seeThroughPart) return true;
     if (bodyLayerCount <= 0) return false;
     if (!ADMIT_ONLY_ARMED_LAYERS) return true;
     return turretCount > 0;
@@ -25,9 +26,9 @@ export function enemyQueueBudget(maxSlots: number, playerReserves: boolean): num
     return Math.max(1, maxSlots - 1);
 }
 
-export function playerReservesMultiLayerSlot(bodyLayerCount: number, turretCount: number): boolean {
+export function playerReservesMultiLayerSlot(bodyLayerCount: number, turretCount: number, seeThroughPart = false): boolean {
     if (!RESERVE_PLAYER_ML_SLOT) return false;
-    return needsLayerInterleaveSlot(bodyLayerCount, turretCount);
+    return needsLayerInterleaveSlot(bodyLayerCount, turretCount, seeThroughPart);
 }
 
 export function playerReservesInvisibleSlot(

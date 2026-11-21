@@ -3,6 +3,7 @@ import { pushUndoAction } from './shell/undoActions';
 import { GameLogic } from '../game/GameLogic';
 import { GameModeConfig, TEAM_NAMES, isManhuntMode, BOT_PORTAL_DEFAULTS, isPortalMode, SANDBOX_TEAMS } from '../types';
 import { SMALL_FIX } from '../game/smallFixSwitch';
+import { LEVEL_LIMIT } from '../game/levelLimit';
 import { Joystick, ChevronRight, MevEvents, HdGame, HdActivityCircle, HdSettingDone01, HdAnalyticsUp, HdChart02, HdUserGroup03 } from './ui/icons';
 import { Reveal, SwapText } from './kit/Collapse';
 import { GameModesWindow, gameModeArt } from './GameModesWindow';
@@ -165,7 +166,7 @@ export const GameModeDesignerUI: React.FC<Props> = ({ logic, onUpdate, className
       newConfig.playerTeam = 1;
     }
     if (partial.growth !== undefined && partial.levelCap === undefined) {
-      newConfig.levelCap = partial.growth ? 1000 : 45;
+      newConfig.levelCap = partial.growth ? (SMALL_FIX.R994 !== 0 ? LEVEL_LIMIT : 1000) : 45;
     }
     if (partial.growth === true) {
       if (partial.growthMaxMultiplier === undefined && newConfig.growthMaxMultiplier === undefined) {
@@ -256,6 +257,7 @@ export const GameModeDesignerUI: React.FC<Props> = ({ logic, onUpdate, className
   const canPickTeamCount = supportsTeamCountChoice(config.mode) && !config.preset;
   const isOD = config.mode === 'old-dreadnoughts';
   const isManhunt = isManhuntMode(config.mode);
+  const powerNoneStep = (config.growth ? 1000 : 200) + 1;
 
   const respawn = {
     percent: logic.state.respawnLevelPercent,
@@ -299,7 +301,7 @@ export const GameModeDesignerUI: React.FC<Props> = ({ logic, onUpdate, className
           />
         )}
         <ToggleRow label="Growth Mode" description="Tanks grow as they level up."
-          help="Level cap 1000. Tanks grow in size as they level up. Speed decreases with size. Skill points: every level (1 to 40), every other (41 to 51), every 10 (52 and up). Size scaling: tanks grow per level past the start level, capped by the max multiplier. Speed penalty: up to 4x slower at max growth (2x normally)."
+          help={(SMALL_FIX.R994 !== 0 ? 'No Max Power Level.' : 'Level cap 1000.') + " Tanks grow in size as they level up. Speed decreases with size. Skill points: every level (1 to 40), every other (41 to 51), every 10 (52 and up). Size scaling: tanks grow per level past the start level, capped by the max multiplier. Speed penalty: up to 4x slower at max growth (2x normally)."}
           checked={config.growth} onChange={v => applyConfig({ growth: v })} />
         <Reveal when={ALL_MODES.ON !== 0 && config.mode !== 'sandbox' && config.mode !== 'old-dreadnoughts'}>
           <ToggleRow label="Arms Race Tree" help="You and the bots upgrade along the Arms Race tree."
@@ -330,15 +332,22 @@ export const GameModeDesignerUI: React.FC<Props> = ({ logic, onUpdate, className
           </div>
         </Reveal>
         <Reveal when={!isManhunt}>
-        <SliderRow label="Level Cap" help="Maximum achievable level. Default: 45. Growth mode: 1000." deferred
-          value={config.levelCap ?? 45} onChange={handleLevelCapChange} min={1} max={config.growth ? 1000 : 200} step={1} inputMax={1000} />
+        {SMALL_FIX.R994 !== 0
+          ? <SliderRow label="Max Power Level" help="Your level and score keep going past it, but skill points and growth stop at this level. The far right is None. Default: 45, Growth modes: None." deferred
+              value={(config.levelCap ?? 45) >= LEVEL_LIMIT ? powerNoneStep : (config.levelCap ?? 45)}
+              onChange={v => handleLevelCapChange(v >= powerNoneStep ? LEVEL_LIMIT : v)}
+              min={1} max={powerNoneStep} step={1} inputMax={powerNoneStep} format={v => (v >= powerNoneStep ? 'None' : String(v))} />
+          : <SliderRow label="Level Cap" help="Maximum achievable level. Default: 45. Growth mode: 1000." deferred
+              value={config.levelCap ?? 45} onChange={handleLevelCapChange} min={1} max={config.growth ? 1000 : 200} step={1} inputMax={1000} />}
         </Reveal>
         <Reveal when={isManhunt}>
-          <FieldRow label="Level Cap" help="Manhunt has no level cap: levels keep going up."><span className="k-value-text">None in Manhunt</span></FieldRow>
+          {SMALL_FIX.R994 !== 0
+            ? <FieldRow label="Max Power Level" help="Manhunt has none: skill points and growth go on with every level."><span className="k-value-text">None in Manhunt</span></FieldRow>
+            : <FieldRow label="Level Cap" help="Manhunt has no level cap: levels keep going up."><span className="k-value-text">None in Manhunt</span></FieldRow>}
         </Reveal>
         <Reveal when={isOD && (config.levelCap ?? 45) < 45}>
           <p className="k-hint k-hint-strong">
-            Warning: Level cap ({config.levelCap}) is below the Forge gate (45). Players cannot reach the Forge.
+            {SMALL_FIX.R994 !== 0 ? 'Warning: Max Power Level' : 'Warning: Level cap'} ({config.levelCap}) is below the Forge gate (45). Players cannot reach the Forge.
           </p>
         </Reveal>
         <Reveal when={isOD}><div className="space-y-3">
@@ -511,7 +520,7 @@ export const GameModeDesignerUI: React.FC<Props> = ({ logic, onUpdate, className
         <Dim when={scoreKept} why="Keep Score is on: the mode's Growth Rules decide the respawn." className="k-stack">
         <SliderRow label="Level Kept" unit="%" help="How much of your level you come back with. At 25%, dying at level 160 returns you at level 40. The engine works out the exact XP for that level, so your size, growth and skill points all follow automatically." deferred
           value={respawn.percent} onChange={v => setRespawn({ respawnLevelPercent: v })} min={0} max={100} step={1} />
-        <SliderRow label="Minimum Level" help="Die below this level and you keep nothing, returning at level 0. Note that a mode's own level cap still applies: in modes capped at 45 you can never reach a minimum set above it, so nothing would ever carry over there." deferred
+        <SliderRow label="Minimum Level" help={SMALL_FIX.R994 !== 0 ? "Die below this level and you keep nothing, returning at level 0. The respawn counts your level only up to the mode's Max Power Level: where that is 45, a minimum set above it never carries anything over." : "Die below this level and you keep nothing, returning at level 0. Note that a mode's own level cap still applies: in modes capped at 45 you can never reach a minimum set above it, so nothing would ever carry over there."} deferred
           value={respawn.minLevel} onChange={v => setRespawn({ respawnMinLevel: v })} min={0} max={1000} step={1} />
         <SliderRow label="Highest Respawn Level" help="The ceiling on where you can come back, however high you were when you died. At 40, a level 160 death and a level 900 death both return you at level 40." deferred
           value={respawn.maxLevel} onChange={v => setRespawn({ respawnMaxLevel: v })} min={0} max={1000} step={1} />
@@ -525,7 +534,7 @@ export const GameModeDesignerUI: React.FC<Props> = ({ logic, onUpdate, className
         <Reveal when={isTDM}><SummaryRow label="Teams" value={`${config.teams}`} /></Reveal>
         <Reveal when={isTDM}><SummaryRow label="Your Team" value={TEAM_NAMES[config.playerTeam - 1] ?? ''} /></Reveal>
         <Reveal when={config.mode === 'tdm' && BASE_AREAS.ON === 0}><SummaryRow label="Team Bases" value={config.enableSpawnZones ? 'On' : 'Off'} /></Reveal>
-        <SummaryRow label="Growth" value={isManhunt ? (config.growth ? 'On (no level cap)' : 'Off (no level cap)') : config.growth ? `On (Lvl ${config.levelCap ?? 1000})` : `Off (Lvl ${config.levelCap ?? 45})`} />
+        <SummaryRow label="Growth" value={SMALL_FIX.R994 !== 0 ? `${config.growth ? 'On' : 'Off'} (Max Power Level ${isManhunt || (config.levelCap ?? 45) >= LEVEL_LIMIT ? 'None' : config.levelCap ?? 45})` : isManhunt ? (config.growth ? 'On (no level cap)' : 'Off (no level cap)') : config.growth ? `On (Lvl ${config.levelCap ?? 1000})` : `Off (Lvl ${config.levelCap ?? 45})`} />
         <SummaryRow label="Bots Rest After a Trip" value={botRest ? `${botRestMin} min` : 'Off'} />
       </Group>
     </ScrollArea>

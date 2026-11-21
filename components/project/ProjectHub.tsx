@@ -1,3 +1,4 @@
+import { shortcutKey } from '../../utils/shortcutKey';
 import { SMALL_FIX } from '../../game/smallFixSwitch';
 import { TEXT_LIMITS } from '../kit/textLimits';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
@@ -86,7 +87,7 @@ const fullDate = (t: number) => (t ? new Date(t).toLocaleString(undefined, { yea
 const KIND_OF_TYPE: Record<string, LibKind> = { Tank: 'tank', TurretPreset: 'turret', CustomTurret: 'turret', CustomProjectile: 'projectile', Other: 'other', FoodShape: 'shape' };
 const TYPE_WORD: Record<string, string> = {
   Tank: 'Tank', TurretPreset: 'Turret', CustomTurret: 'Turret', CustomProjectile: 'Projectile', Other: 'Other', FoodShape: 'Food shape',
-  Map: 'Map', MultiAreaMap: 'Map with areas',
+  Map: 'Map', MultiAreaMap: 'Map with areas', Solid: '3D solid',
 };
 
 function entryOf(it: HubItem, file: ExportFile | undefined, openId: string | null, gpuOk: boolean): LibEntry {
@@ -285,7 +286,7 @@ const ProjectHubWindow: React.FC<{ logic: GameLogic; setTool: (t: Tool) => void;
     if (lock) { toast('info', lock); return; }
     if (f.type === 'FoodShape') {
       logic.loadFoodShapeDesignIntoCanvas(f.data as FoodShapeDesign);
-      setTool('tank');
+      setTool('turret');
     } else {
       const en: LibEntry = { ...e, item: { id: 'hub-' + it.id, name: it.name, fileData: f, loadedAt: it.created, source: 'manual-import' } };
       const act = canvasActions({ logic, showToast: (k, t) => toast(k, t), onUpdate: () => logic.onStateChange?.(logic.state), showTool: setTool })(en)[0];
@@ -408,8 +409,8 @@ const ProjectHubWindow: React.FC<{ logic: GameLogic; setTool: (t: Tool) => void;
     if (ev.key !== 'Escape') ev.stopPropagation();
     const t = ev.target as HTMLElement;
     const inField = t.tagName === 'INPUT' || t.tagName === 'TEXTAREA';
-    if ((ev.key === 'k' && (ev.ctrlKey || ev.metaKey)) || (ev.key === '/' && !inField)) { ev.preventDefault(); searchRef.current?.focus(); searchRef.current?.select(); return; }
-    if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && !ev.altKey && ev.key.toLowerCase() === 'z' && !inField) { ev.preventDefault(); undoRemove(); return; }
+    if ((shortcutKey(ev) === 'k' && (ev.ctrlKey || ev.metaKey)) || (shortcutKey(ev) === '/' && !inField)) { ev.preventDefault(); searchRef.current?.focus(); searchRef.current?.select(); return; }
+    if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && !ev.altKey && shortcutKey(ev) === 'z' && !inField) { ev.preventDefault(); undoRemove(); return; }
     if (inField && t !== searchRef.current) return;
     if ((t.tagName === 'BUTTON' || t.tagName === 'A') && (ev.key === 'Enter' || ev.key === ' ')) return;
     if (inField && ev.key !== 'ArrowDown' && ev.key !== 'Enter') return;

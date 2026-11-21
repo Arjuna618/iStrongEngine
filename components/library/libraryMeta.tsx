@@ -32,6 +32,7 @@ export function cardFacts(e: LibEntry): string[] {
       return [n > 0 ? `Carries ${plural(n, 'turret', 'turrets')}` : 'No turrets'];
     }
     case 'other': return [sides <= 1 ? 'One shape' : `${sides} shapes`];
+    case 'solid': return [plural(sides, 'face', 'faces')];
     case 'shape': {
       const s = e.shape;
       if (!s) return [];

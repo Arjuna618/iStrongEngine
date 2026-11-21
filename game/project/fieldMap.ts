@@ -3,7 +3,7 @@ import type { GameState } from '../../types';
 export type Home = 'canvas' | 'world' | 'mode' | 'enemies' | 'library' | 'person' | 'runtime' | 'derived' | 'legacy';
 
 export const PROJECT_FIELDS: Record<keyof GameState, Home> = {
-  tankSides: 'canvas', tankShapeDepth: 'canvas', tankShapeCurved: 'canvas', tankSize: 'canvas', tankColor: 'canvas',
+  tankSides: 'canvas', tankShapeDepth: 'canvas', tankShapeCurved: 'canvas', tankSize: 'canvas', tankColor: 'canvas', tankOpacity: 'canvas',
   tankColorMap: 'canvas', tankColorFree: 'canvas', keepOwnColor: 'canvas', tankHP: 'canvas', tankBodyDamage: 'canvas',
   tankMovementSpeed: 'canvas', tankShieldRegen: 'canvas', tankShieldCapacity: 'canvas', fovMultiplier: 'canvas',
   maxSkillPoints: 'canvas', maxPointsPerSkill: 'canvas', bonusSkillPoints: 'canvas', skillCaps: 'canvas',
@@ -24,6 +24,7 @@ export const PROJECT_FIELDS: Record<keyof GameState, Home> = {
   autoSubTurretSelectedId: 'canvas', autoSubTurretSelectMode: 'canvas',
   mirrorMode: 'canvas', autoPlacement: 'canvas', autoPlacementCount: 'canvas', snapPlacement: 'canvas', snapPlacementCount: 'canvas',
   autoSubTurretMirrorMode: 'canvas', autoSubTurretSnapPlacement: 'canvas', autoSubTurretSnapPlacementCount: 'canvas',
+  snapTarget: 'canvas', autoSubTurretSnapTarget: 'canvas',
   autoSubTurretAutoPlacement: 'canvas', autoSubTurretAutoPlacementCount: 'canvas',
 
   mapSize: 'world', mapConfig: 'world', multiAreaConfig: 'world', shapeSpawnConfig: 'world', spawnRate: 'world',
@@ -33,14 +34,14 @@ export const PROJECT_FIELDS: Record<keyof GameState, Home> = {
 
   enemyConfigs: 'enemies', aiBehaviorCategories: 'enemies',
 
-  tankLibrary: 'library', otherLibrary: 'library', projectileDesigns: 'library', turretPresets: 'library',
+  tankLibrary: 'library', otherLibrary: 'library', solidLibrary: 'library', projectileDesigns: 'library', turretPresets: 'library',
 
   playerName: 'person', debugMode: 'person', showHPBars: 'person', showPlayerNames: 'person', showPlayerScores: 'person',
   showKillsBar: 'person', showAllMinimap: 'person',
   debugShowShapeHP: 'person', debugShowProjectileHP: 'person', debugShowAILogic: 'person', debugShowXpGain: 'person',
   debugShowAllNames: 'person',
   showSpawnStats: 'person',
-  dbgHudEntities: 'person', dbgHudJitter: 'person', dbgHudPerf: 'person', dbgHudMemory: 'person', dbgHudDrawOps: 'person', dbgHudWaves: 'person', dbgShowAreaMarks: 'person',
+  dbgHudEntities: 'person', dbgHudJitter: 'person', dbgHudPerf: 'person', dbgHudMemory: 'person', dbgHudDrawOps: 'person', dbgHudWaves: 'person', dbgShowAreaMarks: 'person', dbgShowHitAreas: 'person',
   dbgHudOverlayCost: 'person', dbgHudAimError: 'person', dbgHudAimReact: 'person', dbgHudStalkFlee: 'person',
   dbgHudRoleRepair: 'person', dbgHudFleeReroute: 'person', dbgHudFleeDeadEnd: 'person', dbgHudFearRearm: 'person',
   dbgHudFleeStand: 'person', dbgHudFleeCommit: 'person', dbgHudBorderSqueeze: 'person', dbgHudProvokeShield: 'person',

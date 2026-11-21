@@ -5,12 +5,14 @@ import { cmMapOf } from './colorMap';
 import { lookList, lookUnit } from './placedLook';
 import { outlineFansFromMiddle, cleanOutline } from './halloween';
 import { outlineFillTriangles } from './outlineFill';
-import { layerOutlineOf } from './layerOutline';
+import { layerOutlineOf, layerSolidOf } from './layerOutline';
+import type { ArrasSolid } from './solidArras';
+import { layerIsPlaced } from './canvasParts';
 import { layerColourOf, LAYER_BODY, LAYER_TEAM } from '../game/teamColourSwitch';
 import { autoBaseDepth, autoBaseTurn } from './autoBaseShape';
 import {
   GRID_SPACING, HEALER_CROSS_SCALE, mapVal,
-  sortTurretsByLayer, bodyLayerCmp, buildTurretLayerFlags, getTurretOnLayer, getTurretLayerOrder,
+  sortTurretsByLayer, bodyLayerCmp, buildTurretLayerFlags, getTurretOnLayer, getTurretLayerOrder, getTurretLayerRef,
 } from '../components/shared/tankIconRenderer';
 import { computeCircumcircle } from '../components/TankPreview';
 
@@ -22,8 +24,54 @@ export const CT_MESH_POLY0 = 2;
 export const CT_MESH_POLY_MAX_SIDES = 16;
 export const CT_MESH_CROSS = 16;
 export const CT_MESH_STAR0 = 17;
-export const ctStarMeshes: { sides: number; depth: number; curved: boolean; outline?: [number, number][]; line?: boolean }[] = [];
+export const ctStarMeshes: { sides: number; depth: number; curved: boolean; outline?: [number, number][]; line?: boolean; solid?: ArrasSolid; solidLines?: boolean }[] = [];
 const _starIds = new Map<string, number>();
+
+const _solidIds = new WeakMap<ArrasSolid, number>();
+export function ctSolidMesh(s: ArrasSolid, lines: boolean): number {
+  let id = _solidIds.get(s);
+  if (id === undefined) {
+    id = CT_MESH_STAR0 + ctStarMeshes.length;
+    ctStarMeshes.push({ sides: 0, depth: 0, curved: false, solid: s, solidLines: false }, { sides: 0, depth: 0, curved: false, solid: s, solidLines: true });
+    _solidIds.set(s, id);
+  }
+  return lines ? id + 1 : id;
+}
+
+export function ctSolidsOf(layers: readonly BodyLayer[] | null | undefined): (ArrasSolid | null)[] | null {
+  let out: (ArrasSolid | null)[] | null = null;
+  if (layers) for (let i = 0; i < layers.length; i++) {
+    const L = layers[i];
+    if (!L || L.solidId === undefined) continue;
+    (out ??= []).push(layerSolidOf(L));
+  }
+  return out;
+}
+export function ctSolidsSame(layers: readonly BodyLayer[] | null | undefined, kept: readonly (ArrasSolid | null)[] | null): boolean {
+  let j = 0;
+  if (layers) for (let i = 0; i < layers.length; i++) {
+    const L = layers[i];
+    if (!L || L.solidId === undefined) continue;
+    if (kept === null || j >= kept.length || layerSolidOf(L) !== kept[j]) return false;
+    j++;
+  }
+  return kept === null ? j === 0 : j === kept.length;
+}
+const _solidSerial = new WeakMap<ArrasSolid, number>();
+let _nextSolidSerial = 1;
+export function ctSolidKey(layers: readonly BodyLayer[] | null | undefined): string {
+  if (!layers) return '';
+  let key = '';
+  for (let i = 0; i < layers.length; i++) {
+    const L = layers[i];
+    if (!L || L.solidId === undefined) continue;
+    const s = layerSolidOf(L);
+    let n = 0;
+    if (s !== null) { n = _solidSerial.get(s) ?? 0; if (n === 0) { n = _nextSolidSerial++; _solidSerial.set(s, n); } }
+    key += '|s' + n;
+  }
+  return key;
+}
 
 export function ctOutlineMesh(pts: [number, number][]): number {
   let h = 2166136261 >>> 0;
@@ -99,9 +147,10 @@ export function ctIconParts(config: TankConfig, dark: boolean, bodyOverride: str
   const cc = computeCircumcircle(turrets, sizePx, tankSides, layers);
   const k = cc.radius > 0 ? 1 / (2 * cc.radius) : 0;
   const cF = Math.cos(CT_ICON_FACING), sF = Math.sin(CT_ICON_FACING);
+  let shOn = false, shX = 0, shY = 0;
   const emit = (mesh: number, x: number, y: number, rot: number, sx: number, sy: number,
     col: readonly number[], aspect: number) => {
-    const dx = x - cc.centerX, dy = y - cc.centerY;
+    const dx = (shOn ? x + shX : x) - cc.centerX, dy = (shOn ? y + shY : y) - cc.centerY;
     out.push(mesh, k * (dx * cF - dy * sF), k * (dx * sF + dy * cF), rot + CT_ICON_FACING,
       k * sx, k * sy, col[0], col[1], col[2], aspect);
   };
@@ -168,19 +217,25 @@ export function ctIconParts(config: TankConfig, dark: boolean, bodyOverride: str
   const sorted: Turret[] = turrets.length > 0 ? sortTurretsByLayer(turrets).slice() : [];
   buildTurretLayerFlags(sorted, layers);
   const onLayer = getTurretOnLayer().slice(0, sorted.length);
-  const layerOf = getTurretLayerOrder().slice(0, sorted.length);
+  const layerOf = getTurretLayerOrder().slice(0, sorted.length); void layerOf;
+  const ownerOf = getTurretLayerRef().slice(0, sorted.length);
   const layerList: BodyLayer[] = layers && layers.length > 0 ? layers.slice().sort(bodyLayerCmp) : [];
 
   const layer = (L: BodyLayer) => {
     const lsz = sizePx * L.sizeRatio;
+    shOn = layerIsPlaced(L); shX = shOn ? (L.x || 0) * sizePx / 2 : 0; shY = shOn ? (L.y || 0) * sizePx / 2 : 0;
     const lw = layerColourOf(L, bodyOverride !== undefined, layerTeam !== undefined);
     let col = lw === LAYER_BODY ? body : lw === LAYER_TEAM ? rgbOf(mapBody(layerTeam!, dark)) : rgbOf(bodyFillIn(L.color, cmMapOf(L.colorMap), dark));
     if (dark && L.intangible) col = BLACK_RGB;
-    for (let i = 0; i < sorted.length; i++) if (!sorted[i].aboveTankBody && layerOf[i] === L.renderOrder) turret(sorted[i], lsz, 0);
+    for (let i = 0; i < sorted.length; i++) if (!sorted[i].aboveTankBody && ownerOf[i] === L) turret(sorted[i], lsz, 0);
     const half = lsz / 2;
     const init = L.initialAngle || 0;
     const lo = layerOutlineOf(L) !== null ? ctLookMesh({ kind: 'outline', points: L.outline }) : -1;
-    if (lo >= 0) {
+    const ls = layerSolidOf(L);
+    if (ls !== null) {
+      const sf = ctSolidMesh(ls, false), sl = ctSolidMesh(ls, true), n = L.copies > 1 ? L.copies : 1;
+      for (let c = 0; c < n; c++) { const a = (Math.PI * 2 * c) / n + init; emit(sf, 0, 0, a, half, half, col, 1); emit(sl, 0, 0, a, half, half, col, 1); }
+    } else if (lo >= 0) {
       const n = L.copies > 1 ? L.copies : 1;
       for (let c = 0; c < n; c++) emit(lo, 0, 0, (Math.PI * 2 * c) / n + init, half, half, col, 1);
     } else if (L.sides < 3) {
@@ -192,7 +247,8 @@ export function ctIconParts(config: TankConfig, dark: boolean, bodyOverride: str
       for (let c = 0; c < n; c++) emit(mesh, 0, 0, (Math.PI * 2 * c) / n + init, vh, vh, col, 1);
     }
     if (L.showHealerCross) emit(CT_MESH_CROSS, 0, 0, init, HEALER_CROSS_SCALE * lsz, HEALER_CROSS_SCALE * lsz, rgbOf(healerCrossFillIn(dark)), 1);
-    for (let i = 0; i < sorted.length; i++) if (sorted[i].aboveTankBody && layerOf[i] === L.renderOrder) turret(sorted[i], lsz, 0);
+    for (let i = 0; i < sorted.length; i++) if (sorted[i].aboveTankBody && ownerOf[i] === L) turret(sorted[i], lsz, 0);
+    shOn = false; shX = 0; shY = 0;
   };
 
   for (const L of layerList) if (L.renderOrder >= 0) layer(L);

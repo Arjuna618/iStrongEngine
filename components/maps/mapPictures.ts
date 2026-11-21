@@ -52,6 +52,12 @@ export function loadBuiltMazePictures(): Promise<void> {
   return builtLoad;
 }
 
+export function prewarmMapPictures(): void {
+  if (builtLoad || (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches)) return;
+  const go = () => { void loadBuiltMazePictures(); };
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(go, { timeout: 8000 }); else window.setTimeout(go, 2000);
+}
+
 type Job = { key: string; req: { kind: 'single'; config: MapConfig } | { kind: 'multi'; mac: MultiAreaMapConfig } };
 let worker: Worker | null = null;
 let running: { id: number; job: Job } | null = null;

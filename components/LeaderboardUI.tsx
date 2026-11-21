@@ -1,5 +1,7 @@
 import React, { useRef, useEffect, useLayoutEffect, useState, useMemo, useCallback } from 'react';
 import { SMALL_FIX } from '../game/smallFixSwitch';
+import { partOpacityOf, PartScratch } from '../utils/partOpacity';
+import { sortInPlace } from '../utils/sortInPlace';
 import { GameLogic } from '../game/GameLogic';
 import { AT_ON_LEADERBOARD } from '../game/adminPanel';
 import { Turret, BodyLayer, TEAM_COLORS_DARK, TEAM_COLORS_LIGHT, isFfaStyleMode } from '../types';
@@ -21,14 +23,20 @@ import {
     bodyLayerSortBuf as _lbBodyLayerSortBuf,
     bodyLayerCmp as _lbBodyLayerCmp,
     buildTurretLayerFlags as _lbBuildTurretLayerFlags,
-    getTurretOnLayer, getTurretLayerOrder,
+    getTurretOnLayer, getTurretLayerOrder, getTurretLayerRef,
     roundedPolygonPath, roundedBarrelPath,
     roundedStarPath as _lbRoundedStarPath,
     strokeFillPolygonCopies as _lbStrokeFillPolygonCopies,
     drawHealerCross as _lbDrawHealerCrossRaw,
 } from './shared/tankIconRenderer';
 import { computeCircumcircle } from './TankPreview';
-import { lbU32, lbAbbrev, lbScoreOf } from '../utils/hudEase';
+import { ctSolidKey } from '../utils/classTreeIcon';
+import { layerIsPlaced, layerPlaceInto } from '../utils/canvasParts';
+const _lbLp: number[] = [0, 0];
+const _lbScoreDesc = (a: LeaderboardEntry, b: LeaderboardEntry): number => b.score - a.score;
+const _lbScratch = new PartScratch();
+import { lbU32, lbWhole, lbAbbrev, lbScoreOf } from '../utils/hudEase';
+const lbShownWhole = SMALL_FIX.R994 !== 0 ? lbWhole : lbU32;
 import { autoBaseDepth, autoBaseTurn } from '../utils/autoBaseShape';
 import {
   LbRow, LbBoard, lbNewBoard, lbClearBoard, lbApplyUpdate, lbStep, lbMoving, lbFoldValues, lbBlending,
@@ -36,7 +44,7 @@ import {
   lbFitPrefix, lbNumShape, LB_NUM_MASKS, LB_LABEL_MAX,
 } from '../utils/lbAnim';
 import { botNameGlyphsRun } from '../utils/botNameGlyphs';
-import { layerOutlineOf, strokeFillLayerOutline } from '../utils/layerOutline';
+import { layerOutlineOf, strokeFillLayerOutline, layerSolidOf, strokeFillLayerSolid } from '../utils/layerOutline';
 import { layerColourOf, LAYER_BODY, LAYER_TEAM, anyForcedTeamLayer } from '../game/teamColourSwitch';
 import { mobileActive, subscribeMobile, mobHud, mobKeys, subscribeMobKeys, subscribeMobSticks } from '../utils/mobileMode';
 import { motionOff } from './kit/presence';
@@ -56,9 +64,11 @@ function _lbDrawHealerCross(ctx: CanvasRenderingContext2D, sizePx: number, strok
 
 let _lbTurretOnLayer: Uint8Array;
 let _lbTurretLayerOrder: Int8Array;
+let _lbTurretLayerRef: (BodyLayer | null)[];
 function _refreshLayerAccessors(): void {
     _lbTurretOnLayer = getTurretOnLayer();
-    _lbTurretLayerOrder = getTurretLayerOrder();
+    _lbTurretLayerOrder = getTurretLayerOrder(); void _lbTurretLayerOrder;
+    _lbTurretLayerRef = getTurretLayerRef();
 }
 _refreshLayerAccessors();
 
@@ -227,10 +237,10 @@ function lbPaint(v: LbView, clockUs: number): boolean {
         r.pFillEl = fill; r.pFill = fx;
       }
     }
-    const n = lbU32(r.shown);
+    const n = lbShownWhole(r.shown);
     const text = r.textRef.current;
     if (text && (text !== r.pTextEl || n !== r.pN || r.prefix !== r.pPrefix || r.pFitGen !== _lbFitGen)) {
-      const shape = lbNumShape(lbU32(r.now > r.old ? r.now : r.old));
+      const shape = lbNumShape(lbShownWhole(r.now > r.old ? r.now : r.old));
       if (shape !== r.pShape || r.pFitGen !== _lbFitGen) lbRefit(r, shape, s);
       const label = r.entry.fixedLabel ?? r.prefix + lbAbbrev(n);
       if (text !== r.pTextEl || label !== r.pLabel) { text.textContent = label; r.pLabel = label; }
@@ -283,6 +293,7 @@ const TankPreviewMini: React.FC<{
   layerTeamColor?: string;
 }> = ({ tankColor, tankSides, tankShapeDepth, tankShapeCurved, turrets, tankSize, previewSize, left, top, iconSize, isDark, themeV, bodyLayers, isHealer, teamColorOverride, layerTeamColor }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const solidKey = ctSolidKey(bodyLayers);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -332,8 +343,17 @@ const TankPreviewMini: React.FC<{
     let lookHost = 0;
     const lookFill = (c: string, m: number): string => bodyFillIn(c, m, !!isDark);
     const lookLine = (f: string): string => darkenColor(f, 0.598);
+    const iconCtx = ctx;
     const drawTurret = (t: Turret, overrideSizePx?: number, parentRotation?: number,
-        sideCorr = 1.0) => {
+        sideCorr = 1.0, ctx: CanvasRenderingContext2D = iconCtx) => {
+      if (t.opacity !== undefined && t.opacity < 1) {
+        const sc = _lbScratch.begin(ctx);
+        drawTurretOne(t, overrideSizePx, parentRotation, sideCorr, sc);
+        _lbScratch.paste(ctx, sc, partOpacityOf(t.opacity));
+      } else drawTurretOne(t, overrideSizePx, parentRotation, sideCorr, ctx);
+    };
+    const drawTurretOne = (t: Turret, overrideSizePx: number | undefined, parentRotation: number | undefined,
+        sideCorr: number, ctx: CanvasRenderingContext2D) => {
       const effSizePx = overrideSizePx ?? tankSizePx;
       const isAuto = t.turretType === 'auto';
 
@@ -369,7 +389,7 @@ const TankPreviewMini: React.FC<{
         lookHost = effSizePx;
         for (let si = 0; si < sortedSubs.length; si++) {
           if (sortedSubs[si].aboveBase === true) continue;
-          drawTurret(sortedSubs[si], subSizePx, t.angle);
+          drawTurret(sortedSubs[si], subSizePx, t.angle, 1.0, ctx);
         }
         lookHost = 0;
         ctx.restore();
@@ -430,7 +450,7 @@ const TankPreviewMini: React.FC<{
             ctx.rotate(t.angle);
             const subsAbove = _lbSortSubTurrets(t.autoSubTurrets!);
             lookHost = effSizePx;
-            for (let si = 0; si < subsAbove.length; si++) if (subsAbove[si].aboveBase === true) drawTurret(subsAbove[si], circleR * 2, t.angle);
+            for (let si = 0; si < subsAbove.length; si++) if (subsAbove[si].aboveBase === true) drawTurret(subsAbove[si], circleR * 2, t.angle, 1.0, ctx);
             lookHost = 0;
             ctx.restore();
           }
@@ -451,32 +471,17 @@ const TankPreviewMini: React.FC<{
     if (hasBodyLayers) {
       _lbBodyLayerSortBuf.length = bodyLayers!.length;
       for (let bli = 0; bli < bodyLayers!.length; bli++) _lbBodyLayerSortBuf[bli] = bodyLayers![bli];
-      if (bodyLayers!.length > 1) _lbBodyLayerSortBuf.sort(_lbBodyLayerCmp);
+      if (bodyLayers!.length > 1) sortInPlace(_lbBodyLayerSortBuf, _lbBodyLayerCmp);
     }
 
-    if (hasBodyLayers) {
-      for (let bli = 0; bli < _lbBodyLayerSortBuf.length; bli++) {
-        const bLayer = _lbBodyLayerSortBuf[bli];
-        if (bLayer.renderOrder < 0) continue;
-
-        const layerSizePx = tankSizePx * bLayer.sizeRatio;
-        const layerHalf = layerSizePx / 2;
-        const _lw = layerColourOf(bLayer, !!teamColorOverride, !!layerTeamColor);
-        const layerColor = _lw === LAYER_BODY ? bodyColor : _lw === LAYER_TEAM ? layerTeamColor! : bodyFillIn(bLayer.color, bLayer.colorMap, !!isDark);
-
-        ctx.save();
-
-        if (sortedT) {
-        for (let ti = 0; ti < sortedT.length; ti++) {
-          if (!sortedT[ti].aboveTankBody && _lbTurretLayerOrder[ti] === bLayer.renderOrder) {
-            drawTurret(sortedT[ti], layerSizePx);
-          }
-        }
-        }
-
+    const drawLayerShape = (ctx: CanvasRenderingContext2D, bLayer: BodyLayer, layerSizePx: number, layerHalf: number, layerColor: string) => {
         ctx.lineJoin = 'round';
         const _lbOutline = layerOutlineOf(bLayer);
-        if (_lbOutline !== null) {
+        const _lbSolid = layerSolidOf(bLayer);
+        if (_lbSolid !== null) {
+          const _slStroke = darkenColor(layerColor, 0.598);
+          strokeFillLayerSolid(ctx, _lbSolid, layerHalf, bLayer.initialAngle || 0, bLayer.copies, _slStroke, screenStroke, (isDark && bLayer.intangible) ? _slStroke : layerColor);
+        } else if (_lbOutline !== null) {
           const _loStroke = darkenColor(layerColor, 0.598);
           strokeFillLayerOutline(ctx, _lbOutline, layerHalf, bLayer.initialAngle || 0, bLayer.copies, _loStroke, screenStroke, (isDark && bLayer.intangible) ? _loStroke : layerColor);
         } else if (bLayer.sides < 3) {
@@ -509,10 +514,37 @@ const TankPreviewMini: React.FC<{
         if (bLayer.showHealerCross) {
           _lbDrawHealerCross(ctx, layerSizePx, screenStroke);
         }
+    };
+    const drawLayer = (bLayer: BodyLayer, layerSizePx: number, layerHalf: number, layerColor: string) => {
+      const op = partOpacityOf(bLayer.opacity);
+      if (op < 1) { const sc = _lbScratch.begin(iconCtx); drawLayerShape(sc, bLayer, layerSizePx, layerHalf, layerColor); _lbScratch.paste(iconCtx, sc, op); }
+      else drawLayerShape(iconCtx, bLayer, layerSizePx, layerHalf, layerColor);
+    };
 
+    if (hasBodyLayers) {
+      for (let bli = 0; bli < _lbBodyLayerSortBuf.length; bli++) {
+        const bLayer = _lbBodyLayerSortBuf[bli];
+        if (bLayer.renderOrder < 0) continue;
+
+        const layerSizePx = tankSizePx * bLayer.sizeRatio;
+        const layerHalf = layerSizePx / 2;
+        const _lw = layerColourOf(bLayer, !!teamColorOverride, !!layerTeamColor);
+        const layerColor = _lw === LAYER_BODY ? bodyColor : _lw === LAYER_TEAM ? layerTeamColor! : bodyFillIn(bLayer.color, bLayer.colorMap, !!isDark);
+
+        ctx.save();
+        if (layerIsPlaced(bLayer)) { layerPlaceInto(_lbLp, bLayer, tankSizePx / 2, 1, 0); ctx.translate(_lbLp[0], _lbLp[1]); }
         if (sortedT) {
         for (let ti = 0; ti < sortedT.length; ti++) {
-          if (sortedT[ti].aboveTankBody && _lbTurretLayerOrder[ti] === bLayer.renderOrder) {
+          if (!sortedT[ti].aboveTankBody && _lbTurretLayerRef[ti] === bLayer) {
+            drawTurret(sortedT[ti], layerSizePx);
+          }
+        }
+        }
+
+        drawLayer(bLayer, layerSizePx, layerHalf, layerColor);
+        if (sortedT) {
+        for (let ti = 0; ti < sortedT.length; ti++) {
+          if (sortedT[ti].aboveTankBody && _lbTurretLayerRef[ti] === bLayer) {
             drawTurret(sortedT[ti], layerSizePx);
           }
         }
@@ -581,54 +613,19 @@ const TankPreviewMini: React.FC<{
         const layerColor = _lw === LAYER_BODY ? bodyColor : _lw === LAYER_TEAM ? layerTeamColor! : bodyFillIn(bLayer.color, bLayer.colorMap, !!isDark);
 
         ctx.save();
-
+        if (layerIsPlaced(bLayer)) { layerPlaceInto(_lbLp, bLayer, tankSizePx / 2, 1, 0); ctx.translate(_lbLp[0], _lbLp[1]); }
         if (sortedT) {
         for (let ti = 0; ti < sortedT.length; ti++) {
-          if (!sortedT[ti].aboveTankBody && _lbTurretLayerOrder[ti] === bLayer.renderOrder) {
+          if (!sortedT[ti].aboveTankBody && _lbTurretLayerRef[ti] === bLayer) {
             drawTurret(sortedT[ti], layerSizePx);
           }
         }
         }
 
-        ctx.lineJoin = 'round';
-        const _lbOutline2 = layerOutlineOf(bLayer);
-        if (_lbOutline2 !== null) {
-          const _loStroke = darkenColor(layerColor, 0.598);
-          strokeFillLayerOutline(ctx, _lbOutline2, layerHalf, bLayer.initialAngle || 0, bLayer.copies, _loStroke, screenStroke, (isDark && bLayer.intangible) ? _loStroke : layerColor);
-        } else if (bLayer.sides < 3) {
-          ctx.beginPath();
-          ctx.arc(0, 0, layerHalf, 0, Math.PI * 2);
-          ctx.closePath();
-        } else {
-          const visualHalf = layerHalf * getRealSizeFactor(bLayer.sides);
-          const layerInitAngle = bLayer.initialAngle || 0;
-          ctx.beginPath();
-          if (bLayer.copies > 1) {
-            const _cpStroke = darkenColor(layerColor, 0.598);
-            _lbStrokeFillPolygonCopies(ctx, bLayer.sides, bLayer.copies, visualHalf, layerInitAngle,
-              _cpStroke, screenStroke, (isDark && bLayer.intangible) ? _cpStroke : layerColor,
-              bLayer.starDepth, bLayer.starCurved);
-            ctx.beginPath();
-          } else if (bLayer.starDepth > 0) {
-            const innerR = visualHalf * (1 - bLayer.starDepth);
-            _lbRoundedStarPath(ctx, bLayer.sides, visualHalf, innerR, layerInitAngle, bLayer.starCurved);
-          } else {
-            roundedPolygonPath(ctx, bLayer.sides, visualHalf, layerInitAngle);
-          }
-        }
-        ctx.strokeStyle = darkenColor(layerColor, 0.598);
-        ctx.lineWidth = screenStroke;
-        ctx.stroke();
-        ctx.fillStyle = (isDark && bLayer.intangible) ? ctx.strokeStyle : layerColor;
-        ctx.fill();
-
-        if (bLayer.showHealerCross) {
-          _lbDrawHealerCross(ctx, layerSizePx, screenStroke);
-        }
-
+        drawLayer(bLayer, layerSizePx, layerHalf, layerColor);
         if (sortedT) {
         for (let ti = 0; ti < sortedT.length; ti++) {
-          if (sortedT[ti].aboveTankBody && _lbTurretLayerOrder[ti] === bLayer.renderOrder) {
+          if (sortedT[ti].aboveTankBody && _lbTurretLayerRef[ti] === bLayer) {
             drawTurret(sortedT[ti], layerSizePx);
           }
         }
@@ -639,7 +636,7 @@ const TankPreviewMini: React.FC<{
     }
 
     ctx.restore();
-  }, [tankColor, tankSides, tankShapeDepth, tankShapeCurved, turrets, tankSize, previewSize, iconSize, isDark, themeV, bodyLayers, isHealer, teamColorOverride, layerTeamColor]);
+  }, [tankColor, tankSides, tankShapeDepth, tankShapeCurved, turrets, tankSize, previewSize, iconSize, isDark, themeV, bodyLayers, isHealer, teamColorOverride, layerTeamColor, solidKey]);
 
   return (
     <canvas
@@ -979,7 +976,7 @@ export const LeaderboardUI: React.FC<Props> = ({ logic }) => {
       });
     }
 
-    result.sort((a, b) => b.score - a.score);
+    sortInPlace(result, _lbScoreDesc, 63);
 
     return result.slice(0, 10);
   }, [logic, shown, logic?.state.leaderboardVersion, logic?.state.playerName, logic?.state.currentTankFileName, logic?.state.editorTankLabel, isDark, lbTick]);
@@ -1094,3 +1091,5 @@ export const LeaderboardUI: React.FC<Props> = ({ logic }) => {
     </div>
   );
 };
+
+export const __leaderboardPreviewHooks = { TankPreviewMini, scoreDesc: _lbScoreDesc };

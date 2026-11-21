@@ -10,13 +10,15 @@ import { ColorMapControl, ColorMapSwitch } from './shared/ColorMapField';
 import type { ColorMapValue } from './shared/colorMapRules';
 import { CM_USE } from '../utils/colorMap';
 import { FoodShapeDesign } from '../types';
-import { ALL_RARITIES, RARITY_LABELS, RARITY_MULTIPLIERS, RARITY_COLORS, LABY_LABELS, effectiveShapeColor, userShapeMass, POLYHEDRA_DEFS, type Rarity, type LabyLevel } from '../game/ShapeRegistry';
-import { FOOD_SHAPE_RANGES } from '../game/ValueClamp';
+import { ALL_RARITIES, RARITY_LABELS, RARITY_MULTIPLIERS, RARITY_COLORS, LABY_LABELS, effectiveShapeColor, userShapeMass, POLYHEDRA_DEFS, isSolidBodyKey, foodShapeOfSolid, rescaleDesignForRarity, type Rarity, type LabyLevel } from '../game/ShapeRegistry';
+import type { SolidDesign } from '../types';
+import { FOOD_SHAPE_RANGES, clampFoodShapeDesign } from '../game/ValueClamp';
 
 interface Props {
   logic: GameLogic | null;
   onUpdate: () => void;
   className?: string;
+  top?: React.ReactNode;
 }
 
 const STAT_RANGE = FOOD_SHAPE_RANGES;
@@ -30,10 +32,7 @@ function clampNum(v: number, min: number, max: number): number {
   return v < min ? min : v > max ? max : v;
 }
 
-function snapSides(next: number, prev: number): number {
-  if (next === 0 || next >= 3) return next;
-  return prev === 0 ? 3 : 0;
-}
+import { snapSides, nearSides } from '../utils/foodSidesSlider';
 
 function fmtStat(v: number): string {
   const r = Math.abs(v) >= 100 ? Math.round(v) : Math.round(v * 100) / 100;
@@ -43,7 +42,26 @@ const fmtNesting = (v: number) => (v === 0 ? 'None' : LABY_LABELS[Math.round(v) 
 
 const lowerHex = (c: string): string => c.toLowerCase();
 
-export const FoodShapeEditorUI: React.FC<Props> = ({ logic, onUpdate, className }) => {
+function bodyChangeOf(cur: FoodShapeDesign, key: string | undefined): Partial<FoodShapeDesign> {
+  if (isSolidBodyKey(cur.polyhedronType) || !isSolidBodyKey(key)) return { polyhedronType: key };
+  const model = foodShapeOfSolid(key as string, cur.name);
+  const next: FoodShapeDesign = cur.rarity !== 'normal' ? rescaleDesignForRarity(cur, 'normal') : { ...cur };
+  next.polyhedronType = key;
+  next.labyLevel = 0;
+  next.isCrasher = false;
+  next.isIntangible = model.isIntangible;
+  next.color = model.color;
+  next.colorMap = model.colorMap;
+  next.colorFree = model.colorFree;
+  clampFoodShapeDesign(next);
+  const out: Record<string, unknown> = {};
+  const n = next as unknown as Record<string, unknown>, c = cur as unknown as Record<string, unknown>;
+  for (const k of Object.keys(n)) if (k !== 'name' && k !== 'shapeId' && n[k] !== c[k]) out[k] = n[k];
+  for (const k of Object.keys(c)) if (!(k in n)) out[k] = undefined;
+  return out as Partial<FoodShapeDesign>;
+}
+
+export const FoodShapeEditorUI: React.FC<Props> = ({ logic, onUpdate, className, top }) => {
   const keptD = useRef<FoodShapeDesign | null>(null);
   if (!logic) return null;
   const liveD: FoodShapeDesign | null = logic.state.editingShape;
@@ -63,7 +81,12 @@ export const FoodShapeEditorUI: React.FC<Props> = ({ logic, onUpdate, className 
 
   const rm = d ? RARITY_MULTIPLIERS[d.rarity] : null;
   const colourAnimated = !!rm?.isAnimatedColor;
-  const isPoly = !!d && !!d.polyhedronType && !!POLYHEDRA_DEFS[d.polyhedronType];
+  const isPoly = !!d && isSolidBodyKey(d.polyhedronType);
+  const bodyKey = d && typeof d.polyhedronType === 'string' ? d.polyhedronType : '';
+  const bodyOptions = [{ value: '', label: 'Flat Shape' }];
+  for (const k in POLYHEDRA_DEFS) bodyOptions.push({ value: k, label: k.charAt(0).toUpperCase() + k.slice(1) });
+  for (const l of logic.state.solidLibrary) { const sd = l.fileData.data as SolidDesign; bodyOptions.push({ value: sd.solidId, label: l.name || sd.name }); }
+  if (bodyKey !== '' && !bodyOptions.some(o => o.value === bodyKey)) bodyOptions.push({ value: bodyKey, label: 'Missing Solid' });
   const isRelic = !!d && !isPoly && !!d.look;
   const colourFromMode = !!d && !!RARITY_COLORS[d.rarity];
   const colourLocked = colourAnimated || colourFromMode;
@@ -79,6 +102,7 @@ export const FoodShapeEditorUI: React.FC<Props> = ({ logic, onUpdate, className 
 
   return (
     <ScrollArea className={className} contentClassName="p-4 space-y-3 overflow-x-hidden">
+      {top}
       <Button block size="sm" icon={<ArrowLeft size={14} />} onClick={backToTank}>Back to Tank</Button>
 
       {!d ? (
@@ -89,18 +113,22 @@ export const FoodShapeEditorUI: React.FC<Props> = ({ logic, onUpdate, className 
         <FieldRow label="Name" help="Display name. The shape id is made from it." stacked>
           <TextField maxLength={TEXT_LIMITS.NAME} value={d.name} onChange={v => patch({ name: v })} placeholder="e.g. Golden Pentagon" />
         </FieldRow>
-        {isPoly && (
-          <p className="k-row-desc">This is a polyhedron. Its look comes from the game's own model and cannot be edited here. Size and stats can.</p>
+        {!isRelic && (
+          <SelectRow label="Body" help="A flat shape with sides, or a 3D solid: the game's Cube, Dodecahedron and Icosahedron, or one of your solids from the Content Library. A solid turns as it moves."
+            value={bodyKey} onChange={v => { const cur = logic.state.editingShape; if (cur) patch(bodyChangeOf(cur, v === '' ? undefined : v)); }} options={bodyOptions} />
         )}
+        <Reveal when={isPoly}>
+          <p className="k-row-desc">Its body is a 3D solid. Its look comes from the solid and cannot be edited here. Size and stats can.</p>
+        </Reveal>
         {isRelic && (
           <p className="k-row-desc">This shape is drawn from its own parts. Its sides, nesting and color come from them and cannot be edited here. Size and stats can.</p>
         )}
-        {!isPoly && !isRelic && (<>
+        <Reveal when={!isPoly && !isRelic}>
           <SliderRow label="Sides" help="Polygon sides. 0 = circle. There is no 1 or 2 sided shape, so the slider jumps from circle to triangle."
-            value={d.sides} onChange={v => patch({ sides: snapSides(Math.round(v), d.sides) })} min={0} max={16} step={1} display={d.sides === 0 ? 'O' : String(d.sides)} />
+            value={d.sides} onChange={v => patch({ sides: snapSides(Math.round(v), d.sides) })} dragSnap={nearSides} min={0} max={16} step={1} display={d.sides === 0 ? 'O' : String(d.sides)} />
           <SliderRow label="Nesting" help="Nested inner layers, like the Beta to Delta shapes. 0 = none." deferred
             value={d.labyLevel} onChange={v => patch({ labyLevel: clampNum(Math.round(v), 0, 5) as LabyLevel })} min={0} max={5} step={1} format={fmtNesting} />
-        </>)}
+        </Reveal>
         <SliderRow label="Size" help="Outer size in game units, the same number the Spawn Tool uses."
           value={d.size} onChange={v => setStat('size', v)} min={STAT_RANGE.size.min} max={STAT_RANGE.size.max} step="any" display={fmtStat(d.size)} />
         <ToggleRow label="Size Randomization" description="Spawns vary a little in size."
@@ -113,7 +141,7 @@ export const FoodShapeEditorUI: React.FC<Props> = ({ logic, onUpdate, className 
         </Reveal>
       </Group>
 
-      {!isPoly && (
+      <Reveal when={!isPoly}>
         <Group title="Color" icon={headerIcon(HdColorPicker)}>
           <SelectRow label="Color Mode"
             help={`Normal, Shiny, Legendary, Shadow, Rainbow or Trans. Changing it moves HP, body damage and XP by the same steps the game uses for that mode (the nested shape tables when nesting is on). Everything else stays as it is. Now: HP ${fmtStat(d.hp)}, XP ${fmtStat(d.xpValue)}.`}
@@ -124,7 +152,7 @@ export const FoodShapeEditorUI: React.FC<Props> = ({ logic, onUpdate, className 
           <Reveal when={!colourLocked}><ColorMapSwitch value={shapeColorValue} use={CM_USE.SHAPE} onChange={setShapeColor} /></Reveal>
           </>)}
         </Group>
-      )}
+      </Reveal>
 
       <Group title="Stats" icon={headerIcon(HdRanking)}>
         <div className="k-grid-2">
@@ -145,7 +173,7 @@ export const FoodShapeEditorUI: React.FC<Props> = ({ logic, onUpdate, className 
       </Group>
 
       <Group title="Movement and Collision" icon={headerIcon(HdPendulum)}>
-        {!isPoly && (<>
+        <Reveal when={!isPoly}>
           <ToggleRow label="Crasher" description="Chases tanks instead of drifting."
             help="Hostile shape that chases tanks instead of drifting."
             checked={d.isCrasher} onChange={v => patch({ isCrasher: v })} />
@@ -153,16 +181,16 @@ export const FoodShapeEditorUI: React.FC<Props> = ({ logic, onUpdate, className 
             <SliderRow label="Chase Speed" help="How fast the crasher moves toward its target. At 0 it uses the default chase speed."
               value={d.crasherSpeed} onChange={v => setStat('crasherSpeed', v)} min={STAT_RANGE.crasherSpeed.min} max={STAT_RANGE.crasherSpeed.max} step="any" display={d.crasherSpeed === 0 ? 'Default' : fmtStat(d.crasherSpeed)} />
           </Reveal>
-        </>)}
+        </Reveal>
         <SliderRow label="Drift Speed" help="Idle wander speed. 0 = it holds still."
           value={d.driftSpeed} onChange={v => setStat('driftSpeed', v)} min={STAT_RANGE.driftSpeed.min} max={STAT_RANGE.driftSpeed.max} step="any" display={fmtStat(d.driftSpeed)} />
         <SliderRow label="Pushability" help="How far a hit shoves the shape. 0 = immovable."
           value={d.pushability} onChange={v => setStat('pushability', v)} min={STAT_RANGE.pushability.min} max={STAT_RANGE.pushability.max} step="any" display={fmtStat(d.pushability)} />
-        {!isPoly && (
+        <Reveal when={!isPoly}>
           <ToggleRow label="Intangible" description="Tanks pass through it."
             help="Tanks pass through it and it takes no push, like an egg."
             checked={d.isIntangible === true} onChange={v => patch({ isIntangible: v })} />
-        )}
+        </Reveal>
       </Group>
 
       </>)}

@@ -14,7 +14,7 @@ import {
   HUD_UP_NAME_FONT, HUD_UP_KEY_FONT, HUD_UP_NAME_DX, HUD_UP_KEY_RIGHT, HUD_UP_TEXT_BOTTOM, HUD_UP_KEYS,
   HUD_DU_TEXT, HUD_DU_W, HUD_DU_H, HUD_DU_FONT, HUD_STROKE_F, HUD_FONT_FAMILY,
 } from '../utils/hudArras';
-import { hudBuildIcon, hudDrawIcon } from '../utils/hudIcon2d';
+import { hudBuildIcon, hudDrawIcon, hudIconCurrent } from '../utils/hudIcon2d';
 import { hudSlideLayer } from '../utils/hudLayer';
 import type { HudIcon } from '../utils/hudIcon2d';
 import { keepStyle } from '../utils/keptStyle';
@@ -38,7 +38,7 @@ function iconFor(config: TankConfig, dark: boolean, body: string | undefined): H
   if (!m) { m = new Map(); _icons.set(config, m); }
   const key = (dark ? 'd' : 'l') + gameThemeVersion() + '|' + (body ?? '');
   let ic = m.get(key);
-  if (!ic) { ic = hudBuildIcon(config, dark, body); m.set(key, ic); }
+  if (!ic || !hudIconCurrent(ic, config)) { ic = hudBuildIcon(config, dark, body); m.set(key, ic); }
   return ic;
 }
 

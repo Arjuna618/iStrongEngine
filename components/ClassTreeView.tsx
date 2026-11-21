@@ -1,3 +1,4 @@
+import { shortcutKey } from '../utils/shortcutKey';
 import React, { useRef, useEffect, useState } from 'react';
 import { TEXT_LIMITS } from './kit/textLimits';
 import { escapeIsOwned } from './shared/escapeStack';
@@ -24,7 +25,7 @@ import {
   ctClampCentre, ctDrag, ctPinch,
 } from '../utils/classTreeArras';
 import type { CtNode, CtLayout, CtSource, CtView } from '../utils/classTreeArras';
-import { ctIconParts } from '../utils/classTreeIcon';
+import { ctIconParts, ctSolidKey } from '../utils/classTreeIcon';
 import { anyForcedTeamLayer } from '../game/teamColourSwitch';
 import { classTreeGL, ctPackScene } from './classTreeGL';
 import type { CtFrame, CtPacked } from './classTreeGL';
@@ -147,7 +148,7 @@ export function buildClassTreeScene(data: ClassTreeData, tankMap: Map<string, Li
         if (!item) continue;
         const cfg = item.fileData.data as TankConfig;
         const override = teamOverrideColor(colourIndexOf(id, cfg.keepOwnColor), dark);
-        const layerTeam = override === undefined && anyForcedTeamLayer(cfg.bodyLayers) ? teamOverrideColor(colourIndexOf(id, false), dark) : undefined; const key = id + '|' + th + '|' + (override ?? '') + '|' + (layerTeam ?? '');
+        const layerTeam = override === undefined && anyForcedTeamLayer(cfg.bodyLayers) ? teamOverrideColor(colourIndexOf(id, false), dark) : undefined; const key = id + '|' + th + '|' + (override ?? '') + '|' + (layerTeam ?? '') + ctSolidKey(cfg.bodyLayers);
         if (_partsCache.has(key) || pending.seen.has(key)) continue;
         pending.seen.add(key); pending.keys.push(key); pending.cfgs.push(cfg); pending.overrides.push(override); pending.layerTeams.push(layerTeam);
       }
@@ -171,7 +172,7 @@ export function buildClassTreeScene(data: ClassTreeData, tankMap: Map<string, Li
     if (!item) { tileParts[t] = null; continue; }
     const cfg = item.fileData.data as TankConfig;
     const override = teamOverrideColor(colourIndexOf(id, cfg.keepOwnColor), dark);
-    const layerTeam = override === undefined && anyForcedTeamLayer(cfg.bodyLayers) ? teamOverrideColor(colourIndexOf(id, false), dark) : undefined; const key = id + '|' + th + '|' + (override ?? '') + '|' + (layerTeam ?? '');
+    const layerTeam = override === undefined && anyForcedTeamLayer(cfg.bodyLayers) ? teamOverrideColor(colourIndexOf(id, false), dark) : undefined; const key = id + '|' + th + '|' + (override ?? '') + '|' + (layerTeam ?? '') + ctSolidKey(cfg.bodyLayers);
     let parts = _partsCache.get(key);
     if (!parts) {
       if (slice) { tileParts[t] = null; continue; }
@@ -602,8 +603,8 @@ const ClassTreeView: React.FC<{ logic: GameLogic }> = ({ logic }) => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target === inputRef.current) return;
       const st = stateRef.current;
-      if (e.key === '+' || e.key === '=') { _view.pTarget = ctButton(_view.pTarget, 1); e.preventDefault(); return; }
-      if (e.key === '-' || e.key === '_') { _view.pTarget = ctButton(_view.pTarget, -1); e.preventDefault(); return; }
+      if (shortcutKey(e) === '+' || shortcutKey(e) === '=') { _view.pTarget = ctButton(_view.pTarget, 1); e.preventDefault(); return; }
+      if (shortcutKey(e) === '-' || shortcutKey(e) === '_') { _view.pTarget = ctButton(_view.pTarget, -1); e.preventDefault(); return; }
       st.panFast = e.shiftKey;
       if (e.key === 'ArrowUp') { st.panY = -1; e.preventDefault(); e.stopPropagation(); }
       if (e.key === 'ArrowDown') { st.panY = 1; e.preventDefault(); e.stopPropagation(); }

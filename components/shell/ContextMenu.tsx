@@ -5,6 +5,12 @@ import type { AppIcon } from '../ui/icons';
 import { ChevronRight, Scissors, Copy, ClipboardPaste, TextSelect, Check } from '../ui/icons';
 import { useEscapeOwner } from '../shared/escapeStack';
 import { getVisualScale } from '../../utils/zoomCompensation';
+import { getChromeScale } from '../../utils/useMenuScale';
+
+function menuZoomOf(el: Element | null): number {
+  const z = getVisualScale(el) || 1;
+  return Math.abs(z - 1) < 1e-6 ? getChromeScale() || 1 : z;
+}
 import { useMenuStage } from '../kit/motion';
 import { useLeave, scrollGlide, nearestScrollTop, motionOff } from '../kit/presence';
 import { uiThemeId } from '../../utils/uiTheme';
@@ -57,7 +63,7 @@ export function openContextMenu(e: React.MouseEvent | MouseEvent, entries: MenuE
   _handled.add(native);
   if (!_isEngine() || entries.length === 0) return;
   if (menuBusy()) return;
-  const zoom = getVisualScale(e.target as Element) || 1;
+  const zoom = menuZoomOf(e.target as Element);
   window.clearTimeout(_leaveTimer);
   _menuBusyUntil = performance.now() + menuOpenMs();
   setMenu({ open: true, leaving: false, x: e.clientX / zoom, y: e.clientY / zoom, zoom, entries, prompt: null, key: _state.key + 1, textEl: null, textOver: null });
@@ -65,7 +71,7 @@ export function openContextMenu(e: React.MouseEvent | MouseEvent, entries: MenuE
 
 export function openPromptAt(el: Element, prompt: MenuPrompt): void {
   if (!_isEngine()) return;
-  const zoom = getVisualScale(el) || 1;
+  const zoom = menuZoomOf(el);
   const r = el.getBoundingClientRect();
   window.clearTimeout(_leaveTimer);
   setMenu({ open: true, leaving: false, x: r.left / zoom, y: (r.bottom + 6) / zoom, zoom, entries: [], prompt, key: _state.key + 1, textEl: null, textOver: null });
@@ -112,7 +118,7 @@ export function installContextMenuGuard(isEngine: () => boolean): () => void {
     const t = e.target as Element | null;
     if (isTextBox(t)) {
       _handled.add(e);
-      const zoom = getVisualScale(t) || 1;
+      const zoom = menuZoomOf(t);
       if (_state.open && !_state.leaving && _state.prompt && t.closest('.k-ctx-prompt')) {
         setMenu({ ..._state, textOver: { entries: textMenu(t), x: e.clientX / _state.zoom, y: e.clientY / _state.zoom } });
         return;
@@ -174,7 +180,7 @@ export const MenuBox: React.FC<{
   onBack?: () => void;
 }> = ({ entries, x, y, zoom, leaving, flyFrom, depth, onPick, activeKeys, instant, onSide, onBack }) => {
   const box = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ left: x, top: y, ready: false });
+  const [pos, setPos] = useState({ left: x, top: y, ready: false, up: false });
   const [active, setActive] = useState(-1);
   const [sub, setSub] = useState<{ index: number; rect: DOMRect } | null>(null);
   const subTimer = useRef(0);
@@ -187,18 +193,18 @@ export const MenuBox: React.FC<{
     if (!el) return;
     const w = el.offsetWidth, h = el.offsetHeight;
     const vw = window.innerWidth / zoom, vh = window.innerHeight / zoom;
-    let left = x, top = y;
+    let left = x, top = y, up = false;
     if (flyFrom) {
       const r = { left: flyFrom.left / zoom, right: flyFrom.right / zoom, top: flyFrom.top / zoom };
       left = r.right + 2 + w > vw - 6 ? r.left - w - 2 : r.right + 2;
       top = r.top - 4;
     } else {
       if (left + w > vw - 6) left = Math.max(6, left - w);
-      if (top + h > vh - 6) top = Math.max(6, top - h);
+      if (top + h > vh - 6) { top = Math.max(6, top - h); up = true; }
     }
     if (top + h > vh - 6) top = Math.max(6, vh - 6 - h);
     if (left < 6) left = 6;
-    setPos({ left, top, ready: true });
+    setPos({ left, top, ready: true, up });
   }, [x, y, zoom, flyFrom, entries]);
 
   useEffect(() => {
@@ -255,7 +261,7 @@ export const MenuBox: React.FC<{
   const subRect = subShown >= 0 ? subRects.current.get(subShown) ?? null : null;
   return (
     <>
-      <div ref={box} role="menu" className={`k-ctx${leaving ? ' k-ctx-leave' : ''}${depth > 0 ? ' k-ctx-sub' : ''}${instant && depth === 0 ? ' k-ctx-instant' : ''}`}
+      <div ref={box} role="menu" className={`k-ctx${leaving ? ' k-ctx-leave' : ''}${depth > 0 ? ' k-ctx-sub' : ''}${instant && depth === 0 ? ' k-ctx-instant' : ''}${pos.up ? ' k-ctx-up' : ''}`}
         style={{ left: pos.left, top: pos.top, zoom: zoom !== 1 ? zoom : undefined, visibility: pos.ready ? undefined : 'hidden',
           maxHeight: window.innerHeight / zoom - 12, overflowY: 'auto' }}
         onMouseDown={e => e.preventDefault()} onContextMenu={e => e.preventDefault()}>

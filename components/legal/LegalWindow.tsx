@@ -5,7 +5,7 @@ import { PickGlide } from '../kit/TabSlide';
 import { LegalTerms } from '../ui/icons';
 import { useModalMaxHeight, useModalMaxWidth } from '../../utils/useMenuScale';
 import { isTouchScreen } from '../../utils/device';
-import { Segmented } from '../kit/kit';
+import { Tabs } from '../kit/kit';
 
 const LEGAL_NARROW_BELOW = 560;
 const LEGAL_TOUCH_MIN_H = 120;
@@ -109,7 +109,7 @@ export const LegalWindow: React.FC<{
       <div className={narrow ? 'flex flex-col min-h-0 k-legal-narrow' : 'flex min-h-0'} style={{ height: bodyH }}>
         {narrow ? (
           <div className="k-legal-tabs">
-            <Segmented<LegalPage> value={page} onChange={setPage} options={PAGES.map(p => ({ value: p.id, label: p.label }))} />
+            <Tabs<LegalPage> value={page} onChange={setPage} tabs={PAGES.map(p => ({ value: p.id, label: p.label }))} />
           </div>
         ) : (
           <nav className="k-rd-side k-legal-side" aria-label="Pages">

@@ -14,7 +14,6 @@ export interface EngineTool {
 }
 
 export const ENGINE_TOOLS: readonly EngineTool[] = [
-  { id: 'tank', group: 'build', Icon: Box, rail: 'Tank', title: 'Tank Properties' },
   { id: 'turret', group: 'build', Icon: CanvasTool, rail: 'Canvas', title: 'Canvas Tool' },
   { id: 'game-mode', group: 'world', Icon: Joystick, rail: 'Game Mode', title: 'Game Mode' },
   { id: 'enemy', group: 'world', Icon: Bot, rail: 'Enemy Tool', title: 'Enemy Tool' },

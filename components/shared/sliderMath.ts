@@ -1,8 +1,10 @@
 import type React from 'react';
 
-export function sliderFillStyle(val: number, min: number, max: number): React.CSSProperties {
+export function sliderFillStyle(val: number, min: number, max: number, center?: number): React.CSSProperties {
   const pct = max > min ? ((val - min) / (max - min)) * 100 : 0;
-  return { '--slider-pct': `${pct}%` } as React.CSSProperties;
+  if (center === undefined) return { '--slider-pct': `${pct}%` } as React.CSSProperties;
+  const c = max > min ? ((center - min) / (max - min)) * 100 : 0;
+  return { '--slider-from': `${Math.min(c, pct)}%`, '--slider-pct': `${Math.max(c, pct)}%` } as React.CSSProperties;
 }
 
 export type SliderStep = number | 'any';

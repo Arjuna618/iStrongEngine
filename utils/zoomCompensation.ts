@@ -1,3 +1,4 @@
+import { shortcutKey } from './shortcutKey';
 export const INITIAL_DPR: number = (typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1;
 
 export function getZoomCompensation(): number {
@@ -51,7 +52,8 @@ export function blockBrowserZoomInputs(): () => void {
   };
   const onKeyDown = (e: KeyboardEvent) => {
     if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
-    if (e.key === '+' || e.key === '-' || e.key === '=' || e.key === '_' ||
+    const zk = shortcutKey(e);
+    if (zk === '+' || zk === '-' || zk === '=' || zk === '_' ||
         e.code === 'NumpadAdd' || e.code === 'NumpadSubtract') {
       e.preventDefault();
     }

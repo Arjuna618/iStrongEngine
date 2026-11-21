@@ -3,6 +3,8 @@ import { sanitizeImport } from './ValueClamp';
 import { ALL_RARITIES, POLYHEDRA_DEFS, RETIRED_POLYHEDRA, makeUserShapeId, makeUserShapeIdLegacy } from './ShapeRegistry';
 import { otherRefusal } from '../utils/otherDraw';
 import { shapeLookRefusal } from '../utils/shapeLook';
+import { normalizeSolid, makeSolidId, makeSolidIdLegacy, orientFaces } from '../utils/solidDesign';
+import { HIS_SOLID_ID_RE } from '../utils/solidArras';
 import { importChanges, recordImportChanges } from '../utils/importChanges';
 import { SMALL_FIX } from './smallFixSwitch';
 import { tankFileOfOldDriveLaw, convertOldDriveLaw } from './tankFileLaw';
@@ -17,6 +19,7 @@ import type {
   TurretPreset,
   FoodShapeDesign,
   OtherDesign,
+  SolidDesign,
   TankConfig,
 } from '@/types';
 
@@ -84,6 +87,7 @@ export class DataRegistry {
   static libraryIdFor(file: ExportFile): string {
     if (file.type === 'FoodShape') return 'shape-' + (file.data as FoodShapeDesign).shapeId;
     if (file.type === 'Other') return 'other-' + (file.data as OtherDesign).otherId;
+    if (file.type === 'Solid') return 'user-solid/' + (file.data as SolidDesign).solidId;
     return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   }
 
@@ -91,6 +95,7 @@ export class DataRegistry {
     const before = json && typeof json === 'object' && json.data && typeof json.data === 'object' ? structuredClone(json.data) : null;
     const oldDrive = SMALL_FIX.R564 !== 0 && !keepLaw && tankFileOfOldDriveLaw(json);
     const file = DataRegistry.validateFileType(json);
+    if (file && file.type === 'Solid' && before !== null && Array.isArray(before.verts) && Array.isArray(before.faces)) before.faces = orientFaces(before.verts, before.faces);
     if (file && before !== null) recordImportChanges(file, importChanges(before, file.data));
     if (file && oldDrive && file.type === 'Tank') convertOldDriveLaw(file.data as TankConfig);
     return file;
@@ -119,6 +124,26 @@ export class DataRegistry {
       && data.turrets === undefined && data.tankHP === undefined && data.visual === undefined && data.shapeId === undefined
       && !Array.isArray(data.layers) && data.mazeType === undefined && data.areas === undefined;
 
+    const isSolid = typeof data.solidId === 'string' && Array.isArray(data.verts) && Array.isArray(data.faces)
+      && data.turrets === undefined && data.tankHP === undefined && data.visual === undefined && data.shapeId === undefined
+      && data.otherId === undefined && !Array.isArray(data.layers) && data.mazeType === undefined && data.areas === undefined;
+    if (isSolid) {
+      const solid = normalizeSolid(data);
+      if (!solid) {
+        DataRegistry.lastRejectReason = 'This solid file has corners or faces the game cannot draw: 4 to 64 corners within 4 of the middle, 4 to 96 faces of 3 to 12 corners each, every corner of a face one that exists and none twice.';
+        return null;
+      }
+      if (!HIS_SOLID_ID_RE.test(solid.solidId)) {
+        DataRegistry.lastRejectReason = `This solid file has an id the engine cannot use: ${String(solid.solidId)}. A solid id looks like solid:my-solid.`;
+        return null;
+      }
+      if (solid.solidId !== makeSolidId(solid.name) && solid.solidId !== makeSolidIdLegacy(solid.name)) {
+        DataRegistry.lastRejectReason = `This solid file has an id that does not match its name. For the name "${solid.name}" the id should be ${makeSolidId(solid.name)}.`;
+        return null;
+      }
+      return sanitizeImport({ version: json.version || '1.0.0', type: 'Solid', name: typeof json.name === 'string' ? json.name : solid.name, timestamp: json.timestamp || 0,
+        category: typeof json.category === 'string' ? json.category : undefined, data: solid });
+    }
     if (data.gameModeFile === 1) {
       const ok = data.config && typeof data.config === 'object' && typeof data.config.mode === 'string' && typeof data.map === 'object' && data.map !== null && typeof data.map.gridCells === 'number';
       if (!ok) { DataRegistry.lastRejectReason = 'This mode file holds no rules or no map.'; return null; }
@@ -155,7 +180,7 @@ export class DataRegistry {
       }
       if (typeof data.polyhedronType === 'string' && RETIRED_POLYHEDRA.has(data.polyhedronType)) delete data.polyhedronType;
       if (data.polyhedronType !== undefined && data.polyhedronType !== null
-          && (typeof data.polyhedronType !== 'string' || !POLYHEDRA_DEFS[data.polyhedronType])) {
+          && (typeof data.polyhedronType !== 'string' || (!POLYHEDRA_DEFS[data.polyhedronType] && !HIS_SOLID_ID_RE.test(data.polyhedronType)))) {
         DataRegistry.lastRejectReason = `This food shape file names a polyhedron the engine does not have: ${String(data.polyhedronType)}.`;
         return null;
       }
@@ -436,6 +461,10 @@ export class DataRegistry {
   }
 
   async smartExport(fileContent: ExportFile, fileName: string): Promise<'saved' | 'cancelled' | 'unsupported'> {
+    return DataRegistry.saveWithPicker(fileContent, fileName);
+  }
+
+  static async saveWithPicker(fileContent: ExportFile, fileName: string): Promise<'saved' | 'cancelled' | 'unsupported'> {
     if (!window.showSaveFilePicker) return 'unsupported';
 
     try {

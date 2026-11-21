@@ -1,3 +1,4 @@
+import { shortcutKey } from '../../utils/shortcutKey';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TEXT_LIMITS } from '../kit/textLimits';
 import { lintEvents } from '../../game/mapEvents/problems';
@@ -66,8 +67,8 @@ export const MapEventsWindow: React.FC<{ logic: GameLogic; areaId: string; page:
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       const typing = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); searchBox.current?.querySelector('input')?.focus(); return; }
-      if (typing || !(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z' || readOnly) return;
+      if ((e.ctrlKey || e.metaKey) && shortcutKey(e) === 'k') { e.preventDefault(); searchBox.current?.querySelector('input')?.focus(); return; }
+      if (typing || !(e.ctrlKey || e.metaKey) || shortcutKey(e) !== 'z' || readOnly) return;
       e.preventDefault();
       if (e.shiftKey) { logic.redoMapEdit(); } else { logic.undoMapEdit(); }
       ctx.refresh();

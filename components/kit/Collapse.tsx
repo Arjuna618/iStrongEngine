@@ -8,6 +8,10 @@ export const FOLD_MS = 140;
 export const FOLD_FADE_MS = 105;
 export const FOLD_Q_MS = 700;
 const foldQ = () => uiThemeId() === 'classic' && !motionOff();
+export const FOLD_QA_MS = 260;
+export const FOLD_QA_FADE_MS = 180;
+const foldQA = () => uiThemeId() === 'classic' && !motionOff();
+const fadeMs = () => (foldQA() ? FOLD_QA_FADE_MS : FOLD_FADE_MS);
 
 type Phase = 'open' | 'closed' | 'grow' | 'fadeIn' | 'fadeOut' | 'shrink';
 
@@ -117,7 +121,8 @@ export const Collapse: React.FC<{
   onClosed?: () => void;
   ownAct?: boolean;
   dataKey?: string;
-}> = ({ open, children, className, onBusyChange, gapInside, gapPx, reveal = 'parent', onClosed, ownAct, dataKey }) => {
+  container?: boolean;
+}> = ({ open, children, className, onBusyChange, gapInside, gapPx, reveal = 'parent', onClosed, ownAct, dataKey, container }) => {
   const [mounted, setMounted] = useState(open);
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
@@ -131,6 +136,7 @@ export const Collapse: React.FC<{
   const closedCb = useRef(onClosed); closedCb.current = onClosed;
   const revealRef = useRef(reveal); revealRef.current = reveal;
   const ownActRef = useRef(ownAct); ownActRef.current = ownAct;
+  const containerRef = useRef(container); containerRef.current = container;
   const busyNow = useRef(false);
   const setBusy = (b: boolean) => { if (busyNow.current !== b) { busyNow.current = b; busyCb.current?.(b); } };
   const kept = useRef(children);
@@ -152,8 +158,11 @@ export const Collapse: React.FC<{
     phase.current = p;
     setBusy(false);
     const o = outer.current, i = inner.current;
-    if (o) { o.style.height = ''; o.style.overflow = ''; o.classList.remove('k-fold-moving', 'k-fold-q'); if (p === 'open') o.inert = false; }
-    if (i) i.style.opacity = '';
+    if (o) {
+      if (p === 'open') { o.style.height = ''; o.style.overflow = ''; o.inert = false; }
+      o.classList.remove('k-fold-moving', 'k-fold-q', 'k-fold-qa', 'k-fold-qc');
+    }
+    if (i && p === 'open') i.style.opacity = '';
     if (p === 'closed') { gapDone.current = false; setMounted(false); closedCb.current?.(); }
   };
 
@@ -163,8 +172,10 @@ export const Collapse: React.FC<{
     applyGap();
     window.clearTimeout(timer.current);
     const fresh = phase.current !== 'fadeOut' && phase.current !== 'shrink';
-    const q = foldQ();
-    noteMotion((q ? FOLD_Q_MS : FOLD_MS + FOLD_FADE_MS) + 20);
+    const q = foldQ() && !!containerRef.current;
+    const qa = !q && foldQA();
+    const growMs = q ? FOLD_Q_MS : qa ? FOLD_QA_MS : FOLD_MS, inMs = qa ? FOLD_QA_FADE_MS : FOLD_FADE_MS;
+    noteMotion((q ? FOLD_Q_MS : growMs + inMs) + 20);
     phase.current = 'grow';
     o.inert = false;
     setBusy(true);
@@ -175,6 +186,7 @@ export const Collapse: React.FC<{
     o.style.overflow = 'hidden';
     o.classList.add('k-fold-moving');
     if (q) o.classList.add('k-fold-q');
+    if (qa) { o.classList.remove('k-fold-qc'); o.classList.add('k-fold-qa'); }
     o.style.height = `${from}px`;
     void o.offsetHeight;
     window.cancelAnimationFrame(startRaf.current);
@@ -201,8 +213,8 @@ export const Collapse: React.FC<{
         o.classList.remove('k-fold-moving', 'k-fold-q');
         i.style.opacity = '1';
         if (!q) reveal(0);
-        timer.current = window.setTimeout(() => settle('open'), q ? 0 : FOLD_FADE_MS);
-      }, q ? FOLD_Q_MS : FOLD_MS);
+        timer.current = window.setTimeout(() => settle('open'), q ? 0 : inMs);
+      }, growMs);
     };
   };
 
@@ -223,8 +235,10 @@ export const Collapse: React.FC<{
     if (phase.current === 'closed' || phase.current === 'shrink' || phase.current === 'fadeOut') return;
     const o = outer.current, i = inner.current;
     if (!o || !i) { pendingGrow.current = false; settle('closed'); return; }
-    const q = foldQ();
-    noteMotion((q ? FOLD_Q_MS : FOLD_FADE_MS + FOLD_MS) + 20);
+    const q = foldQ() && !!containerRef.current;
+    const qa = !q && foldQA();
+    const outMs = qa ? FOLD_QA_FADE_MS : FOLD_FADE_MS, shrinkMs = qa ? FOLD_QA_MS : FOLD_MS;
+    noteMotion((q ? FOLD_Q_MS : outMs + shrinkMs) + 20);
     phase.current = q ? 'shrink' : 'fadeOut';
     if (!q) lastFadeOutAt = performance.now();
     setBusy(true);
@@ -232,6 +246,7 @@ export const Collapse: React.FC<{
     o.style.overflow = 'hidden';
     o.classList.add('k-fold-moving');
     if (q) o.classList.add('k-fold-q');
+    if (qa) { o.classList.remove('k-fold-qa'); o.classList.add('k-fold-qc'); }
     o.inert = true;
     leaveStarts(o);
     void o.offsetHeight;
@@ -252,8 +267,8 @@ export const Collapse: React.FC<{
         phase.current = 'shrink';
         void o.offsetHeight;
         o.style.height = '0px';
-        timer.current = window.setTimeout(() => settle('closed'), FOLD_MS);
-      }, FOLD_FADE_MS);
+        timer.current = window.setTimeout(() => settle('closed'), shrinkMs);
+      }, outMs);
     });
   }, [open]);
 
@@ -261,10 +276,10 @@ export const Collapse: React.FC<{
     if (mounted) applyGap();
     if (mounted && pendingGrow.current) {
       pendingGrow.current = false;
-      const wait = FOLD_FADE_MS - (performance.now() - lastFadeOutAt);
+      const wait = fadeMs() - (performance.now() - lastFadeOutAt);
       const o = outer.current, i = inner.current;
       if (wait > 8 && o && i) {
-        noteMotion(wait + FOLD_MS + FOLD_FADE_MS);
+        noteMotion(wait + (foldQA() ? FOLD_QA_MS + FOLD_QA_FADE_MS : FOLD_MS + FOLD_FADE_MS));
         phase.current = 'grow';
         setBusy(true);
         i.style.transition = 'none'; i.style.opacity = '0'; void i.offsetWidth; i.style.transition = '';

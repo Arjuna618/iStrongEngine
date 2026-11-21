@@ -1,12 +1,13 @@
-import type { TankConfig, TurretPreset, CustomProjectileDesign, OtherDesign, OtherPart } from '../../types';
-import { ctIconParts, ctLookMesh, polyMesh, ctOutlineMesh, CT_MESH_CIRCLE, CT_PART_STRIDE } from '../../utils/classTreeIcon';
+import type { TankConfig, TurretPreset, CustomProjectileDesign, OtherDesign, OtherPart, BodyLayer } from '../../types';
+import { ctIconParts, ctLookMesh, polyMesh, ctOutlineMesh, ctSolidsOf, ctSolidsSame, CT_MESH_CIRCLE, CT_PART_STRIDE } from '../../utils/classTreeIcon';
 import { otherDrawList, otherReach } from '../../utils/otherDraw';
 import { lookFromShape } from '../../utils/placedLook';
 import { bodyFillIn, shapeFillIn } from '../../utils/gameColors';
 import { CM, cmHex, CM_USE, cmMapOf } from '../../utils/colorMap';
 import { getRealSizeFactor } from '../../utils/p5Utils';
 import { labyDownscale, getAnimatedColor, RARITY_MULTIPLIERS, type ShapeDefinition } from '../../game/ShapeRegistry';
-import { solidOf, solidFaces, SOLID_STILL_X, SOLID_STILL_Y, SOLID_FACES_MAX } from '../../utils/solidArras';
+import { solidOf, solidFaces, solidFromDesign, SOLID_STILL_X, SOLID_STILL_Y, SOLID_OUT_MAX, SOLID_FACE_COUNT_MAX, type ArrasSolid } from '../../utils/solidArras';
+import type { SolidDesign } from '../../types';
 import type { LibEntry } from './catalog';
 
 export interface LibPicture {
@@ -63,7 +64,28 @@ function otherParts(design: OtherDesign, dark: boolean, out: number[]): void {
   }
 }
 
-const _faces = new Float64Array(SOLID_FACES_MAX);
+const _faces = new Float64Array(SOLID_OUT_MAX);
+const _fsides = new Uint8Array(SOLID_FACE_COUNT_MAX);
+
+function solidParts(solid: ArrasSolid, col: [number, number, number], out: number[]): void {
+  const shown = solidFaces(solid, SOLID_STILL_X, SOLID_STILL_Y, _faces, _fsides);
+  const r = 0.5 / solid.circumradius;
+  for (let f = 0, w = 0; f < shown; w += _fsides[f] * 2, f++) {
+    const K = _fsides[f];
+    let cx = 0, cy = 0;
+    for (let k = 0; k < K; k++) { cx += _faces[w + k * 2]; cy += _faces[w + k * 2 + 1]; }
+    cx /= K; cy /= K;
+    const pts: [number, number][] = [];
+    for (let k = 0; k < K; k++) pts.push([Math.round((_faces[w + k * 2] - cx) * 1e4) / 1e4, Math.round((_faces[w + k * 2 + 1] - cy) * 1e4) / 1e4]);
+    out.push(ctOutlineMesh(pts), cx * r, cy * r, 0, r, r, col[0], col[1], col[2], 1);
+  }
+}
+
+function solidPicture(design: SolidDesign, dark: boolean): LibPicture {
+  const out: number[] = [];
+  solidParts(solidFromDesign(design), rgb01(shapeFillIn(cmHex(CM.EGGS, false, CM_USE.SHAPE), CM.EGGS, false, dark)), out);
+  return out.length >= CT_PART_STRIDE ? pic(out) : NONE;
+}
 
 function shapePicture(def: ShapeDefinition, dark: boolean): LibPicture {
   if (def.look) return lookPicture(def, dark);
@@ -75,17 +97,7 @@ function shapePicture(def: ShapeDefinition, dark: boolean): LibPicture {
   if (def.isPolyhedron) {
     const solid = solidOf(def.baseShape);
     if (!solid) return NONE;
-    const shown = solidFaces(solid, SOLID_STILL_X, SOLID_STILL_Y, _faces);
-    const K = solid.faceSides;
-    const r = 0.5 / solid.circumradius;
-    for (let f = 0, w = 0; f < shown; f++, w += K * 2) {
-      let cx = 0, cy = 0;
-      for (let k = 0; k < K; k++) { cx += _faces[w + k * 2]; cy += _faces[w + k * 2 + 1]; }
-      cx /= K; cy /= K;
-      const pts: [number, number][] = [];
-      for (let k = 0; k < K; k++) pts.push([Math.round((_faces[w + k * 2] - cx) * 1e4) / 1e4, Math.round((_faces[w + k * 2 + 1] - cy) * 1e4) / 1e4]);
-      out.push(ctOutlineMesh(pts), cx * r, cy * r, 0, r, r, col[0], col[1], col[2], 1);
-    }
+    solidParts(solid, col, out);
     return pic(out, anim, alpha);
   }
   const sides = def.sides < 3 ? 0 : def.sides;
@@ -134,6 +146,7 @@ export function buildPicture(e: LibEntry, dark: boolean): LibPicture {
       case 'other': otherParts(e.item!.fileData.data as OtherDesign, dark, out); break;
       case 'sentry': ctIconParts(e.sentry!.tankConfig, dark, undefined, out); break;
       case 'shape': return e.shape ? shapePicture(e.shape, dark) : NONE;
+      case 'solid': return solidPicture(e.item!.fileData.data as SolidDesign, dark);
     }
   } catch (err) {
     console.error('[ContentLibrary] picture of', e.key, err);
@@ -145,20 +158,30 @@ export function buildPicture(e: LibEntry, dark: boolean): LibPicture {
 const _pics = [new Map<string, LibPicture>(), new Map<string, LibPicture>()];
 const _picSrc = [new Map<string, unknown>(), new Map<string, unknown>()];
 function picSourceOf(e: LibEntry): unknown { return e.item ? e.item.fileData.data : e.sentry ? e.sentry.tankConfig : e.shape; }
+const _picSolids = [new Map<string, ReturnType<typeof ctSolidsOf>>(), new Map<string, ReturnType<typeof ctSolidsOf>>()];
+function picLayersOf(e: LibEntry): readonly BodyLayer[] | undefined {
+  if (e.kind === 'sentry') return e.sentry ? e.sentry.tankConfig.bodyLayers : undefined;
+  if (!e.item) return undefined;
+  if (e.kind === 'tank') return (e.item.fileData.data as TankConfig).bodyLayers;
+  if (e.kind === 'projectile') return (e.item.fileData.data as CustomProjectileDesign).bodyLayers;
+  return undefined;
+}
 export function pictureOf(e: LibEntry, dark: boolean): LibPicture {
   const i = dark ? 1 : 0, m = _pics[i];
-  const src = picSourceOf(e);
+  const src = picSourceOf(e), layers = picLayersOf(e);
   let p = m.get(e.key);
-  if (!p || _picSrc[i].get(e.key) !== src) { p = buildPicture(e, dark); m.set(e.key, p); _picSrc[i].set(e.key, src); }
+  if (!p || _picSrc[i].get(e.key) !== src || !ctSolidsSame(layers, _picSolids[i].get(e.key) ?? null)) {
+    p = buildPicture(e, dark); m.set(e.key, p); _picSrc[i].set(e.key, src); _picSolids[i].set(e.key, ctSolidsOf(layers));
+  }
   return p;
 }
 export function hasPicture(e: LibEntry, dark: boolean): boolean {
   const i = dark ? 1 : 0;
-  return _pics[i].has(e.key) && _picSrc[i].get(e.key) === picSourceOf(e);
+  return _pics[i].has(e.key) && _picSrc[i].get(e.key) === picSourceOf(e) && ctSolidsSame(picLayersOf(e), _picSolids[i].get(e.key) ?? null);
 }
 export function forgetPictures(keep: ReadonlyMap<string, LibEntry>): void {
   for (let i = 0; i < 2; i++) {
-    const m = _pics[i], srcs = _picSrc[i];
-    for (const k of m.keys()) { const e = keep.get(k); if (!e || srcs.get(k) !== picSourceOf(e)) { m.delete(k); srcs.delete(k); } }
+    const m = _pics[i], srcs = _picSrc[i], sols = _picSolids[i];
+    for (const k of m.keys()) { const e = keep.get(k); if (!e || srcs.get(k) !== picSourceOf(e)) { m.delete(k); srcs.delete(k); sols.delete(k); } }
   }
 }

@@ -1,8 +1,10 @@
 import type React from 'react';
 import type { LucideIcon } from '../ui/icons';
 import type { GameLogic } from '../../game/GameLogic';
-import type { CustomProjectileDesign, FoodShapeDesign, OtherDesign, PlacedLook, TurretPreset } from '../../types';
-import { designFromShapeDef, labyDownscale, RARITY_MULTIPLIERS } from '../../game/ShapeRegistry';
+import type { CustomProjectileDesign, FoodShapeDesign, LibraryItem, OtherDesign, PlacedLook, SolidDesign, TurretPreset } from '../../types';
+import { designFromShapeDef, foodShapeOfSolid, labyDownscale, RARITY_MULTIPLIERS } from '../../game/ShapeRegistry';
+import { openSolidEditor } from '../solids/solidEditorBridge';
+import { GAME_SOLID_DESIGNS } from '../solids/solidEdit';
 import { getRealSizeFactor } from '../../utils/p5Utils';
 import { lookFromOther, lookFromShape } from '../../utils/placedLook';
 import { fireTip } from '../../utils/tips';
@@ -36,6 +38,30 @@ export interface LibMode {
   panelExtraFirst?: boolean;
   allowImport?: boolean;
   settingsPanel?: { title: string; content: React.ReactNode };
+  newOf?: (kind: LibKind) => { label: string; tip: string; run: () => boolean | void } | null;
+  undoRemove?: () => boolean;
+}
+
+const SOLID_UNDO_LIMIT = 40;
+const solidRemoved: { item: LibraryItem; index: number; epoch: number }[] = [];
+
+export function removeSolidRow(logic: GameLogic, item: LibraryItem, showToast: CanvasModeDeps['showToast']): void {
+  const index = logic.state.solidLibrary.findIndex(l => l.id === item.id);
+  if (index < 0) return;
+  logic.removeFromLibrary(item.id);
+  solidRemoved.push({ item, index, epoch: logic.projectEpoch });
+  if (solidRemoved.length > SOLID_UNDO_LIMIT) solidRemoved.shift();
+  showToast('success', `Removed "${item.name}". Ctrl Z brings it back.`);
+}
+export function undoSolidRemove(logic: GameLogic, showToast: CanvasModeDeps['showToast']): boolean {
+  while (solidRemoved.length > 0) {
+    const s = solidRemoved.pop()!;
+    if (s.epoch !== logic.projectEpoch || logic.state.solidLibrary.some(l => l.id === s.item.id)) continue;
+    logic.restoreToLibrary(s.item, s.index);
+    showToast('success', `"${s.item.name}" is back.`);
+    return true;
+  }
+  return false;
 }
 
 export interface CanvasModeDeps {
@@ -47,7 +73,7 @@ export interface CanvasModeDeps {
 
 export function canvasKinds(logic: GameLogic): { kinds: LibKind[]; locked: Partial<Record<LibKind, string>> } {
   const s = logic.state;
-  const all: LibKind[] = ['tank', 'turret', 'projectile', 'other', 'shape'];
+  const all: LibKind[] = ['tank', 'turret', 'projectile', 'other', 'shape', 'solid'];
   let only: LibKind | null = null;
   let why = '';
   if (!s.isTestMode && s.canvasEntityKind === 'other' && s.viewingOther !== null) { only = 'other'; why = 'An Other is shown on the canvas. Go back to the tank first.'; }
@@ -55,13 +81,13 @@ export function canvasKinds(logic: GameLogic): { kinds: LibKind[]; locked: Parti
   else if (s.autoSubTurretEditMode) { only = 'turret'; why = 'You are editing an auto turret. Only turrets can go on its base.'; }
   if (!only) return { kinds: all, locked: {} };
   const locked: Partial<Record<LibKind, string>> = {};
-  for (const k of all) if (k !== only) locked[k] = why;
+  for (const k of all) if (k !== only && k !== 'solid') locked[k] = why;
   return { kinds: all, locked };
 }
 
 export function canvasActions(deps: CanvasModeDeps): (e: LibEntry) => LibAction[] {
   const { logic, showToast, onUpdate, showTool } = deps;
-  const showItsPanel = () => showTool?.('tank');
+  const showItsPanel = () => showTool?.('turret');
   const placeLook = (look: PlacedLook): boolean => {
     if (!logic.startLookPlacement(look)) {
       showToast('error', 'Go back to the tank first: a food shape is being edited on the canvas.');
@@ -103,6 +129,12 @@ export function canvasActions(deps: CanvasModeDeps): (e: LibEntry) => LibAction[
             return true;
           },
         }];
+        if (def.isPolyhedron || def.category === 'user') {
+          const key = def.baseShape;
+          const solid = GAME_SOLID_DESIGNS.find(d => d.solidId === key)
+            ?? (logic.state.solidLibrary.find(r => (r.fileData.data as SolidDesign | undefined)?.solidId === key)?.fileData.data as SolidDesign | undefined);
+          if (solid) acts.push({ id: 'solid3d', label: 'Edit in 3D', run: () => { openSolidEditor(solid); return true; } });
+        }
         if (!def.isPolyhedron) {
           acts.push({ id: 'look', label: 'Place as Look', run: () => placeLook(lookFromShape({
             id: def.id, name: def.displayName, sides: def.sides < 3 ? 0 : def.sides,
@@ -121,6 +153,21 @@ export function canvasActions(deps: CanvasModeDeps): (e: LibEntry) => LibAction[
           { id: 'show', label: 'Show on Canvas', run: () => { logic.loadOtherIntoCanvas(item!.fileData.data as OtherDesign); onUpdate(); showItsPanel(); return true; } },
           { id: 'look', label: 'Place as Look', run: () => placeLook(lookFromOther(item!.fileData.data as OtherDesign)) },
         ];
+      case 'solid': {
+        const design = item!.fileData.data as SolidDesign;
+        return [
+          { id: 'edit', label: 'Edit in 3D', run: () => { openSolidEditor(design); return true; } },
+          { id: 'food', label: 'Use as Food Shape', run: () => {
+            const why = canvasKinds(logic).locked.shape;
+            if (why) { showToast('error', why); return false; }
+            logic.loadFoodShapeDesignIntoCanvas(foodShapeOfSolid(design.solidId, design.name));
+            onUpdate();
+            showItsPanel();
+            return true;
+          } },
+          { id: 'remove', label: 'Remove', run: () => { removeSolidRow(logic, item!, showToast); onUpdate(); return false; } },
+        ];
+      }
       default:
         return [];
     }
@@ -134,6 +181,8 @@ export function canvasMode(deps: CanvasModeDeps, place: string): LibMode {
     kinds, lockedKinds: locked, actionsOf: canvasActions(deps), allowImport: true,
     isChosen: (e) => canvasShows(deps.logic, e),
     chosenSection: { title: 'Active' },
+    newOf: (k) => k === 'solid' ? { label: 'New Solid', tip: 'Make a new solid in the 3D Solid Editor, from a starter shape.', run: () => { openSolidEditor(null); return true; } } : null,
+    undoRemove: () => undoSolidRemove(deps.logic, deps.showToast),
   };
 }
 

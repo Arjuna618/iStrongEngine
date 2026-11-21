@@ -1,7 +1,7 @@
 export const PANEL_CARD_FOLDS: Readonly<Record<string, { open?: readonly string[]; closed?: readonly string[] }>> = {
-  'tool:tank': { open: ['Base Stats', 'Tank Body Layers', 'Projectile Layers', 'Picked Part'] },
+  'tool:tank': { open: ['Base Stats', 'Picked Part'] },
   'tool:shape': { open: ['Shape'] },
-  'tool:turret': { open: ['Installed Turrets', 'Showing an Other', 'Editing food shape'] },
+  'tool:turret': { open: ['Installed Turrets', 'Tank Parts', 'Projectile Parts', 'Showing an Other'] },
   'tool:game-mode': { open: ['Mode'] },
   'tool:enemy': { open: ['Team Bots'] },
   'tool:map-designer': { open: ['Map Generation', 'Custom Editor'] },

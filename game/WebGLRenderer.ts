@@ -3,6 +3,7 @@ import { flashWhite } from '../utils/motionArras';
 import { isSoftwareRendererName } from '../utils/gpuDetect';
 import { HW_KINDS, HW_BATCH, HW_VEIL, outlineFansFromMiddle, cleanOutline, type HalloweenMeshes } from '../utils/halloween';
 import { outlineFillTriangles, outlineStrokeLoops } from '../utils/outlineFill';
+import { solidStill, SOLID_STROKE_OF_BORDER, type ArrasSolid, type SolidStillView } from '../utils/solidArras';
 import { SMALL_FIX } from './smallFixSwitch';
 
 const INSTANCE_STRIDE = 12;
@@ -117,6 +118,7 @@ uniform float u_blend;
 uniform float u_flashTo;
 uniform float u_strokeK;
 uniform vec3 u_ink;
+uniform float u_inkK;
 
 out vec3 v_color;
 out float v_alpha;
@@ -170,7 +172,7 @@ void main() {
     float only = step(3.5, a_gDmgOverlay);
     if (only * (1.0 - isS) > 0.5) gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
     vec3 blendedFill = geomFill(a_gFillColor, a_gDmgOverlay - 2.0 * (hl + only), u_flashTo);
-    v_color = mix(blendedFill, mix(geomStroke(blendedFill, u_darkMode, u_blend), u_ink, hl), isS);
+    v_color = mix(blendedFill, mix(geomStroke(blendedFill, u_darkMode, u_blend), u_ink, hl * u_inkK), isS);
     v_alpha = a_gAlpha;
     v_cap = vec3(strokeOff, (a_isStroke - 1.0) * strokeK);
 }
@@ -339,6 +341,7 @@ uniform vec4 u_viewport;
 uniform float u_pxPerWorld;
 uniform float u_strokeK;
 uniform vec3 u_ink;
+uniform float u_inkK;
 
 flat out vec3 v_fill;
 flat out vec3 v_stroke;
@@ -368,7 +371,7 @@ void main() {
     if (only * (1.0 - a_isStroke) > 0.5) gl_Position = vec4(0.0, 0.0, -2.0, 1.0);
     vec3 blendedFill = geomFill(a_gFillColor, a_gDmgOverlay - 2.0 * (hl + only), u_flashTo);
     v_fill = blendedFill;
-    v_stroke = mix(geomStroke(blendedFill, u_darkMode, u_blend), u_ink, hl);
+    v_stroke = mix(geomStroke(blendedFill, u_darkMode, u_blend), u_ink, hl * u_inkK);
     v_alpha = a_gAlpha;
     v_piece = a_isStroke;
 }
@@ -1008,6 +1011,65 @@ function _emitOutlineLines(data: Float32Array, off: number, px: Float64Array, py
     return off;
 }
 
+export const SOLID_LINE_HALF = STROKE_HALF_WIDTH * SOLID_STROKE_OF_BORDER;
+
+export function _triangulateSolidStill(v: SolidStillView, exactCaps: boolean = false, part: 0 | 1 | 2 = 0): Float32Array {
+    const xy = v.xy, h = SOLID_LINE_HALF;
+    const fill: number[] = [];
+    if (part !== 2) for (let f = 0; f < v.faceCount; f++) {
+        const a = v.faceAt[f], K = v.faceLen[f];
+        const pts: [number, number][] = [];
+        for (let i = 0; i < K; i++) pts.push([xy[(a + i) * 2], xy[(a + i) * 2 + 1]]);
+        const tri = outlineFillTriangles(pts);
+        if (tri !== null) { for (let t = 0; t < tri.length; t++) fill.push(tri[t]); }
+        else for (let i = 1; i + 1 < K; i++) fill.push(pts[0][0], pts[0][1], pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
+    }
+    const edges: number[] = [];
+    const seen = new Set<string>();
+    if (part !== 1) for (let f = 0; f < v.faceCount; f++) {
+        const a = v.faceAt[f], K = v.faceLen[f];
+        for (let i = 0; i < K; i++) {
+            const p = (a + i) * 2, q = (a + (i + 1) % K) * 2;
+            const ax = xy[p], ay = xy[p + 1], bx = xy[q], by = xy[q + 1];
+            const k1 = ax + ',' + ay + ',' + bx + ',' + by;
+            if (seen.has(k1) || seen.has(bx + ',' + by + ',' + ax + ',' + ay)) continue;
+            seen.add(k1);
+            if (ax !== bx || ay !== by) edges.push(ax, ay, bx, by);
+        }
+    }
+    const capParts = exactCaps ? 4 * 6 : ARC_SEGMENTS * 4 * 3;
+    const corners = part === 1 ? 0 : v.cornerCount;
+    const data = new Float32Array((fill.length / 2 + (edges.length / 4) * 6 + corners * capParts) * GEOM_VERT_SIZE);
+    let off = 0;
+    for (let t = 0; t < fill.length; t += 2) { data[off++] = fill[t]; data[off++] = fill[t + 1]; data[off++] = 0; data[off++] = 0; data[off++] = 0; }
+    for (let e = 0; e < edges.length; e += 4) {
+        const ax = edges[e], ay = edges[e + 1], bx = edges[e + 2], by = edges[e + 3];
+        const dx = bx - ax, dy = by - ay, L = Math.sqrt(dx * dx + dy * dy);
+        const nx = (-dy / L) * h, ny = (dx / L) * h;
+        data[off++] = ax; data[off++] = ay; data[off++] = nx;  data[off++] = ny;  data[off++] = 1;
+        data[off++] = bx; data[off++] = by; data[off++] = nx;  data[off++] = ny;  data[off++] = 1;
+        data[off++] = bx; data[off++] = by; data[off++] = -nx; data[off++] = -ny; data[off++] = 1;
+        data[off++] = ax; data[off++] = ay; data[off++] = nx;  data[off++] = ny;  data[off++] = 1;
+        data[off++] = bx; data[off++] = by; data[off++] = -nx; data[off++] = -ny; data[off++] = 1;
+        data[off++] = ax; data[off++] = ay; data[off++] = -nx; data[off++] = -ny; data[off++] = 1;
+    }
+    for (let c = 0; c < corners; c++) {
+        const cx = v.corners[c * 2], cy = v.corners[c * 2 + 1];
+        if (exactCaps) {
+            for (let q = 0; q < 4; q++) off = _emitExactCap(data, off, cx, cy, (Math.PI / 2) * q, Math.PI / 2, h);
+        } else {
+            const segs = ARC_SEGMENTS * 4;
+            for (let j = 0; j < segs; j++) {
+                const a0 = (Math.PI * 2 * j) / segs, a1 = (Math.PI * 2 * (j + 1)) / segs;
+                data[off++] = cx; data[off++] = cy; data[off++] = 0; data[off++] = 0; data[off++] = 1;
+                data[off++] = cx; data[off++] = cy; data[off++] = Math.cos(a0) * h; data[off++] = Math.sin(a0) * h; data[off++] = 1;
+                data[off++] = cx; data[off++] = cy; data[off++] = Math.cos(a1) * h; data[off++] = Math.sin(a1) * h; data[off++] = 1;
+            }
+        }
+    }
+    return data.subarray(0, off);
+}
+
 export function _triangulateLineStroke(exactCaps: boolean = false): Float32Array {
     const w = STROKE_HALF_WIDTH;
     const endX = [-1, 1];
@@ -1132,8 +1194,11 @@ export class WebGLBulletRenderer {
     private geomUStrokeK: WebGLUniformLocation | null = null;
     private geomUInk: WebGLUniformLocation | null = null;
     private circleUInk: WebGLUniformLocation | null = null;
+    private geomUInkK: WebGLUniformLocation | null = null;
+    private circleUInkK: WebGLUniformLocation | null = null;
     private circleUStrokeK: WebGLUniformLocation | null = null;
     private inkR: number = 0; private inkG: number = 0; private inkB: number = 0;
+    private inkK: number = 1;
     private gridProgram: WebGLProgram | null = null;
     private gridVAO: WebGLVertexArrayObject | null = null;
     private gridBuffer: WebGLBuffer | null = null;
@@ -1344,6 +1409,8 @@ export class WebGLBulletRenderer {
         this.geomUStrokeK = null;
         this.geomUInk = null;
         this.circleUInk = null;
+        this.geomUInkK = null;
+        this.circleUInkK = null;
         this.circleUStrokeK = null;
         this._gpuGen++;
         this.gridProgram = null;
@@ -1866,6 +1933,7 @@ export class WebGLBulletRenderer {
         this.geomUA2c = corners ? gl.getUniformLocation(prog, 'u_a2c') : null;
         this.geomUStrokeK = gl.getUniformLocation(prog, 'u_strokeK');
         this.geomUInk = gl.getUniformLocation(prog, 'u_ink');
+        this.geomUInkK = gl.getUniformLocation(prog, 'u_inkK');
 
         const circleProg = EXACT_CIRCLES ? this._linkProgram(gl, CIRCLE_VERT_SRC, CIRCLE_FRAG_SRC, 'circle') : null;
         this.circleProgram = circleProg;
@@ -1879,6 +1947,7 @@ export class WebGLBulletRenderer {
             this.circleUYFix = gl.getUniformLocation(circleProg, 'u_yFix');
             this.circleUA2c = gl.getUniformLocation(circleProg, 'u_a2c');
             this.circleUInk = gl.getUniformLocation(circleProg, 'u_ink');
+            this.circleUInkK = gl.getUniformLocation(circleProg, 'u_inkK');
             this.circleUStrokeK = gl.getUniformLocation(circleProg, 'u_strokeK');
         }
 
@@ -2051,6 +2120,30 @@ export class WebGLBulletRenderer {
         if (at >= 0) this._geomBatchArr.splice(at, 1);
     }
 
+    solidLayerBatchKey(solid: ArrasSolid): string {
+        const kept = this._solidLayerKeys.get(solid);
+        if (kept === '') return '';
+        if (kept !== undefined && this.geomBatches.has(kept)) { if (SMALL_FIX.G729 !== 0) this._outlineUsed.set(kept, ++this._outlineTick); return kept; }
+        if (!this.gl || !this.enabled || !this.geomProgram) return '';
+        const v = solidStill(solid);
+        if (v.faceCount === 0) { this._solidLayerKeys.set(solid, ''); return ''; }
+        let h = 2166136261 >>> 0;
+        for (let i = 0; i < v.xy.length; i++) h = Math.imul(h ^ Math.round(v.xy[i] * 4096), 16777619) >>> 0;
+        for (let f = 0; f < v.faceCount; f++) h = Math.imul(h ^ v.faceLen[f], 16777619) >>> 0;
+        const key = 'layer_s_' + v.faceCount + '_' + h.toString(36);
+        if (!this.geomBatches.has(key)) {
+            if (SMALL_FIX.G729 !== 0) {
+                this._outlineEvict(key);
+                this._createGeomBatch(key, _triangulateSolidStill(v, this._exactCorners), OUTLINE_BATCH_CAPACITY);
+            } else this._createGeomBatch(key, _triangulateSolidStill(v, this._exactCorners));
+            this._keepCrossLast();
+        }
+        if (SMALL_FIX.G729 !== 0) this._outlineUsed.set(key, ++this._outlineTick);
+        this._solidLayerKeys.set(solid, key);
+        return key;
+    }
+    private _solidLayerKeys = new WeakMap<ArrasSolid, string>();
+
     private _keepCrossLast(): void {
         const cross = this.geomBatches.get('healer_cross');
         if (cross === undefined) return;
@@ -2204,7 +2297,7 @@ export class WebGLBulletRenderer {
 
     setStrokeScale(k: number): void { this.strokeK = k > 1 ? k : 1.0; }
 
-    setInk(r: number, g: number, b: number): void { this.inkR = r; this.inkG = g; this.inkB = b; }
+    setInk(r: number, g: number, b: number, k: number = 1): void { this.inkR = r; this.inkG = g; this.inkB = b; this.inkK = k; }
 
     isSoftware(): boolean {
         if (this._software < 0) {
@@ -2435,6 +2528,7 @@ export class WebGLBulletRenderer {
         gl.uniform1f(this.geomUFlashTo, this.flashTo);
         gl.uniform1f(this.geomUStrokeK, this.strokeK);
         gl.uniform3f(this.geomUInk, this.inkR, this.inkG, this.inkB);
+        if (this.geomUInkK !== null) gl.uniform1f(this.geomUInkK, this.inkK);
         if (this.geomUPxPerWorld !== null) {
             gl.uniform1f(this.geomUPxPerWorld, pxPerWorld);
             gl.uniform1f(this.geomUA2c, a2c);
@@ -2456,6 +2550,7 @@ export class WebGLBulletRenderer {
         gl.uniform1f(this.circleUA2c, a2c);
         gl.uniform1f(this.circleUStrokeK, this.strokeK);
         gl.uniform3f(this.circleUInk, this.inkR, this.inkG, this.inkB);
+        if (this.circleUInkK !== null) gl.uniform1f(this.circleUInkK, this.inkK);
     }
 
     setKeptGeom(set: KeptGeom, keys: readonly string[], bufs: readonly Float32Array[], counts: readonly number[],

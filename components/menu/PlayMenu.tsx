@@ -18,7 +18,7 @@ import { MOBILE_UI } from '../../game/mobileSwitch';
 import { useSwapStage } from '../kit/motion';
 import { SwapInPlace, SwapText, Fade } from '../kit/Collapse';
 import { glideIntoView } from '../kit/presence';
-import { IconButton, SearchField, Segmented, SliderRow, EmptyState, Button, emptyArt, RowLabel } from '../kit/kit';
+import { IconButton, SearchField, Segmented, SliderRow, EmptyState, Button, emptyArt, RowLabel, Tabs } from '../kit/kit';
 import { ModeDetailsArt, ModeCard, ModeMain, ModeSideBody, useModeShelf, ALL_ID, modeSearchWords, type ModeItem, type SortId } from './modeBrowser';
 import { ConfirmDialog } from '../kit/Modal';
 import { askFullscreenFirst } from '../mobile/fullscreenNotice';
@@ -384,7 +384,7 @@ export const PlayMenu: React.FC<Props> = ({
 
   const catsRef = useCallback((el: HTMLDivElement | null) => {
     if (!el) return;
-    const on = el.querySelector<HTMLElement>('.k-seg-on');
+    const on = el.querySelector<HTMLElement>('.k-tab-on');
     if (on) el.scrollLeft = Math.max(0, on.offsetLeft - (el.clientWidth - on.offsetWidth) / 2);
   }, []);
   const catOptions = CATEGORY_ORDER.map(c => ({ value: c, label: CATEGORY_INFO.get(c)?.title ?? c, title: modeCountLabel(MODE_COUNTS[c] ?? 0) }));
@@ -398,7 +398,7 @@ export const PlayMenu: React.FC<Props> = ({
       </>)}
       {touch ? (
         <div className="k-play-cats" ref={catsRef}>
-          <Segmented<ModeCategory> value={category} onChange={pickCategory} options={catOptions} />
+          <Tabs<ModeCategory> value={category} onChange={pickCategory} tabs={catOptions} />
         </div>
       ) : (
         <Segmented<ModeCategory> value={category} onChange={pickCategory} block options={catOptions} />

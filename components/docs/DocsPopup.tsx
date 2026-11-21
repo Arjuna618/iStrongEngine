@@ -325,7 +325,7 @@ const CategoryNode = React.memo(function CategoryNode({ cat, open, subsOpen, sel
                             <span className="k-rd-item-text truncate">{cat.title}</span>
                             <ChevronDown size={12} className={`k-chevron shrink-0 ${catOpen ? 'k-chevron-open' : ''}`} />
                           </button>
-                          <Collapse open={catOpen} onBusyChange={busyCb(`cat:${cat.id}`)}>{cat.subs.map(sub => {
+                          <Collapse open={catOpen} container onBusyChange={busyCb(`cat:${cat.id}`)}>{cat.subs.map(sub => {
                             const subOpen = subsOpenHas.includes(sub.id);
                             const SubIcon = sub.icon;
                             return (
@@ -340,7 +340,7 @@ const CategoryNode = React.memo(function CategoryNode({ cat, open, subsOpen, sel
                                   <span className="k-rd-item-text truncate">{sub.title}</span>
                                   <ChevronDown size={11} className={`k-chevron shrink-0 ${subOpen ? 'k-chevron-open' : ''}`} />
                                 </button>
-                                <Collapse open={subOpen} onBusyChange={busyCb(`sub:${sub.id}`)}>
+                                <Collapse open={subOpen} container onBusyChange={busyCb(`sub:${sub.id}`)}>
                                   <div className="k-rd-sub">
                                     <PickGlide pick=".k-rd-item-on" look="row" />
                                     {sub.guides.map(g => (

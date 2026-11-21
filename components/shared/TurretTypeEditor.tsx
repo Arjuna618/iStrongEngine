@@ -4,8 +4,9 @@ import { TURRET_TYPE_LABELS } from './labels';
 import { renderDropdown, renderMiniSlider } from './uiHelpers';
 import { ToggleRow, Button, Dim } from '../kit/kit';
 import { Reveal, SwapBox } from '../kit/Collapse';
-
-export type TurretTypePart = 'type' | 'subTurrets' | 'baseShape' | 'firing' | 'targeting' | 'drawOrder';
+import { CANVAS_EXTENT } from '@/game/ValueClamp';
+import { SizeRow } from './transformRows';
+export type TurretTypePart = 'type' | 'subTurrets' | 'baseSize' | 'baseShape' | 'firing' | 'targeting' | 'drawOrder';
 
 interface Props {
   part: TurretTypePart;
@@ -25,7 +26,7 @@ export function turretTypePartShows(part: TurretTypePart, t: Pick<Turret, 'turre
   switch (part) {
     case 'type': return true;
     case 'subTurrets': return type === 'auto' && !!opts.onEnterSubTurretMode;
-    case 'baseShape': case 'targeting': return type === 'auto';
+    case 'baseSize': case 'baseShape': case 'targeting': return type === 'auto';
     case 'firing': return type === 'auto' || (!opts.hideAlwaysShoot && type !== 'decorative');
     case 'drawOrder': return type !== 'decorative';
   }
@@ -71,8 +72,12 @@ export const TurretTypeEditor: React.FC<Props> = ({
       </Reveal>
     </>) : null;
 
+    case 'baseSize': return isAuto ? (
+      <SizeRow label="Shape Size" value={t.autoCircleSize ?? 25} onChange={(v) => updateT({ autoCircleSize: v })} min={1} base={50} bound={CANVAS_EXTENT}
+        help="Size of the auto turret base shape." />
+    ) : null;
+
     case 'baseShape': return isAuto ? (<>
-      {renderMiniSlider('Shape Size', t.autoCircleSize ?? 25, (v) => updateT({ autoCircleSize: v }), 1, 50, 1, 'Size of the auto turret base shape.')}
       {renderMiniSlider('Base Shape Sides', t.autoCircleBaseSides ?? 0, (v) => updateT({ autoCircleBaseSides: v }), 0, 12, 1, '0 = circle. 3 = triangle, 4 = square, etc.')}
       <Reveal when={(t.autoCircleBaseSides ?? 0) >= 3}>{renderMiniSlider('Base Shape Depth', Math.round((t.autoCircleBaseDepth ?? 0) * 100), (v) => updateT({ autoCircleBaseDepth: v / 100 }), 0, 100, 1, 'Star indent depth of the base shape. 0 = a plain shape.')}</Reveal>
     </>) : null;

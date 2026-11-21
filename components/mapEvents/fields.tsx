@@ -723,7 +723,7 @@ export const RowCard: React.FC<{ family: Family; row: Row; path: Path; index: nu
         </span>
       </div>
       <Collapse open={!open && facts.length > 0} reveal="none"><div className="k-ev-step-facts"><Facts items={facts} /></div></Collapse>
-      <Collapse open={open} reveal="self">
+      <Collapse open={open} container reveal="self">
         <div className="k-ev-step-body">
           <SelectRow label="Change It To" help={helpWithPick('Change It To', def.label, def.tip)} value={row.k} groups={groupsOfKinds(family)} onChange={k => ctx.commit(d => changeRowKind(d!, path, family, k))} />
           <Reveal when={noting || !!row.note}><FieldRow stacked label="Note" help="A note for yourself. It changes nothing in play."><TextField value={row.note ?? ''} placeholder="A Note" onChange={v => ctx.commit(d => setAt(d, [...path, 'note'], v || undefined))} /></FieldRow></Reveal>

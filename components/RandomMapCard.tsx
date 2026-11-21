@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { scrollGlide } from './kit/presence';
 import { pushUndoAction } from './shell/undoActions';
 import type { GameLogic } from '../game/GameLogic';
 import type { GameModeConfig, LibraryItem } from '../types';
@@ -14,7 +15,7 @@ import { MazeTypeName } from './maps/mazeTypeName';
 import { MapLibrarySlot } from './maps/MapLibraryWindow';
 import { useOpenFlag } from './library/LibraryWindowSlot';
 import { ROCK_PATTERN_NAMES } from './maps/rockCatalog';
-import { mapPoolShares } from '../game/mapPool';
+import { mapPoolShares, sameMapRow } from '../game/mapPool';
 
 const SHARE_MAX = 1000;
 
@@ -39,12 +40,23 @@ export const RandomMapCard: React.FC<{ logic: GameLogic; config: GameModeConfig;
   const has = (id: string | undefined) => !!id && mapLibrary.some(it => it.id === id);
   const shares = mapPoolShares(pool.rows, r => r.kind !== 'file' || has(r.file));
   const setRows = (rows: MapPoolRow[]) => onChange({ ...pool, rows });
+  const listed = (r: Omit<MapPoolRow, 'id' | 'share'>) => pool.rows.some(x => sameMapRow(x, r));
+  const listBox = useRef<HTMLDivElement>(null);
+  const added = useRef(false);
   const add = (r: Omit<MapPoolRow, 'id' | 'share'>) => {
+    if (listed(r)) { toast('info', `"${r.name}" is already in the list.`); return; }
     const id = pool.rows.reduce((a, x) => Math.max(a, x.id), 0) + 1;
     setRows([...pool.rows, { ...r, id, share: pool.rows.length > 0 ? Math.round(pool.rows.reduce((a, x) => a + x.share, 0) / pool.rows.length) || 1 : 50 }]);
+    added.current = true;
     flag.set(false);
     again(n => n + 1);
   };
+  useEffect(() => {
+    if (!added.current) return;
+    added.current = false;
+    const box = listBox.current;
+    if (box && box.scrollHeight > box.clientHeight) scrollGlide(box, box.scrollHeight - box.clientHeight);
+  }, [pool.rows.length]);
   const remove = (r: MapPoolRow) => {
     const at = pool.rows.indexOf(r);
     setRows(pool.rows.filter(x => x !== r));
@@ -58,14 +70,19 @@ export const RandomMapCard: React.FC<{ logic: GameLogic; config: GameModeConfig;
         checked={pool.on} onChange={v => onChange({ ...pool, on: v })} />
       <Reveal when={pool.on}>
         <div className="k-stack">
-          <MotionList gap={8} empty={<p className="k-hint">No maps yet: a match plays your map in the editor.</p>}>
-            {pool.rows.map(r => <RowOf key={r.id} row={r} percent={shares.get(r.id) ?? 0} missing={r.kind === 'file' && !has(r.file)}
-              onShare={v => setRows(pool.rows.map(x => (x === r ? { ...x, share: v } : x)))} onRemove={() => remove(r)} />)}
-          </MotionList>
+          <div ref={listBox} className="k-rm-list custom-scrollbar">
+            <MotionList gap={8} empty={<p className="k-hint">No maps yet: a match plays your map in the editor.</p>}>
+              {pool.rows.map(r => <RowOf key={r.id} row={r} percent={shares.get(r.id) ?? 0} missing={r.kind === 'file' && !has(r.file)}
+                onShare={v => setRows(pool.rows.map(x => (x === r ? { ...x, share: v } : x)))} onRemove={() => remove(r)} />)}
+            </MotionList>
+          </div>
           <Button size="sm" variant="secondary" block onClick={() => flag.set(true)} title="Pick a maze type, a rock pattern or a saved map from the Map Library">Add Map</Button>
         </div>
       </Reveal>
       <MapLibrarySlot flag={flag} rockFlag={rockFlag} logic={logic} config={logic.state.mapConfig} library={mapLibrary} pickOnly
+        listed={c => c.kind === 'rock' ? listed({ kind: 'rock', rock: c.pattern ?? 'random', name: c.name })
+          : c.kind === 'mine' ? !!c.item && listed({ kind: 'file', file: c.item.id, name: c.name })
+          : c.kind === 'maze' && listed({ kind: 'maze', maze: c.type, name: c.name })}
         onLoadMaze={type => add({ kind: 'maze', maze: type, name: MazeTypeName(type) })}
         onPickRock={pattern => add({ kind: 'rock', rock: pattern, name: ROCK_PATTERN_NAMES[pattern] })}
         onLoadFile={item => add({ kind: 'file', file: item.id, name: item.name || 'Map' })}

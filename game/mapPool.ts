@@ -5,6 +5,11 @@ import { ROCK_FORMATIONS, type RockFormationWord } from './rockFormations.genera
 import { isRockFormation } from './rockFormationWord';
 import { ARRAS_ROCK_VARIATION } from './constants';
 
+export function sameMapRow(a: Pick<MapPoolRow, 'kind' | 'maze' | 'rock' | 'file'>, b: Pick<MapPoolRow, 'kind' | 'maze' | 'rock' | 'file'>): boolean {
+  if (a.kind !== b.kind) return false;
+  return a.kind === 'maze' ? a.maze === b.maze : a.kind === 'rock' ? a.rock === b.rock : !!a.file && a.file === b.file;
+}
+
 export function mapPoolShares(rows: readonly MapPoolRow[], can: (r: MapPoolRow) => boolean): Map<number, number> {
   let total = 0;
   for (const r of rows) if (can(r)) total += Math.max(0, r.share);

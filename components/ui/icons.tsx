@@ -443,6 +443,8 @@ import { CircleIcon, HexagonIcon, PenTool01Icon } from '@hugeicons/core-free-ico
 export const AreaEllipse = make(CircleIcon, 'lucide-area-ellipse');
 export const AreaPolygon = make(HexagonIcon, 'lucide-area-polygon');
 export const AreaFree = make(PenTool01Icon, 'lucide-area-free');
+import { NodeEditIcon } from '@hugeicons/core-free-icons';
+export const EditPoints = make(NodeEditIcon, 'lucide-edit-points');
 
 import { AuctionIcon } from '@hugeicons/core-free-icons';
 export const LegalTerms = make(AuctionIcon, 'lucide-legal-terms');

@@ -1,7 +1,7 @@
 import type { Turret, BodyLayer } from '../../types';
 import { getRealSizeFactor } from '../../utils/p5Utils';
 import { healerCrossFill } from '../../utils/gameColors';
-
+import { sortInPlace } from '../../utils/sortInPlace';
 export const CORNER_ROUND_FACTOR = 0.072;
 
 export const TARGET_STROKE_SCREEN_PX = 2.5;
@@ -25,7 +25,7 @@ export function sortTurretsByLayer(turrets: any[]): any[] {
     const len = turrets.length;
     _turretSortBuf.length = len;
     for (let i = 0; i < len; i++) _turretSortBuf[i] = turrets[i];
-    _turretSortBuf.sort(_turretCmp);
+    sortInPlace(_turretSortBuf, _turretCmp);
     return _turretSortBuf;
 }
 
@@ -35,26 +35,31 @@ export function sortSubTurretsByLayer(turrets: any[]): any[] {
     const len = turrets.length;
     _subSortBuf.length = len;
     for (let i = 0; i < len; i++) _subSortBuf[i] = turrets[i];
-    _subSortBuf.sort(_turretCmp);
+    sortInPlace(_subSortBuf, _turretCmp);
     return _subSortBuf;
 }
 
 export const bodyLayerSortBuf: BodyLayer[] = [];
 export const bodyLayerCmp = (a: BodyLayer, b: BodyLayer) => a.renderOrder - b.renderOrder;
+export const __iconSortHooks = { turretCmp: _turretCmp };
 
 let _turretOnLayer = new Uint8Array(64);
 let _turretLayerOrder = new Int8Array(64);
+let _turretLayerRef: (BodyLayer | null)[] = new Array(64).fill(null);
 
 export function getTurretOnLayer(): Uint8Array { return _turretOnLayer; }
 export function getTurretLayerOrder(): Int8Array { return _turretLayerOrder; }
+export function getTurretLayerRef(): (BodyLayer | null)[] { return _turretLayerRef; }
 
 export function buildTurretLayerFlags(turrets: Turret[], layers: BodyLayer[] | undefined): void {
     if (_turretOnLayer.length < turrets.length) {
         _turretOnLayer = new Uint8Array(Math.max(turrets.length, 64));
         _turretLayerOrder = new Int8Array(Math.max(turrets.length, 64));
+        _turretLayerRef = new Array(Math.max(turrets.length, 64)).fill(null);
     }
     _turretOnLayer.fill(0, 0, turrets.length);
     _turretLayerOrder.fill(-128, 0, turrets.length);
+    _turretLayerRef.fill(null, 0, turrets.length);
     if (!layers || layers.length === 0) return;
     for (let li = 0; li < layers.length; li++) {
         const ids = layers[li].turretIds;
@@ -64,6 +69,7 @@ export function buildTurretLayerFlags(turrets: Turret[], layers: BodyLayer[] | u
                 if (turrets[ti].id === ids[ii]) {
                     _turretOnLayer[ti] = 1;
                     _turretLayerOrder[ti] = order;
+                    _turretLayerRef[ti] = layers[li];
                     break;
                 }
             }

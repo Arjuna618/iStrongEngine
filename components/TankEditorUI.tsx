@@ -1,10 +1,10 @@
-import React, { useRef, useState } from 'react';
-import { useSwapStage, useGlideHeight } from './kit/motion';
+import React, { useState, useEffect } from 'react';
 import { GameLogic } from '../game/GameLogic';
-import { Plus, Trash2, Layers, SlidersHorizontal, Copy, Pencil, Tags, CanvasTool, HdPhysics, Settings2, HdPreferenceHorizontal, BodyLayersIcon, HdProfile02, HdGeometricShapes01, HdFingerprintPattern, HdAiBrain01, HdAiSparkles } from './ui/icons';
+import { dialOfDepth, depthOfDial } from '../utils/shapeDepthDial';
+import { Plus, Trash2, Layers, SlidersHorizontal, Copy, Pencil, Tags, CanvasTool, HdPhysics, Settings2, HdPreferenceHorizontal, BodyLayersIcon, HdProfile02, HdGeometricShapes01, HdFingerprintPattern, HdAiBrain01, HdAiSparkles, Lock, EyeOff } from './ui/icons';
 import { ScrollArea } from './ui/ScrollArea';
-import { Group, ToggleRow, SliderRow, SelectRow, FieldRow, Segmented, PickRow, NumberField, IconButton, Button, EmptyState, headerIcon, emptyArt } from './kit/kit';
-import { Reveal, MotionList, PageSwap, SwapText } from './kit/Collapse';
+import { Group, ToggleRow, SliderRow, SelectRow, FieldRow, Segmented, PickRow, NumberField, IconButton, Button, EmptyState, headerIcon, emptyArt, Dim } from './kit/kit';
+import { Reveal, MotionList, PageSwap, SwapText, Collapse } from './kit/Collapse';
 import { ColorMapControl, ColorMapSwitch } from './shared/ColorMapField';
 import type { ColorMapValue } from './shared/colorMapRules';
 import { CM_USE } from '../utils/colorMap';
@@ -15,6 +15,11 @@ import { fireTip } from '../utils/tips';
 import { ARRAS_BODY_PUSH_SHARE, ARRAS_TANK_BASE_PENETRATION } from '../game/arrasCombat';
 import { openContextMenu, type MenuEntry } from './shell/ContextMenu';
 import { InlineName } from './shared/InstalledTurretsList';
+import { PlaceRow, SizeRow, AngleRow, OpacityRow, degreesOf } from './shared/transformRows';
+import { LAYER_PLACE_MAX, layerIsPlaced } from '../utils/canvasParts';
+import { layerHitKind, layerHitFrac } from '../utils/partHits';
+import { layerSolidOf } from '../utils/layerOutline';
+import type { SolidDesign } from '../types';
 import type { Tool } from './shell/engineTools';
 import { SMALL_FIX } from '../game/smallFixSwitch';
 import { layerTeamShown, teamColourEntry } from '../game/teamColourSwitch';
@@ -36,21 +41,46 @@ const STAT_NAME_OPTIONS = [
   { value: 'mixed', label: 'Mixed (Weapon)' },
   { value: 'smasher', label: 'Smasher (Ram)' },
 ];
+const HIT_KINDS = [
+  { value: 'none', label: 'None', title: 'Nothing touches this layer: bullets, walls and tanks pass through it' },
+  { value: 'circle', label: 'Circle', title: 'A round area as big as the layer' },
+  { value: 'exact', label: 'Shape', title: 'The layer\'s own outline' },
+];
+const PreviewSpinRow: React.FC<{ logic: GameLogic; onUpdate: () => void }> = ({ logic, onUpdate }) => (
+  <ToggleRow label="Preview Spin" description="Watch the tank turn."
+    help="Shows the body and every layer turning as they will in a game. One switch for the whole tank. While it is on, clicks on the canvas edit nothing, so nothing moves by mistake."
+    checked={logic.previewMotion} onChange={v => { logic.setPreviewMotion(v); onUpdate(); }} />
+);
+const HitPeek: React.FC<{ logic: GameLogic; children: React.ReactNode }> = ({ logic, children }) => {
+  const set = (on: boolean) => { if (logic.showHitAreas !== on) logic.showHitAreas = on; };
+  useEffect(() => () => { logic.showHitAreas = false; }, [logic]);
+  return (
+    <div className="space-y-3" onPointerEnter={() => set(true)} onPointerLeave={() => set(false)}
+      onFocus={() => set(true)} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) set(false); }}>
+      {children}
+    </div>
+  );
+};
 const SPIN_DIRECTIONS = [
   { value: '-1', label: 'CW', title: 'Clockwise' },
   { value: '1', label: 'CCW', title: 'Counterclockwise' },
 ];
 const MAX_BODY_LAYERS = 10;
 const round1 = (v: number) => String(Math.round(v * 10) / 10);
+const GAME_SOLIDS = [
+  { value: 'cube', label: 'Cube' },
+  { value: 'dodecahedron', label: 'Dodecahedron' },
+  { value: 'icosahedron', label: 'Icosahedron' },
+];
+const SOLID_WHY = 'This layer is drawn as a 3D solid. Pick None in Solid to draw its own shape again.';
+function solidNameOf(id: string | undefined, library: { name: string; fileData: { data: unknown } }[]): string {
+  if (id === undefined || id === '') return '';
+  for (const g of GAME_SOLIDS) if (g.value === id) return g.label;
+  for (const r of library) { const sd = r.fileData.data as SolidDesign; if (sd && sd.solidId === id) return r.name || sd.name; }
+  return 'Missing Solid';
+}
 
-export const TankEditorUI: React.FC<Props> = ({ logic, onUpdate, className, showTool }) => {
-  const [showSkillCaps, setShowSkillCaps] = useState(false);
-  const [renamingLayer, setRenamingLayer] = useState<string | null>(null);
-  const [showPreDefined, setShowPreDefined] = useState(false);
-  const partCardRef = useRef<HTMLElement>(null);
-  const partStage = useSwapStage(logic ? (logic.state.activeBodyLayerId ?? null) : null, { glide: true, box: partCardRef });
-  useGlideHeight(partCardRef, partStage.shown);
-  const keptCard = useRef<{ title: string; icon: React.ReactNode; body: React.ReactNode } | null>(null);
+export const TankPartCard: React.FC<{ logic: GameLogic | null; onUpdate: () => void }> = ({ logic, onUpdate }) => {
   if (!logic) return null;
   const s = logic.state;
   const isProjectile = s.canvasIsProjectile === true;
@@ -64,10 +94,7 @@ export const TankEditorUI: React.FC<Props> = ({ logic, onUpdate, className, show
     logic.updateState({ tankColor: v.color, tankColorMap: v.colorMap, tankColorFree: v.colorFree });
     onUpdate();
   };
-
-  const activeLayer = partStage.shown
-    ? s.bodyLayers.find((l: BodyLayer) => l.id === partStage.shown) ?? null
-    : null;
+  const activeLayer = s.activeBodyLayerId ? s.bodyLayers.find((l: BodyLayer) => l.id === s.activeBodyLayerId) ?? null : null;
   const updateLayer = (updates: Partial<BodyLayer>) => {
     if (activeLayer) { logic.updateBodyLayer(activeLayer.id, updates); onUpdate(); }
   };
@@ -75,49 +102,22 @@ export const TankEditorUI: React.FC<Props> = ({ logic, onUpdate, className, show
     ? { color: activeLayer.color, colorMap: activeLayer.colorMap, colorFree: activeLayer.colorFree }
     : { color: '', colorMap: undefined, colorFree: undefined };
   const setLayerColor = (v: ColorMapValue) => updateLayer({ color: v.color, colorMap: v.colorMap, colorFree: v.colorFree });
-
-  const growth = !!s.gameModeConfig.growth;
-  const layersFull = s.bodyLayers.length >= MAX_BODY_LAYERS;
-  const pickLayer = (id: string | null) => { logic.setActiveBodyLayer(id); onUpdate(); };
-  const addLayer = () => { logic.addBodyLayer(); onUpdate(); fireTip('bodyLayerAdded'); };
-  const toCanvas = (id: string | null) => { logic.setActiveBodyLayer(id); onUpdate(); showTool?.('turret'); };
-  const layerMenu = (layer: BodyLayer): MenuEntry[] => [
-    { label: 'Edit', icon: SlidersHorizontal, disabled: s.activeBodyLayerId === layer.id, onSelect: () => pickLayer(layer.id) },
-    ...(showTool ? [{ label: 'Edit Its Turrets', icon: CanvasTool, onSelect: () => toCanvas(layer.id) }] : []),
-    'sep',
-    { label: 'Rename', icon: Pencil, onSelect: () => setRenamingLayer(layer.id) },
-    layer.tag
-      ? { label: 'Edit Tag', icon: Tags, prompt: { title: 'Tag', placeholder: 'Up to 8 letters', initial: layer.tag, maxLength: TURRET_TAG_MAX, submit: 'Save', onSubmit: (v: string) => { logic.setBodyLayerTag(layer.id, v); onUpdate(); } } }
-      : { label: 'Add Tag', icon: Tags, prompt: { title: 'Add Tag', placeholder: 'Up to 8 letters', maxLength: TURRET_TAG_MAX, submit: 'Add', onSubmit: (v: string) => { logic.setBodyLayerTag(layer.id, v); onUpdate(); } } },
-    ...(layer.tag ? [{ label: 'Remove Tag', icon: Tags, onSelect: () => { logic.setBodyLayerTag(layer.id, ''); onUpdate(); } }] : []),
-    'sep',
-    { label: 'Duplicate Layer', icon: Copy, disabled: layersFull, onSelect: () => { logic.duplicateBodyLayer(layer.id); onUpdate(); } },
-    { label: 'Add Body Layer', icon: Plus, disabled: layersFull, onSelect: addLayer },
-    'sep',
-    { label: 'Delete Layer', icon: Trash2, onSelect: () => { logic.removeBodyLayer(layer.id); onUpdate(); } },
-  ];
-  const mainMenu: MenuEntry[] = [
-    { label: 'Edit', icon: SlidersHorizontal, disabled: s.activeBodyLayerId === null, onSelect: () => pickLayer(null) },
-    ...(showTool ? [{ label: 'Edit Its Turrets', icon: CanvasTool, onSelect: () => toCanvas(null) }] : []),
-    'sep',
-    { label: 'Add Body Layer', icon: Plus, disabled: layersFull, onSelect: addLayer },
-  ];
-  const botOn = (s.healerAI ? 1 : 0) + (s.chargeAI ? 1 : 0) + (s.arenaCloserAI ? 1 : 0);
-  const abilitiesOn = (s.invisibleEnabled ? 1 : 0) + (s.invisibleEnabled && s.invisibleAlways ? 1 : 0) + (s.ignoresWalls ? 1 : 0);
   const capBadge = (on: boolean | undefined, n: number | undefined) => (on ? `Max ${n ?? 8}` : undefined);
-  const physicsOn = (s.tankPushShare !== undefined ? 1 : 0) + ((s.tankResistBase ?? 1) !== 1 ? 1 : 0)
-    + ((s.tankPenetrationBase ?? ARRAS_TANK_BASE_PENETRATION) !== ARRAS_TANK_BASE_PENETRATION ? 1 : 0)
-    + ((s.tankPushability ?? 1) !== 1 ? 1 : 0) + ((s.tankTouchScale ?? 1) !== 1 ? 1 : 0);
+  const layerSolidId = activeLayer && activeLayer.solidId !== undefined ? activeLayer.solidId : '';
+  const solidOn = !!activeLayer && layerSolidOf(activeLayer) !== null;
+  const solidOptions = [{ value: '', label: 'None' }, ...GAME_SOLIDS];
+  for (const r of s.solidLibrary) { const sd = r.fileData.data as SolidDesign; if (sd && !solidOptions.some(o => o.value === sd.solidId)) solidOptions.push({ value: sd.solidId, label: r.name || sd.name }); }
+  if (layerSolidId !== '' && !solidOptions.some(o => o.value === layerSolidId)) solidOptions.push({ value: layerSolidId, label: solidNameOf(layerSolidId, s.solidLibrary) });
 
   const liveBody = !activeLayer ? (<>
             <Group title="Shape" level={3}>
               <SliderRow label="Sides" help="Polygon sides for the body. 0 = circle."
                 value={s.tankSides} onChange={v => handleChange('tankSides', v)} min={0} max={16} step={1} keepFraction display={s.tankSides === 0 ? 'O' : String(s.tankSides)} />
               <Reveal when={s.tankSides >= 3}>
-                <SliderRow label="Shape Depth" help="Star/trap indent depth."
-                  note={`Arras default: ${Math.round((6 / (Math.max(3, s.tankSides) ** 2)) * 100)}%`}
-                  value={(s.tankShapeDepth ?? 0) * 100} onChange={v => handleChange('tankShapeDepth', v / 100)} min={0} max={100} step="any"
-                  display={String(Math.round((s.tankShapeDepth ?? 0) * 100))} />
+                <SliderRow label="Shape Depth" help="How deep the shape's points go. The middle is the plain shape. Slide right and the points go in, like a star. Slide left and the sides bulge out."
+                  note={`Arras default: ${Math.round(dialOfDepth(6 / (Math.max(3, s.tankSides) ** 2), s.tankSides))}`}
+                  value={dialOfDepth(s.tankShapeDepth ?? 0, s.tankSides)} onChange={v => handleChange('tankShapeDepth', depthOfDial(v, s.tankSides))} min={-100} max={100} step="any"
+                  fillFrom={0} minLabel="Out" maxLabel="In" display={String(Math.round(dialOfDepth(s.tankShapeDepth ?? 0, s.tankSides)))} />
               </Reveal>
               <Reveal when={(s.tankShapeDepth ?? 0) > 0}>
                 <ToggleRow label="Curved Edges" description="Rounds the star's points."
@@ -147,6 +147,7 @@ export const TankEditorUI: React.FC<Props> = ({ logic, onUpdate, className, show
                 <SliderRow label="Spin Speed" help="Body rotation speed when spin is enabled."
                   value={s.baseSpinSpeed} onChange={v => handleChange('baseSpinSpeed', v)} min={0} max={100} step={1} />
               </div></Reveal>
+              <PreviewSpinRow logic={logic} onUpdate={onUpdate} />
             </Group>
 
             <Group title="Display" level={3} hidden={isProjectile}>
@@ -154,6 +155,8 @@ export const TankEditorUI: React.FC<Props> = ({ logic, onUpdate, className, show
                 checked={s.isHealer ?? false} onChange={v => handleChange('isHealer', v)} />
               <ToggleRow label="Show Health Bar" description="Its health and shield bars."
                 checked={s.showHealthBar ?? true} onChange={v => handleChange('showHealthBar', v)} />
+              <OpacityRow value={s.tankOpacity} onChange={v => handleChange('tankOpacity', v)}
+                help="How much of the main body you see. Under 100 % the layers under it show through it. Its turrets and layers have their own." />
             </Group>
 
             <Group title="Projectile Cap" level={3} collapsible defaultOpen={false} count={capBadge(s.globalMaxAliveEnabled, s.globalMaxAlive)} hidden={isProjectile}>
@@ -167,29 +170,54 @@ export const TankEditorUI: React.FC<Props> = ({ logic, onUpdate, className, show
             </Group>
 
         </>) : (<>
+            <Group title="Transform" foldKey="Position" level={3}>
+              <PlaceRow label="X Offset" help="Moves this layer forward or back from the middle of the tank, in body radii. 0 is the middle. A moved layer has a hit area of its own (Hits below)."
+                value={activeLayer.x ?? 0} onChange={v => updateLayer({ x: v })} bound={LAYER_PLACE_MAX} />
+              <PlaceRow label="Y Offset" help="Moves this layer to the side from the middle of the tank, in body radii. 0 is the middle. A moved layer has a hit area of its own (Hits below)."
+                value={activeLayer.y ?? 0} onChange={v => updateLayer({ y: v })} bound={LAYER_PLACE_MAX} />
+              <SizeRow label="Size Ratio" help="Scale relative to main body. 1.0 = same size."
+                value={activeLayer.sizeRatio} onChange={v => updateLayer({ sizeRatio: v })} min={0.1} base={5} bound={100} suffix="x" />
+              <Reveal when={activeLayer.sides >= 3 || solidOn}>
+                <AngleRow label="Angle Offset" help="Starting rotation offset in degrees. Useful for positioning polygon copies at specific angles."
+                  value={degreesOf(activeLayer.initialAngle ?? 0)} onChange={v => updateLayer({ initialAngle: v * Math.PI / 180 })} />
+              </Reveal>
+              <OpacityRow value={activeLayer.opacity} onChange={v => updateLayer({ opacity: v })}
+                help="How much of this layer you see. Under 100 % what lies under it in the tank shows through it. Its turrets have their own." />
+              <Reveal when={layerIsPlaced(activeLayer)}><Dim when={activeLayer.intangible} why="Intangible is on, so this layer hits nothing." className="space-y-3">
+                <HitPeek logic={logic}>
+                <FieldRow label="Hit Area" help="Where bullets, walls, shapes and other tanks touch this layer, now that it sits away from the middle of the tank. Point here to see it on the canvas as a dashed line. A layer in the middle of the tank uses the tank's own round area.">
+                  <Segmented value={layerHitKind(activeLayer)} onChange={v => updateLayer({ hits: v as 'none' | 'circle' | 'exact' })} options={HIT_KINDS} />
+                </FieldRow>
+                <Reveal when={layerHitKind(activeLayer) !== 'none'}>
+                  <SliderRow label="Hit Area Size" help="How big the hit area is, in percent of the layer's size. Point here to see it on the canvas."
+                    value={Math.round(layerHitFrac(activeLayer, layerHitKind(activeLayer)) * 1000) / 10} onChange={v => updateLayer({ hitSize: v })}
+                    min={1} max={200} step={1} keepFraction inputMin={1} inputMax={400} format={(v) => `${Math.round(v * 10) / 10}%`} />
+                </Reveal>
+                </HitPeek>
+              </Dim></Reveal>
+            </Group>
 
             <Group title="Shape" level={3}>
-              <SliderRow label="Sides" help={activeLayer.outline ? 'Polygon sides for the body. 0 = circle. This layer has a custom shape from its recording: picking sides or a shape depth replaces it.' : 'Polygon sides for the body. 0 = circle.'}
+              <SelectRow label="Solid" help="Draws this layer as a 3D solid: the game's Cube, Dodecahedron and Icosahedron, or one of your solids from the Content Library. It turns with the layer, its corners at the layer's size. Its own sides and shape depth are kept, and None brings them back."
+                value={layerSolidId} onChange={v => updateLayer({ solidId: v === '' ? undefined : v })} options={solidOptions} />
+              <Dim when={solidOn} why={SOLID_WHY}>
+              <SliderRow label="Sides" help={activeLayer.outline ? 'Polygon sides for the body. 0 = circle. This layer has a custom shape: picking sides or a shape depth replaces it, and Ctrl Z brings it back.' : 'Polygon sides for the body. 0 = circle.'}
                 note={activeLayer.outline ? 'Custom shape' : undefined}
                 value={activeLayer.sides} onChange={v => updateLayer({ sides: v })} min={0} max={16} step={1} keepFraction display={activeLayer.sides === 0 ? 'O' : String(activeLayer.sides)} />
-              <SliderRow label="Size Ratio" help="Scale relative to main body. 1.0 = same size."
-                value={activeLayer.sizeRatio} onChange={v => updateLayer({ sizeRatio: v })} min={0.1} max={5} step="any" display={`${activeLayer.sizeRatio.toFixed(2)}x`} />
-              <Reveal when={activeLayer.sides >= 3}>
+              </Dim>
+              <Reveal when={activeLayer.sides >= 3 || solidOn}>
                 <SliderRow label="Copies" help="Number of overlapping polygon copies drawn at equal angular spacing. Spike=4x triangle, creates star like visual."
                   value={activeLayer.copies ?? 1} onChange={v => updateLayer({ copies: v })} min={1} max={8} step={1} />
               </Reveal>
-              <Reveal when={activeLayer.sides >= 3}>
-                <SliderRow label="Angle Offset" help="Starting rotation offset in degrees. Useful for positioning polygon copies at specific angles."
-                  value={Math.round((activeLayer.initialAngle ?? 0) * 180 / Math.PI)} onChange={v => updateLayer({ initialAngle: v * Math.PI / 180 })} min={0} max={360} step={1} />
-              </Reveal>
-              <Reveal when={activeLayer.sides >= 3}>
-                <SliderRow label="Shape Depth" help="Star/trap indent depth."
-                  value={activeLayer.starDepth * 100} onChange={v => updateLayer({ starDepth: v / 100 })} min={0} max={100} step="any" display={String(Math.round(activeLayer.starDepth * 100))} />
-              </Reveal>
-              <Reveal when={activeLayer.starDepth > 0}>
+              <Reveal when={activeLayer.sides >= 3}><Dim when={solidOn} why={SOLID_WHY}>
+                <SliderRow label="Shape Depth" help="How deep the shape's points go. The middle is the plain shape. Slide right and the points go in, like a star. Slide left and the sides bulge out."
+                  value={dialOfDepth(activeLayer.starDepth, activeLayer.sides)} onChange={v => updateLayer({ starDepth: depthOfDial(v, activeLayer.sides) })} min={-100} max={100} step="any"
+                  fillFrom={0} minLabel="Out" maxLabel="In" display={String(Math.round(dialOfDepth(activeLayer.starDepth, activeLayer.sides)))} />
+              </Dim></Reveal>
+              <Reveal when={activeLayer.starDepth > 0}><Dim when={solidOn} why={SOLID_WHY}>
                 <ToggleRow label="Curved Edges" description="Rounds the star's points."
                   checked={activeLayer.starCurved} onChange={v => updateLayer({ starCurved: v })} />
-              </Reveal>
+              </Dim></Reveal>
             </Group>
 
             <Group title="Color" level={3}>
@@ -218,6 +246,7 @@ export const TankEditorUI: React.FC<Props> = ({ logic, onUpdate, className, show
                 <SliderRow label="Spin Speed" help="Body rotation speed when spin is enabled."
                   value={activeLayer.spinSpeed} onChange={v => updateLayer({ spinSpeed: v })} min={0} max={500} step={1} />
               </div></Reveal>
+              <PreviewSpinRow logic={logic} onUpdate={onUpdate} />
             </Group>
 
             <Group title="Display" level={3}>
@@ -239,15 +268,131 @@ export const TankEditorUI: React.FC<Props> = ({ logic, onUpdate, className, show
               </Reveal>
             </Group>
         </>);
-  const cardLive = Object.is(partStage.shown, s.activeBodyLayerId ?? null);
-  if (cardLive || !keptCard.current) {
-    keptCard.current = { title: activeLayer ? activeLayer.label : 'Main Body', icon: headerIcon(activeLayer ? HdProfile02 : HdGeometricShapes01), body: liveBody };
-  }
-  const card = keptCard.current;
+
+  return (
+    <Group title={activeLayer ? activeLayer.label : 'Main Body'} icon={headerIcon(activeLayer ? HdProfile02 : HdGeometricShapes01)} foldKey="Picked Part" flush>
+      <div className="k-card-body k-stack">
+      {liveBody}
+      </div>
+    </Group>
+  );
+};
+
+export const TankPartsTree: React.FC<{
+  logic: GameLogic | null; onUpdate: () => void;
+  turretsOf: (scope: string) => React.ReactNode;
+  placing: boolean;
+  onAddTurret: (part?: string | null) => void;
+  onDone: () => void;
+  headRight?: React.ReactNode;
+  below?: React.ReactNode;
+}> = ({ logic, onUpdate, turretsOf, placing, onAddTurret, onDone, headRight, below }) => {
+  const [renamingLayer, setRenamingLayer] = useState<string | null>(null);
+  if (!logic) return null;
+  const s = logic.state;
+  const isProjectile = s.canvasIsProjectile === true;
+  const layersFull = s.bodyLayers.length >= MAX_BODY_LAYERS;
+  const pickLayer = (id: string | null) => {
+    if (placing) logic.setActiveBodyLayer(id);
+    else logic.pickPart(id, true);
+    onUpdate();
+  };
+  const partOn = (id: string | null) => logic.partPicked && !s.selectedTurretId && s.activeBodyLayerId === id;
+  const addLayer = () => { logic.addBodyLayer(); onUpdate(); fireTip('bodyLayerAdded'); };
+  const layerMenu = (layer: BodyLayer): MenuEntry[] => [
+    { label: 'Edit', icon: SlidersHorizontal, disabled: partOn(layer.id), onSelect: () => pickLayer(layer.id) },
+    { label: 'Add Turret Here', icon: CanvasTool, onSelect: () => onAddTurret(layer.id) },
+    'sep',
+    { label: 'Rename', icon: Pencil, onSelect: () => setRenamingLayer(layer.id) },
+    layer.tag
+      ? { label: 'Edit Tag', icon: Tags, prompt: { title: 'Tag', placeholder: 'Up to 8 letters', initial: layer.tag, maxLength: TURRET_TAG_MAX, submit: 'Save', onSubmit: (v: string) => { logic.setBodyLayerTag(layer.id, v); onUpdate(); } } }
+      : { label: 'Add Tag', icon: Tags, prompt: { title: 'Add Tag', placeholder: 'Up to 8 letters', maxLength: TURRET_TAG_MAX, submit: 'Add', onSubmit: (v: string) => { logic.setBodyLayerTag(layer.id, v); onUpdate(); } } },
+    ...(layer.tag ? [{ label: 'Remove Tag', icon: Tags, onSelect: () => { logic.setBodyLayerTag(layer.id, ''); onUpdate(); } }] : []),
+    'sep',
+    { label: 'Duplicate Layer', icon: Copy, disabled: layersFull, onSelect: () => { logic.duplicateBodyLayer(layer.id); onUpdate(); } },
+    { label: 'Add Layer', icon: Plus, disabled: layersFull, onSelect: addLayer },
+    'sep',
+    { label: logic.partLocks.has(layer.id) ? 'Unlock on Canvas' : 'Lock on Canvas', icon: Lock, onSelect: () => logic.togglePartLock(layer.id) },
+    { label: logic.partHides.has(layer.id) ? 'Unhide on Canvas' : 'Hide on Canvas', icon: EyeOff, onSelect: () => logic.togglePartHide(layer.id) },
+    'sep',
+    { label: 'Delete Layer', icon: Trash2, onSelect: () => { logic.removeBodyLayer(layer.id); onUpdate(); } },
+  ];
+  const mainMenu: MenuEntry[] = [
+    { label: 'Edit', icon: SlidersHorizontal, disabled: partOn(null), onSelect: () => pickLayer(null) },
+    { label: 'Add Turret Here', icon: CanvasTool, onSelect: () => onAddTurret(null) },
+    'sep',
+    { label: 'Add Layer', icon: Plus, disabled: layersFull, onSelect: addLayer },
+    'sep',
+    { label: logic.partLocks.has('main') ? 'Unlock on Canvas' : 'Lock on Canvas', icon: Lock, onSelect: () => logic.togglePartLock('main') },
+    { label: logic.partHides.has('main') ? 'Unhide on Canvas' : 'Hide on Canvas', icon: EyeOff, onSelect: () => logic.togglePartHide('main') },
+  ];
+
+  return (
+      <Group title={isProjectile ? 'Projectile Parts' : 'Tank Parts'} icon={headerIcon(BodyLayersIcon)} count={`${s.bodyLayers.length} / ${MAX_BODY_LAYERS}`} right={headRight}>
+        <MotionList gap={8}>
+          <div key="main" className="k-pnode">
+            <PickRow title="Main Body" selected={partOn(null)}
+              facts={[{ key: 'sides', text: s.tankSides === 0 ? 'Circle' : `${s.tankSides} sides` }, { key: 'size', text: `Size ${Math.round(s.tankSize * 10) / 10}` }]}
+              onPick={() => pickLayer(null)} onContextMenu={(e) => openContextMenu(e, mainMenu)} />
+            <Collapse open={s.activeBodyLayerId === null} container className="k-parts-fold"><div className="k-parts-branch">{s.activeBodyLayerId === null ? turretsOf('main') : null}</div></Collapse>
+          </div>
+          {s.bodyLayers.map((layer: BodyLayer) => (
+            <div key={layer.id} className="k-pnode">
+              <PickRow title={layer.label} tags={layer.tag ? [{ key: 'own', text: layer.tag }] : []} selected={partOn(layer.id)}
+                onRename={() => setRenamingLayer(layer.id)}
+                renaming={renamingLayer === layer.id
+                  ? <InlineName value={layer.label} max={TURRET_NAME_MAX} onDone={v => { setRenamingLayer(null); if (v !== null) { logic.renameBodyLayer(layer.id, v); onUpdate(); } }} />
+                  : undefined}
+                facts={[
+                  { key: 'sides', text: layerSolidOf(layer) !== null ? solidNameOf(layer.solidId, s.solidLibrary) : layer.outline ? 'Custom Shape' : layer.sides === 0 ? 'Circle' : `${layer.sides} sides` },
+                  { key: 'size', text: `${layer.sizeRatio.toFixed(1)}x` },
+                  ...(layer.spinEnabled ? [{ key: 'spin', text: layer.spinDirection === -1 ? 'Spins CW' : 'Spins CCW' }] : []),
+                  { key: 'turrets', text: `${layer.turretIds.length} turret${layer.turretIds.length !== 1 ? 's' : ''}` },
+                ]}
+                onPick={() => pickLayer(layer.id)}
+                onContextMenu={(e) => openContextMenu(e, layerMenu(layer))}
+                actions={
+                  <IconButton label="Delete Layer" size="sm" onClick={(e) => { e.stopPropagation(); logic.removeBodyLayer(layer.id); onUpdate(); }}>
+                    <Trash2 size={14} />
+                  </IconButton>
+                } />
+              <Collapse open={s.activeBodyLayerId === layer.id} container className="k-parts-fold"><div className="k-parts-branch">{s.activeBodyLayerId === layer.id ? turretsOf(layer.id) : null}</div></Collapse>
+            </div>
+          ))}
+        </MotionList>
+        {below}
+        <div className="k-grid-2">
+          <Button block size="sm" icon={<Plus size={14} />} disabled={layersFull} onClick={addLayer}>
+            <SwapText>{layersFull ? 'Max Layers' : 'Add Layer'}</SwapText>
+          </Button>
+          <Button block size="sm" variant={placing ? 'primary' : 'secondary'} icon={placing ? undefined : <Plus size={14} />} onClick={() => (placing ? onDone() : onAddTurret())}
+            title={placing ? 'Stop placing turrets' : 'Shows the new turret\'s settings; then each click on the canvas places it on its part.'}>
+            <SwapText>{placing ? 'Done' : 'Add Turret'}</SwapText>
+          </Button>
+        </div>
+      </Group>
+  );
+};
+
+export const TankWideCards: React.FC<{ logic: GameLogic | null; onUpdate: () => void }> = ({ logic, onUpdate }) => {
+  const [showSkillCaps, setShowSkillCaps] = useState(false);
+  const [showPreDefined, setShowPreDefined] = useState(false);
+  if (!logic) return null;
+  const s = logic.state;
+  const isProjectile = s.canvasIsProjectile === true;
+  const handleChange = (key: keyof typeof s, val: any) => {
+    logic.updateState({ [key]: val });
+    onUpdate();
+  };
+  const growth = !!s.gameModeConfig.growth;
+  const botOn = (s.healerAI ? 1 : 0) + (s.chargeAI ? 1 : 0) + (s.arenaCloserAI ? 1 : 0);
+  const abilitiesOn = (s.invisibleEnabled ? 1 : 0) + (s.invisibleEnabled && s.invisibleAlways ? 1 : 0) + (s.ignoresWalls ? 1 : 0);
+  const physicsOn = (s.tankPushShare !== undefined ? 1 : 0) + ((s.tankResistBase ?? 1) !== 1 ? 1 : 0)
+    + ((s.tankPenetrationBase ?? ARRAS_TANK_BASE_PENETRATION) !== ARRAS_TANK_BASE_PENETRATION ? 1 : 0)
+    + ((s.tankPushability ?? 1) !== 1 ? 1 : 0) + ((s.tankTouchScale ?? 1) !== 1 ? 1 : 0);
 
   return (<>
-    <PageSwap>
-    <ScrollArea key={isProjectile ? 'projectile' : 'tank'} className={className} contentClassName="p-4 space-y-3 overflow-x-hidden">
+    <div className="space-y-3">
 
       <Group title="Base Stats" icon={headerIcon(HdPreferenceHorizontal)} hidden={isProjectile}>
         <div className="k-grid-2">
@@ -260,47 +405,6 @@ export const TankEditorUI: React.FC<Props> = ({ logic, onUpdate, className, show
           value={s.tankMovementSpeed} onChange={v => handleChange('tankMovementSpeed', v)} min={0} max={100} step="any" display={round1(s.tankMovementSpeed)} />
         <SliderRow label="FOV Multiplier" help="Camera zoom multiplier. Higher = see farther (sniper: 1.2, assassin: 1.35)."
           value={s.fovMultiplier} onChange={v => handleChange('fovMultiplier', v)} min={0.5} max={2.0} step="any" display={(s.fovMultiplier ?? 1).toFixed(2)} />
-      </Group>
-
-      <Group title={isProjectile ? 'Projectile Layers' : 'Tank Body Layers'} icon={headerIcon(BodyLayersIcon)} count={`${s.bodyLayers.length} / ${MAX_BODY_LAYERS}`}>
-        <div className="max-h-56 overflow-y-auto custom-scrollbar -mx-1 px-1">
-          <MotionList gap={8}>
-          <PickRow key="main" title="Main Body" selected={s.activeBodyLayerId === null}
-            facts={[{ key: 'sides', text: s.tankSides === 0 ? 'Circle' : `${s.tankSides} sides` }, { key: 'size', text: `Size ${Math.round(s.tankSize * 10) / 10}` }]}
-            onPick={() => pickLayer(null)} onContextMenu={(e) => openContextMenu(e, mainMenu)} />
-          {s.bodyLayers.map((layer: BodyLayer) => (
-            <PickRow key={layer.id} title={layer.label} tags={layer.tag ? [{ key: 'own', text: layer.tag }] : []} selected={s.activeBodyLayerId === layer.id}
-              onRename={() => setRenamingLayer(layer.id)}
-              renaming={renamingLayer === layer.id
-                ? <InlineName value={layer.label} max={TURRET_NAME_MAX} onDone={v => { setRenamingLayer(null); if (v !== null) { logic.renameBodyLayer(layer.id, v); onUpdate(); } }} />
-                : undefined}
-              facts={[
-                { key: 'sides', text: layer.outline ? 'Custom Shape' : layer.sides === 0 ? 'Circle' : `${layer.sides} sides` },
-                { key: 'size', text: `${layer.sizeRatio.toFixed(1)}x` },
-                ...(layer.spinEnabled ? [{ key: 'spin', text: layer.spinDirection === -1 ? 'Spins CW' : 'Spins CCW' }] : []),
-                { key: 'turrets', text: `${layer.turretIds.length} turret${layer.turretIds.length !== 1 ? 's' : ''}` },
-              ]}
-              onPick={() => pickLayer(layer.id)}
-              onContextMenu={(e) => openContextMenu(e, layerMenu(layer))}
-              actions={
-                <IconButton label="Delete Layer" size="sm" onClick={(e) => { e.stopPropagation(); logic.removeBodyLayer(layer.id); onUpdate(); }}>
-                  <Trash2 size={14} />
-                </IconButton>
-              } />
-          ))}
-          {s.bodyLayers.length === 0 && <div key="none"><EmptyState icon={emptyArt(BodyLayersIcon)} title="No extra layers" /></div>}
-          </MotionList>
-        </div>
-        <Button block size="sm" icon={<Plus size={14} />} disabled={layersFull} onClick={addLayer}>
-          <SwapText>{layersFull ? `Max Layers Reached (${MAX_BODY_LAYERS})` : 'Add Body Layer'}</SwapText>
-        </Button>
-      </Group>
-
-      <Group title={card.title} icon={card.icon} foldKey="Picked Part" flush
-        className={partStage.swapClass} boxRef={partCardRef} inert={partStage.inert}>
-        <div className="k-card-body k-stack">
-        {card.body}
-        </div>
       </Group>
 
       <Group title="Skills" icon={headerIcon(HdFingerprintPattern)} hidden={isProjectile}>
@@ -369,8 +473,7 @@ export const TankEditorUI: React.FC<Props> = ({ logic, onUpdate, className, show
           checked={s.ignoresWalls ?? false} onChange={v => handleChange('ignoresWalls', v)} />
       </Group>
 
-    </ScrollArea>
-    </PageSwap>
+    </div>
 
     {showSkillCaps && s.skillCaps && (
       <SkillCapsPopup

@@ -141,7 +141,7 @@ function sameList(a: string[], b: string[]): boolean {
 
 const FIELD_NAMES: Record<string, string> = {
   tankSides: 'Body Sides', tankShapeDepth: 'Shape Depth', tankShapeCurved: 'Curved Edges', tankSize: 'Body Size',
-  tankColor: 'Body Color', tankColorMap: 'Body Color', tankColorFree: 'Body Color', keepOwnColor: 'Keep Own Color',
+  tankColor: 'Body Color', tankColorMap: 'Body Color', tankColorFree: 'Body Color', keepOwnColor: 'Keep Own Color', tankOpacity: 'Opacity',
   tankHP: 'Health', tankBodyDamage: 'Body Damage', tankMovementSpeed: 'Movement Speed', tankShieldRegen: 'Shield Regen',
   tankShieldCapacity: 'Shield', fovMultiplier: 'Field of View', maxSkillPoints: 'Max Skill Points', maxPointsPerSkill: 'Points per Skill',
   bonusSkillPoints: 'Bonus Skill Points', skillCaps: 'Skill Caps', preDefinedSkills: 'Starting Skills', canEarnSkillPoints: 'Earns Skill Points',
@@ -167,10 +167,14 @@ const FIELD_NAMES: Record<string, string> = {
   copies: 'Copies', initialAngle: 'Angle', starDepth: 'Star Depth', starCurved: 'Curved Star', intangible: 'Intangible',
   stationary: 'Stationary', renderOrder: 'Draw Order', turretIds: 'Turrets', maxAliveEnabled: 'Projectile Cap', maxAlive: 'Projectile Cap',
   useInheritColor: 'Color', teamColour: 'Team Color', showHealerCross: 'Healer Cross',
+  x: 'Position X', y: 'Position Y',
+};
+const MORE_FIELD_NAMES: Record<string, string> = {
+  solidId: 'Solid',
 };
 
 function fieldName(k: string): string {
-  const n = FIELD_NAMES[k];
+  const n = FIELD_NAMES[k] ?? MORE_FIELD_NAMES[k];
   if (n !== undefined) return n;
   const words = k.replace(/^_+/, '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').split(' ');
   return words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');

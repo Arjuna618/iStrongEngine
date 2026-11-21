@@ -134,6 +134,23 @@ export const HUD_FONT_FAMILY = 'Ubuntu, Inter, sans-serif';
 export const HUD_STROKE_F = 0.25;
 export const HUD_STROKE_F_BIG = 0.2;
 
+const UBUNTU_BOLD_ADV = [240,286,465,699,568,918,705,247,356,356,502,568,246,340,246,437,568,568,568,568,568,568,568,568,568,568,246,246,
+  568,568,568,455,974,721,672,648,737,606,574,702,734,316,529,684,563,897,756,790,644,790,667,582,614,707,722,948,675,661,610,371,437,371,
+  568,500,286,553,604,500,604,584,422,594,589,289,289,579,316,862,589,607,604,604,422,485,444,589,550,784,554,547,500,371,322,371,568];
+export function hudTextEm(text: string): number {
+  let w = 0;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    w += c >= 32 && c <= 126 ? UBUNTU_BOLD_ADV[c - 32] : 600;
+  }
+  return w / 1000;
+}
+export function hudFitScale(text: string, g: HudBarGeom): number {
+  const w = hudTextEm(text) * g.font;
+  const room = (g.x1 - g.x0) - HUD_STROKE_F * g.font;
+  return w > room ? room / w : 1;
+}
+
 export function hudCommas(n: number): string {
   const v = Math.trunc(n);
   const neg = v < 0;

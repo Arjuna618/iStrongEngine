@@ -18,8 +18,9 @@ import { toast } from '../ui/Toast';
 import {
   FileNew, HdFileBox, Save, SaveAs, RotateCcw, Pencil, Download, BackupAll, FileImport, FileExport, Upload, FolderOpen, House,
   Undo2, Redo2, Trash2, Settings, ContentLibraryIcon, Sun, Moon, FullScreen, BookText, Keyboard, TestTube, Discord, BadgeInfo, LegalTerms, Map as MapIcon,
-  HdFileAttachment, FolderDown,
+  HdFileAttachment, FolderDown, Box,
 } from '../ui/icons';
+import { openSolidEditor } from '../solids/solidEditorBridge';
 
 const EXPORT_KINDS: { kind: ExportKind; label: string }[] = [
   { kind: 'tank', label: 'Tank' },
@@ -144,6 +145,7 @@ export const AppMenuBar: React.FC<AppMenuProps> = (props) => {
           ...ENGINE_TOOLS.map(t => ({ label: t.rail, icon: t.Icon, checked: now === t.id, onSelect: () => p.current.setTool(t.id) })),
           'sep',
           { label: 'Content Library', icon: ContentLibraryIcon, onSelect: () => { p.current.setTool('turret'); requestAnimationFrame(() => canvasLibraryDoor.open()); } },
+          { label: '3D Solid Editor', icon: Box, onSelect: () => openSolidEditor(null) },
           { label: 'Theme', icon: p.current.isDark ? Moon : Sun, items: [
             { label: 'Light', icon: Sun, checked: !p.current.isDark, onSelect: () => { if (p.current.isDark) p.current.toggleTheme(); } },
             { label: 'Dark', icon: Moon, checked: p.current.isDark, onSelect: () => { if (!p.current.isDark) p.current.toggleTheme(); } },

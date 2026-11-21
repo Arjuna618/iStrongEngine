@@ -1,8 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo, useSyncExternalStore } from 'react';
 import { uiThemeId, subscribeUiTheme } from './utils/uiTheme';
 import { GameCanvas } from './components/GameCanvas';
-import { TankEditorUI } from './components/TankEditorUI';
-import { FoodShapeEditorUI } from './components/FoodShapeEditorUI';
 import { TurretManagerUI } from './components/TurretManagerUI';
 import { SandboxSettingsUI } from './components/SandboxSettingsUI';
 import { ImportExportUI } from './components/ImportExportUI';
@@ -84,6 +82,7 @@ import { SnapshotSkeleton, useSkeletonCapture, captureSkeleton, snapshotOf } fro
 import { toolStore, useActiveTool, useIsActiveTool } from './components/shell/toolStore';
 import { prewarmCatalog } from './components/library/catalog';
 import { prewarmPreviewGL } from './components/shared/tankPreviewGL';
+import { prewarmMapPictures } from './components/maps/mapPictures';
 import { HdJoker, GpuWarning } from './components/ui/icons';
 import { Reveal, usePanelSwap } from './components/kit/Collapse';
 import { GameMenuCard, MenuCard, MenuDoor, MenuSwitch, KeyChip } from './components/shell/GameMenu';
@@ -106,6 +105,7 @@ import { KeyboardShortcutsPopup, AboutPopup } from './components/shell/HelpPopup
 import { LegalWindow, LEGAL_HASH, legalPageOfHash, type LegalPage } from './components/legal/LegalWindow';
 import { termsAgreed, agreeToTerms, useTermsAgreed } from './components/legal/termsConsent';
 import { ProjectHubSlot } from './components/project/ProjectHub';
+import { SolidEditorWindow } from './components/solids/SolidEditorWindow';
 import { dragWatch } from './components/kit/dragWatch';
 
 startTheme();
@@ -117,9 +117,7 @@ function toolSlot<P extends object>(Panel: React.ComponentType<P>, scope: string
     return <PanelScope.Provider value={scope}><Panel {...(rest as unknown as P)} /></PanelScope.Provider>;
   });
 }
-const TankEditorSlot = toolSlot(TankEditorUI, 'tool:tank');
-const FoodShapeEditorSlot = toolSlot(FoodShapeEditorUI, 'tool:shape');
-const TurretManagerSlot = toolSlot(TurretManagerUI, 'tool:turret');
+const CanvasToolSlot = toolSlot(TurretManagerUI, 'tool:turret');
 const SandboxSettingsSlot = toolSlot(SandboxSettingsUI, 'tool:settings');
 const ImportExportSlot = toolSlot(ImportExportUI, 'tool:import-export');
 const EnemyToolSlot = toolSlot(EnemyToolUI, 'tool:enemy');
@@ -190,7 +188,7 @@ const EngineToolPanels = React.memo(function EngineToolPanels({
   const turretRefresh = turretLive ? panelRefresh : (frozenKeys.current.turret ?? -1);
   const entityKind: 'tank' | 'shape' | 'other' = logic?.state.canvasEntityKind === 'shape' ? 'shape' : logic?.state.canvasEntityKind === 'other' ? 'other' : 'tank';
   const kindSwap = usePanelSwap(entityKind);
-  const skelId = (t: Tool) => 'tool:' + t + (t === 'tank' ? ':' + entityKind : '');
+  const skelId = (t: Tool) => 'tool:' + t + (t === 'tank' || t === 'turret' ? ':' + entityKind : '');
   const layerEls = useRef<Partial<Record<Tool, HTMLDivElement | null>>>({});
   useLayoutEffect(() => {
     if (switching || switchStart.current === 0 || performance.now() - switchStart.current <= 150) return;
@@ -219,7 +217,7 @@ const EngineToolPanels = React.memo(function EngineToolPanels({
     const ric: (cb: () => void) => number = typeof requestIdleCallback === 'function'
       ? (cb) => requestIdleCallback(cb, { timeout: 3000 }) : (cb) => window.setTimeout(cb, 200);
     const unric = (h: number) => { if (typeof cancelIdleCallback === 'function') cancelIdleCallback(h); else window.clearTimeout(h); };
-    const queue: Tool[] = ['turret', 'map-designer', 'game-mode', 'enemy', 'settings', 'import-export', 'tank'];
+    const queue: Tool[] = ['turret', 'map-designer', 'game-mode', 'enemy', 'settings', 'import-export'];
     let h = 0;
     const step = () => {
       h = 0;
@@ -255,27 +253,8 @@ const EngineToolPanels = React.memo(function EngineToolPanels({
 
             <div className="flex-1 relative overflow-hidden z-[2]">
               <PanelFold on>
-                <div ref={layerRefs['tank']} data-tool-layer="tank" className={`absolute inset-0 k-tool-layer ${layerOn('tank') ? 'k-tool-layer-on opacity-100 translate-y-0 z-10' : 'opacity-0 translate-y-2 z-0'}${shownTool === 'tank' ? '' : ' pointer-events-none'}`}>
-                     <div data-kind="tank" className={`absolute inset-0 ${kindSwap.classOf('tank')}`} hidden={kindSwap.hiddenOf('tank')}>
-                         <TankEditorSlot refresh={live('tank')} logic={logic} onUpdate={onUpdate} className="h-full" showTool={showTool} />
-                     </div>
-                     <div data-kind="other" className={`absolute inset-0 p-4 ${kindSwap.classOf('other')}`} hidden={kindSwap.hiddenOf('other')}>
-                         <Group title={logic?.state.viewingOther?.name ?? lastOtherName.current} icon={headerIcon(HdJoker)}>
-                             <p className="k-row-desc">
-                                 It has no settings yet. Your tank is kept exactly as it was.
-                             </p>
-                             <Button block size="sm" icon={<ArrowLeft size={14} />} onClick={() => { logic?.exitOtherViewing(); onUpdate(); }}>
-                                 Back to Tank
-                             </Button>
-                         </Group>
-                     </div>
-                     <div data-kind="shape" className={`absolute inset-0 ${kindSwap.classOf('shape')}`} hidden={kindSwap.hiddenOf('shape')}>
-                         <FoodShapeEditorSlot refresh={live('tank')} logic={logic} onUpdate={onUpdate} className="h-full" />
-                     </div>
-                </div>
-
                 <div ref={layerRefs['turret']} data-tool-layer="turret" className={`absolute inset-0 k-tool-layer ${layerOn('turret') ? 'k-tool-layer-on opacity-100 translate-y-0 z-10' : 'opacity-0 translate-y-2 z-0'}${shownTool === 'turret' ? '' : ' pointer-events-none'}`}>
-                     <TurretManagerSlot refresh={turretRefresh} logic={logic} onUpdate={onUpdate} className="h-full"
+                     <CanvasToolSlot refresh={turretRefresh} logic={logic} onUpdate={onUpdate} className="h-full"
                          panelVisible={engineScreen && shownTool === 'turret' && !isTestMode} showTool={showTool} />
                 </div>
 
@@ -501,8 +480,9 @@ export default function App() {
   const unmountLoadingScreen = useCallback(() => setLoadingMounted(false), []);
   useEffect(() => {
     if (!logic || showLoading) return;
-    prewarmCatalog(() => ({ tankLibrary: logic.state.tankLibrary, otherLibrary: logic.state.otherLibrary, projectileDesigns: logic.state.projectileDesigns, rev: logic.libraryRev }));
+    prewarmCatalog(() => ({ tankLibrary: logic.state.tankLibrary, otherLibrary: logic.state.otherLibrary, solidLibrary: logic.state.solidLibrary, projectileDesigns: logic.state.projectileDesigns, rev: logic.libraryRev }));
     prewarmPreviewGL();
+    prewarmMapPictures();
   }, [logic, showLoading]);
   const loadStartTimeRef = useRef(Date.now());
   const [dataRegistryOnce] = useState(() => new DataRegistry());
@@ -522,7 +502,8 @@ export default function App() {
 
     setLogic(gameLogic);
     gameLogic.isTurretPlacementEnabled = false;
-    gameLogic.isTankToolActive = toolStore.get() === 'tank';
+    gameLogic.isTankToolActive = false;
+    gameLogic.turretPlacing = false;
 
     gameLogic.onStateChange = () => {
        setTick(t => t + 1);
@@ -586,7 +567,8 @@ export default function App() {
   }, [logic]);
 
   useEffect(() => { setEngineTestDoor(handleTestTank); return () => setEngineTestDoor(null); }, [handleTestTank]);
-  const setTool = useCallback((tool: Tool) => {
+  const setTool = useCallback((toolAsked: Tool) => {
+    const tool: Tool = toolAsked === 'tank' ? 'turret' : toolAsked;
     const prevTool = toolStore.get();
     const wasMapDesigner = prevTool === 'map-designer';
     if (tool !== prevTool) {
@@ -597,7 +579,7 @@ export default function App() {
     toolStore.set(tool);
     if (logic) {
       logic.isTurretPlacementEnabled = (tool === 'turret');
-      logic.isTankToolActive = (tool === 'tank');
+      logic.isTankToolActive = false;
       logic.isMapDesignerActive = (tool === 'map-designer');
       if (tool !== 'map-designer') { logic.endMapEditStroke(); cancelMapEditInteraction(logic.mapEditor); }
       if (tool === 'map-designer' && !logic.state.isTestMode) {
@@ -630,6 +612,17 @@ export default function App() {
   const curtain = useScreenCurtain();
   const screenFit = useScreenFit(chromeScale);
   const sizeGate = screen === 'engine' && !isTestMode && screenFit.tooSmall;
+  const frameOff = isTestMode || sizeGate;
+  const [frameBack, setFrameBack] = useState(false);
+  const frameOffWas = useRef(frameOff);
+  useEffect(() => {
+    if (frameOffWas.current === frameOff) return;
+    frameOffWas.current = frameOff;
+    if (frameOff) { setFrameBack(false); return; }
+    setFrameBack(true);
+    const t = window.setTimeout(() => setFrameBack(false), 360);
+    return () => window.clearTimeout(t);
+  }, [frameOff]);
   const mapGlass = useFadePresence(!!logic?.isMapGenerating && screen === 'engine' && !isTestMode && !sizeGate, 700);
   const [sizeLocked, setSizeLocked] = useState(false);
   const engineHeadRef = useRef<HTMLElement>(null);
@@ -798,6 +791,8 @@ export default function App() {
       )}
 
       {screen === 'engine' && <MapEventsSlot logic={logic} />} { }
+
+      <SolidEditorWindow logic={logic} />
 
       <ProjectHubSlot logic={logic} setTool={setTool} />
       <ProjectDialogs />
@@ -1080,7 +1075,7 @@ export default function App() {
 
         </main>
 
-        <div aria-hidden className={`k-layer-frame${isTestMode || sizeGate ? ' k-layer-frame-off' : ''}`}
+        <div aria-hidden className={`k-layer-frame${frameOff ? ' k-layer-frame-off' : frameBack ? ' k-layer-frame-back' : ''}`}
             style={{ left: Math.floor(RAIL_W * chromeScale), ['--k-layer-gap' as string]: Math.round(LAYER_GAP * chromeScale) + 'px', ['--k-layer-foot' as string]: Math.round(LAYER_FOOT * chromeScale) + 'px', ['--k-layer-panel' as string]: Math.round((320 + LAYER_GAP) * chromeScale) + 'px', ['--k-layer-r' as string]: Math.round(10 * chromeScale) + 'px', ['--k-ui-zoom' as string]: chromeScale } as React.CSSProperties}>
           <div className="k-layer-frame-box" />
           <div className="k-layer-frame-edge" />

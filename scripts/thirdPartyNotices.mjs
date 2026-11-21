@@ -19,11 +19,18 @@ const WORKS = [
     file: 'legal/third-party/open-source-arras-2.0.10-rev3-LICENSE.txt',
   },
   {
-    title: 'Fonts: Inter, JetBrains Mono, Ubuntu (open font licenses)',
+    title: 'Fonts: Inter, JetBrains Mono (SIL Open Font License 1.1)',
     link: 'https://fonts.google.com',
-    note: 'The app shows its text in these fonts, which it loads from Google Fonts while it runs; no font file comes with\n'
-      + 'iStrongEngine. Inter and JetBrains Mono are under the SIL Open Font License 1.1, Ubuntu under the Ubuntu Font Licence 1.0.',
+    note: 'The app shows some of its text in these fonts, which it loads from Google Fonts while it runs; no file of them comes\n'
+      + 'with iStrongEngine.',
     text: '',
+  },
+  {
+    title: 'Font: Ubuntu Bold (Ubuntu Font Licence 1.0)',
+    link: 'https://design.ubuntu.com/font',
+    note: 'The Classic look shows its text in Ubuntu Bold, whose font files come with iStrongEngine unchanged (taken from the\n'
+      + '@fontsource/ubuntu package, version 5.3.0). Its licence follows.',
+    file: 'legal/third-party/ubuntu-font-licence-1.0.txt',
   },
 ];
 const SHIPPED = [

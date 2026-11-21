@@ -1,4 +1,8 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { shortcutKey } from '../../utils/shortcutKey';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useHtmlDark } from '../library/useHtmlDark';
+import { uiThemeId, subscribeUiTheme } from '../../utils/uiTheme';
+const classicNow = () => uiThemeId() === 'classic';
 import { lexCode, type Tokens } from './codeLexer';
 import { scrollGlide } from '../kit/presence';
 import { ArrowUp } from '../ui/icons';
@@ -240,6 +244,29 @@ export const CodeView: React.FC<CodeViewProps> = React.memo(({ text, lang, find,
     ro.observe(el);
     return () => { ro.disconnect(); if (raf.current) cancelAnimationFrame(raf.current); };
   }, []);
+  const dark = useHtmlDark();
+  const classic = useSyncExternalStore(subscribeUiTheme, classicNow, classicNow);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    let fill = '';
+    const alphaOf = (c: string): number => {
+      if (!c || c === 'transparent') return 0;
+      const slash = c.match(/\/\s*([\d.]+)(%?)\s*\)\s*$/);
+      if (slash) return parseFloat(slash[1]) / (slash[2] ? 100 : 1);
+      const m = c.match(/^rgba\(([^)]+)\)$/);
+      if (m) { const parts = m[1].split(','); return parts.length > 3 ? parseFloat(parts[3]) : 1; }
+      return 1;
+    };
+    for (let p: HTMLElement | null = el; p; p = p.parentElement) {
+      const c = getComputedStyle(p).backgroundColor;
+      const a = alphaOf(c);
+      if (a <= 0.001) continue;
+      if (a >= 0.99) fill = c;
+      break;
+    }
+    if (fill) el.style.setProperty('--k-sc-under', fill); else el.style.removeProperty('--k-sc-under');
+  }, [dark, classic]);
   const lastLeft = useRef(0);
   const [far, setFar] = useState(false);
   const onScroll = () => {
@@ -437,7 +464,7 @@ export const CodeView: React.FC<CodeViewProps> = React.memo(({ text, lang, find,
   };
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
-    const key = e.key.toLowerCase();
+    const key = shortcutKey(e).toLowerCase();
     if (key === 'a') { e.preventDefault(); sel.current = { a: 0, f: text.length }; paint(); }
     else if (key === 'c' || key === 'insert') { const t = picked(); if (t) { e.preventDefault(); copyText(t); } }
   };

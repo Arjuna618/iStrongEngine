@@ -9,7 +9,7 @@ import { treeTierOfUpgrade } from './evolutionTree';
 import { setTeamTwoGreen, modeWearsTeamTwoGreen } from '../types';
 import { MODE_WORLDS, isWorldId, worldIdOf, worldWritesMap, writeWorldMap, writeWorldBases, worldHasBosses, isPlaySandbox } from './modeWorlds';
 import { TURRET_NAME_MAX, TURRET_TAG_MAX } from '../types';
-import { GameState, Turret, Bullet, FloatingPolygon, INITIAL_GAME_STATE, aiCatNoBackBoost, aiCatNoGapDistance, MapSize, TankConfig, ExportFile, UpgradeStat, LibraryItem, EnemyConfig, EnemyTank, TeamId, AIState, FearState, RevivalEntry, AI_CONSTANTS, DamageContribution, XpTextAnimation, DEFAULT_TURRET_CONFIG, DEFAULT_PROJECTILE_TYPE, DEFAULT_BEHAVIOR_CONFIG, BehaviorConfig, BehaviorType, ControlIO, createDefaultControllerData, DroneTracker, PortalEntity, ProjectileVisual, SubTurretConfig, BulletSubTurret, CustomProjectileDesign, TurretPreset, ShapeType, SNAP_COUNTS, GameMessage, BodyLayer, BaseShapeConfig, ShapeSpawnConfig, ShapeSpawnCrowd, FacingType, MotionType, SpawnStats, createEmptySpawnStats, MapState, BaseZoneRect, TileType, GameModeConfig, GameModeType, AIBehavior, TEAM_COLORS, TEAM_NAMES, generateRandomSeed, AreaConfig, MultiAreaMapConfig, MapConfig, createDefaultMapConfig, DEFAULT_SHAPE_SPAWN_CONFIG, createDefaultAreaId, OD_AREA_NAMES, AIBehaviorCategory, TeamBotKey, TeamBotSettings, createDefaultTeamBotSettings, createDefaultTeamBotSettingsMap, DEFAULT_RESPAWN_RULES, RESPAWN_COOLDOWN_MS, AI_CATEGORY_SCHEMA_VERSION, createDefaultAIBehaviorCategories, modeMapDefaults, FoodShapeDesign, OtherDesign, ExplodeConfig, ExplodeRing } from "../types";
+import { type SnapTarget, GameState, Turret, Bullet, FloatingPolygon, INITIAL_GAME_STATE, aiCatNoBackBoost, aiCatNoGapDistance, MapSize, TankConfig, ExportFile, UpgradeStat, LibraryItem, EnemyConfig, EnemyTank, TeamId, AIState, FearState, RevivalEntry, AI_CONSTANTS, DamageContribution, XpTextAnimation, DEFAULT_TURRET_CONFIG, DEFAULT_PROJECTILE_TYPE, DEFAULT_BEHAVIOR_CONFIG, BehaviorConfig, BehaviorType, ControlIO, createDefaultControllerData, DroneTracker, PortalEntity, ProjectileVisual, SubTurretConfig, BulletSubTurret, CustomProjectileDesign, TurretPreset, ShapeType, SNAP_COUNTS, GameMessage, BodyLayer, BaseShapeConfig, ShapeSpawnConfig, ShapeSpawnCrowd, FacingType, MotionType, SpawnStats, createEmptySpawnStats, MapState, BaseZoneRect, TileType, GameModeConfig, GameModeType, AIBehavior, TEAM_COLORS, TEAM_NAMES, generateRandomSeed, AreaConfig, MultiAreaMapConfig, MapConfig, createDefaultMapConfig, DEFAULT_SHAPE_SPAWN_CONFIG, createDefaultAreaId, OD_AREA_NAMES, AIBehaviorCategory, TeamBotKey, TeamBotSettings, createDefaultTeamBotSettings, createDefaultTeamBotSettingsMap, DEFAULT_RESPAWN_RULES, RESPAWN_COOLDOWN_MS, AI_CATEGORY_SCHEMA_VERSION, createDefaultAIBehaviorCategories, modeMapDefaults, FoodShapeDesign, OtherDesign, ExplodeConfig, ExplodeRing } from "../types";
 import { EXPLODE_MAX_DEPTH, EXPLODE_MAX_RINGS, EXPLODE_MAX_PIECES_PER_SHOT, EXPLODE_DEFAULT_COUNT, explodeCount, explodeAngleDeg, explodeActive, roundNeverAges, cloneExplode } from './explode';
 
 function mapDistanceSlider(v: number): number {
@@ -66,9 +66,35 @@ import { isShapeThing, SHAPE_HEAD, OTHER_HEAD, PROJECTILE_HEAD, TURRET_HEAD, MAP
 import { TOUCH_KINDS, TOUCH_STRIDE, TW_WALLS, TW_ROCKS, TW_EDGE, TW_TANKS, TW_BOSSES, TW_SHAPES, TT_BOUNCE, TT_DIE, TT_DAMAGE, TT_HEAL, touchMask } from './mapEvents/thingBody';
 import type { ShapeBodySpec } from './mapEvents/thingBody';
 import { makeShapeLook } from '../utils/shapeLook';
-import { cleanLayerOutline } from '../utils/layerOutline';
+import { cleanLayerOutline, layerOutlineOf, layerSolidOf, cleanLayerSolid } from '../utils/layerOutline';
+import { partOpacityOf } from '../utils/partOpacity';
+import { collectPartHits, partHitsReach, partHitTouch, PART_HIT_STRIDE, PART_HITS_MAX } from '../utils/partHits';
+export const PART_HITS = { ON: 1 };
+const _phBufE = new Float64Array(PART_HIT_STRIDE * PART_HITS_MAX);
+const _phBufP = new Float64Array(PART_HIT_STRIDE * PART_HITS_MAX);
+const _phBufR = new Float64Array(PART_HIT_STRIDE * PART_HITS_MAX);
+const _phBufE2 = new Float64Array(PART_HIT_STRIDE * PART_HITS_MAX);
+let _ph5N = new Int32Array(64), _ph5R = new Float64Array(64);
+let _partWallPushX = 0, _partWallPushY = 0;
+import { type PathPoint, flattenLayerPath, pathFromOutline, pathOfLayerShape, splitPathSide, nearestOnSide, togglePathPoint, flipPath, stretchPath, copyPath, PATH_MAX_POINTS, cleanLayerPath } from '../utils/layerPath';
+import { outlineFansFromMiddle, cleanOutline } from '../utils/halloween';
+import { outlineFillTriangles } from '../utils/outlineFill';
+import { pathMatchesOutline as pathMatchesOutlineGL } from '../utils/layerPath';
+import { cleanLayerPlace, layerIsPlaced, layerPlaceInto, addLayerPlace, layerPlaceReach, layerHasPoint, LAYER_PLACE_MAX } from '../utils/canvasParts';
+const _lpPt = { x: 0, y: 0 };
+function _layerOfId(ls: readonly BodyLayer[] | null | undefined, id: string): BodyLayer | null {
+  if (!ls || id === '') return null;
+  for (let i = 0; i < ls.length; i++) if (ls[i].id === id) return ls[i];
+  return null;
+}
 import { type PresetXform, presetXformIsNone, presetXformClean, presetPiecesXformed, presetPieceMirrored } from '../utils/presetGroupXform';
 import { fogWallFace, type FogWalls } from '../utils/fogPuffs';
+import { registerSolid, unregisterSolid, solidStill, solidStillOutline } from '../utils/solidArras';
+import { sortInPlace } from '../utils/sortInPlace';
+const _pickTurretCmp = (a: Turret, b: Turret): number => (a.renderLayer ?? 0) - (b.renderLayer ?? 0);
+const _pickLayerCmp = (a: BodyLayer, b: BodyLayer): number => a.renderOrder - b.renderOrder;
+import { normalizeSolid } from '../utils/solidDesign';
+import type { SolidDesign } from '../types';
 import { GameMapEventsHost, MF_LEFT_ALONE, MF_STAGE, MF_STANDS, MF_GOD, MF_UNSEEN, MF_NO_XP, MF_PLACED, MF_EDITOR, MF_ORDER, MF_NO_CRASHERS, MF_NO_HEAL, MF_NO_MM, MF_GHOST, MF_SCENE_MOVES, MF_RISEN, MF_NO_FIRE, MF_NO_TURN, MF_HORDE, MF_NO_KILL, MF_IN_WALLS } from './mapEvents/gameHost';
 import type { MevEngine } from './mapEvents/gameHost';
 import type { MevBody, SpawnReq, SpawnLike } from './mapEvents/host';
@@ -81,6 +107,7 @@ import { DEFENSE_ARRAS, defenseOnBody, defenseShieldMult, defenseBrst, defenseAt
 import { TANK_KINDS, tankKindOf, debuffResist, debuffHealthK, clampTankDebuffs, setTankGroupRules, groupStopChance, groupPortals, kindFileResist, type TankDebuffs, type TankDebuff, type TankKindId, type TankGroupRule } from "./tankDebuffs";
 import { STAT_SHARES, statKOf, type StatK, type StatShares } from "./statShares";
 import { KILL_SHARE_FLOOR, ksNote, ksClear, ksDrop, ksEarns, ksFresh, KILL_ASSIST_SHARE } from './killShares';
+import { LEVEL_LIMIT, XP_LIMIT } from './levelLimit';
 import { isFixedMapThing } from "./fixedBodies";
 import { ACTIVE_GROWTH, growthFactor, growthSkillPointsAt, growthRespawnXp, clampGrowthRules, defaultGrowthRules, type GrowthRules, growthRulesOf, MF_WAVE, MF_NO_GROW } from "./growthRules";
 import { skipTargetXp, SKIP_MAX_MINUTES, SKIP_CLIMB_S, SKIP_CLIMB_MAX_MS } from './skipTime';
@@ -218,17 +245,17 @@ import {
   HUD_MSG_LIFE_MS, HUD_MSG_MAX,
   hudMsgKillLine, hudMsgShapeKillLine, hudMsgDeathLine, hudMsgProjectileWord, hudMsgBarrelHint, hudMsgAlwaysInvisibleRounds, HUD_MSG_ALWAYS_INVISIBLE,
 } from '../utils/hudArras';
-import { entityEase, ENTITY_EASE_SEC, barGlide } from '../utils/hudEase';
+import { entityEase, ENTITY_EASE_SEC, barGlide, hudLevelOfXp } from '../utils/hudEase';
 import { SEEN, seenBy, shownTo, tankOwnShowing, edgeDistance, nearness } from '../utils/seenRule';
 import { carryFloor, type CarryMarked } from '../utils/carryShow';
 import { auraHeals, auraRadius, auraOpacityOf, auraTickDamage, AURA_RANGE } from '../utils/aura';
 import { cutFromMiss, bellFromSeed } from '../utils/scatterLaw';
 import { handStep, quarterFollow, handReachMs, handSwingMs } from '../utils/botHand';
 import { FEEL_LIVE, FeelFrame, newHfState, hfReset, clampBotFeel, type BotFeelEntry, FEEL, hfKeyStep, HF_KEY_X, HF_KEY_Y, hfHash, hfNoise, hfHandT, hfShakeRad, hfReactMs, hfReactMs2, hfTankFacts, hfIdNum, HF_TR_SLOTS, HF_HOOK, feelRowOn, type HfAreaFacts } from './humanFeel';
-import { normalizeLook, lookUnit, lookReach } from '../utils/placedLook';
+import { normalizeLook, lookUnit, lookReach, LOOK_SIZE } from '../utils/placedLook';
 import { MAX_TURRETS_PER_LIST, MAX_TURRET_GROUPS } from './turretLimits';
 import { editorNotice } from '../utils/editorNotice';
-import { DesignHistory, type HistoryCapture, type HistoryHint } from './designHistory';
+import { DesignHistory, type HistoryCapture, type HistoryHint, turretShownName } from './designHistory';
 import type { EngineSnapshot, CanvasData, EnemyConfigData, ApplyReport } from './project/snapshot';
 import { canonicalStringify } from './project/canonical';
 import { LB_UPDATE_SEC } from '../utils/lbAnim';
@@ -292,6 +319,16 @@ export function snapAngleToFaceMidpoint(angle: number, sides: number, bodyAngle:
     const offset = bodyAngle + faceOffset;
     return Math.round((angle - offset) / step) * step + offset;
 }
+export function snapPointsOf(sides: number, target: SnapTarget | undefined): number {
+    return target === 'both' ? sides * 2 : sides;
+}
+export function snapAngleToSides(angle: number, sides: number, bodyAngle: number, firstFace: number | undefined, target: SnapTarget | undefined): number {
+    if (target !== 'corners' && target !== 'both') return snapAngleToFaceMidpoint(angle, sides, bodyAngle, firstFace);
+    const step = (Math.PI * 2) / sides;
+    const face = firstFace ?? ((sides >= 4 && sides % 2 === 0) ? 0 : step / 2);
+    return target === 'corners' ? snapAngleToFaceMidpoint(angle, sides, bodyAngle, face + step / 2)
+                                : snapAngleToFaceMidpoint(angle, sides * 2, bodyAngle, face);
+}
 const AUTO_RETURN_SMOOTH_RATE = 7.2;
 const AUTO_RETURN_EPSILON = 0.001;
 const AUTO_TURN_TAIL_SPEED = 4.5;
@@ -336,7 +373,10 @@ export function xpThresholdForLevel(level: number): number {
 export function levelForXp(xp: number): number {
   if (!(xp > 0)) return 0;
   let hi = XP_REQUIREMENTS.length;
-  if (xp >= XP_REQUIREMENTS[hi - 1]) { let L = hi; while (xp >= xpThresholdForLevel(L)) L++; return L; }
+  if (xp >= XP_REQUIREMENTS[hi - 1]) {
+    if (SMALL_FIX.R994 !== 0) return manhuntLevelFor(xp, hi, Infinity);
+    let L = hi; while (xp >= xpThresholdForLevel(L)) L++; return L;
+  }
   let lo = 0;
   while (lo < hi) { const m = (lo + hi) >> 1; if (XP_REQUIREMENTS[m] <= xp) lo = m + 1; else hi = m; }
   return lo;
@@ -346,10 +386,14 @@ export function levelHeldIn(gm: GameModeConfig): boolean {
   return SMALL_FIX.R857 !== 0 && !gm.growth && !isManhuntMode(gm.mode) && gm.mode !== 'sandbox';
 }
 
+export function hudLevelCapOf(gm: GameModeConfig): number {
+  if (SMALL_FIX.R994 !== 0) return LEVEL_LIMIT;
+  return isManhuntMode(gm.mode) ? Infinity : levelHeldIn(gm) && gm.vampirism !== true ? 0 : (gm.levelCap ?? 45);
+}
+
 export { _XP_OFFSET as XP_LEVEL_OFFSET, _XP_COEFF as XP_CURVE_COEFF, _XP_BASE as XP_SCORE_BASE };
 
-export const MANHUNT_LEVEL_CAP = 1_000_000;
-
+export const MANHUNT_LEVEL_CAP = SMALL_FIX.R994 !== 0 ? LEVEL_LIMIT : 1_000_000;
 export const DEBUG_SET_LEVEL_MAX = 1000;
 
 const SMART_FIT_RATIO = 0.8;
@@ -486,6 +530,7 @@ export interface EditStatsPreview {
   level: number;
   skillPoints: number;
   upgrades: Record<UpgradeStat, number>;
+  powerCap?: number;
   skillCaps: Record<UpgradeStat, number>;
   maxSkillPoints: number;
   bonusSkillPoints: number;
@@ -916,7 +961,7 @@ function _dropUnsetTurretColor(t: any, updates: Partial<Turret>): void {
 }
 
 export const HISTORY_TANK_KEYS: readonly string[] = [
-  'tankSides', 'tankShapeDepth', 'tankShapeCurved', 'tankSize', 'tankColor', 'tankColorMap', 'tankColorFree', 'keepOwnColor',
+  'tankSides', 'tankShapeDepth', 'tankShapeCurved', 'tankSize', 'tankColor', 'tankColorMap', 'tankColorFree', 'keepOwnColor', 'tankOpacity',
   'tankHP', 'tankBodyDamage', 'tankMovementSpeed', 'tankShieldRegen', 'tankShieldCapacity', 'fovMultiplier',
   'maxSkillPoints', 'maxPointsPerSkill', 'bonusSkillPoints', 'skillCaps', 'preDefinedSkills', 'canEarnSkillPoints',
   'baseSpinEnabled', 'baseSpinSpeed', 'baseSpinDirection', 'isHealer', 'healerAI', 'chargeAI', 'arenaCloserAI', 'ignoresWalls', 'showHealthBar',
@@ -937,6 +982,7 @@ export const HISTORY_PICK_KEYS: readonly string[] = [
   'savedAutoSubEditingBeforePick',
   'mirrorMode', 'autoPlacement', 'autoPlacementCount', 'snapPlacement', 'snapPlacementCount',
   'autoSubTurretMirrorMode', 'autoSubTurretSnapPlacement', 'autoSubTurretSnapPlacementCount', 'autoSubTurretAutoPlacement', 'autoSubTurretAutoPlacementCount',
+  'snapTarget', 'autoSubTurretSnapTarget',
 ];
 const HISTORY_RUNTIME = new Set<string>([
   'animProgress', 'nextShotTime', 'recoilPosition', 'recoilVelocity', 'physRecoilPos', 'physRecoilVel', 'physRecoilDirX',
@@ -4042,6 +4088,7 @@ function BotShell(this: EnemyTank, logic: GameLogic): void {
   this._hasHealGun = undefined;
   this.shapeDepth = undefined;
   this.shapeCurved = undefined;
+  this.bodyOpacity = undefined;
   this.pushShare = undefined;
   this._aimGunIdx = undefined;
   this.keepAttackingThroughCover = undefined;
@@ -4204,6 +4251,7 @@ function _gunSpendsShare(t: Turret): boolean {
   if (cpd) return Array.isArray(cpd.turrets) && cpd.turrets.length > 0;
   return !!pt.customProjectileDesignName;
 }
+const _CE_LAYER_HANDLES = new Int8Array([1, 1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1, 1, 0, 2, 0, 1, 3, -1, 0, 2, 0, -1, 3]);
 export class GameLogic {
   public state: GameState;
   
@@ -6451,18 +6499,29 @@ export class GameLogic {
     if (!t) return;
     let layerAngle = 0;
     let layerSizeRatio = 1;
+    let mountLayer: BodyLayer | null = null;
     const bl = enemy.bodyLayers;
     for (let li = 0; bl && li < bl.length; li++) {
       if (bl[li].turretIds.indexOf(t.id) !== -1) {
         if (layerStandsStill(bl[li])) return;
         layerAngle = bl[li]._currentAngle;
         layerSizeRatio = bl[li].sizeRatio;
+        mountLayer = bl[li];
         break;
       }
     }
     const effectiveSize = enemy.size * layerSizeRatio;
     const offX = t.xOffset * effectiveSize / 2;
     const offY = t.yOffset * effectiveSize / 2;
+    if (mountLayer !== null && layerIsPlaced(mountLayer)) {
+      const c = Math.cos(layerAngle), s = Math.sin(layerAngle), hr = enemy.size / 2;
+      const vx = (mountLayer.x || 0) * hr + offX * c - offY * s, vy = (mountLayer.y || 0) * hr + offX * s + offY * c;
+      const rv = Math.sqrt(vx * vx + vy * vy);
+      if (!(rv > 1e-6)) return;
+      this._aimMountR = rv;
+      this._aimMountBearing = Math.atan2(vy, vx);
+      return;
+    }
     const r = Math.sqrt(offX * offX + offY * offY);
     if (!(r > 1e-6)) return;
     this._aimMountR = r;
@@ -7272,10 +7331,11 @@ export class GameLogic {
       const maxLevel = isManhuntMode(this.state.gameModeConfig.mode)
         ? MANHUNT_LEVEL_CAP : this._capOnTank(this.state.currentTankFileName, this.state.gameModeConfig.levelCap ?? 45);
       const _mhCount = SMALL_FIX.GH317 !== 0 && maxLevel === MANHUNT_LEVEL_CAP;
-      const _count = _mhCount || levelHeldIn(this.state.gameModeConfig);
+      const _count = _mhCount || levelHeldIn(this.state.gameModeConfig) || SMALL_FIX.R994 !== 0;
       if (this.state.level >= maxLevel && !_count) return;
 
       this.state.currentXp += amount;
+      if (SMALL_FIX.R994 !== 0 && this.state.currentXp > XP_LIMIT) this.state.currentXp = XP_LIMIT;
       let nextLevelXp = xpThresholdForLevel(this.state.level);
       if (_mhCount && this.state.currentXp >= nextLevelXp && this.state.level < maxLevel) {
         const _to = manhuntLevelFor(this.state.currentXp, this.state.level, maxLevel) - 1;
@@ -9681,7 +9741,7 @@ export class GameLogic {
     if (!UC && !(this._hfFacesMe(e, t) || (e.lastTankDamageById === tid && now - e.lastTankDamageAt < 3000))) return;
     const cx0 = Math.floor((lx + mh) / cs), cy0 = Math.floor((ly + mhY) / cs);
     if (cx0 < 0 || cx0 >= gc || cy0 < 0 || cy0 >= gcY) return;
-    const dr = h.dRad > 0 ? h.dRad : 12, bodyR = this.getEffectiveEnemyRadius(e);
+    const dr = h.dRad > 0 ? h.dRad : 12, bodyR = this._routeR(e);
     ensureRegionFields(nav, ms, ox, oy);
     const dist = ensureAuxDistField(nav, ms, tid, tlx, tly, now, dr);
     if (dist === null) return;
@@ -9755,7 +9815,7 @@ export class GameLogic {
       const cx0 = Math.floor((lx + mh) / cs), cy0 = Math.floor((ly + mhY) / cs);
       if (cx0 < 0 || cx0 >= gc || cy0 < 0 || cy0 >= gcY) return false;
       const walled = ms.walls.length > 0, hidNow = walled && this._hfCellHid(ms, lx, ly, tlx, tly, ox, oy, cs);
-      const d0 = Math.sqrt((lx - tlx) * (lx - tlx) + (ly - tly) * (ly - tly)), bodyR = this.getEffectiveEnemyRadius(e);
+      const d0 = Math.sqrt((lx - tlx) * (lx - tlx) + (ly - tly) * (ly - tly)), bodyR = this._routeR(e);
       this._hfOthersNear(e, tp.x, tp.y);
       const fovK = e.fovRadius * 0.96, fyK = h.sightBox ? fovK * 0.5625 : fovK, near2 = 1.69 * cs * cs;
       const o0x = tlx - lx, o0y = tly - ly, offNow = NP && (h.sightBox ? ((o0x < 0 ? -o0x : o0x) > fovK || (o0y < 0 ? -o0y : o0y) > fyK) : d0 > fovK);
@@ -9809,7 +9869,7 @@ export class GameLogic {
       const cx0 = Math.floor((lx + mh) / cs), cy0 = Math.floor((ly + mhY) / cs);
       if (cx0 < 0 || cx0 >= gc || cy0 < 0 || cy0 >= gcY) return 0;
       const walled = ms.walls.length > 0, hidNow = walled && this._hfCellHid(ms, lx, ly, dlx, dly, ox, oy, cs);
-      const d0 = Math.sqrt((lx - dlx) * (lx - dlx) + (ly - dly) * (ly - dly)), bodyR = this.getEffectiveEnemyRadius(e);
+      const d0 = Math.sqrt((lx - dlx) * (lx - dlx) + (ly - dly) * (ly - dly)), bodyR = this._routeR(e);
       const total = gc * gcY, mask = nav.regionsBuilt && nav.navBlocked.length === total ? nav.navBlocked : null;
       let bs = -Infinity, bx = 0, by = 0, bk = -1;
       const gvl = Math.sqrt(e.velocity.x * e.velocity.x + e.velocity.y * e.velocity.y), gvx = gvl > 0.5 ? e.velocity.x / gvl : 0, gvy = gvl > 0.5 ? e.velocity.y / gvl : 0;
@@ -12568,23 +12628,40 @@ export class GameLogic {
   }
 
   public getDebugMaxSettableLevel(): number {
+      if (SMALL_FIX.R994 !== 0) return LEVEL_LIMIT;
+      return this._debugMaxBefore();
+  }
+  private _debugMaxBefore(): number {
       return Math.min(
         isManhuntMode(this.state.gameModeConfig.mode)
           ? MANHUNT_LEVEL_CAP : (this.state.gameModeConfig.levelCap ?? 45),
         DEBUG_SET_LEVEL_MAX);
   }
+  private _powerCapFor(tank: string | null | undefined): number {
+      return isManhuntMode(this.state.gameModeConfig.mode) ? MANHUNT_LEVEL_CAP : this._capOnTank(tank, this.state.gameModeConfig.levelCap ?? 45);
+  }
+  public shownLevelOf(t: EnemyTank | null): number {
+      return hudLevelOfXp(t === null ? this.state.currentXp : t.currentXp, _XP_BASE, _XP_COEFF, _XP_OFFSET);
+  }
+  private _editLevelOf(e: EnemyTank | null): number {
+      return SMALL_FIX.R994 !== 0 ? this.shownLevelOf(e) : (e === null ? this.state.level : e.level);
+  }
+  private _editPowerCap(tank: string | null | undefined): number {
+      return SMALL_FIX.R994 !== 0 ? this._powerCapFor(tank) : Infinity;
+  }
 
   public setLevel(targetLevel: number) {
       const maxLevel = this.getDebugMaxSettableLevel();
       const safeLevel = Math.max(0, Math.min(maxLevel, Math.floor(targetLevel)));
+      const powLevel = SMALL_FIX.R994 !== 0 ? Math.min(safeLevel, this._powerCapFor(this.state.currentTankFileName)) : safeLevel;
 
       let _spent = 0;
       for (let _ui = 0; _ui < _UPGRADE_KEYS.length; _ui++) _spent += this.state.upgrades[_UPGRADE_KEYS[_ui]];
-      const _spDelta = debugLevelSpDelta(this.state.level, safeLevel, this.state.gameModeConfig,
+      const _spDelta = debugLevelSpDelta(this.state.level, powLevel, this.state.gameModeConfig,
         this.state.maxSkillPoints, this.state.bonusSkillPoints, _spent + this.state.skillPoints, this.state.canEarnSkillPoints);
 
       const prevLevel = this.state.level;
-      this.state.level = safeLevel;
+      this.state.level = powLevel;
 
       if (safeLevel === 0) {
           this.state.currentXp = 0;
@@ -12808,6 +12885,13 @@ export class GameLogic {
           starDepth: l.starDepth,
           starCurved: l.starCurved,
           ...(l.outline ? { outline: l.outline.map(p => [p[0], p[1]] as [number, number]) } : null),
+          ...(l.outline && l.outlinePath ? { outlinePath: l.outlinePath.map(q => [q[0], q[1], q[2], q[3], q[4], q[5]] as [number, number, number, number, number, number]) } : null),
+          ...(l.solidId ? { solidId: l.solidId } : null),
+          ...(l.x ? { x: l.x } : null),
+          ...(partOpacityOf(l.opacity) < 1 ? { opacity: partOpacityOf(l.opacity) } : null),
+          ...(l.hits !== undefined ? { hits: l.hits } : null),
+          ...(l.hitSize !== undefined ? { hitSize: l.hitSize } : null),
+          ...(l.y ? { y: l.y } : null),
           intangible: l.intangible,
           showHealerCross: l.showHealerCross,
           stationary: l.stationary,
@@ -12825,6 +12909,7 @@ export class GameLogic {
       tankSides: this.state.tankSides,
       tankShapeDepth: this.state.tankShapeDepth,
       tankShapeCurved: this.state.tankShapeCurved,
+      ...(partOpacityOf(this.state.tankOpacity) < 1 ? { tankOpacity: partOpacityOf(this.state.tankOpacity) } : null),
       tankSize: this.state.tankSize,
       tankColor: this.state.tankColor,
       ...(this.state.tankColorMap !== undefined ? { tankColorMap: this.state.tankColorMap } : null),
@@ -12889,6 +12974,7 @@ export class GameLogic {
       tankSides: config.tankSides ?? defaults.tankSides,
       tankShapeDepth: config.tankShapeDepth ?? defaults.tankShapeDepth,
       tankShapeCurved: config.tankShapeCurved ?? defaults.tankShapeCurved,
+      tankOpacity: partOpacityOf(config.tankOpacity) < 1 ? partOpacityOf(config.tankOpacity) : undefined,
       tankSize: config.tankSize ?? defaults.tankSize,
       tankColor: cmDesignHex(config.tankColor ?? defaults.tankColor, cmMapOf(config.tankColorMap), CM_USE.TANK),
       tankColorMap: cmMapOf(config.tankColorMap),
@@ -12967,6 +13053,13 @@ export class GameLogic {
         starDepth: l.starDepth ?? 0,
         starCurved: l.starCurved ?? false,
         outline: cleanLayerOutline(l.outline),
+        solidId: cleanLayerSolid(l.solidId),
+        outlinePath: ((): any => { const o = cleanLayerOutline(l.outline), p = o ? cleanLayerPath(l.outlinePath) : undefined; return p && pathMatchesOutlineGL(p, o) ? p : undefined; })(),
+        x: cleanLayerPlace(l.x),
+        opacity: partOpacityOf(l.opacity) < 1 ? partOpacityOf(l.opacity) : undefined,
+        hits: l.hits === 'none' || l.hits === 'circle' || l.hits === 'exact' ? l.hits : undefined,
+        hitSize: typeof l.hitSize === 'number' && Number.isFinite(l.hitSize) ? Math.max(1, Math.min(400, l.hitSize)) : undefined,
+        y: cleanLayerPlace(l.y),
         intangible: l.intangible ?? false,
         showHealerCross: l.showHealerCross ?? false,
         stationary: l.stationary ?? false,
@@ -13191,13 +13284,20 @@ export class GameLogic {
 
   public libraryRev = 0;
 
-  public addToLibrary(item: LibraryItem) {
+  public addToLibrary(item: LibraryItem): boolean {
     this.libraryRev++;
+    if (item.fileData.type === 'Solid') {
+      const id = this._putSolidRow(item);
+      if (id === null) return false;
+      this._shapesOfSolids([id]);
+      if (this.onStateChange) this.onStateChange(this.state);
+      return true;
+    }
     if (item.fileData.type === 'Other') {
       const at = this.state.otherLibrary.findIndex(l => l.id === item.id);
       if (at >= 0) this.state.otherLibrary[at] = item; else this.state.otherLibrary.push(item);
       if (this.onStateChange) this.onStateChange(this.state);
-      return;
+      return true;
     }
     const existingIndex = this.state.tankLibrary.findIndex(l => l.id === item.id);
     if (existingIndex >= 0) {
@@ -13208,10 +13308,44 @@ export class GameLogic {
     if (item.fileData.type === 'FoodShape') this.registerUserShapeDesign(item.fileData.data as FoodShapeDesign);
     this._tankCPDCache.clear();
     if (this.onStateChange) this.onStateChange(this.state);
+    return true;
+  }
+
+  private _putSolidRow(item: LibraryItem, at?: number): string | null {
+    const d = normalizeSolid(item.fileData.data);
+    if (!d || !registerSolid(d)) return null;
+    const row: LibraryItem = { ...item, fileData: { ...item.fileData, data: d } };
+    const list = this.state.solidLibrary;
+    const was = list.findIndex(l => l.id === row.id);
+    if (was >= 0) {
+      const oldId = (list[was].fileData.data as SolidDesign).solidId;
+      list[was] = row;
+      if (oldId !== d.solidId && !list.some(l => (l.fileData.data as SolidDesign).solidId === oldId)) { unregisterSolid(oldId); this._shapesOfSolids([oldId]); }
+    } else if (at !== undefined) list.splice(Math.min(Math.max(0, at), list.length), 0, row);
+    else list.push(row);
+    return d.solidId;
+  }
+
+  private _shapesOfSolids(ids: readonly string[]): void {
+    if (ids.length === 0) return;
+    for (const l of this.state.tankLibrary) {
+      if (l.fileData.type !== 'FoodShape') continue;
+      const d = l.fileData.data as FoodShapeDesign;
+      if (typeof d.polyhedronType === 'string' && ids.includes(d.polyhedronType)) this.registerUserShapeDesign(d);
+    }
   }
 
   public removeFromLibrary(id: string) {
     this.libraryRev++;
+    const sIndex = this.state.solidLibrary.findIndex(l => l.id === id);
+    if (sIndex >= 0) {
+      const gone = this.state.solidLibrary[sIndex];
+      this.state.solidLibrary.splice(sIndex, 1);
+      const sid = (gone.fileData.data as SolidDesign).solidId;
+      if (!this.state.solidLibrary.some(l => (l.fileData.data as SolidDesign).solidId === sid)) { unregisterSolid(sid); this._shapesOfSolids([sid]); }
+      if (this.onStateChange) this.onStateChange(this.state);
+      return;
+    }
     const oIndex = this.state.otherLibrary.findIndex(l => l.id === id);
     if (oIndex >= 0) {
       const gone = this.state.otherLibrary[oIndex];
@@ -13231,6 +13365,14 @@ export class GameLogic {
   }
 
   public restoreToLibrary(item: LibraryItem, index: number): void {
+    if (item.fileData.type === 'Solid') {
+      if (this.state.solidLibrary.some(l => l.id === item.id)) return;
+      this.libraryRev++;
+      const id = this._putSolidRow(item, index);
+      if (id !== null) this._shapesOfSolids([id]);
+      if (this.onStateChange) this.onStateChange(this.state);
+      return;
+    }
     const list = this.state.tankLibrary;
     if (list.some(l => l.id === item.id)) return;
     this.libraryRev++;
@@ -13264,8 +13406,14 @@ export class GameLogic {
 
   public addToLibraryBatch(items: LibraryItem[]) {
     this.libraryRev++;
+    let solids: string[] | null = null;
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
+      if (item.fileData.type === 'Solid') {
+        const sid = this._putSolidRow(item);
+        if (sid !== null) (solids ??= []).push(sid);
+        continue;
+      }
       if (item.fileData.type === 'Other') {
         const at = this.state.otherLibrary.findIndex(l => l.id === item.id);
         if (at >= 0) this.state.otherLibrary[at] = item; else this.state.otherLibrary.push(item);
@@ -13279,6 +13427,7 @@ export class GameLogic {
       }
       if (item.fileData.type === 'FoodShape') this.registerUserShapeDesign(item.fileData.data as FoodShapeDesign);
     }
+    if (solids !== null) this._shapesOfSolids(solids);
     this._tankCPDCache.clear();
   }
 
@@ -13350,6 +13499,8 @@ export class GameLogic {
   }
 
   public startPresetPreview(preset: TurretPreset): void {
+    if (this.state.presetPreviewTurrets.length === 0) this._placingBeforePreview = this.turretPlacing;
+    this.turretPlacing = true;
     if (this.state.presetPreviewTurrets.length === 0) this.state.presetPreviewXform = { x: 0, y: 0, turn: 0, size: 1 };
     if (!this._presetSavedEditingTurret) {
       this._presetSavedEditingTurret = { ...this.state.editingTurret };
@@ -13438,7 +13589,7 @@ export class GameLogic {
                         && this.state.activeBodyLayerId !== _w18Layer1.id
                         && activeSides >= 3
                         && this.state.snapPlacement
-                        && _w18Layer1.sides >= 3
+                        && this._shapeSides(_w18Layer1) >= 3
                         && previewTurrets.length > 0);
     let _w15XShift: number;
     if (_w18UseW18) {
@@ -13580,13 +13731,16 @@ export class GameLogic {
   public get presetPreviewName(): string | null { return this._presetPreviewName; }
 
   public cancelPresetPreview(): void {
+    const _had = this.state.presetPreviewTurrets.length > 0;
     if (this._presetSavedEditingTurret) {
       this.state.editingTurret = { ...this._presetSavedEditingTurret };
       this._presetSavedEditingTurret = null;
     }
     this.state.presetPreviewTurrets = [];
+    if (_had) this.turretPlacing = this._placingBeforePreview;
     if (this.onStateChange) this.onStateChange(this.state);
   }
+  private _placingBeforePreview = false;
 
   public exportTurretPreset(name: string): TurretPreset {
     const primaryIdx = this.state.primaryTurretId
@@ -13631,6 +13785,8 @@ export class GameLogic {
   }
 
   public loadProjectileAsTank(design: CustomProjectileDesign): void {
+    this.partPicked = false;
+    this.partHides.clear();
     this.loadTankConfig(this._projectileTankConfig(design), true, true);
     const _pdn = typeof design.name === 'string' ? design.name.trim() : '';
     this.state.editorTankLabel = _pdn !== '' ? _pdn : null;
@@ -13804,8 +13960,8 @@ export class GameLogic {
     this.state = { ...this.state, ...partialState };
     const s = this.state;
     const _activeSides = this.getActiveLayerSides();
-    if (s.autoPlacement && s.snapPlacement && _activeSides >= 3 && s.autoPlacementCount > _activeSides) {
-      s.autoPlacementCount = _activeSides;
+    if (s.autoPlacement && s.snapPlacement && _activeSides >= 3 && s.autoPlacementCount > snapPointsOf(_activeSides, s.snapTarget)) {
+      s.autoPlacementCount = snapPointsOf(_activeSides, s.snapTarget);
     }
     if (!this.state.isTestMode && (this.state.tankSize !== prevTankSize || this.state.fovMultiplier !== prevFovMult)) {
       this.updateEditorFov();
@@ -13834,7 +13990,7 @@ export class GameLogic {
     }
   }
 
-  public updateEditingTurret(updates: Partial<Turret>) {
+  public updateEditingTurret(updates: Partial<Turret>, quiet = false) {
     const _editActiveSides = this.getActiveLayerSides();
     if (updates.turretType === 'auto' && this.state.autoPlacement && this.state.snapPlacement && _editActiveSides >= 3) {
       updates.aboveTankBody = false;
@@ -13858,7 +14014,7 @@ export class GameLogic {
       }
       this._presetPiecesSrc = null;
     }
-    if (this.onStateChange) this.onStateChange(this.state);
+    if (!quiet && this.onStateChange) this.onStateChange(this.state);
   }
 
   public undoLastTurret() {
@@ -14314,9 +14470,27 @@ export class GameLogic {
     if (this.onStateChange) this.onStateChange(this.state);
   }
 
+  public activeBodyLayer(): BodyLayer | null {
+    const id = this.state.activeBodyLayerId;
+    if (id === null || id === undefined) return null;
+    const ls = this.state.bodyLayers;
+    for (let i = 0; i < ls.length; i++) if (ls[i].id === id) return ls[i];
+    return null;
+  }
+  public readonly edLayerPlace: number[] = [0, 0];
+  public editorLayerPlace(layer: BodyLayer | null | undefined): boolean {
+    if (!layer || !layerIsPlaced(layer)) { this.edLayerPlace[0] = 0; this.edLayerPlace[1] = 0; return false; }
+    layerPlaceInto(this.edLayerPlace, layer, tankSizeFromSlider(this.state.tankSize) / 2, Math.cos(this.tankAngle), Math.sin(this.tankAngle));
+    return true;
+  }
+
   public bodyPartAtMouse(): string | null | undefined {
     const mx = (this.mouseX - this.width / 2) / this.zoom + (this.cameraX - this.tankPos.x);
     const my = (this.mouseY - this.height / 2) / this.zoom + (this.cameraY - this.tankPos.y);
+    if (SMALL_FIX.R282P !== 0) {
+      if (!this.partAtPoint(mx, my, 0, true, 4 / (this.zoom || 1))) return undefined;
+      return this.partHit.kind === 'body' ? null : this.partHit.id;
+    }
     const d = Math.sqrt(mx * mx + my * my);
     const baseR = tankSizeFromSlider(this.state.tankSize) / 2;
     const reach = (sides: number, r: number): number => {
@@ -14330,8 +14504,9 @@ export class GameLogic {
     if (d <= mainR) { best = null; bestR = mainR; }
     for (let i = 0; i < this.state.bodyLayers.length; i++) {
       const l = this.state.bodyLayers[i];
-      const r = reach(l.sides, baseR * l.sizeRatio);
-      if (d <= r && r < bestR) { best = l.id; bestR = r; }
+      const r = reach(this._shapeSides(l), baseR * l.sizeRatio);
+      const dl = this.editorLayerPlace(l) ? Math.sqrt((mx - this.edLayerPlace[0]) * (mx - this.edLayerPlace[0]) + (my - this.edLayerPlace[1]) * (my - this.edLayerPlace[1])) : d;
+      if (dl <= r && r < bestR) { best = l.id; bestR = r; }
     }
     return best;
   }
@@ -14384,7 +14559,7 @@ export class GameLogic {
     if (idx === -1) return;
     const layer = this.state.bodyLayers[idx];
     const wasActive = this.state.activeBodyLayerId === layerId;
-
+    if (wasActive) this.partPicked = false;
     for (let i = layer.turretIds.length - 1; i >= 0; i--) {
       const tid = layer.turretIds[i];
       const tIdx = this.state.turrets.findIndex(t => t.id === tid);
@@ -14509,7 +14684,11 @@ export class GameLogic {
     if (!layer) return;
     if (updates.label !== undefined) layer.label = updates.label;
     if (updates.sides !== undefined) layer.sides = updates.sides;
-    if ((updates.sides !== undefined || updates.starDepth !== undefined) && layer.outline !== undefined) layer.outline = undefined;
+    if ((updates.sides !== undefined || updates.starDepth !== undefined) && layer.outline !== undefined) { layer.outline = undefined; layer.outlinePath = undefined; }
+    if ((updates.sides !== undefined || updates.starDepth !== undefined) && layer.solidId !== undefined && !('solidId' in updates)) layer.solidId = undefined;
+    if ('outline' in updates) layer.outline = updates.outline;
+    if ('outlinePath' in updates) layer.outlinePath = updates.outlinePath;
+    if ('solidId' in updates) layer.solidId = cleanLayerSolid(updates.solidId);
     if (updates.sizeRatio !== undefined) layer.sizeRatio = updates.sizeRatio;
     if (updates.color !== undefined) layer.color = updates.color;
     if (updates.colorMap !== undefined) layer.colorMap = cmMapOf(updates.colorMap);
@@ -14527,6 +14706,11 @@ export class GameLogic {
     if (updates.showHealerCross !== undefined) layer.showHealerCross = updates.showHealerCross;
     if (updates.stationary !== undefined) layer.stationary = updates.stationary;
     if (updates.renderOrder !== undefined) layer.renderOrder = updates.renderOrder;
+    if ('x' in updates) layer.x = cleanLayerPlace(updates.x);
+    if ('opacity' in updates) layer.opacity = partOpacityOf(updates.opacity) < 1 ? partOpacityOf(updates.opacity) : undefined;
+    if ('hits' in updates) layer.hits = updates.hits === 'none' || updates.hits === 'circle' || updates.hits === 'exact' ? updates.hits : undefined;
+    if ('hitSize' in updates) layer.hitSize = typeof updates.hitSize === 'number' && Number.isFinite(updates.hitSize) ? Math.max(1, Math.min(400, updates.hitSize)) : undefined;
+    if ('y' in updates) layer.y = cleanLayerPlace(updates.y);
     if (updates.maxAliveEnabled !== undefined) layer.maxAliveEnabled = updates.maxAliveEnabled;
     if (updates.maxAlive !== undefined) layer.maxAlive = updates.maxAlive;
     if (this.onStateChange) this.onStateChange(this.state);
@@ -14773,9 +14957,13 @@ export class GameLogic {
   public getActiveLayerSides(): number {
     if (this.state.activeBodyLayerId) {
       const layer = this.state.bodyLayers.find(l => l.id === this.state.activeBodyLayerId);
-      if (layer) return layer.sides;
+      if (layer) { const p = layerOutlineOf(layer) !== null ? this.layerPathOf(layer) : null; return p !== null ? p.length : this._shapeSides(layer); }
     }
     return this.state.tankSides;
+  }
+
+  private _shapeSides(L: BodyLayer): number {
+    return L.solidId !== undefined && layerSolidOf(L) !== null ? 0 : L.sides;
   }
 
   public getActiveLayerSizeRatio(): number {
@@ -14802,6 +14990,7 @@ export class GameLogic {
     let maxR = baseR;
     for (let i = 0; i < this.state.bodyLayers.length; i++) {
       if (this.state.bodyLayers[i].intangible) continue;
+      if (layerIsPlaced(this.state.bodyLayers[i])) continue;
       const lr = baseR * this.state.bodyLayers[i].sizeRatio;
       if (lr > maxR) maxR = lr;
     }
@@ -14815,10 +15004,21 @@ export class GameLogic {
     if (!_bl) return maxR * _tk;
     for (let i = 0; i < _bl.length; i++) {
       if (enemy.bodyLayers[i].intangible) continue;
+      if (layerIsPlaced(enemy.bodyLayers[i])) continue;
       const lr = (enemy.size / 2) * enemy.bodyLayers[i].sizeRatio;
       if (lr > maxR) maxR = lr;
     }
     return maxR * _tk;
+  }
+
+  private _partReachOf(e: EnemyTank): number {
+    if (PART_HITS.ON === 0) return 0;
+    const n = collectPartHits(e.bodyLayers, e.size, e.angle, _phBufR);
+    return n > 0 ? partHitsReach(_phBufR, n) : 0;
+  }
+  private _routeR(e: EnemyTank): number {
+    const r = this.getEffectiveEnemyRadius(e), q = this._partReachOf(e);
+    return q > r ? q : r;
   }
 
   public getLayerForTurret(turretId: string): BodyLayer | null {
@@ -14888,7 +15088,7 @@ export class GameLogic {
 
   public shouldShowSelectButton(): boolean {
     return !this.state.isTestMode && this.state.canvasEntityKind === 'tank' && (
-      this.isTurretPlacementEnabled ||
+      (this.isTurretPlacementEnabled && this.turretPlacing) ||
       this.state.autoSubTurretEditMode
     );
   }
@@ -14925,7 +15125,9 @@ export class GameLogic {
   }
 
   private _getAutoSubParent(): Turret | undefined {
-    return this.state.turrets.find(t => t.id === this.state.autoSubTurretParentId);
+    const ts = this.state.turrets, id = this.state.autoSubTurretParentId;
+    for (let i = 0; i < ts.length; i++) if (ts[i].id === id) return ts[i];
+    return undefined;
   }
 
   public makeAutoSubTurretPrimary() {
@@ -15122,6 +15324,7 @@ export class GameLogic {
   public enterAutoSubTurretMode(parentTurretId: string) {
     const parent = this.state.turrets.find(t => t.id === parentTurretId);
     if (!parent || parent.turretType !== 'auto') return;
+    this.partHides.delete(parentTurretId);
     if (this.state.presetPreviewTurrets.length > 0 && this._presetSavedEditingTurret) {
       this.state.editingTurret = { ...this._presetSavedEditingTurret };
       this._presetSavedEditingTurret = null;
@@ -15177,7 +15380,7 @@ export class GameLogic {
     if (this.onStateChange) this.onStateChange(this.state);
   }
 
-  public updateAutoSubTurretEditing(updates: Partial<Turret>) {
+  public updateAutoSubTurretEditing(updates: Partial<Turret>, quiet = false) {
     this.state.autoSubTurretEditing = { ...this.state.autoSubTurretEditing, ...updates };
     _dropUnsetTurretColor(this.state.autoSubTurretEditing, updates);
     if (this.state.autoSubTurretSelectMode && this.state.autoSubTurretSelectedId && this.state.autoSubTurretParentId) {
@@ -15190,7 +15393,7 @@ export class GameLogic {
         }
       }
     }
-    if (this.onStateChange) this.onStateChange(this.state);
+    if (!quiet && this.onStateChange) this.onStateChange(this.state);
   }
 
   public removeAutoSubTurret(subId: string) {
@@ -16560,7 +16763,7 @@ export class GameLogic {
     const lx = e.position.x - ox, ly = e.position.y - oy, gx = e._carryHx, gy = e._carryHy;
     const dx = gx - lx, dy = gy - ly, d = Math.sqrt(dx * dx + dy * dy);
     if (d < 1) return false;
-    const bodyR = this.getEffectiveEnemyRadius(e);
+    const bodyR = this._routeR(e);
     if (ms.navigation && ms.walls.length > 0 && !isPathClear(ms, lx, ly, gx, gy, ox, oy, bodyR)) {
       ensureRegionFields(ms.navigation, ms, ox, oy);
       const dist = ensureAuxDistField(ms.navigation, ms, this._ftHomeKey(ms, gx, gy), gx, gy, now, bodyR);
@@ -17974,7 +18177,7 @@ export class GameLogic {
     if (k === undefined) {
       const d = this._bossDesignOf(this.state.tankLibrary, req.tank) as TankConfig | null;
       k = 1;
-      if (d && Array.isArray(d.bodyLayers)) for (const l of d.bodyLayers) if (!l.intangible && (l.sizeRatio ?? 0) > k) k = l.sizeRatio as number;
+      if (d && Array.isArray(d.bodyLayers)) for (const l of d.bodyLayers) if (!l.intangible && !layerIsPlaced(l) && (l.sizeRatio ?? 0) > k) k = l.sizeRatio as number;
       if (SIZE_ARRAS.TOUCH !== 0) k *= bodyTouchOf(d?.tankTouchScale);
       this._mevRadiusCache.set(req.tank, k);
       if (SMALL_FIX.GH420) this._mevRadiusPx.set(req.tank, tankSizeFromSlider(d?.tankSize ?? 24));
@@ -19109,7 +19312,7 @@ export class GameLogic {
     const half = tankSizeFromSlider(tc.tankSize) / 2;
     let r = half;
     const bl = tc.bodyLayers;
-    if (bl) for (let i = 0; i < bl.length; i++) { if (bl[i].intangible) continue; const lr = half * bl[i].sizeRatio; if (lr > r) r = lr; }
+    if (bl) for (let i = 0; i < bl.length; i++) { if (bl[i].intangible || layerIsPlaced(bl[i])) continue; const lr = half * bl[i].sizeRatio; if (lr > r) r = lr; }
     if (SIZE_ARRAS.TOUCH !== 0) r *= bodyTouchOf(tc.tankTouchScale);
     return Math.max(SPAWN_HAZARD_PAD, r + GRID_SPACING);
   }
@@ -21113,7 +21316,7 @@ export class GameLogic {
     return { changesTank: true, freshStart: true, level: 0, skillPoints: o.skillPoints, upgrades: o.upgrades, skillCaps: caps,
       maxSkillPoints: o.maxSkillPoints, bonusSkillPoints: o.bonusSkillPoints, canEarnSkillPoints: o.canEarnSkillPoints };
   }
-  public spawnerMaxLevel(): number { return this.getDebugMaxSettableLevel(); }
+  public spawnerMaxLevel(): number { return this._debugMaxBefore(); }
   public spawnerXpOfLevel(level: number): number { return level <= 0 ? 0 : xpThresholdForLevel(level - 1); }
   public spawnerLevelOfXp(xp: number): number {
     const cap = this.spawnerMaxLevel();
@@ -21702,6 +21905,7 @@ export class GameLogic {
         for (let li = 0; li < enemy.bodyLayers.length; li++) {
           if (enemy.bodyLayers[li].stationary) continue;
           if (ARRAS_PARITY.RING_WORLD !== 0 && enemy.bodyLayers[li].spinEnabled) continue;
+          if (SMALL_FIX.R306 !== 0 && !enemy.bodyLayers[li].spinEnabled) continue;
           const _ebl = enemy.bodyLayers[li];
           _ebl._currentAngle -= bodyDelta;
           if (SMALL_FIX.GH346 !== 0) {
@@ -22879,7 +23083,7 @@ export class GameLogic {
   public projectMarkBuiltIns(): void {
     for (const d of this.state.projectileDesigns) this._builtInDesigns.add(d);
     for (const p of this.state.turretPresets) this._builtInPresets.add(p);
-    this._builtInRows = [...this.state.tankLibrary, ...this.state.otherLibrary].filter(l => l.source === 'data-library');
+    this._builtInRows = [...this.state.tankLibrary, ...this.state.otherLibrary, ...this.state.solidLibrary].filter(l => l.source === 'data-library');
     this._builtInDesignList = [...this.state.projectileDesigns];
     this._builtInPresetList = [...this.state.turretPresets];
   }
@@ -22984,6 +23188,7 @@ export class GameLogic {
     const items: LibraryItem[] = [];
     for (const l of s.tankLibrary) if (l.source !== 'data-library') items.push(l);
     for (const l of s.otherLibrary) if (l.source !== 'data-library') items.push(l);
+    for (const l of s.solidLibrary) if (l.source !== 'data-library') items.push(l);
     const me = this.mapEditor;
     return {
       canvas,
@@ -23046,11 +23251,18 @@ export class GameLogic {
       if (l.fileData.type === 'FoodShape') unregisterUserShapeDef((l.fileData.data as FoodShapeDesign).shapeId);
     }
     for (let i = s.otherLibrary.length - 1; i >= 0; i--) if (s.otherLibrary[i].source !== 'data-library') s.otherLibrary.splice(i, 1);
+    for (let i = s.solidLibrary.length - 1; i >= 0; i--) {
+      const l = s.solidLibrary[i];
+      if (l.source === 'data-library') continue;
+      s.solidLibrary.splice(i, 1);
+      const sid = (l.fileData.data as SolidDesign).solidId;
+      if (!s.solidLibrary.some(r => (r.fileData.data as SolidDesign).solidId === sid)) unregisterSolid(sid);
+    }
     for (let i = s.projectileDesigns.length - 1; i >= 0; i--) if (!this._builtInDesigns.has(s.projectileDesigns[i])) s.projectileDesigns.splice(i, 1);
     for (let i = s.turretPresets.length - 1; i >= 0; i--) if (!this._builtInPresets.has(s.turretPresets[i])) s.turretPresets.splice(i, 1);
     const back: LibraryItem[] = [];
     for (const row of this._builtInRows) {
-      const list = row.fileData.type === 'Other' ? s.otherLibrary : s.tankLibrary;
+      const list = row.fileData.type === 'Other' ? s.otherLibrary : row.fileData.type === 'Solid' ? s.solidLibrary : s.tankLibrary;
       if (!list.some(l => l.id === row.id)) back.push(row);
     }
     if (back.length > 0) this.addToLibraryBatch(back);
@@ -23068,6 +23280,8 @@ export class GameLogic {
     const s = this.state;
     this.projectEpoch++;
     this._mdGlide = null;
+    this.partPicked = false;
+    this.partHides.clear();
     this.endMapEditStroke();
     cancelMapEditInteraction(this.mapEditor);
     clearMapEditSelection(this.mapEditor);
@@ -23499,6 +23713,8 @@ export class GameLogic {
   }
 
   public loadLibraryTank(item: LibraryItem): void {
+    this.partPicked = false;
+    this.partHides.clear();
     this._bringingBuiltIn = item.source === 'data-library';
     this.loadTankConfig(item.fileData.data as TankConfig);
     this._bringingBuiltIn = false;
@@ -23646,10 +23862,12 @@ export class GameLogic {
           : (e!.skillCaps[k] ?? e!.maxPointsPerSkill);
       }
       return isPlayer
-        ? { changesTank: false, freshStart: false, level: s.level, skillPoints: s.skillPoints, upgrades, skillCaps,
-            maxSkillPoints: s.maxSkillPoints, bonusSkillPoints: s.bonusSkillPoints, canEarnSkillPoints: s.canEarnSkillPoints }
-        : { changesTank: false, freshStart: false, level: e!.level, skillPoints: e!.skillPoints, upgrades, skillCaps,
-            maxSkillPoints: e!.maxSkillPoints, bonusSkillPoints: e!.bonusSkillPoints, canEarnSkillPoints: e!.canEarnSkillPoints };
+        ? { changesTank: false, freshStart: false, level: this._editLevelOf(null), skillPoints: s.skillPoints, upgrades, skillCaps,
+            maxSkillPoints: s.maxSkillPoints, bonusSkillPoints: s.bonusSkillPoints, canEarnSkillPoints: s.canEarnSkillPoints,
+            powerCap: this._editPowerCap(s.currentTankFileName) }
+        : { changesTank: false, freshStart: false, level: this._editLevelOf(e!), skillPoints: e!.skillPoints, upgrades, skillCaps,
+            maxSkillPoints: e!.maxSkillPoints, bonusSkillPoints: e!.bonusSkillPoints, canEarnSkillPoints: e!.canEarnSkillPoints,
+            powerCap: this._editPowerCap(e!.currentTankName) };
     }
     const cfg = item.fileData.data as TankConfig;
     const fresh = this._debugTankChangeIsFreshStart(
@@ -23671,12 +23889,13 @@ export class GameLogic {
     return {
       changesTank: true,
       freshStart: fresh,
-      level: fresh ? 0 : (isPlayer ? s.level : e!.level),
+      level: fresh ? 0 : this._editLevelOf(isPlayer ? null : e!),
       skillPoints: fresh
         ? (bonusSkillPoints > 0 ? Math.min(bonusSkillPoints, maxSkillPoints) : 0)
         : (isPlayer ? s.skillPoints : e!.skillPoints),
       upgrades, skillCaps, maxSkillPoints, bonusSkillPoints,
       canEarnSkillPoints: cfg.canEarnSkillPoints ?? true,
+      powerCap: this._editPowerCap(pickKey),
     };
   }
 
@@ -23698,11 +23917,13 @@ export class GameLogic {
         upgrades[k] = Math.max(0, Math.min(cap, Math.floor(edit.upgrades[k] ?? 0)));
       }
       const prevLevel = s0.level;
+      const _r994 = SMALL_FIX.R994 !== 0;
+      const _same = _r994 ? level === this.shownLevelOf(null) : level === prevLevel;
       this.updateState({
-        level,
+        level: _same ? prevLevel : _r994 ? Math.min(level, this._powerCapFor(s0.currentTankFileName)) : level,
         skillPoints: points,
         upgrades,
-        currentXp: level === prevLevel ? s0.currentXp : (level === 0 ? 0 : xpThresholdForLevel(level - 1)),
+        currentXp: _same ? s0.currentXp : (level === 0 ? 0 : xpThresholdForLevel(level - 1)),
       });
       const s = this.state;
       const hpMax1 = s.tankHP * this.getStatMultiplier('maxHealth');
@@ -23725,8 +23946,12 @@ export class GameLogic {
       const k = _UPGRADE_KEYS[i];
       upgrades[k] = Math.max(0, Math.min(e.skillCaps[k] ?? e.maxPointsPerSkill, Math.floor(edit.upgrades[k] ?? 0)));
     }
-    if (level !== e.level) e.currentXp = level === 0 ? 0 : xpThresholdForLevel(level - 1);
-    e.level = level;
+    if (SMALL_FIX.R994 !== 0) {
+      if (level !== this.shownLevelOf(e)) { e.currentXp = level === 0 ? 0 : xpThresholdForLevel(level - 1); e.level = Math.min(level, this._powerCapFor(e.currentTankName)); }
+    } else {
+      if (level !== e.level) e.currentXp = level === 0 ? 0 : xpThresholdForLevel(level - 1);
+      e.level = level;
+    }
     e.upgrades = upgrades;
     e.skillPoints = points;
     e.currentHealth = e.displayHp = hpFrac * e.maxHealth * getEnemyStatMultiplier(e, 'maxHealth');
@@ -24486,6 +24711,7 @@ export class GameLogic {
   public matchSerial = 0;
   public readonly feel = new FeelFrame();
   public enterTestMode() {
+    this.ceCancel(); this.resetEditorView(true);
     this.matchSerial++;
     this.feel.matchStart(this.matchSerial, this.state.mapConfig ? this.state.mapConfig.seed : 0);
     this._seenOk = false;
@@ -25019,6 +25245,14 @@ export class GameLogic {
     return Math.min(levelForXp(growthRespawnXp(r, this._deathXp)), cap);
   }
 
+  public respawnShownLevelNow(): number {
+    if (SMALL_FIX.R994 === 0) return this.respawnLevelNow();
+    const gm = this.state.gameModeConfig;
+    const r = gm.growth && gm.growthModel === 'rules' && gm.growthRules?.respawn.on ? gm.growthRules.respawn : null;
+    if (!r) return this.respawnLevelFor(this.state.deathLevel);
+    return hudLevelOfXp(Math.min(growthRespawnXp(r, this._deathXp), XP_LIMIT), _XP_BASE, _XP_COEFF, _XP_OFFSET);
+  }
+
   public respawnCooldownRemainingMs(): number {
     if (!this.state.playerDead || this.state.deathMenuOpenedAt <= 0) return 0;
     const elapsed = this.gameNow() - this.state.deathMenuOpenedAt;
@@ -25043,7 +25277,9 @@ export class GameLogic {
     const _rsCap = isManhuntMode(_rsGm.mode) ? MANHUNT_LEVEL_CAP : (_rsGm.levelCap ?? 45);
     const _rsXp0 = _rsR ? growthRespawnXp(_rsR, this._deathXp) : 0;
     const respawnLevel = this.respawnLevelNow();
-    const _rsXp = _rsR ? (levelForXp(_rsXp0) > _rsCap ? (respawnLevel > 0 ? XP_REQUIREMENTS[respawnLevel - 1] : 0) : _rsXp0) : (respawnLevel > 0 ? XP_REQUIREMENTS[respawnLevel - 1] : 0);
+    const _rsXp = SMALL_FIX.R994 !== 0
+      ? (_rsR ? Math.min(_rsXp0, XP_LIMIT) : respawnLevel > 0 ? xpThresholdForLevel(respawnLevel - 1) : 0)
+      : _rsR ? (levelForXp(_rsXp0) > _rsCap ? (respawnLevel > 0 ? XP_REQUIREMENTS[respawnLevel - 1] : 0) : _rsXp0) : (respawnLevel > 0 ? XP_REQUIREMENTS[respawnLevel - 1] : 0);
     const now = this.gameNow();
 
     const resetUpgrades: Record<UpgradeStat, number> = {
@@ -26079,6 +26315,7 @@ export class GameLogic {
         const sinTA = Math.sin(totalBaseAngle);
         b.exitBaseX = this.tankPos.x + (offX * cosTA - offY * sinTA);
         b.exitBaseY = this.tankPos.y + (offX * sinTA + offY * cosTA);
+        { const _xl = _layerOfId(this.state.bodyLayers, b.sourceLayerId); if (_xl !== null && layerIsPlaced(_xl)) { _lpPt.x = b.exitBaseX; _lpPt.y = b.exitBaseY; addLayerPlace(_lpPt, _xl, tankPixelSize / 2, this.tankAngle); b.exitBaseX = _lpPt.x; b.exitBaseY = _lpPt.y; } }
         b.exitBarrelAngle = tAngle;
         if (t.animProgress > 0) {
           const recoilDist = effectiveTankSize * 0.15 * t.animProgress * b.exitRecoilStrength;
@@ -26116,6 +26353,7 @@ export class GameLogic {
       const sinBA = Math.sin(totalBaseAngle);
       b.exitBaseX = enemy.position.x + offX * cosBA - offY * sinBA;
       b.exitBaseY = enemy.position.y + offX * sinBA + offY * cosBA;
+      { const _xl = _layerOfId(enemy.bodyLayers, b.sourceLayerId); if (_xl !== null && layerIsPlaced(_xl)) { _lpPt.x = b.exitBaseX; _lpPt.y = b.exitBaseY; addLayerPlace(_lpPt, _xl, enemy.size / 2, enemy.angle); b.exitBaseX = _lpPt.x; b.exitBaseY = _lpPt.y; } }
       b.exitBarrelAngle = tAngle;
       if (turret.animProgress > 0) {
         const recoilDist = effectiveSize * 0.15 * turret.animProgress * b.exitRecoilStrength;
@@ -26141,6 +26379,7 @@ export class GameLogic {
       const sinFA = Math.sin(bodyAngle);
       b.exitBaseX = parent.position.x + offX * cosFA - offY * sinFA;
       b.exitBaseY = parent.position.y + offX * sinFA + offY * cosFA;
+      if (_xLayer !== null && layerIsPlaced(_xLayer)) { _lpPt.x = b.exitBaseX; _lpPt.y = b.exitBaseY; addLayerPlace(_lpPt, _xLayer, parent.size / 2, _xBase); b.exitBaseX = _lpPt.x; b.exitBaseY = _lpPt.y; }
       b.exitBarrelAngle = bodyAngle + td.angle;
       if (st.animProgress > 0) {
         const recoilDist = _xSize * 0.15 * st.animProgress * b.exitRecoilStrength;
@@ -26179,6 +26418,7 @@ export class GameLogic {
       const sinAuto3 = Math.sin(parentTurret.autoCurrentAngle);
       b.exitBaseX = circleWorldX + subOffX * cosAuto3 - subOffY * sinAuto3;
       b.exitBaseY = circleWorldY + subOffX * sinAuto3 + subOffY * cosAuto3;
+      { const _xl = _layerOfId(this.state.bodyLayers, b.sourceLayerId); if (_xl !== null && layerIsPlaced(_xl)) { _lpPt.x = b.exitBaseX; _lpPt.y = b.exitBaseY; addLayerPlace(_lpPt, _xl, tankSizeFromSlider(this.state.tankSize) * this.state.playerGrowthScale / 2, this.tankAngle); b.exitBaseX = _lpPt.x; b.exitBaseY = _lpPt.y; } }
       const subWorldAngle = parentTurret.autoCurrentAngle + sub.angle;
       b.exitBarrelAngle = subWorldAngle;
       if (sub.animProgress > 0) {
@@ -26219,6 +26459,7 @@ export class GameLogic {
       const sinAuto4 = Math.sin(parentTurret.autoCurrentAngle);
       b.exitBaseX = circleWorldX + subOffX * cosAuto4 - subOffY * sinAuto4;
       b.exitBaseY = circleWorldY + subOffX * sinAuto4 + subOffY * cosAuto4;
+      { const _xl = _layerOfId(enemy.bodyLayers, b.sourceLayerId); if (_xl !== null && layerIsPlaced(_xl)) { _lpPt.x = b.exitBaseX; _lpPt.y = b.exitBaseY; addLayerPlace(_lpPt, _xl, enemy.size / 2, enemy.angle); b.exitBaseX = _lpPt.x; b.exitBaseY = _lpPt.y; } }
       const subWorldAngle = parentTurret.autoCurrentAngle + sub.angle;
       b.exitBarrelAngle = subWorldAngle;
       if (sub.animProgress > 0) {
@@ -26241,8 +26482,9 @@ export class GameLogic {
       const sinBody = Math.sin(_rh5);
       const parentOffX = parentTurret.xOffset * bulletSizePx / 2;
       const parentOffY = parentTurret.yOffset * bulletSizePx / 2;
-      const circleWorldX = parentBullet.position.x + parentOffX * cosBody - parentOffY * sinBody;
-      const circleWorldY = parentBullet.position.y + parentOffX * sinBody + parentOffY * cosBody;
+      let circleWorldX = parentBullet.position.x + parentOffX * cosBody - parentOffY * sinBody;
+      let circleWorldY = parentBullet.position.y + parentOffX * sinBody + parentOffY * cosBody;
+      if (this._rtLayer !== null) { _lpPt.x = circleWorldX; _lpPt.y = circleWorldY; addLayerPlace(_lpPt, this._rtLayer, parentBullet.size / 2, this._rtBase); circleWorldX = _lpPt.x; circleWorldY = _lpPt.y; }
       const circleR = _mapVal(parentTurret.autoCircleSize ?? 25, 0, 50, 0, bulletSizePx * 0.96) * 0.7;
       const subSizePx = circleR * 2;
       const subOffX = sub.xOffset * subSizePx / 2;
@@ -27280,6 +27522,7 @@ export class GameLogic {
     enemy.sides = newConfig.tankSides;
     enemy.shapeDepth = newConfig.tankShapeDepth ?? 0;
     enemy.shapeCurved = newConfig.tankShapeCurved ?? false;
+    enemy.bodyOpacity = partOpacityOf(newConfig.tankOpacity) < 1 ? partOpacityOf(newConfig.tankOpacity) : undefined;
     enemy.colorMap = cmMapOf(newConfig.tankColorMap);
     enemy.color = cmDesignHex(newConfig.tankColor, enemy.colorMap, CM_USE.TANK);
     enemy.keepOwnColor = newConfig.keepOwnColor === true;
@@ -27588,6 +27831,7 @@ export class GameLogic {
     enemy.sides = tankConfig.tankSides;
     enemy.shapeDepth = tankConfig.tankShapeDepth ?? 0;
     enemy.shapeCurved = tankConfig.tankShapeCurved ?? false;
+    enemy.bodyOpacity = partOpacityOf(tankConfig.tankOpacity) < 1 ? partOpacityOf(tankConfig.tankOpacity) : undefined;
     enemy.colorMap = cmMapOf(tankConfig.tankColorMap);
     enemy.color = cmDesignHex(tankConfig.tankColor, enemy.colorMap, CM_USE.TANK);
     enemy.keepOwnColor = tankConfig.keepOwnColor === true;
@@ -30441,11 +30685,13 @@ export class GameLogic {
     }
     let layerAngle = 0;
     let layerSizeRatio = 1;
+    let mountLayer: BodyLayer | null = null;
     const bl = enemy.bodyLayers;
     for (let li = 0; bl && li < bl.length; li++) {
       if (bl[li].turretIds.indexOf(mainTurret.id) !== -1) {
         layerAngle = layerTurnInBody(bl[li], enemy.angle);
         layerSizeRatio = bl[li].sizeRatio;
+        mountLayer = bl[li];
         break;
       }
     }
@@ -30457,6 +30703,7 @@ export class GameLogic {
     const sinBA = Math.sin(totalBaseAngle);
     out.x = enemy.position.x + offX * cosBA - offY * sinBA;
     out.y = enemy.position.y + offX * sinBA + offY * cosBA;
+    addLayerPlace(out, mountLayer, enemy.size / 2, enemy.angle);
   }
 
   private _aimedMuzzleReach(enemy: EnemyTank): number {
@@ -30467,16 +30714,23 @@ export class GameLogic {
     if (this._aimedShotHomes(t)) return 0;
 
     let layerSizeRatio = 1;
+    let mountLayer: BodyLayer | null = null;
     for (let li = 0; li < enemy.bodyLayers.length; li++) {
       if (enemy.bodyLayers[li].turretIds.indexOf(t.id) !== -1) {
         layerSizeRatio = enemy.bodyLayers[li].sizeRatio;
+        mountLayer = enemy.bodyLayers[li];
         break;
       }
     }
     const effectiveSize = enemy.size * layerSizeRatio;
     const len = _mapVal(t.length, 1, 100, effectiveSize * 0.01, effectiveSize / 2 + effectiveSize * 10);
-    const offX = t.xOffset * effectiveSize / 2;
-    const offY = t.yOffset * effectiveSize / 2;
+    let offX = t.xOffset * effectiveSize / 2;
+    let offY = t.yOffset * effectiveSize / 2;
+    if (mountLayer !== null && layerIsPlaced(mountLayer)) {
+      const la = layerTurnInBody(mountLayer, enemy.angle), c = Math.cos(la), s = Math.sin(la), hr = enemy.size / 2;
+      const vx = (mountLayer.x || 0) * hr + offX * c - offY * s, vy = (mountLayer.y || 0) * hr + offX * s + offY * c;
+      offX = vx; offY = vy;
+    }
     const reach = len + Math.sqrt(offX * offX + offY * offY);
     return reach > 0 ? reach : 0;
   }
@@ -30556,8 +30810,9 @@ export class GameLogic {
 
       const lmx = ap[b] * size;
       const lmy = ap[b + 1] * size;
-      const mx = px + lmx * cb - lmy * sb;
-      const my = py + lmx * sb + lmy * cb;
+      let mx = px + lmx * cb - lmy * sb;
+      let my = py + lmx * sb + lmy * cb;
+      if (li >= 0 && bl && bl[li] && layerIsPlaced(bl[li])) { _lpPt.x = mx; _lpPt.y = my; addLayerPlace(_lpPt, bl[li], size / 2, hullA); mx = _lpPt.x; my = _lpPt.y; }
       const dX = ap[b + 2] * cb - ap[b + 3] * sb;
       const dY = ap[b + 2] * sb + ap[b + 3] * cb;
 
@@ -30862,8 +31117,9 @@ export class GameLogic {
       const la = (li >= 0 && bl && bl[li]) ? layerTurnInBody(bl[li], enemy.angle) : 0;
       const cb = Math.cos(enemy.angle + la), sb = Math.sin(enemy.angle + la);
       const lmx = ap[b] * size, lmy = ap[b + 1] * size;
-      const mx = px + lmx * cb - lmy * sb;
-      const my = py + lmx * sb + lmy * cb;
+      let mx = px + lmx * cb - lmy * sb;
+      let my = py + lmx * sb + lmy * cb;
+      if (li >= 0 && bl && bl[li] && layerIsPlaced(bl[li])) { _lpPt.x = mx; _lpPt.y = my; addLayerPlace(_lpPt, bl[li], size / 2, enemy.angle); mx = _lpPt.x; my = _lpPt.y; }
       if (checkShotWallsClear(navMs, mx - offX, my - offY, tgtX - offX, tgtY - offY,
         offX, offY, ap[b + 5] * size)) return false;
     }
@@ -34627,6 +34883,7 @@ export class GameLogic {
     enemy: EnemyTank, navMs: MapState, offX: number, offY: number,
     lx: number, ly: number, tLx: number, tLy: number, bodyR: number, now: number,
   ): number {
+    { const q = this._partReachOf(enemy); if (q > bodyR) bodyR = q; }
     const nav = navMs.navigation!;
     const cs = navMs.cellSize;
     const mh = navMs.mapHalf;
@@ -35508,7 +35765,7 @@ export class GameLogic {
 
     const lx = enemy.position.x - navOffX;
     const ly = enemy.position.y - navOffY;
-    const bodyR = this.getEffectiveEnemyRadius(enemy);
+    const bodyR = this._routeR(enemy);
     const st = queryDistanceStep(nav, f.code, lx, ly, true, bodyR);
     if (!st.ok) return false;
     const rawX = st.dirX, rawY = st.dirY;
@@ -35594,7 +35851,7 @@ export class GameLogic {
       _twLy,
       navOffX, navOffY,
       AI_CONSTANTS.TRAVEL_WAYPOINT_CELLS,
-      this.getEffectiveEnemyRadius(enemy)
+      this._routeR(enemy)
     );
     if (!wp.ok) {
       if (enemy.navGoalRegion < enemy.navRegionBlockedUntil.length) {
@@ -36666,7 +36923,7 @@ export class GameLogic {
     const navMs = this._getEnemyNavMapState(enemy);
     const navOff = this._navOffX;
     const navOffY_ = this._navOffY;
-    const _navBodyR = this.getEffectiveEnemyRadius(enemy);
+    const _navBodyR = this._routeR(enemy);
     if (navMs && ((this._fsActive ? this._vFrame : this.frameCounter) - enemy.navLosCheckFrame >= AI_CONSTANTS.NAV_LOS_CHECK_INTERVAL)) {
       enemy.navLosCheckFrame = this._fsActive ? this._vFrame : this.frameCounter;
       const prevLos = enemy.navLosResult;
@@ -37770,7 +38027,7 @@ export class GameLogic {
     const navMs = this._getEnemyNavMapState(enemy);
     const navOff = this._navOffX;
     const navOffY_ = this._navOffY;
-    const _navBodyR = this.getEffectiveEnemyRadius(enemy);
+    const _navBodyR = this._routeR(enemy);
     const _navExactView = navMs && navMs.rocks.length > 0 && navMs.navigation
       ? exactFieldView(navMs.navigation, _navBodyR) : null;
 
@@ -39123,8 +39380,7 @@ export class GameLogic {
     const navMs = this._getEnemyNavMapState(enemy);
     const _flOffX = this._navOffX;
     const _flOffY = this._navOffY;
-    const _flBodyR = this.getEffectiveEnemyRadius(enemy);
-
+    const _flBodyR = this._routeR(enemy);
     let _flSteered = false;
     if (navMs?.navigation) {
       const _flNav = navMs.navigation;
@@ -39649,10 +39905,12 @@ export class GameLogic {
         if (_eTapName && _eTapPt?.tankAsProjectileUseAI) {
           let _eTapLayerAngle = 0;
           let _eTapLayerSizeRatio = 1;
+          let _eTapLayer: BodyLayer | null = null;
           for (let _etli = 0; _etli < enemy.bodyLayers.length; _etli++) {
             if (enemy.bodyLayers[_etli].turretIds.indexOf(turret.id) !== -1) {
               _eTapLayerAngle = layerTurnInBody(enemy.bodyLayers[_etli], enemy.angle);
               _eTapLayerSizeRatio = enemy.bodyLayers[_etli].sizeRatio;
+              _eTapLayer = enemy.bodyLayers[_etli];
               break;
             }
           }
@@ -39663,8 +39921,9 @@ export class GameLogic {
           const _eTapBaseAngle = enemy.angle + _eTapLayerAngle;
           const _eTapCosBA = Math.cos(_eTapBaseAngle);
           const _eTapSinBA = Math.sin(_eTapBaseAngle);
-          const _eTapBaseX = enemy.position.x + (_eTapOffX * _eTapCosBA - _eTapOffY * _eTapSinBA);
-          const _eTapBaseY = enemy.position.y + (_eTapOffX * _eTapSinBA + _eTapOffY * _eTapCosBA);
+          let _eTapBaseX = enemy.position.x + (_eTapOffX * _eTapCosBA - _eTapOffY * _eTapSinBA);
+          let _eTapBaseY = enemy.position.y + (_eTapOffX * _eTapSinBA + _eTapOffY * _eTapCosBA);
+          if (_eTapLayer !== null && layerIsPlaced(_eTapLayer)) { _lpPt.x = _eTapBaseX; _lpPt.y = _eTapBaseY; addLayerPlace(_lpPt, _eTapLayer, enemy.size / 2, enemy.angle); _eTapBaseX = _lpPt.x; _eTapBaseY = _lpPt.y; }
           const _eTapSideCorr = computeSideCorr(enemy.sides, enemy.sides);
           const _eTapLenCorr = _eTapSideCorr < 1 ? Math.pow(_eTapSideCorr, 0.25) : 1.0;
           const _eTapLenSize = _eTapEffSize * _eTapLenCorr;
@@ -39811,10 +40070,12 @@ export class GameLogic {
         if (_esArm && _bhMs && !enemy.ignoresWalls) {
           let _esLayerAngle = 0;
           let _esLayerRatio = 1;
+          let _esLayer: BodyLayer | null = null;
           for (let _esli = 0; _esli < enemy.bodyLayers.length; _esli++) {
             if (enemy.bodyLayers[_esli].turretIds.indexOf(turret.id) !== -1) {
               _esLayerAngle = layerTurnInBody(enemy.bodyLayers[_esli], enemy.angle);
               _esLayerRatio = enemy.bodyLayers[_esli].sizeRatio;
+              _esLayer = enemy.bodyLayers[_esli];
               break;
             }
           }
@@ -39825,8 +40086,9 @@ export class GameLogic {
           const _esOy = turret.yOffset * _esEff / 2;
           const _esCosBA = Math.cos(_esBA), _esSinBA = Math.sin(_esBA);
           const _esCosGA = Math.cos(_esGA), _esSinGA = Math.sin(_esGA);
-          const _esBx = enemy.position.x + _esOx * _esCosBA - _esOy * _esSinBA;
-          const _esBy = enemy.position.y + _esOx * _esSinBA + _esOy * _esCosBA;
+          let _esBx = enemy.position.x + _esOx * _esCosBA - _esOy * _esSinBA;
+          let _esBy = enemy.position.y + _esOx * _esSinBA + _esOy * _esCosBA;
+          if (_esLayer !== null && layerIsPlaced(_esLayer)) { _lpPt.x = _esBx; _lpPt.y = _esBy; addLayerPlace(_lpPt, _esLayer, enemy.size / 2, enemy.angle); _esBx = _lpPt.x; _esBy = _lpPt.y; }
           const _esLen = _mapVal(turret.length, 1, 100, _esEff * 0.01, _esEff / 2 + _esEff * 10);
           const _esR = _mapVal(turret.width, 0, 50, 0, _esEff * 0.96) / 2;
           const _esBack = _esR * 3 < _esLen * 0.4 ? _esR * 3 : _esLen * 0.4;
@@ -39855,10 +40117,12 @@ export class GameLogic {
             _deriveMotionType(turret.projectileBehaviors, turret.projectileType?.motionType || 'glide') === 'glide') {
           let _bhLayerAngle = 0;
           let _bhLayerRatio = 1;
+          let _bhLayer: BodyLayer | null = null;
           for (let _bhli = 0; _bhli < enemy.bodyLayers.length; _bhli++) {
             if (enemy.bodyLayers[_bhli].turretIds.indexOf(turret.id) !== -1) {
               _bhLayerAngle = layerTurnInBody(enemy.bodyLayers[_bhli], enemy.angle);
               _bhLayerRatio = enemy.bodyLayers[_bhli].sizeRatio;
+              _bhLayer = enemy.bodyLayers[_bhli];
               break;
             }
           }
@@ -39872,8 +40136,9 @@ export class GameLogic {
           const _bhLen = _mapVal(turret.length, 1, 100, _bhEff * 0.01, _bhEff / 2 + _bhEff * 10);
           const _bhCosGA = Math.cos(_bhGA);
           const _bhSinGA = Math.sin(_bhGA);
-          const _bhMx = enemy.position.x + _bhOx * _bhCosBA - _bhOy * _bhSinBA + _bhCosGA * _bhLen;
-          const _bhMy = enemy.position.y + _bhOx * _bhSinBA + _bhOy * _bhCosBA + _bhSinGA * _bhLen;
+          let _bhMx = enemy.position.x + _bhOx * _bhCosBA - _bhOy * _bhSinBA + _bhCosGA * _bhLen;
+          let _bhMy = enemy.position.y + _bhOx * _bhSinBA + _bhOy * _bhCosBA + _bhSinGA * _bhLen;
+          if (_bhLayer !== null && layerIsPlaced(_bhLayer)) { _lpPt.x = _bhMx; _lpPt.y = _bhMy; addLayerPlace(_lpPt, _bhLayer, enemy.size / 2, enemy.angle); _bhMx = _lpPt.x; _bhMy = _lpPt.y; }
           const _bhGc = _bhMs.gridCells;
           const _bhGcY = _bhMs.gridCellsY;
           const _bhGx = Math.floor((_bhMx - _bhOffX + _bhMs.mapHalf) / _bhMs.cellSize);
@@ -39941,6 +40206,7 @@ export class GameLogic {
     let layerSides = enemy.sides;
     let sourceLayerId = '';
     let sourceLayerOrder = -1;
+    let sourceLayer: BodyLayer | null = null;
     for (let li = 0; li < enemy.bodyLayers.length; li++) {
       if (enemy.bodyLayers[li].turretIds.indexOf(turret.id) !== -1) {
         layerAngle = layerTurnInBody(enemy.bodyLayers[li], enemy.angle);
@@ -39948,6 +40214,7 @@ export class GameLogic {
         layerSides = enemy.bodyLayers[li].sides;
         sourceLayerId = enemy.bodyLayers[li].id;
         sourceLayerOrder = enemy.bodyLayers[li].renderOrder;
+        sourceLayer = enemy.bodyLayers[li];
         break;
       }
     }
@@ -39961,9 +40228,9 @@ export class GameLogic {
     const totalBaseAngle = enemy.angle + layerAngle;
     const cosBA = Math.cos(totalBaseAngle);
     const sinBA = Math.sin(totalBaseAngle);
-    const eTurretBaseX = enemy.position.x + offX * cosBA - offY * sinBA;
-    const eTurretBaseY = enemy.position.y + offX * sinBA + offY * cosBA;
-
+    let eTurretBaseX = enemy.position.x + offX * cosBA - offY * sinBA;
+    let eTurretBaseY = enemy.position.y + offX * sinBA + offY * cosBA;
+    if (sourceLayer !== null && layerIsPlaced(sourceLayer)) { _lpPt.x = eTurretBaseX; _lpPt.y = eTurretBaseY; addLayerPlace(_lpPt, sourceLayer, enemy.size / 2, enemy.angle); eTurretBaseX = _lpPt.x; eTurretBaseY = _lpPt.y; }
     const eLenSize = effectiveSize;
     const eWidSize = effectiveSize;
 
@@ -40579,6 +40846,7 @@ export class GameLogic {
   public handleMouseMove(x: number, y: number) {
       this.mouseX = x;
       this.mouseY = y;
+      if (this.ce.phase !== 0) this._ceMove();
   }
 
   public handleMouseDown() {
@@ -40590,6 +40858,7 @@ export class GameLogic {
       if (this.state.isTestMode) this.admin.mouseDown();
       if (!this.state.isTestMode) {
           if (this.state.canvasEntityKind !== 'tank') return;
+          if (this.previewMotion && this.isTurretPlacementEnabled) return;
           if (this.isTankToolActive) {
               if (this.layerPickMode) {
                   const part = this.bodyPartAtMouse();
@@ -40607,7 +40876,7 @@ export class GameLogic {
           }
           if (this.state.autoSubTurretEditMode) {
               if (this.state.autoSubTurretSelectMode) {
-                  this.trySelectAutoSubTurretAtMouse();
+                  if (!this._cePressHandle()) { this.trySelectAutoSubTurretAtMouse(); this._ceArmPick(); }
               } else if (this.state.presetPreviewTurrets.length > 0) {
                   this.placeAutoSubTurretPresetFromPreview();
               } else {
@@ -40615,8 +40884,15 @@ export class GameLogic {
               }
           } else if (this.state.presetPreviewTurrets.length > 0) {
               if (this.isTurretPlacementEnabled) this.placePresetFromPreview();
+          } else if (this.isTurretPlacementEnabled && !this.turretPlacing) {
+              if (this.pen.on) this._penPress();
+              else if (!(this.pe.on && this._pePress()) && !this._cePressHandle()) { this.pickPartAtMouse(); this._ceArmPick(); }
           } else if (this.state.selectMode && this.isTurretPlacementEnabled) {
-              this.trySelectTurretAtMouse();
+              if (SMALL_FIX.R282P !== 0 && this.state.selectedTurretId !== null && this._cePressHandle()) { }
+              else {
+                if (SMALL_FIX.R282P === 0 || !this.selectPickOnTop()) this.trySelectTurretAtMouse();
+                if (SMALL_FIX.R282P !== 0) this._ceArmPick();
+              }
           } else if (this.isTurretPlacementEnabled) {
               const turretCountBefore = this.state.turrets.length;
               this.placeTurret();
@@ -40626,6 +40902,7 @@ export class GameLogic {
   }
 
   public handleMouseUp(latched: boolean = false) {
+      if (this.ce.phase !== 0) this._ceUp();
       this.admin.mouseUp();
       if (latched && this._fsActive && this._fsMouseDownSince) { this._fsMouseUpPending = true; return; }
       this.mousePressed = false;
@@ -40635,8 +40912,10 @@ export class GameLogic {
       if (SMALL_FIX.G672 !== 0) this._dbgWatchOn = false;
       if (this.state.presetPreviewTurrets.length > 0) {
           this.cancelPresetPreview();
+          this._rightCancelledPreview = true;
           return;
       }
+      this._rightCancelledPreview = false;
       this.mouseRightPressed = true;
       if (this._fsActive) { this._fsRightDownSince = true; this._fsRightUpPending = false; }
       if (this.state.isTestMode) this.admin.rightDown();
@@ -40648,6 +40927,7 @@ export class GameLogic {
   }
 
   public handleMapDesignerWheel(mx: number, my: number, deltaY: number, canvasW: number, canvasH: number) {
+      if (deltaY === 0) return;
       this._mdGlide = null;
       const zoomFactor = deltaY > 0 ? 0.9 : 1.1;
       const oldZoom = this.mapDesignerZoom;
@@ -40670,6 +40950,7 @@ export class GameLogic {
                      mx: number, my: number, skipId?: string | null): Turret | null {
     const subs = parent.autoSubTurrets;
     if (!subs || subs.length === 0) return null;
+    if (this.partHides.size > 0 && this.partHides.has(parent.id)) return null;
     const circleR = ((parent.autoCircleSize ?? 25) / 50) * (effectiveSize * 0.96) * 0.7;
     const subSizePx = circleR * 2;
     const circleAngle = baseAngle + parent.angle;
@@ -40678,6 +40959,7 @@ export class GameLogic {
     let bestOrder = -Infinity;
     for (const sub of subs) {
       if (skipId && sub.id === skipId) continue;
+      if (this.partHides.size > 0 && this.partHides.has(sub.id)) continue;
       const subOffX = sub.xOffset * subSizePx / 2;
       const subOffY = sub.yOffset * subSizePx / 2;
       const subBaseX = circleCX + subOffX * cosC - subOffY * sinC;
@@ -40747,15 +41029,1447 @@ export class GameLogic {
   }
 
   private _autoBaseCovers(t: Turret, circleCX: number, circleCY: number, effectiveSize: number, mx: number, my: number): boolean {
-    if (t.autoCircleHidden) return false;
+    if (t.autoCircleHidden || (this.partHides.size > 0 && this.partHides.has(t.id))) return false;
     const circleR = ((t.autoCircleSize ?? 25) / 50) * (effectiveSize * 0.96) * 0.7;
     const dx = mx - circleCX, dy = my - circleCY;
     return dx * dx + dy * dy <= circleR * circleR;
   }
 
-  private _turretHitAtMouse(skipId: string | null = null): { turret: Turret; sub: Turret | null } | null {
+  private _turretHitOne(t: Turret, mx: number, my: number): Turret | null | undefined {
+    if (this.partHides.size > 0 && this.partHides.has(t.id)) return undefined;
+    const _mv = (val: number, inMin: number, inMax: number, outMin: number, outMax: number) =>
+      (val - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
+    const sizePx = tankSizeFromSlider(this.state.tankSize);
+    const layer = this.getLayerForTurret(t.id);
+    const layerSizeRatio = layer ? layer.sizeRatio : 1;
+    const layerAngle = layer ? layerTurnInBody(layer, this.tankAngle) : 0;
+    const effectiveSize = sizePx * layerSizeRatio;
+    const baseAngle = this.tankAngle + layerAngle;
+
+    const offX = t.xOffset * effectiveSize / 2;
+    const offY = t.yOffset * effectiveSize / 2;
+    const cosL = Math.cos(baseAngle);
+    const sinL = Math.sin(baseAngle);
+    const baseX = offX * cosL - offY * sinL;
+    const baseY = offX * sinL + offY * cosL;
+    const globalAngle = baseAngle + t.angle;
+    const isAuto = t.turretType === 'auto';
+    const effLen = isAuto ? (t.autoTurretLength ?? 10) : t.length;
+    const effWid = isAuto ? (t.autoTurretWidth ?? 25) : t.width;
+    const lenSize = effectiveSize;
+    const widSize = effectiveSize;
+    const tLen = _mv(effLen, 1, 100, lenSize * 0.01, lenSize / 2 + lenSize * 10);
+    const tWid = _mv(effWid, 0, 50, 0, widSize * 0.96);
+
+    const dmx = mx - baseX;
+    const dmy = my - baseY;
+    const cosG = Math.cos(globalAngle);
+    const sinG = Math.sin(globalAngle);
+    const along = dmx * cosG + dmy * sinG;
+    const perp = -dmx * sinG + dmy * cosG;
+
+    let inside = !isAuto && GameLogic._barrelContains(along, perp, tLen, tWid, t.aspect);
+    if (t.look !== undefined) { const _lr = lookUnit(t.look, effectiveSize) * lookReach(t.look); inside = dmx * dmx + dmy * dmy <= _lr * _lr; }
+
+    let sub: Turret | null = null;
+    if (!inside && isAuto) {
+      const inCircle = this._autoBaseCovers(t, baseX, baseY, effectiveSize, mx, my);
+      sub = this._autoSubAt(t, baseX, baseY, baseAngle, effectiveSize, mx, my);
+      if (sub && sub.aboveBase !== true && inCircle) sub = null;
+      inside = inCircle || sub !== null;
+    }
+
+    if (!inside) return undefined;
+    return sub;
+  }
+
+  public turretPlacing = true;
+  public partPicked = false;
+  public pickPart(layerId: string | null, toggle = false): void {
+    if (toggle && this.partPicked && !this.state.selectedTurretId && this.state.activeBodyLayerId === layerId) {
+      this.partPicked = false;
+      if (this.onStateChange) this.onStateChange(this.state);
+      return;
+    }
+    this.partPicked = true;
+    if (this.state.selectedTurretId) this.setSelectMode(false);
+    if (this.state.activeBodyLayerId !== layerId) this.setActiveBodyLayer(layerId);
+    else if (this.onStateChange) this.onStateChange(this.state);
+  }
+  public endTurretPlacing(): void {
+    if (this.state.presetPreviewTurrets.length > 0) this.cancelPresetPreview();
+    this.setTurretPlacing(false);
+  }
+  public setTurretPlacing(on: boolean): void {
+    if (on && this.state.selectedTurretId) this.setSelectMode(false);
+    this.ceCancel();
+    this.turretPlacing = on;
+    if (this.onStateChange) this.onStateChange(this.state);
+  }
+  public previewMotion = false;
+  public showHitAreas = false;
+  private _pmBody = 0;
+  private readonly _pmAngles = new Map<string, number>();
+  public setPreviewMotion(on: boolean): void {
+    if (on === this.previewMotion) return;
+    if (on) {
+      this.ceCancel();
+      if (this.state.presetPreviewTurrets.length > 0) this.cancelPresetPreview();
+      if (this.turretPlacing) this.setTurretPlacing(false);
+      if (this.pen.on) this.setPen(false);
+      if (this.pe.on) this.setPointEdit(false);
+      this._pmAngles.clear();
+      for (const L of this.state.bodyLayers) this._pmAngles.set(L.id, L._currentAngle);
+      this._pmBody = 0;
+      this.previewMotion = true;
+    } else {
+      this.previewMotion = false;
+      for (const L of this.state.bodyLayers) { const a = this._pmAngles.get(L.id); L._currentAngle = a !== undefined ? a : 0; }
+      this._pmAngles.clear();
+      this._pmBody = 0;
+    }
+    if (this.onStateChange) this.onStateChange(this.state);
+  }
+  private _stepPreviewSpin(dtFactor: number): void {
+    if (!this.isTurretPlacementEnabled || this.state.canvasEntityKind !== 'tank') { this.setPreviewMotion(false); return; }
+    const bodyDelta = this.state.baseSpinEnabled ? ((this.state.baseSpinSpeed ?? 100) / 50) * 0.02 * this.state.baseSpinDirection * dtFactor : 0;
+    this._pmBody += bodyDelta;
+    if (this._pmBody > Math.PI * 2) this._pmBody -= Math.PI * 2;
+    if (this._pmBody < -Math.PI * 2) this._pmBody += Math.PI * 2;
+    this.tankAngle = this._pmBody; this._baseBodyAngle = this._pmBody;
+    const ring = ARRAS_PARITY.RING_WORLD !== 0;
+    for (let i = 0; i < this.state.bodyLayers.length; i++) {
+      const L = this.state.bodyLayers[i];
+      if (L.stationary) continue;
+      if (L.spinEnabled) {
+        if (ring) L._currentAngle -= bodyDelta;
+        L._currentAngle += (L.spinSpeed / 50) * 0.02 * L.spinDirection * dtFactor;
+      } else if (SMALL_FIX.R306 === 0) L._currentAngle -= bodyDelta;
+      if (L._currentAngle > Math.PI * 2) L._currentAngle -= Math.PI * 2;
+      if (L._currentAngle < -Math.PI * 2) L._currentAngle += Math.PI * 2;
+    }
+  }
+  public readonly partLocks = new Set<string>();
+  public readonly partHides = new Set<string>();
+  public partHidden(id: string): boolean { return this.partHides.size > 0 && this.partHides.has(id); }
+  public edZoom = 1;
+  public edPanX = 0;
+  public edPanY = 0;
+  private _edGlide = false;
+  public ceShift = false;
+  public ceAlt = false;
+  public ceCtrl = false;
+  public readonly ce = {
+    phase: 0, mode: '' as '' | 'move' | 'size' | 'turn' | 'length' | 'width' | 'aspect' | 'base' | 'look' | 'point' | 'stretch' | 'pen',
+    kind: '' as '' | 'body' | 'layer' | 'turret' | 'sub', id: '',
+    p1: 0, p2: 0,
+    downSX: 0, downSY: 0, downX: 0, downY: 0,
+    o1: 0, o2: 0, o3: 0, o4: 0,
+    cx: 0, cy: 0, frameA: 0, frameS: 1, frameX: 0, frameY: 0,
+    notifyAt: 0, guideX: NaN, guideY: NaN, guideR: NaN, label: '', copied: false, around: false,
+  };
+  private readonly _ceSnap = new Float64Array(2048);
+  private _ceSnapN = 0;
+  private readonly _ceRadii = new Float64Array(64);
+  private _ceRadiiN = 0;
+  private _ceSnapTurn(a: number, extra: number): number {
+    const k = Math.PI / 4, near = (3 * Math.PI) / 180;
+    const q = Math.round(a / k) * k;
+    let best = Math.abs(a - q) <= near ? q : a, bd = Math.abs(a - q);
+    if (extra === extra) {
+      const e = extra + Math.round((a - extra) / (Math.PI * 2)) * Math.PI * 2;
+      if (Math.abs(a - e) <= near && Math.abs(a - e) < bd) best = e;
+    }
+    return best;
+  }
+  public readonly ceBoxOut = { ok: false, kind: '' as '' | 'body' | 'layer' | 'turret' | 'sub', id: '', cx: 0, cy: 0, a: 0, hw: 0, hh: 0, n: 0,
+    hx: new Float64Array(12), hy: new Float64Array(12), hk: new Int8Array(12), turnFromX: 0, turnFromY: 0 };
+  private readonly _ceF = { frameA: 0, frameS: 1, frameX: 0, frameY: 0 };
+  private _ceNum(v: number): number { return Math.round(v * 10000) / 10000; }
+  private _ceLocal(out: number[]): void {
+    out[0] = (this.mouseX - this.width / 2) / this.zoom + (this.cameraX - this.tankPos.x);
+    out[1] = (this.mouseY - this.height / 2) / this.zoom + (this.cameraY - this.tankPos.y);
+  }
+  private readonly _cePt: number[] = [0, 0];
+  public ceActive(): boolean {
+    return !this.state.isTestMode && this.isTurretPlacementEnabled && !this.isMapDesignerActive && this.state.canvasEntityKind === 'tank'
+      && !this.state.autoSubTurretEditMode && !this.previewMotion;
+  }
+  private _ceTurretFrame(t: Turret, o: { frameA: number; frameS: number; frameX: number; frameY: number }): BodyLayer | null {
+    const L = this.getLayerForTurret(t.id);
+    const S = tankSizeFromSlider(this.state.tankSize) * (L ? L.sizeRatio : 1);
+    o.frameA = this.tankAngle + (L ? layerTurnInBody(L, this.tankAngle) : 0);
+    o.frameS = S / 2;
+    o.frameX = 0; o.frameY = 0;
+    if (L && this.editorLayerPlace(L)) { o.frameX = this.edLayerPlace[0]; o.frameY = this.edLayerPlace[1]; }
+    return L;
+  }
+  public ceBox(): GameLogic['ceBoxOut'] {
+    const b = this._ceBoxRaw();
+    if (b.ok && ((this.partLocks.size > 0 && this.partLocks.has(b.id)) || this.partHidden(b.id))) { b.ok = false; b.n = 0; }
+    return b;
+  }
+  private _ceBoxRaw(): GameLogic['ceBoxOut'] {
+    const b = this.ceBoxOut;
+    b.ok = false; b.n = 0;
+    if (!this.ceSubActive() && (!this.ceActive() || this.cePlacing())) return b;
+    const R = tankSizeFromSlider(this.state.tankSize) / 2;
+    if (this.ceSubActive()) {
+      const parent = this._getAutoSubParent(), sid = this.state.autoSubTurretSelectedId;
+      let sub: Turret | undefined;
+      if (parent && parent.autoSubTurrets && sid) { const ss = parent.autoSubTurrets; for (let i = 0; i < ss.length; i++) if (ss[i].id === sid) { sub = ss[i]; break; } }
+      if (!parent || !sub) return b;
+      const f = this._ceF, P = this._ceSubFrame(parent, f);
+      const c = Math.cos(f.frameA), s = Math.sin(f.frameA);
+      const bx = f.frameX + (sub.xOffset * c - sub.yOffset * s) * f.frameS, by = f.frameY + (sub.xOffset * s + sub.yOffset * c) * f.frameS;
+      const g = f.frameA + sub.angle, cg = Math.cos(g), sg = Math.sin(g);
+      b.kind = 'sub'; b.id = sub.id; b.ok = true;
+      if (sub.look !== undefined) {
+        const L = this.getLayerForTurret(parent.id);
+        const r = lookUnit(sub.look, tankSizeFromSlider(this.state.tankSize) * (L ? L.sizeRatio : 1)) * lookReach(sub.look);
+        b.cx = bx; b.cy = by; b.a = g; b.hw = r; b.hh = r;
+        return b;
+      }
+      const len = (sub.length - 1) * (P / 2 + P * 10 - P * 0.01) / 99 + P * 0.01;
+      const wid = (sub.width / 50) * (P * 0.96);
+      b.cx = bx + cg * len / 2; b.cy = by + sg * len / 2; b.a = g; b.hw = len / 2; b.hh = Math.max(wid / 2, Math.abs((wid / 2) * (sub.aspect ?? 1)));
+      const mx = bx + cg * len, my = by + sg * len, tr = 26 / (this.zoom || 1);
+      const smw = (wid / 2) * (sub.aspect ?? 1), smidH = (wid / 2) * (1 + (sub.aspect ?? 1)) / 2;
+      this._cePut(mx, my, 4);
+      this._cePut(bx + cg * len / 2 - sg * smidH, by + sg * len / 2 + cg * smidH, 5);
+      this._cePut(mx - sg * smw, my + cg * smw, 6);
+      this._cePut(mx + cg * tr, my + sg * tr, 3); b.turnFromX = mx; b.turnFromY = my;
+      return b;
+    }
+    if (!this.ceActive()) return b;
+    const tid = this.state.selectedTurretId;
+    if (tid) {
+      let t: Turret | undefined;
+      { const ts = this.state.turrets; for (let i = 0; i < ts.length; i++) if (ts[i].id === tid) { t = ts[i]; break; } }
+      if (!t) return b;
+      const f = this._ceF; this._ceTurretFrame(t, f);
+      const c = Math.cos(f.frameA), s = Math.sin(f.frameA);
+      const bx = f.frameX + (t.xOffset * c - t.yOffset * s) * f.frameS, by = f.frameY + (t.xOffset * s + t.yOffset * c) * f.frameS;
+      const S = f.frameS * 2, g = f.frameA + t.angle, cg = Math.cos(g), sg = Math.sin(g);
+      b.kind = 'turret'; b.id = t.id; b.ok = true;
+      if (t.look !== undefined) {
+        const r = lookUnit(t.look, S) * lookReach(t.look);
+        b.cx = bx; b.cy = by; b.a = g; b.hw = r; b.hh = r;
+        this._cePut(bx + (cg - sg) * r, by + (sg + cg) * r, 8);
+        return b;
+      }
+      if (t.turretType === 'auto') {
+        const r = ((t.autoCircleSize ?? 25) / 50) * (S * 0.96) * 0.7;
+        b.cx = bx; b.cy = by; b.a = g; b.hw = r; b.hh = r;
+        this._cePut(bx + cg * r, by + sg * r, 7);
+        const tr = r + 26 / (this.zoom || 1);
+        this._cePut(bx - sg * tr, by + cg * tr, 3); b.turnFromX = bx - sg * r; b.turnFromY = by + cg * r;
+        return b;
+      }
+      const len = (t.length - 1) * (S / 2 + S * 10 - S * 0.01) / 99 + S * 0.01;
+      const wid = (t.width / 50) * (S * 0.96);
+      const mw = (wid / 2) * (t.aspect ?? 1);
+      b.cx = bx + cg * len / 2; b.cy = by + sg * len / 2; b.a = g; b.hw = len / 2; b.hh = Math.max(wid / 2, Math.abs(mw));
+      const mx = bx + cg * len, my = by + sg * len;
+      this._cePut(mx, my, 4);
+      const midH = (wid / 2) * (1 + (t.aspect ?? 1)) / 2;
+      this._cePut(bx + cg * len / 2 - sg * midH, by + sg * len / 2 + cg * midH, 5);
+      this._cePut(mx - sg * mw, my + cg * mw, 6);
+      const tr = 26 / (this.zoom || 1);
+      this._cePut(mx + cg * tr, my + sg * tr, 3); b.turnFromX = mx; b.turnFromY = my;
+      return b;
+    }
+    if (!this.partPicked || this.pe.on || this.pen.on) return b;
+    const lid = this.state.activeBodyLayerId;
+    if (lid === null) {
+      const r = R * (this.state.tankSides >= 3 ? getRealSizeFactor(Math.floor(this.state.tankSides)) : 1);
+      b.kind = 'body'; b.id = 'main'; b.ok = true; b.cx = 0; b.cy = 0; b.a = 0; b.hw = r; b.hh = r;
+      return b;
+    }
+    let L: BodyLayer | undefined;
+    { const ls = this.state.bodyLayers; for (let i = 0; i < ls.length; i++) if (ls[i].id === lid) { L = ls[i]; break; } }
+    if (!L) return b;
+    let cx = 0, cy = 0;
+    if (this.editorLayerPlace(L)) { cx = this.edLayerPlace[0]; cy = this.edLayerPlace[1]; }
+    const rr = R * L.sizeRatio;
+    const a = this.tankAngle + layerTurnInBody(L, this.tankAngle) + (L.initialAngle ?? 0);
+    const c = Math.cos(a), s = Math.sin(a);
+    const o = layerOutlineOf(L);
+    const sl = o === null ? layerSolidOf(L) : null;
+    let u0 = -1, u1 = 1, v0 = -1, v1 = 1;
+    if (o) { u0 = Infinity; u1 = -Infinity; v0 = Infinity; v1 = -Infinity; for (let i = 0; i < o.length; i++) { const q = o[i]; if (q[0] < u0) u0 = q[0]; if (q[0] > u1) u1 = q[0]; if (q[1] < v0) v0 = q[1]; if (q[1] > v1) v1 = q[1]; } }
+    else if (sl !== null) { const sv = solidStill(sl); if (L.copies > 1) { u0 = -sv.reach; u1 = sv.reach; v0 = -sv.reach; v1 = sv.reach; } else { u0 = sv.minX; u1 = sv.maxX; v0 = sv.minY; v1 = sv.maxY; } }
+    else { const f = L.sides >= 3 ? getRealSizeFactor(Math.floor(L.sides)) : 1; u0 = -f; u1 = f; v0 = -f; v1 = f; }
+    const mu = (u0 + u1) / 2, mv = (v0 + v1) / 2, hu = Math.max(1e-6, (u1 - u0) / 2 * rr), hv = Math.max(1e-6, (v1 - v0) / 2 * rr);
+    const bx = cx + (mu * c - mv * s) * rr, by = cy + (mu * s + mv * c) * rr;
+    b.kind = 'layer'; b.id = L.id; b.ok = true; b.cx = bx; b.cy = by; b.a = a; b.hw = hu; b.hh = hv;
+    const ku = o ? 9 : 2, kv = o ? 10 : 2;
+    const H = _CE_LAYER_HANDLES;
+    for (let i = 0; i < H.length; i += 3) { const u = H[i], v = H[i + 1], w = H[i + 2]; this._cePut(bx + u * c * hu - v * s * hv, by + u * s * hu + v * c * hv, w === 1 ? 1 : w === 2 ? ku : kv); }
+    const tr = hv + 26 / (this.zoom || 1);
+    this._cePut(bx + s * tr, by - c * tr, 3); b.turnFromX = bx + s * hv; b.turnFromY = by - c * hv;
+    return b;
+  }
+  private _cePut(x: number, y: number, k: number): void {
+    const b = this.ceBoxOut;
+    if (b.n < 12) { b.hx[b.n] = x; b.hy[b.n] = y; b.hk[b.n] = k; b.n++; }
+  }
+  public cePlacing(): boolean { return this.turretPlacing && !this.state.selectedTurretId; }
+  public ceHandleAt(): number {
+    const b = this.ceBox();
+    if (!b.ok) return -1;
+    this._ceLocal(this._cePt);
+    const slack = 8 / (this.zoom || 1);
+    let best = -1, bd = slack * slack;
+    for (let i = 0; i < b.n; i++) { const dx = b.hx[i] - this._cePt[0], dy = b.hy[i] - this._cePt[1], d = dx * dx + dy * dy; if (d <= bd) { bd = d; best = i; } }
+    if (best >= 0 && b.hk[best] !== 3) { const cx = b.cx - this._cePt[0], cy = b.cy - this._cePt[1]; if (cx * cx + cy * cy < bd) return -1; }
+    return best;
+  }
+  private _cePressHandle(): boolean {
+    const h = this.ceHandleAt();
+    if (h < 0) return false;
+    const b = this.ceBoxOut, k = b.hk[h];
+    this._ceArm(b.kind, b.id, k === 1 || k === 2 ? 'size' : k === 3 ? 'turn' : k === 4 ? 'length' : k === 5 ? 'width' : k === 6 ? 'aspect' : k === 7 ? 'base' : k === 9 || k === 10 ? 'stretch' : 'look');
+    if (k === 9 || k === 10) this.ce.p1 = k === 9 ? 0 : 1;
+    return true;
+  }
+  private _ceArmPick(): void {
+    const b = this.ceBox();
+    if (b.ok && b.kind === 'body' && this.ceAlt) { this._ceArm('body', 'main', ''); return; }
+    if (!b.ok || b.kind === 'body') { this.ce.phase = 0; return; }
+    this._ceArm(b.kind, b.id, 'move');
+  }
+  private _ceArm(kind: '' | 'body' | 'layer' | 'turret' | 'sub', id: string, mode: GameLogic['ce']['mode']): void {
+    const ce = this.ce, b = this.ceBoxOut;
+    this._ceLocal(this._cePt);
+    ce.phase = 1; ce.mode = mode; ce.kind = kind; ce.id = id; ce.copied = false; ce.around = false;
+    ce.downSX = this.mouseX; ce.downSY = this.mouseY; ce.downX = this._cePt[0]; ce.downY = this._cePt[1];
+    ce.cx = b.cx; ce.cy = b.cy; ce.guideX = NaN; ce.guideY = NaN; ce.guideR = NaN; ce.label = '';
+    this._ceTake();
+    if (mode === 'move') this._ceSnapBuild(kind, id);
+  }
+  public ceSubActive(): boolean {
+    return !this.state.isTestMode && this.isTurretPlacementEnabled && !this.isMapDesignerActive && this.state.canvasEntityKind === 'tank'
+      && this.state.autoSubTurretEditMode && this.state.autoSubTurretSelectMode && !this.previewMotion;
+  }
+  private _ceSubFrame(parent: Turret, o: { frameA: number; frameS: number; frameX: number; frameY: number }): number {
+    const L = this.getLayerForTurret(parent.id);
+    const S = tankSizeFromSlider(this.state.tankSize) * (L ? L.sizeRatio : 1);
+    const baseA = this.tankAngle + (L ? layerTurnInBody(L, this.tankAngle) : 0);
+    let ox = 0, oy = 0;
+    if (L && this.editorLayerPlace(L)) { ox = this.edLayerPlace[0]; oy = this.edLayerPlace[1]; }
+    const c = Math.cos(baseA), s = Math.sin(baseA), px = parent.xOffset * S / 2, py = parent.yOffset * S / 2;
+    const circleR = ((parent.autoCircleSize ?? 25) / 50) * (S * 0.96) * 0.7;
+    o.frameA = baseA + parent.angle; o.frameS = circleR; o.frameX = ox + px * c - py * s; o.frameY = oy + px * s + py * c;
+    return circleR * 2;
+  }
+  private _ceSnapBuild(kind: string, id: string): void {
+    const P = this._ceSnap, cap = P.length - 2;
+    let n = 0;
+    const add = (x: number, y: number) => { if (n < cap) { P[n++] = x; P[n++] = y; } };
+    const poly = (cx: number, cy: number, sides: number, r: number, a: number) => {
+      const k = Math.floor(sides);
+      if (k < 3) return;
+      const V = r * getRealSizeFactor(k), F = V * Math.cos(Math.PI / k);
+      for (let i = 0; i < k; i++) {
+        const ai = a + (Math.PI * 2 * i) / k;
+        add(cx + Math.cos(ai) * V, cy + Math.sin(ai) * V);
+        add(cx + Math.cos(ai + Math.PI / k) * F, cy + Math.sin(ai + Math.PI / k) * F);
+      }
+    };
+    const R = tankSizeFromSlider(this.state.tankSize) / 2;
+    let nr = 0;
+    const part = (x: number, y: number) => {
+      add(x, y);
+      if (Math.abs(y) > 1e-6) add(x, -y);
+      const d = Math.sqrt(x * x + y * y);
+      if (d > 1e-6 && nr < this._ceRadii.length) this._ceRadii[nr++] = d;
+    };
+    this._ceRadiiN = 0;
+    add(0, 0);
+    if (kind === 'sub') { this._ceSnapN = n; return; }
+    if (!this.partHidden('main')) {
+      const sides = this.state.tankSides, k = Math.floor(sides);
+      const evenOff = (k >= 4 && k % 2 === 0) ? -Math.PI / k : 0;
+      poly(0, 0, sides, R, this.tankAngle + (this._baseBodyAngle || 0) + evenOff + (sides % 1) * Math.PI * 2);
+    }
+    for (const L of this.state.bodyLayers) {
+      if ((kind === 'layer' && L.id === id) || this.partHidden(L.id)) continue;
+      let cx = 0, cy = 0;
+      if (this.editorLayerPlace(L)) { cx = this.edLayerPlace[0]; cy = this.edLayerPlace[1]; part(cx, cy); }
+      const sl = layerSolidOf(L);
+      if (sl !== null) {
+        const sv = solidStill(sl), r = R * L.sizeRatio, nc = L.copies > 1 ? L.copies : 1;
+        for (let c = 0; c < nc; c++) {
+          const a = this.tankAngle + layerTurnInBody(L, this.tankAngle) + (L.initialAngle ?? 0) + (Math.PI * 2 * c) / nc, ca = Math.cos(a), sa = Math.sin(a);
+          for (let i = 0; i < sv.cornerCount; i++) { const x = sv.corners[i * 2] * r, y = sv.corners[i * 2 + 1] * r; add(cx + x * ca - y * sa, cy + x * sa + y * ca); }
+        }
+      } else if (!L.outline) poly(cx, cy, L.sides, R * L.sizeRatio, this.tankAngle + layerTurnInBody(L, this.tankAngle) + (L.initialAngle ?? 0));
+    }
+    if (kind === 'turret') {
+      for (const t of this.state.turrets) {
+        if (t.id === id || this.partHidden(t.id)) continue;
+        this._ceTurretFrame(t, this._ceF);
+        const f = this._ceF, c = Math.cos(f.frameA), s = Math.sin(f.frameA);
+        part(f.frameX + (t.xOffset * c - t.yOffset * s) * f.frameS, f.frameY + (t.xOffset * s + t.yOffset * c) * f.frameS);
+      }
+    }
+    this._ceSnapN = n;
+    this._ceRadiiN = nr;
+  }
+  private _ceSnapPoint(x: number, y: number, slack: number, edge: boolean, out: number[]): void {
+    const ce = this.ce, P = this._ceSnap;
+    let best = -1, bd = slack * slack;
+    for (let i = 0; i < this._ceSnapN; i += 2) { const dx = P[i] - x, dy = P[i + 1] - y, d = dx * dx + dy * dy; if (d <= bd) { bd = d; best = i; } }
+    if (best >= 0) { out[0] = P[best]; out[1] = P[best + 1]; ce.guideX = out[0]; ce.guideY = out[1]; return; }
+    out[0] = x; out[1] = y;
+    if (Math.abs(x) <= slack) { out[0] = 0; ce.guideX = 0; }
+    if (Math.abs(y) <= slack) { out[1] = 0; ce.guideY = 0; }
+    if (edge && ce.guideX !== ce.guideX && ce.guideY !== ce.guideY && Math.floor(this.state.tankSides) < 3 && !this.partHidden('main')) {
+      const R = tankSizeFromSlider(this.state.tankSize) / 2, d = Math.sqrt(x * x + y * y);
+      if (d > 1e-9 && Math.abs(d - R) <= slack) { out[0] = x / d * R; out[1] = y / d * R; ce.guideR = R; }
+    }
+    if (ce.guideR !== ce.guideR && ce.guideX !== ce.guideX && ce.guideY !== ce.guideY) {
+      const d = Math.sqrt(x * x + y * y);
+      let bestR = NaN, bdR = slack;
+      for (let i = 0; i < this._ceRadiiN; i++) { const e = Math.abs(d - this._ceRadii[i]); if (e <= bdR) { bdR = e; bestR = this._ceRadii[i]; } }
+      if (bestR === bestR && d > 1e-9) { out[0] = x / d * bestR; out[1] = y / d * bestR; ce.guideR = bestR; }
+    }
+  }
+  private readonly _ceS: number[] = [0, 0];
+  private _ceTake(): void {
+    const ce = this.ce;
+    if (ce.kind === 'layer') {
+      const L = this.state.bodyLayers.find(l => l.id === ce.id);
+      if (!L) { ce.phase = 0; return; }
+      ce.o1 = L.x ?? 0; ce.o2 = L.y ?? 0; ce.o3 = L.sizeRatio; ce.o4 = L.initialAngle ?? 0;
+      this.shapeFrameOf(L, ce);
+      if (ce.mode === 'point' || ce.mode === 'stretch') {
+        const p0 = this.layerPathOf(L);
+        this.pe.path = p0 ? copyPath(p0) : null;
+        if (!this.pe.path) { ce.phase = 0; return; }
+        if (ce.mode === 'point') {
+          const q = this.pe.path[this.pe.pick];
+          if (!q) { ce.phase = 0; return; }
+          ce.o1 = q[0] + (this.pe.part === 1 ? q[2] : this.pe.part === 2 ? q[4] : 0);
+          ce.o2 = q[1] + (this.pe.part === 1 ? q[3] : this.pe.part === 2 ? q[5] : 0);
+          this._ceSnapBuildShape(L);
+        }
+      }
+      return;
+    }
+    if (ce.kind === 'turret') {
+      const t = this.state.turrets.find(x => x.id === ce.id);
+      if (!t) { ce.phase = 0; return; }
+      this._ceTurretFrame(t, ce);
+      ce.o1 = t.xOffset; ce.o2 = t.yOffset; ce.o3 = t.angle;
+      { const S = ce.frameS * 2; ce.p1 = (t.length - 1) * (S / 2 + S * 10 - S * 0.01) / 99 + S * 0.01; ce.p2 = (t.width / 50) * (S * 0.96); }
+      ce.o4 = ce.mode === 'base' ? (t.autoCircleSize ?? 25) : ce.mode === 'look' ? (t.look ? t.look.size : 1) : 0;
+      return;
+    }
+    if (ce.kind === 'sub') {
+      const parent = this._getAutoSubParent();
+      const sub = parent && parent.autoSubTurrets ? parent.autoSubTurrets.find(x => x.id === ce.id) : undefined;
+      if (!parent || !sub) { ce.phase = 0; return; }
+      this._ceSubFrame(parent, ce);
+      ce.o1 = sub.xOffset; ce.o2 = sub.yOffset; ce.o3 = sub.angle; ce.o4 = 0;
+      { const S = ce.frameS * 2; ce.p1 = (sub.length - 1) * (S / 2 + S * 10 - S * 0.01) / 99 + S * 0.01; ce.p2 = (sub.width / 50) * (S * 0.96); }
+    }
+  }
+  private _ceUnbake(t: Turret, L: BodyLayer | null, bx: number, by: number, out: number[]): void {
+    const scale = this._getBakeScaleForTurret(t, L);
+    if (t._bakeShiftX !== undefined && t._bakeShiftY !== undefined) { out[0] = (bx - t._bakeShiftX) / scale; out[1] = (by - t._bakeShiftY) / scale; return; }
+    const shift = L ? this._computePlacementLayerShift(t._origLength ?? t.length, scale, L, t._bakeSnap ?? this.state.snapPlacement) : 0;
+    if (scale === 1 && shift === 0) { out[0] = bx; out[1] = by; return; }
+    const rb = Math.sqrt(bx * bx + by * by);
+    if (rb < 1e-9) { out[0] = 0; out[1] = 0; return; }
+    const ro = Math.max(0, (rb - shift) / scale);
+    out[0] = bx / rb * ro; out[1] = by / rb * ro;
+  }
+  private readonly _ceO: number[] = [0, 0];
+  private _ceMove(): void {
+    const ce = this.ce;
+    if (!this.ceActive() && !this.ceSubActive()) { this._ceUp(); return; }
+    if (ce.mode === '') return;
+    if (ce.phase === 1) {
+      const dsx = this.mouseX - ce.downSX, dsy = this.mouseY - ce.downSY;
+      if (dsx * dsx + dsy * dsy < 16) return;
+      ce.phase = 2;
+      if (ce.mode === 'move' && this.ceAlt) this._ceCopyForDrag();
+    }
+    if (ce.phase !== 2) return;
+    this._ceLocal(this._cePt);
+    const px = this._cePt[0], py = this._cePt[1];
+    if (ce.mode === 'pen') {
+      const P = this.pen.pts, j = P.length - 6;
+      if (j < 0 || !this.pen.held) return;
+      let hx = px - P[j], hy = py - P[j + 1];
+      if (this.ceShift) { const L0 = Math.hypot(hx, hy), a = Math.round(Math.atan2(hy, hx) / (Math.PI / 12)) * (Math.PI / 12); hx = Math.cos(a) * L0; hy = Math.sin(a) * L0; }
+      P[j + 4] = hx; P[j + 5] = hy; P[j + 2] = -hx; P[j + 3] = -hy;
+      ce.label = 'Curve';
+      return;
+    }
+    const snapOn = !this.ceCtrl;
+    const slack = 7 / (this.zoom || 1);
+    ce.guideX = NaN; ce.guideY = NaN; ce.guideR = NaN;
+    const R = tankSizeFromSlider(this.state.tankSize) / 2;
+    if (ce.kind === 'sub') {
+      const parent = this._getAutoSubParent();
+      const sub = parent && parent.autoSubTurrets ? parent.autoSubTurrets.find(x => x.id === ce.id) : undefined;
+      if (!sub || this.state.autoSubTurretSelectedId !== ce.id) { ce.phase = 0; return; }
+      const c = Math.cos(ce.frameA), s = Math.sin(ce.frameA);
+      const fx = px - ce.frameX, fy = py - ce.frameY, dx0 = ce.downX - ce.frameX, dy0 = ce.downY - ce.frameY;
+      const ux = (fx * c + fy * s) / ce.frameS, uy = (-fx * s + fy * c) / ce.frameS;
+      const ux0 = (dx0 * c + dy0 * s) / ce.frameS, uy0 = (-dx0 * s + dy0 * c) / ce.frameS;
+      if (ce.mode === 'move') {
+        let nx = ce.o1 + (ux - ux0), ny = ce.o2 + (uy - uy0);
+        if (snapOn && Math.sqrt(nx * nx + ny * ny) * ce.frameS <= slack) { nx = 0; ny = 0; ce.guideX = ce.frameX; ce.guideY = ce.frameY; }
+        this.updateAutoSubTurretEditing({ xOffset: nx, yOffset: ny }, true);
+        ce.label = 'X ' + nx.toFixed(3) + '   Y ' + ny.toFixed(3);
+      } else if (ce.mode === 'turn') {
+        let turn = Math.atan2(uy - ce.o2, ux - ce.o1) - Math.atan2(uy0 - ce.o2, ux0 - ce.o1);
+        if (this.ceShift) { const target = Math.round((ce.o3 + turn) / (Math.PI / 12)) * (Math.PI / 12); turn = target - ce.o3; }
+        else if (snapOn) turn = this._ceSnapTurn(ce.o3 + turn, Math.abs(ce.o1) + Math.abs(ce.o2) > 1e-6 ? Math.atan2(ce.o2, ce.o1) : NaN) - ce.o3;
+        this.updateAutoSubTurretEditing({ angle: ce.o3 + turn } as Partial<Turret>, true);
+        ce.label = 'Facing ' + ((((ce.o3 + turn) * 180 / Math.PI) % 360 + 360) % 360).toFixed(1) + ' deg';
+      } else if (ce.mode === 'length' || ce.mode === 'width' || ce.mode === 'aspect') {
+        const S = ce.frameS * 2, cg = Math.cos(ce.o3), sg = Math.sin(ce.o3);
+        const along = ((ux - ce.o1) * cg + (uy - ce.o2) * sg) * ce.frameS, perp = Math.abs(-(ux - ce.o1) * sg + (uy - ce.o2) * cg) * ce.frameS;
+        if (ce.mode === 'length') {
+          const tl = Math.max(S * 0.01, along);
+          const len = Math.max(1, (tl - S * 0.01) * 99 / (S / 2 + S * 10 - S * 0.01) + 1);
+          if (this.ceShift && ce.p1 > 1e-9) this.updateAutoSubTurretEditing({ length: len, width: Math.max(0, (ce.p2 * tl / ce.p1) / (S * 0.96) * 50) }, true);
+          else this.updateAutoSubTurretEditing({ length: len }, true);
+          ce.label = 'Length ' + len.toFixed(2);
+        } else if (ce.mode === 'width') {
+          const k1 = Math.max(0.1, Math.abs(1 + (sub.aspect ?? 1)));
+          const w = Math.max(0, (perp * 4 / k1) / (S * 0.96) * 50);
+          if (this.ceShift && ce.p2 > 1e-9) {
+            const tl = Math.max(S * 0.01, ce.p1 * (w / 50 * (S * 0.96)) / ce.p2);
+            this.updateAutoSubTurretEditing({ width: w, length: Math.max(1, (tl - S * 0.01) * 99 / (S / 2 + S * 10 - S * 0.01) + 1) }, true);
+          } else this.updateAutoSubTurretEditing({ width: w }, true);
+          ce.label = 'Width ' + w.toFixed(2);
+        } else {
+          const wid = (sub.width / 50) * (S * 0.96);
+          const asp = wid > 1e-6 ? Math.max(0.05, perp / (wid / 2)) : 1;
+          this.updateAutoSubTurretEditing({ aspect: asp }, true);
+          ce.label = 'Aspect ' + asp.toFixed(3);
+        }
+      }
+    } else if (ce.kind === 'layer') {
+      const L = this.state.bodyLayers.find(l => l.id === ce.id);
+      if (!L) { ce.phase = 0; return; }
+      if (ce.mode === 'move') {
+        let nx = ce.frameX + (px - ce.downX), ny = ce.frameY + (py - ce.downY);
+        if (snapOn) {
+          this._ceSnapPoint(nx, ny, slack, false, this._ceS); nx = this._ceS[0]; ny = this._ceS[1];
+          for (const o of this.state.bodyLayers) {
+            if (o.id === L.id || !this.editorLayerPlace(o)) continue;
+            if (ce.guideX !== ce.guideX && Math.abs(nx - this.edLayerPlace[0]) <= slack) { nx = this.edLayerPlace[0]; ce.guideX = nx; }
+            if (ce.guideY !== ce.guideY && Math.abs(ny - this.edLayerPlace[1]) <= slack) { ny = this.edLayerPlace[1]; ce.guideY = ny; }
+          }
+        }
+        L.x = nx / R; L.y = ny / R;
+        if (L.x === 0 && L.y === 0) { L.x = undefined; L.y = undefined; }
+        else { L.x = Math.max(-LAYER_PLACE_MAX, Math.min(LAYER_PLACE_MAX, L.x)); L.y = Math.max(-LAYER_PLACE_MAX, Math.min(LAYER_PLACE_MAX, L.y)); }
+        ce.label = 'X ' + (L.x ?? 0).toFixed(3) + '   Y ' + (L.y ?? 0).toFixed(3);
+      } else if (ce.mode === 'size') {
+        const d0 = Math.hypot(ce.downX - ce.frameX, ce.downY - ce.frameY), d1 = Math.hypot(px - ce.frameX, py - ce.frameY);
+        if (d0 > 1e-6) L.sizeRatio = Math.max(0.05, Math.min(100, ce.o3 * d1 / d0));
+        let same = '';
+        if (snapOn) {
+          let bd = 0.02;
+          if (Math.abs(L.sizeRatio - 1) / 1 <= bd) { bd = Math.abs(L.sizeRatio - 1); same = 'the main body'; }
+          for (const o of this.state.bodyLayers) {
+            if (o.id === L.id) continue;
+            const e = Math.abs(L.sizeRatio - o.sizeRatio) / o.sizeRatio;
+            if (e <= bd) { bd = e; same = o.label; }
+          }
+          if (same === 'the main body') L.sizeRatio = 1;
+          else if (same !== '') { for (const o of this.state.bodyLayers) if (o.label === same && o.id !== L.id) { L.sizeRatio = o.sizeRatio; break; } }
+        }
+        ce.label = 'Size Ratio ' + L.sizeRatio.toFixed(3) + 'x' + (same !== '' ? ', as ' + same : '');
+      } else if (ce.mode === 'turn') {
+        let a = ce.o4 + Math.atan2(py - ce.frameY, px - ce.frameX) - Math.atan2(ce.downY - ce.frameY, ce.downX - ce.frameX);
+        if (this.ceShift) a = Math.round(a / (Math.PI / 12)) * (Math.PI / 12);
+        else if (snapOn) a = this._ceSnapTurn(a, NaN);
+        a = ((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+        L.initialAngle = a;
+        ce.label = 'Angle ' + (a * 180 / Math.PI).toFixed(1) + ' deg';
+      } else if (ce.mode === 'point' && this.pe.path) {
+        const p = this.pe.path, q = p[this.pe.pick];
+        if (!q) { ce.phase = 0; return; }
+        const c = Math.cos(ce.frameA), s = Math.sin(ce.frameA);
+        const ex = px - ce.frameX, ey = py - ce.frameY, fx0 = ce.downX - ce.frameX, fy0 = ce.downY - ce.frameY;
+        let tu = ce.o1 + ((ex - fx0) * c + (ey - fy0) * s) / ce.frameS, tv = ce.o2 + (-(ex - fx0) * s + (ey - fy0) * c) / ce.frameS;
+        if (snapOn && this.pe.part === 0) {
+          this._ceSnapPoint(ce.frameX + (tu * c - tv * s) * ce.frameS, ce.frameY + (tu * s + tv * c) * ce.frameS, slack, false, this._ceS);
+          const gx = this._ceS[0] - ce.frameX, gy = this._ceS[1] - ce.frameY;
+          tu = (gx * c + gy * s) / ce.frameS; tv = (-gx * s + gy * c) / ce.frameS;
+        }
+        if (this.pe.part === 0) { q[0] = tu; q[1] = tv; ce.label = 'X ' + tu.toFixed(3) + '   Y ' + tv.toFixed(3); }
+        else {
+          const ia = this.pe.part === 1 ? 2 : 4, ib = this.pe.part === 1 ? 4 : 2;
+          const hx = tu - q[0], hy = tv - q[1];
+          const smooth = !this.ceAlt && (q[ib] !== 0 || q[ib + 1] !== 0);
+          q[ia] = hx; q[ia + 1] = hy;
+          if (smooth) { const lb = Math.hypot(q[ib], q[ib + 1]), lh = Math.hypot(hx, hy) || 1; q[ib] = -hx / lh * lb; q[ib + 1] = -hy / lh * lb; }
+          ce.label = 'Curve ' + Math.hypot(hx, hy).toFixed(3);
+        }
+      } else if (ce.mode === 'stretch' && this.pe.path) {
+        const base = this.layerPathOf(L);
+        if (!base || base.length !== this.pe.path.length) { ce.phase = 0; return; }
+        const c = Math.cos(ce.frameA), s = Math.sin(ce.frameA);
+        const d0x = ce.downX - ce.frameX, d0y = ce.downY - ce.frameY, d1x = px - ce.frameX, d1y = py - ce.frameY;
+        const along = ce.p1 === 0;
+        const a0 = along ? d0x * c + d0y * s : -d0x * s + d0y * c, a1 = along ? d1x * c + d1y * s : -d1x * s + d1y * c;
+        let k = Math.abs(a0) > 1e-6 ? a1 / a0 : 1;
+        if (Math.abs(k) < 0.05) k = k < 0 ? -0.05 : 0.05;
+        const sx = along ? k : 1, sy = along ? 1 : k, p = this.pe.path;
+        for (let i = 0; i < p.length; i++) { const q = base[i], w = p[i]; w[0] = q[0] * sx; w[1] = q[1] * sy; w[2] = q[2] * sx; w[3] = q[3] * sy; w[4] = q[4] * sx; w[5] = q[5] * sy; }
+        ce.label = (along ? 'Length x' : 'Width x') + k.toFixed(3);
+      }
+    } else if (ce.kind === 'turret') {
+      const t = this.state.turrets.find(x => x.id === ce.id);
+      if (!t || this.state.selectedTurretId !== t.id) { ce.phase = 0; return; }
+      const L = this.getLayerForTurret(t.id);
+      const c = Math.cos(ce.frameA), s = Math.sin(ce.frameA);
+      const fx = px - ce.frameX, fy = py - ce.frameY;
+      const ux = (fx * c + fy * s) / ce.frameS, uy = (-fx * s + fy * c) / ce.frameS;
+      const dx0 = ce.downX - ce.frameX, dy0 = ce.downY - ce.frameY;
+      const ux0 = (dx0 * c + dy0 * s) / ce.frameS, uy0 = (-dx0 * s + dy0 * c) / ce.frameS;
+      const bx0 = ce.o1, by0 = ce.o2;
+      const S = ce.frameS * 2;
+      if (ce.mode === 'move') {
+        let bx = bx0 + (ux - ux0), by = by0 + (uy - uy0);
+        if (snapOn) {
+          const wx = ce.frameX + (bx * c - by * s) * ce.frameS, wy = ce.frameY + (bx * s + by * c) * ce.frameS;
+          this._ceSnapPoint(wx, wy, slack, true, this._ceS);
+          const sx = this._ceS[0], sy = this._ceS[1];
+          if (sx !== wx || sy !== wy) { const gx = sx - ce.frameX, gy = sy - ce.frameY; bx = (gx * c + gy * s) / ce.frameS; by = (-gx * s + gy * c) / ce.frameS; }
+        }
+        this._ceUnbake(t, L, bx, by, this._ceO);
+        this.updateEditingTurret({ xOffset: this._ceO[0], yOffset: this._ceO[1] }, true);
+        ce.label = 'X ' + this._ceO[0].toFixed(3) + '   Y ' + this._ceO[1].toFixed(3);
+      } else if (ce.mode === 'turn') {
+        const g0 = Math.atan2(uy0 - by0, ux0 - bx0);
+        let g = Math.atan2(uy - by0, ux - bx0);
+        let turn = g - g0;
+        if (this.ceShift) { const target = Math.round((ce.o3 + turn) / (Math.PI / 12)) * (Math.PI / 12); turn = target - ce.o3; }
+        else if (snapOn && !this.ceAlt) {
+          let out = Math.abs(bx0) + Math.abs(by0) > 1e-6 ? Math.atan2(by0, bx0) : NaN;
+          {
+            const nC = this.turretFacingSnaps(t.id, this._tfs), want = ce.o3 + turn;
+            let aim = 0;
+            if (t.turretType === 'auto' && t.primarySubTurretId && t.autoSubTurrets) { const ss = t.autoSubTurrets; for (let i = 0; i < ss.length; i++) if (ss[i].id === t.primarySubTurretId) { aim = ss[i].angle; break; } }
+            let bd = Infinity;
+            for (let i = 0; i < nC; i++) {
+              let e = this._tfs[i] - aim; e += Math.round((want - e) / (Math.PI * 2)) * Math.PI * 2;
+              const d = Math.abs(want - e);
+              if (d < bd) { bd = d; out = e; }
+            }
+          }
+          turn = this._ceSnapTurn(ce.o3 + turn, out) - ce.o3;
+        }
+        if (this.ceAlt && t.look === undefined) {
+          ce.around = true;
+          const pr = Math.atan2(by0, bx0) + turn, pd = Math.sqrt(bx0 * bx0 + by0 * by0);
+          this._ceUnbake(t, L, pd * Math.cos(pr), pd * Math.sin(pr), this._ceO);
+          this.updateEditingTurret({ xOffset: this._ceO[0], yOffset: this._ceO[1], angle: ce.o3 + turn } as Partial<Turret>, true);
+        } else this.updateEditingTurret({ angle: ce.o3 + turn } as Partial<Turret>, true);
+        void g;
+        const deg = (((ce.o3 + turn) * 180 / Math.PI) % 360 + 360) % 360;
+        ce.label = 'Facing ' + deg.toFixed(1) + ' deg';
+      } else if (ce.mode === 'length' || ce.mode === 'width' || ce.mode === 'aspect') {
+        const ga = t.angle, cg = Math.cos(ga), sg = Math.sin(ga);
+        const along = ((ux - bx0) * cg + (uy - by0) * sg) * ce.frameS, perp = Math.abs(-(ux - bx0) * sg + (uy - by0) * cg) * ce.frameS;
+        const scale = this._getBakeScaleForTurret(t, L);
+        if (ce.mode === 'length') {
+          const tl = Math.max(S * 0.01, along);
+          const bakedLen = (tl - S * 0.01) * 99 / (S / 2 + S * 10 - S * 0.01) + 1;
+          const orig = scale !== 1 ? (bakedLen - (1 - scale) * 0.9056) / scale : bakedLen;
+          if (this.ceShift && ce.p1 > 1e-9) {
+            const bw = (ce.p2 * tl / ce.p1) / (S * 0.96) * 50;
+            this.updateEditingTurret({ length: Math.max(1, orig), width: Math.max(0, scale !== 1 ? bw / scale : bw) }, true);
+          } else this.updateEditingTurret({ length: Math.max(1, orig) }, true);
+          ce.label = 'Length ' + Math.max(1, orig).toFixed(2);
+        } else if (ce.mode === 'width') {
+          const k1 = Math.max(0.1, Math.abs(1 + (t.aspect ?? 1)));
+          const bakedW = (perp * 4 / k1) / (S * 0.96) * 50;
+          const orig = Math.max(0, scale !== 1 ? bakedW / scale : bakedW);
+          if (this.ceShift && ce.p2 > 1e-9) {
+            const wpx = bakedW / 50 * (S * 0.96), tl = Math.max(S * 0.01, ce.p1 * wpx / ce.p2);
+            const bl = (tl - S * 0.01) * 99 / (S / 2 + S * 10 - S * 0.01) + 1;
+            this.updateEditingTurret({ width: orig, length: Math.max(1, scale !== 1 ? (bl - (1 - scale) * 0.9056) / scale : bl) }, true);
+          } else this.updateEditingTurret({ width: orig }, true);
+          ce.label = 'Width ' + orig.toFixed(2);
+        } else {
+          const wid = (t.width / 50) * (S * 0.96);
+          const asp = wid > 1e-6 ? Math.max(0.05, perp / (wid / 2)) : 1;
+          this.updateEditingTurret({ aspect: asp }, true);
+          ce.label = 'Aspect ' + asp.toFixed(3);
+        }
+      } else if (ce.mode === 'base') {
+        const d = Math.hypot(ux - bx0, uy - by0) * ce.frameS;
+        const size = Math.max(1, d / (S * 0.96 * 0.7) * 50);
+        this.updateEditingTurret({ autoCircleSize: size }, true);
+        ce.label = 'Shape Size ' + size.toFixed(2);
+      } else if (ce.mode === 'look' && t.look) {
+        const d0 = Math.hypot(ux0 - bx0, uy0 - by0), d1 = Math.hypot(ux - bx0, uy - by0);
+        const size = Math.min(LOOK_SIZE.max, Math.max(LOOK_SIZE.min, d0 > 1e-6 ? ce.o4 * d1 / d0 : ce.o4));
+        this.updateEditingTurret({ look: { ...t.look, size } }, true);
+        ce.label = 'Look Size ' + size.toFixed(2);
+      }
+    }
+    const now = performance.now();
+    if (now - ce.notifyAt > 90) { ce.notifyAt = now; if (this.onStateChange) this.onStateChange(this.state); }
+  }
+  private _ceCopyForDrag(): void {
+    const ce = this.ce;
+    if (ce.kind === 'layer') {
+      const c = this.duplicateBodyLayer(ce.id);
+      if (!c) return;
+      this.partPicked = true;
+      ce.id = c.id; ce.copied = true;
+    } else if (ce.kind === 'turret') {
+      const id = this.duplicatePickedTurret(0);
+      if (!id) return;
+      ce.id = id; ce.copied = true;
+    }
+    this._ceTake();
+  }
+  private _ceUp(): void {
+    const ce = this.ce, was = ce.phase;
+    ce.phase = 0; ce.guideX = NaN; ce.guideY = NaN; ce.guideR = NaN;
+    if (ce.mode === 'pen') { this.pen.held = false; ce.label = ''; if (this.onStateChange) this.onStateChange(this.state); return; }
+    if (was === 1 && this.ceAlt && this.ceActive() && !this.turretPlacing && !this.pe.on) { this._cePickUnder(); return; }
+    if (was !== 2) { if (ce.mode === 'point' || ce.mode === 'stretch') this.pe.path = null; return; }
+    if (ce.kind === 'layer' && (ce.mode === 'point' || ce.mode === 'stretch')) {
+      const L = this.state.bodyLayers.find(l => l.id === ce.id), p = this.pe.path;
+      this.pe.path = null;
+      if (L && p) this._commitLayerPath(L, p, (ce.mode === 'point' ? 'Moved a point of ' : 'Stretched ') + L.label);
+      ce.label = '';
+      return;
+    }
+    if (ce.kind === 'sub') {
+      const parent = this._getAutoSubParent();
+      const sub = parent && parent.autoSubTurrets ? parent.autoSubTurrets.find(x => x.id === ce.id) : undefined;
+      if (sub) {
+        this.historyHint = { label: (ce.mode === 'move' ? 'Moved ' : ce.mode === 'turn' ? 'Turned ' : 'Sized ') + turretShownName(sub, parent!.autoSubTurrets.indexOf(sub)), kind: 'edit' };
+        this.updateAutoSubTurretEditing(ce.mode === 'move' ? { xOffset: this._ceNum(sub.xOffset), yOffset: this._ceNum(sub.yOffset) }
+          : ce.mode === 'length' || ce.mode === 'width' ? { length: this._ceNum(sub.length), width: this._ceNum(sub.width) }
+          : ce.mode === 'aspect' ? { aspect: this._ceNum(sub.aspect ?? 1) } : {});
+      }
+      ce.label = '';
+      return;
+    }
+    if (ce.kind === 'layer') {
+      const L = this.state.bodyLayers.find(l => l.id === ce.id);
+      if (L) {
+        const u: Partial<BodyLayer> = ce.mode === 'move' ? { x: L.x === undefined ? undefined : this._ceNum(L.x), y: L.y === undefined ? undefined : this._ceNum(L.y) }
+          : ce.mode === 'size' ? { sizeRatio: this._ceNum(L.sizeRatio) } : { initialAngle: this._ceNum(L.initialAngle ?? 0) };
+        this.historyHint = { label: (ce.copied ? 'Copied ' : ce.mode === 'move' ? 'Moved ' : ce.mode === 'size' ? 'Sized ' : 'Turned ') + L.label, kind: 'layer' };
+        this.updateBodyLayer(L.id, u);
+      }
+    } else if (ce.kind === 'turret') {
+      const e = this.state.editingTurret;
+      const u: Partial<Turret> = ce.mode === 'move' ? { xOffset: this._ceNum(e.xOffset), yOffset: this._ceNum(e.yOffset) }
+        : ce.mode === 'length' || ce.mode === 'width' ? { length: this._ceNum(e.length), width: this._ceNum(e.width) }
+        : ce.mode === 'aspect' ? { aspect: this._ceNum(e.aspect ?? 1) }
+        : ce.mode === 'turn' && ce.around ? { xOffset: this._ceNum(e.xOffset), yOffset: this._ceNum(e.yOffset) } : ce.mode === 'base' ? { autoCircleSize: this._ceNum(e.autoCircleSize ?? 25) } : {};
+      const t = this.state.turrets.find(x => x.id === ce.id);
+      const idx = this.state.turrets.findIndex(x => x.id === ce.id);
+      this.historyHint = { label: (ce.copied ? 'Copied ' : ce.mode === 'move' ? 'Moved ' : ce.mode === 'turn' ? 'Turned ' : 'Sized ') + turretShownName(t, idx), kind: 'edit' };
+      this.updateEditingTurret(u);
+    }
+    ce.label = '';
+  }
+  private _cePickUnder(): void {
+    this._ceLocal(this._cePt);
+    if (this.partAtPoint(this._cePt[0], this._cePt[1], 1, false, 4 / (this.zoom || 1))) this.pickPartAtMouse(1);
+  }
+  public ceOverPick(): boolean {
+    const b = this.ceBox();
+    if (!b.ok || b.kind === 'body') return false;
+    this._ceLocal(this._cePt);
+    if (b.kind === 'sub') {
+      const c = Math.cos(b.a), s = Math.sin(b.a), dx = this._cePt[0] - b.cx, dy = this._cePt[1] - b.cy;
+      return Math.abs(dx * c + dy * s) <= b.hw && Math.abs(-dx * s + dy * c) <= b.hh;
+    }
+    return this.partAtPoint(this._cePt[0], this._cePt[1], 0, false, 4 / (this.zoom || 1)) && this.partHit.id === b.id && this.partHit.subId === '';
+  }
+  public ceCancel(): void { if (this.ce.phase !== 0) this._ceUp(); }
+
+  public editorWheel(mx: number, my: number, deltaY: number): void {
+    if (!this.ceActiveView() || deltaY === 0) return;
+    this._edGlide = false;
+    const k = deltaY > 0 ? 1 / 1.12 : 1.12;
+    const z0 = this.zoom, nz = Math.max(0.15, Math.min(12, this.edZoom * k));
+    const z1 = z0 * nz / this.edZoom;
+    const wx = this.cameraX + (mx - this.width / 2) / z0, wy = this.cameraY + (my - this.height / 2) / z0;
+    this.edZoom = nz;
+    this.zoom = z1;
+    const camX = wx - (mx - this.width / 2) / z1, camY = wy - (my - this.height / 2) / z1;
+    this.edPanX = camX - (this.tankPos.x + this.getEditorPanelOffsetX());
+    this.edPanY = camY - (this.tankPos.y + this.getEditorPanelOffsetY());
+    this.cameraX = camX; this.cameraY = camY;
+  }
+  public editorPanBy(dsx: number, dsy: number): void {
+    if (!this.ceActiveView()) return;
+    this._edGlide = false;
+    this.edPanX -= dsx / (this.zoom || 1); this.edPanY -= dsy / (this.zoom || 1);
+    this.cameraX = this.tankPos.x + this.getEditorPanelOffsetX() + this.edPanX;
+    this.cameraY = this.tankPos.y + this.getEditorPanelOffsetY() + this.edPanY;
+  }
+  public resetEditorView(instant: boolean = false): void {
+    if (!instant && (this.edZoom !== 1 || this.edPanX !== 0 || this.edPanY !== 0)) { this._edGlide = true; return; }
+    this._edGlide = false;
+    if (this.edZoom !== 1) this.zoom /= this.edZoom;
+    this.edZoom = 1; this.edPanX = 0; this.edPanY = 0;
+  }
+  private _stepEditorGlide(dt: number): void {
+    const k = 1 - Math.pow(GLIDE_KEEP_PER_60, 60 * Math.min(Math.max(dt, 0), 0.1));
+    const z0 = this.edZoom;
+    const z = 1 / (1 / z0 + (1 - 1 / z0) * k);
+    const px = this.edPanX * (1 - k), py = this.edPanY * (1 - k);
+    const zz = this.zoom || 1;
+    const done = Math.abs(z - 1) <= 1e-3 && Math.abs(px) * zz < 0.5 && Math.abs(py) * zz < 0.5;
+    const nz = done ? 1 : z;
+    this.zoom = this.zoom / z0 * nz;
+    this.edZoom = nz;
+    this.edPanX = done ? 0 : px; this.edPanY = done ? 0 : py;
+    if (done) this._edGlide = false;
+  }
+  public ceActiveView(): boolean { return !this.state.isTestMode && !this.isMapDesignerActive; }
+
+  public pickedPart(): { kind: 'turret' | 'layer' | 'body'; id: string } | null {
+    if (this.state.selectedTurretId) return { kind: 'turret', id: this.state.selectedTurretId };
+    if (!this.partPicked) return null;
+    return this.state.activeBodyLayerId === null ? { kind: 'body', id: 'main' } : { kind: 'layer', id: this.state.activeBodyLayerId };
+  }
+  public duplicatePickedTurret(nudge = 0.1): string | null {
+    const tid = this.state.selectedTurretId;
+    const t = tid ? this.state.turrets.find(x => x.id === tid) : undefined;
+    if (!t) return null;
+    if (!this._roomForTurrets(this.state.turrets.length, 1, 'tank')) return null;
+    const copy = deepCloneTurret(t);
+    if (t.explode) copy.explode = cloneExplode(t.explode);
+    const subsSrc = t.autoSubTurrets ?? [];
+    if (copy.autoSubTurrets) for (let j = 0; j < copy.autoSubTurrets.length; j++) if (subsSrc[j] && subsSrc[j].explode) copy.autoSubTurrets[j].explode = cloneExplode(subsSrc[j].explode);
+    const L = this.getLayerForTurret(t.id);
+    if (nudge !== 0) {
+      copy.xOffset += nudge;
+      if (copy._origXOffset !== undefined) { this._ceUnbake(copy, L, copy.xOffset, copy.yOffset, this._ceO); copy._origXOffset = this._ceO[0]; copy._origYOffset = this._ceO[1]; }
+    }
+    const at = this.state.turrets.indexOf(t);
+    const arr = this.state.turrets.slice(); arr.splice(at + 1, 0, copy); this.state.turrets = arr;
+    if (L) L.turretIds.push(copy.id);
+    this.historyHint = { label: 'Copied ' + turretShownName(t, at), kind: 'add' };
+    this.setSelectMode(false);
+    this.pickTurretForEditing(copy);
+    return copy.id;
+  }
+  private _ceClip: { kind: 'turret' | 'layer'; id: string } | null = null;
+  public canvasEditKey(key: string, ctrl: boolean, shift: boolean): boolean {
+    if (!this.ceActive()) return false;
+    if (this.pen.on && !ctrl) {
+      if (key === 'Enter') { this.penFinish(); return true; }
+      if (key === 'Backspace') { this.penBack(); return true; }
+    }
+    if (this.pe.on && !ctrl && (key === 'ArrowLeft' || key === 'ArrowRight' || key === 'ArrowUp' || key === 'ArrowDown')) {
+      const st = shift ? 0.1 : 0.01;
+      if (this._peNudge(key === 'ArrowLeft' ? -st : key === 'ArrowRight' ? st : 0, key === 'ArrowUp' ? -st : key === 'ArrowDown' ? st : 0)) return true;
+    }
+    if (!ctrl && (key === 'p' || key === 'P')) { this.setPen(!this.pen.on); return true; }
+    if (!ctrl && (key === 'a' || key === 'A')) { if (this.pe.on) this.setPointEdit(false); else this.setPointEdit(true); return true; }
+    if (this.cePlacing()) return false;
+    const p = this.pickedPart();
+    if (!ctrl && (key === 'ArrowLeft' || key === 'ArrowRight' || key === 'ArrowUp' || key === 'ArrowDown')) {
+      if (!p || p.kind === 'body') return false;
+      const step = shift ? 0.1 : 0.01;
+      const dx = key === 'ArrowLeft' ? -step : key === 'ArrowRight' ? step : 0, dy = key === 'ArrowUp' ? -step : key === 'ArrowDown' ? step : 0;
+      this.nudgePicked(dx, dy);
+      return true;
+    }
+    if (!ctrl) return false;
+    const k = key.toLowerCase();
+    if (k === 'd') { this.duplicatePicked(); return true; }
+    if (k === 'c') { if (p && p.kind !== 'body') { this._ceClip = { kind: p.kind, id: p.id }; } return !!p; }
+    if (k === 'v') { this.pastePicked(); return true; }
+    if (key === ']' || key === '[') { if (p && p.kind !== 'body') this.orderPicked(key === ']' ? 1 : -1); return !!p; }
+    return false;
+  }
+  public nudgePicked(dx: number, dy: number): void {
+    const p = this.pickedPart();
+    if (!p) return;
+    if (p.kind === 'layer') {
+      const L = this.state.bodyLayers.find(l => l.id === p.id);
+      if (!L) return;
+      this.historyHint = { label: 'Moved ' + L.label, kind: 'layer' };
+      this.updateBodyLayer(L.id, { x: this._ceNum((L.x ?? 0) + dx), y: this._ceNum((L.y ?? 0) + dy) });
+    } else if (p.kind === 'turret') {
+      const t = this.state.turrets.find(x => x.id === p.id);
+      if (!t) return;
+      const L = this._ceTurretFrame(t, this._ceF);
+      const c = Math.cos(this._ceF.frameA), s = Math.sin(this._ceF.frameA);
+      const k = (tankSizeFromSlider(this.state.tankSize) / 2) / this._ceF.frameS;
+      const fx = (dx * c + dy * s) * k, fy = (-dx * s + dy * c) * k;
+      this._ceUnbake(t, L, t.xOffset + fx, t.yOffset + fy, this._ceO);
+      this.updateEditingTurret({ xOffset: this._ceNum(this._ceO[0]), yOffset: this._ceNum(this._ceO[1]) });
+    }
+  }
+  public duplicatePicked(): void {
+    const p = this.pickedPart();
+    if (!p || p.kind === 'body') return;
+    if (p.kind === 'turret') { this.duplicatePickedTurret(0.1); return; }
+    const c = this.duplicateBodyLayer(p.id);
+    if (c) { this.partPicked = true; if (this.state.activeBodyLayerId !== c.id) this.setActiveBodyLayer(c.id); else if (this.onStateChange) this.onStateChange(this.state); }
+  }
+  public pastePicked(): void {
+    const c = this._ceClip;
+    if (!c) return;
+    if (c.kind === 'layer') {
+      if (!this.state.bodyLayers.some(l => l.id === c.id)) return;
+      const n = this.duplicateBodyLayer(c.id);
+      if (n) { this.partPicked = true; if (this.state.activeBodyLayerId !== n.id) this.setActiveBodyLayer(n.id); }
+      return;
+    }
+    const t = this.state.turrets.find(x => x.id === c.id);
+    if (!t) return;
+    const L = this.getLayerForTurret(t.id);
+    if ((L ? L.id : null) !== this.state.activeBodyLayerId) this.setActiveBodyLayer(L ? L.id : null);
+    this.setSelectMode(false);
+    this.pickTurretForEditing(t);
+    this.duplicatePickedTurret(0.1);
+  }
+  public orderPicked(dir: number): void {
+    const p = this.pickedPart();
+    if (!p || p.kind === 'body') return;
+    if (p.kind === 'turret') {
+      const t = this.state.turrets.find(x => x.id === p.id);
+      if (!t) return;
+      const v = Math.max(0, Math.min(10, (t.renderLayer ?? 0) + dir));
+      this.historyHint = { label: (dir > 0 ? 'Brought forward ' : 'Sent backward ') + turretShownName(t, this.state.turrets.indexOf(t)), kind: 'edit' };
+      this.updateEditingTurret({ renderLayer: v });
+      return;
+    }
+    const L = this.state.bodyLayers.find(l => l.id === p.id);
+    if (!L) return;
+    const ranks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, -5, -4, -3, -2, -1];
+    const i = ranks.indexOf(Math.round(L.renderOrder));
+    const j = Math.max(0, Math.min(ranks.length - 1, (i < 0 ? 0 : i) + dir));
+    this.historyHint = { label: (dir > 0 ? 'Brought forward ' : 'Sent backward ') + L.label, kind: 'layer' };
+    this.updateBodyLayer(L.id, { renderOrder: ranks[j] });
+  }
+  public centerPicked(): void { this._ceRemap((x, y) => [0, 0], 'Centered '); }
+  public mirrorPicked(axis: 'x' | 'y'): void { this._ceRemap((x, y) => axis === 'y' ? [x, -y] : [-x, y], 'Mirrored ', axis); }
+  private _ceRemap(f: (x: number, y: number) => number[], word: string, axis?: 'x' | 'y'): void {
+    const p = this.pickedPart();
+    if (!p || p.kind === 'body') return;
+    if (p.kind === 'layer') {
+      const L = this.state.bodyLayers.find(l => l.id === p.id);
+      if (!L) return;
+      const [nx, ny] = f(L.x ?? 0, L.y ?? 0);
+      this.historyHint = { label: word + L.label, kind: 'layer' };
+      const u: Partial<BodyLayer> = { x: nx === 0 && ny === 0 ? undefined : this._ceNum(nx), y: nx === 0 && ny === 0 ? undefined : this._ceNum(ny) };
+      if (axis) u.initialAngle = this._ceNum(axis === 'y' ? -(L.initialAngle ?? 0) : Math.PI - (L.initialAngle ?? 0));
+      const _mp = axis ? this.layerPathOf(L) : null;
+      if (_mp) { const np = copyPath(_mp); flipPath(np, 'y'); this._commitLayerPath(L, np, word + L.label, u); return; }
+      this.updateBodyLayer(L.id, u);
+      return;
+    }
+    const t = this.state.turrets.find(x => x.id === p.id);
+    if (!t) return;
+    const [bx, by] = f(t.xOffset, t.yOffset);
+    this._ceUnbake(t, this.getLayerForTurret(t.id), bx, by, this._ceO);
+    const u: Partial<Turret> = { xOffset: this._ceNum(this._ceO[0]), yOffset: this._ceNum(this._ceO[1]) };
+    if (axis) (u as Partial<Turret>).angle = axis === 'y' ? -t.angle : Math.PI - t.angle;
+    this.historyHint = { label: word + turretShownName(t, this.state.turrets.indexOf(t)), kind: 'edit' };
+    this.updateEditingTurret(u);
+  }
+  public togglePartLock(id: string): void {
+    if (this.partLocks.has(id)) this.partLocks.delete(id); else this.partLocks.add(id);
+    if (this.onStateChange) this.onStateChange(this.state);
+  }
+  public togglePartHide(id: string): void {
+    if (this.partHides.has(id)) { this.partHides.delete(id); if (this.onStateChange) this.onStateChange(this.state); return; }
+    this.ceCancel();
+    this.partHides.add(id);
+    const s = this.state;
+    if (s.autoSubTurretEditMode && s.autoSubTurretSelectedId === id) { s.autoSubTurretSelectedId = null; this._restoreSubGhostAfterPick(); }
+    if (s.selectedTurretId === id) this.setSelectMode(false);
+    else if (this.partPicked && !s.selectedTurretId && (s.activeBodyLayerId ?? 'main') === id) this.partPicked = false;
+    if (this.onStateChange) this.onStateChange(this.state);
+  }
+  public showAllParts(): void {
+    this.partHides.clear();
+    if (this.onStateChange) this.onStateChange(this.state);
+  }
+  public removePickedLayer(): boolean {
+    const p = this.pickedPart();
+    if (!p || p.kind !== 'layer') return false;
+    this.removeBodyLayer(p.id);
+    return true;
+  }
+  public partUnderPointer(): { kind: 'body' | 'layer' | 'turret'; id: string; subId: string } | null {
+    this._ceLocal(this._cePt);
+    if (!this.partAtPoint(this._cePt[0], this._cePt[1], 0, false, 4 / (this.zoom || 1))) return null;
+    const h = this.partHit;
+    return { kind: h.kind as 'body' | 'layer' | 'turret', id: h.id, subId: h.subId };
+  }
+  public ceMenuShown(): boolean {
+    const was = this._rightCancelledPreview;
+    this._rightCancelledPreview = false;
+    return !was && this.ceActive() && !this.turretPlacing;
+  }
+  private _rightCancelledPreview = false;
+  public ceMenuPick(): { kind: 'turret' | 'layer' | 'body'; id: string } | null {
+    if (!this.ceActive() || this.turretPlacing) return null;
+    this.ceCancel();
+    const u = this.partUnderPointer();
+    if (!u) return null;
+    if (u.kind === 'turret') {
+      const t = this.state.turrets.find(x => x.id === u.id);
+      if (!t) return null;
+      const L = this.getLayerForTurret(t.id);
+      const lid = L ? L.id : null;
+      if (this.state.activeBodyLayerId !== lid) this.setActiveBodyLayer(lid);
+      if (this.state.selectedTurretId !== t.id) this.pickTurretForEditing(t);
+    } else if (!this.partPicked || this.state.selectedTurretId || this.state.activeBodyLayerId !== (u.kind === 'layer' ? u.id : null)) {
+      this.pickPart(u.kind === 'layer' ? u.id : null);
+    }
+    return this.pickedPart();
+  }
+
+  public readonly pe = { on: false, layerId: '', pick: -1, part: 0, path: null as PathPoint[] | null };
+  public readonly pen = { on: false, pts: [] as number[], held: false };
+  private readonly _peT: number[] = [0, 0];
+  public shapeFrameOf(L: BodyLayer, o: { frameA: number; frameS: number; frameX: number; frameY: number }): void {
+    o.frameX = 0; o.frameY = 0;
+    if (this.editorLayerPlace(L)) { o.frameX = this.edLayerPlace[0]; o.frameY = this.edLayerPlace[1]; }
+    o.frameA = this.tankAngle + layerTurnInBody(L, this.tankAngle) + (L.initialAngle ?? 0);
+    o.frameS = tankSizeFromSlider(this.state.tankSize) / 2 * L.sizeRatio;
+  }
+  public layerPathOf(L: BodyLayer): PathPoint[] | null {
+    if (L.solidId !== undefined && layerSolidOf(L) !== null) return null;
+    if (L.outlinePath && L.outlinePath.length >= 3) return L.outlinePath as PathPoint[];
+    const o = layerOutlineOf(L);
+    if (!o) return null;
+    let p = this._outlinePaths.get(o);
+    if (p === undefined) { p = pathFromOutline(o); this._outlinePaths.set(o, p); }
+    return p;
+  }
+  private readonly _outlinePaths = new WeakMap<object, PathPoint[]>();
+  private _outlineDrawable(o: [number, number][]): boolean {
+    if (outlineFansFromMiddle(o)) return true;
+    const c = cleanOutline(o);
+    return outlineFansFromMiddle(c) || outlineFillTriangles(c) !== null;
+  }
+  private _commitLayerPath(L: BodyLayer, path: PathPoint[], label: string, extra?: Partial<BodyLayer>): boolean {
+    let p = path, ratio = extra && extra.sizeRatio !== undefined ? extra.sizeRatio : L.sizeRatio;
+    const o0 = flattenLayerPath(p);
+    let far = 0, hmax = 0;
+    for (const q of o0) { const a = Math.abs(q[0]), b = Math.abs(q[1]); if (a > far) far = a; if (b > far) far = b; }
+    for (const q of p) for (let k = 0; k < 6; k++) { const a = Math.abs(q[k]); if (k < 2 ? a > far : a > hmax) { if (k < 2) far = a; else hmax = a; } }
+    const k = Math.max(far / 3.9, hmax / 7.9, 1);
+    if (k > 1) { p = copyPath(p); stretchPath(p, 1 / k, 1 / k); ratio *= k; }
+    p = p.map(q => [Math.round(q[0] * 1e4) / 1e4, Math.round(q[1] * 1e4) / 1e4, Math.round(q[2] * 1e4) / 1e4, Math.round(q[3] * 1e4) / 1e4, Math.round(q[4] * 1e4) / 1e4, Math.round(q[5] * 1e4) / 1e4] as PathPoint);
+    const o = flattenLayerPath(p);
+    const c = cleanLayerOutline(o);
+    if (!c || c.length !== o.length || o.length < 3) { editorNotice('This shape has too many points to keep. Take some away first.'); return false; }
+    if (!this._outlineDrawable(o)) { editorNotice('This shape crosses itself, so it cannot be filled. Move a point so its sides do not cross.'); return false; }
+    this.historyHint = { label, kind: 'layer' };
+    const u: Partial<BodyLayer> = { ...(extra ?? {}), outline: o, outlinePath: copyPath(p) };
+    if (ratio !== L.sizeRatio) u.sizeRatio = Math.round(ratio * 1e4) / 1e4;
+    if (k > 1 && u.sizeRatio !== undefined && L.sizeRatio > 0 && L.turretIds.length > 0) this._keepLayerTurretsDrawn(L, u.sizeRatio / L.sizeRatio);
+    this.updateBodyLayer(L.id, u);
+    return true;
+  }
+  private _keepLayerTurretsDrawn(L: BodyLayer, kk: number): void {
+    const ids = L.turretIds, c = 10.49 / 99;
+    this.state.turrets = this.state.turrets.map(t => {
+      if (!ids.includes(t.id)) return t;
+      const n: Turret = { ...t };
+      n.xOffset = t.xOffset / kk; n.yOffset = t.yOffset / kk;
+      if (t._origXOffset !== undefined) { this._ceUnbake(t, L, n.xOffset, n.yOffset, this._ceO); n._origXOffset = this._ceO[0]; n._origYOffset = this._ceO[1]; }
+      if (t.turretType === 'auto') n.autoCircleSize = Math.max(1, (t.autoCircleSize ?? 25) / kk);
+      else {
+        const scale = this._getBakeScaleForTurret(t, L);
+        n.length = 1 + (((t.length - 1) * c + 0.01) / kk - 0.01) / c;
+        n.width = t.width / kk;
+        if (t._origLength !== undefined) n._origLength = scale !== 1 ? (n.length - (1 - scale) * 0.9056) / scale : n.length;
+        if (t._origWidth !== undefined) n._origWidth = scale !== 1 ? n.width / scale : n.width;
+      }
+      if (t.look) n.look = { ...t.look, size: Math.min(LOOK_SIZE.max, Math.max(LOOK_SIZE.min, t.look.size / kk)) };
+      if (t.autoSubTurrets) n.autoSubTurrets = t.autoSubTurrets.map(s => s.look ? { ...s, look: { ...s.look, size: Math.min(LOOK_SIZE.max, Math.max(LOOK_SIZE.min, s.look.size / kk)) } } : s);
+      return n;
+    });
+  }
+  public convertLayerToCustom(id?: string): boolean {
+    const L = this.state.bodyLayers.find(l => l.id === (id ?? this.state.activeBodyLayerId));
+    if (!L) return false;
+    const sl = layerSolidOf(L);
+    if (sl !== null) {
+      const so = solidStillOutline(sl);
+      if (so === null) { editorNotice('This solid has no single outline to make a custom shape of.'); return false; }
+      return this._commitLayerPath(L, pathFromOutline(so), 'Converted ' + L.label + ' to a Custom Shape', { solidId: undefined });
+    }
+    if (layerOutlineOf(L)) return true;
+    return this._commitLayerPath(L, pathOfLayerShape(L), 'Converted ' + L.label + ' to a Custom Shape');
+  }
+  public setPointEdit(on: boolean): void {
+    if (!on) { if (this.pe.on) { this.pe.on = false; this.pe.pick = -1; this.pe.path = null; if (this.onStateChange) this.onStateChange(this.state); } return; }
+    if (!this.ceActive()) return;
+    const lid = this.state.activeBodyLayerId;
+    const L = lid ? this.state.bodyLayers.find(l => l.id === lid) : undefined;
+    if (!L || !this.partPicked || this.state.selectedTurretId) { editorNotice('Pick a body layer first: its points are edited on the canvas.'); return; }
+    if (this.state.presetPreviewTurrets.length > 0) this.cancelPresetPreview();
+    if (this.turretPlacing) this.setTurretPlacing(false);
+    if (this.pen.on) this.setPen(false);
+    if (!layerOutlineOf(L) && !this.convertLayerToCustom(L.id)) return;
+    this.partHides.delete(L.id);
+    this.pe.on = true; this.pe.layerId = L.id; this.pe.pick = -1; this.pe.path = null;
+    if (this.onStateChange) this.onStateChange(this.state);
+  }
+  public pointEditLayer(): BodyLayer | null {
+    if (!this.pe.on) return null;
+    let L: BodyLayer | undefined;
+    { const ls = this.state.bodyLayers, id = this.pe.layerId; for (let i = 0; i < ls.length; i++) if (ls[i].id === id) { L = ls[i]; break; } }
+    if (!L || !layerOutlineOf(L) || !this.ceActive() || this.turretPlacing || !this.partPicked || this.state.activeBodyLayerId !== L.id || this.partHidden(L.id)) { this.pe.on = false; this.pe.pick = -1; return null; }
+    return L;
+  }
+  private _pePress(): boolean {
+    const L = this.pointEditLayer();
+    if (!L) return false;
+    const p = this.layerPathOf(L);
+    if (!p) return false;
+    const f = this._ceF; this.shapeFrameOf(L, f);
+    this._ceLocal(this._cePt);
+    const c = Math.cos(f.frameA), s = Math.sin(f.frameA);
+    const dx = this._cePt[0] - f.frameX, dy = this._cePt[1] - f.frameY;
+    const u = (dx * c + dy * s) / f.frameS, v = (-dx * s + dy * c) / f.frameS;
+    const tol = 8 / ((this.zoom || 1) * f.frameS);
+    let best = -1, part = 0, bd = tol * tol;
+    const pk = this.pe.pick;
+    if (pk >= 0 && pk < p.length) {
+      const q = p[pk];
+      if (q[2] !== 0 || q[3] !== 0) { const d = (q[0] + q[2] - u) ** 2 + (q[1] + q[3] - v) ** 2; if (d <= bd) { bd = d; best = pk; part = 1; } }
+      if (q[4] !== 0 || q[5] !== 0) { const d = (q[0] + q[4] - u) ** 2 + (q[1] + q[5] - v) ** 2; if (d <= bd) { bd = d; best = pk; part = 2; } }
+    }
+    if (best < 0) for (let i = 0; i < p.length; i++) { const d = (p[i][0] - u) ** 2 + (p[i][1] - v) ** 2; if (d <= bd) { bd = d; best = i; part = 0; } }
+    if (best < 0 && p.length < PATH_MAX_POINTS) {
+      let si = -1, st = 0, sd = (6 / ((this.zoom || 1) * f.frameS)) ** 2;
+      for (let i = 0; i < p.length; i++) { nearestOnSide(p, i, u, v, this._peT); if (this._peT[1] < sd) { sd = this._peT[1]; si = i; st = this._peT[0]; } }
+      if (si >= 0) {
+        const np = copyPath(p); splitPathSide(np, si, st);
+        if (!this._commitLayerPath(L, np, 'Added a point to ' + L.label)) return true;
+        best = si + 1; part = 0;
+      }
+    }
+    if (best < 0) { this.setPointEdit(false); return false; }
+    this.pe.pick = best; this.pe.part = part;
+    this._ceArm('layer', L.id, 'point');
+    if (this.onStateChange) this.onStateChange(this.state);
+    return true;
+  }
+  public pointEditDelete(): boolean {
+    const L = this.pointEditLayer();
+    if (!L) return false;
+    const p = this.layerPathOf(L);
+    if (p && this.pe.pick >= 0 && this.pe.pick < p.length) {
+      if (p.length <= 3) { editorNotice('A shape keeps three points at least.'); return true; }
+      const np = copyPath(p); np.splice(this.pe.pick, 1);
+      if (this._commitLayerPath(L, np, 'Took a point from ' + L.label)) this.pe.pick = -1;
+    }
+    return true;
+  }
+  private _peNudge(dx: number, dy: number): boolean {
+    const L = this.pointEditLayer();
+    if (!L || this.pe.pick < 0) return false;
+    const p = this.layerPathOf(L);
+    if (!p || this.pe.pick >= p.length) return false;
+    const f = this._ceF; this.shapeFrameOf(L, f);
+    const R = tankSizeFromSlider(this.state.tankSize) / 2, c = Math.cos(f.frameA), s = Math.sin(f.frameA);
+    const np = copyPath(p), q = np[this.pe.pick];
+    q[0] += (dx * c + dy * s) * R / f.frameS; q[1] += (-dx * s + dy * c) * R / f.frameS;
+    this._commitLayerPath(L, np, 'Moved a point of ' + L.label);
+    return true;
+  }
+  private _peToggleAtPointer(): boolean {
+    const L = this.pointEditLayer();
+    if (!L) return false;
+    const p = this.layerPathOf(L);
+    if (!p) return false;
+    const f = this._ceF; this.shapeFrameOf(L, f);
+    this._ceLocal(this._cePt);
+    const c = Math.cos(f.frameA), s = Math.sin(f.frameA), dx = this._cePt[0] - f.frameX, dy = this._cePt[1] - f.frameY;
+    const u = (dx * c + dy * s) / f.frameS, v = (-dx * s + dy * c) / f.frameS, tol = 8 / ((this.zoom || 1) * f.frameS);
+    for (let i = 0; i < p.length; i++) if ((p[i][0] - u) ** 2 + (p[i][1] - v) ** 2 <= tol * tol) {
+      const np = copyPath(p); togglePathPoint(np, i);
+      if (this._commitLayerPath(L, np, 'Changed a point of ' + L.label)) this.pe.pick = i;
+      return true;
+    }
+    return false;
+  }
+  private _ceSnapBuildShape(L: BodyLayer): void {
+    const P = this._ceSnap, cap = P.length - 2;
+    let n = 0;
+    P[n++] = 0; P[n++] = 0;
+    const f = this._ceF; this.shapeFrameOf(L, f);
+    P[n++] = f.frameX; P[n++] = f.frameY;
+    const p = this.layerPathOf(L);
+    if (p) {
+      const c = Math.cos(f.frameA), s = Math.sin(f.frameA);
+      for (let i = 0; i < p.length && n < cap; i++) {
+        if (i === this.pe.pick) continue;
+        P[n++] = f.frameX + (p[i][0] * c - p[i][1] * s) * f.frameS; P[n++] = f.frameY + (p[i][0] * s + p[i][1] * c) * f.frameS;
+      }
+    }
+    this._ceSnapN = n;
+  }
+  public flipLayerShape(axis: 'x' | 'y', id?: string): void {
+    const L = this.state.bodyLayers.find(l => l.id === (id ?? this.state.activeBodyLayerId));
+    const p = L ? this.layerPathOf(L) : null;
+    if (!L || !p) return;
+    const np = copyPath(p); flipPath(np, axis);
+    this._commitLayerPath(L, np, 'Flipped the shape of ' + L.label);
+  }
+  public setPen(on: boolean): void {
+    if (on && !this.ceActive()) return;
+    if (on) {
+      if (this.state.presetPreviewTurrets.length > 0) this.cancelPresetPreview();
+      if (this.state.selectedTurretId) this.setSelectMode(false);
+      if (this.turretPlacing) this.setTurretPlacing(false);
+      if (this.pe.on) this.setPointEdit(false);
+    }
+    this.pen.pts.length = 0; this.pen.held = false;
+    this.pen.on = on;
+    if (this.ce.mode === 'pen') this.ce.phase = 0;
+    if (this.onStateChange) this.onStateChange(this.state);
+  }
+  private _penPress(): void {
+    this._ceLocal(this._cePt);
+    const P = this.pen.pts, n = P.length / 6, z = this.zoom || 1;
+    if (n >= 3 && Math.hypot(this._cePt[0] - P[0], this._cePt[1] - P[1]) <= 8 / z) { this.penFinish(); return; }
+    if (n >= PATH_MAX_POINTS) return;
+    let x = this._cePt[0], y = this._cePt[1];
+    if (!this.ceCtrl) {
+      this._ceSnapBuild('pen', '');
+      for (let i = 0; i < n && this._ceSnapN < this._ceSnap.length - 2; i++) { this._ceSnap[this._ceSnapN++] = P[i * 6]; this._ceSnap[this._ceSnapN++] = P[i * 6 + 1]; }
+      this.ce.guideX = NaN; this.ce.guideY = NaN; this.ce.guideR = NaN;
+      this._ceSnapPoint(x, y, 7 / z, false, this._ceS); x = this._ceS[0]; y = this._ceS[1];
+    }
+    P.push(x, y, 0, 0, 0, 0);
+    this.pen.held = true;
+    const ce = this.ce;
+    ce.phase = 1; ce.mode = 'pen'; ce.kind = ''; ce.id = ''; ce.downSX = this.mouseX; ce.downSY = this.mouseY; ce.label = '';
+    ce.guideX = NaN; ce.guideY = NaN; ce.guideR = NaN;
+    if (this.onStateChange) this.onStateChange(this.state);
+  }
+  public penBack(): void {
+    if (!this.pen.on || this.pen.pts.length === 0) return;
+    this.pen.pts.length -= 6;
+    if (this.onStateChange) this.onStateChange(this.state);
+  }
+  public penFinish(): boolean {
+    const P = this.pen.pts, n = P.length / 6;
+    if (n < 3) { editorNotice('A shape needs three points at least.'); return false; }
+    if (this.state.bodyLayers.length >= 10) { editorNotice('A tank holds 10 body layers at most, and this one is full.'); return false; }
+    let cx = 0, cy = 0;
+    for (let i = 0; i < n; i++) { cx += P[i * 6]; cy += P[i * 6 + 1]; }
+    cx /= n; cy /= n;
+    let reach = 0;
+    for (let i = 0; i < n; i++) {
+      const x = P[i * 6] - cx, y = P[i * 6 + 1] - cy;
+      reach = Math.max(reach, Math.hypot(x, y), Math.hypot(x + P[i * 6 + 2], y + P[i * 6 + 3]), Math.hypot(x + P[i * 6 + 4], y + P[i * 6 + 5]));
+    }
+    if (reach < 2) { editorNotice('This shape is too small to keep.'); return false; }
+    const ca = Math.cos(-this.tankAngle), sa = Math.sin(-this.tankAngle), r4 = (v: number) => Math.round(v * 1e4) / 1e4;
+    const path: PathPoint[] = [];
+    for (let i = 0; i < n; i++) {
+      const x = P[i * 6] - cx, y = P[i * 6 + 1] - cy, ix = P[i * 6 + 2], iy = P[i * 6 + 3], ox = P[i * 6 + 4], oy = P[i * 6 + 5];
+      path.push([r4((x * ca - y * sa) / reach), r4((x * sa + y * ca) / reach), r4((ix * ca - iy * sa) / reach), r4((ix * sa + iy * ca) / reach),
+        r4((ox * ca - oy * sa) / reach), r4((ox * sa + oy * ca) / reach)]);
+    }
+    if (!this._outlineDrawable(flattenLayerPath(path))) { editorNotice('This shape crosses itself, so it cannot be filled. Take back a point (Backspace) and close it again.'); return false; }
+    const R = tankSizeFromSlider(this.state.tankSize) / 2;
+    const L = this.addBodyLayer();
+    if (!L) return false;
+    const px = (cx * ca - cy * sa) / R, py = (cx * sa + cy * ca) / R;
+    this.partPicked = true;
+    this._commitLayerPath(L, path, 'Drew ' + L.label, { sizeRatio: reach / R, x: cleanLayerPlace(px), y: cleanLayerPlace(py), renderOrder: -1, spinEnabled: false });
+    this.setPen(false);
+    return true;
+  }
+  public addStarterLayer(kind: 'circle' | 'triangle' | 'square' | 'pentagon' | 'hexagon' | 'star' | 'cross'): void {
+    if (this.state.bodyLayers.length >= 10) { editorNotice('A tank holds 10 body layers at most, and this one is full.'); return; }
+    const L = this.addBodyLayer();
+    if (!L) return;
+    this.partPicked = true;
+    const sides = kind === 'circle' ? 0 : kind === 'triangle' ? 3 : kind === 'square' ? 4 : kind === 'pentagon' || kind === 'star' ? 5 : 6;
+    this.historyHint = { label: 'Added ' + L.label, kind: 'layer' };
+    if (kind === 'cross') {
+      const w = 0.34;
+      const pts: [number, number][] = [[1, -w], [1, w], [w, w], [w, 1], [-w, 1], [-w, w], [-1, w], [-1, -w], [-w, -w], [-w, -1], [w, -1], [w, -w]];
+      this._commitLayerPath(L, pts.map(q => [q[0], q[1], 0, 0, 0, 0] as PathPoint), 'Added ' + L.label, { spinEnabled: false });
+      return;
+    }
+    this.updateBodyLayer(L.id, { sides, starDepth: kind === 'star' ? 0.5 : 0, starCurved: false });
+  }
+
+  public ceDoubleClick(): boolean {
+    if (this.pen.on) return false;
+    if (!this.ceActive() || this.turretPlacing) return false;
+    if (this.pe.on && this._peToggleAtPointer()) return true;
+    const u = this.partUnderPointer();
+    if (u && u.kind === 'layer') {
+      const L = this.state.bodyLayers.find(l => l.id === u.id);
+      if (L && layerOutlineOf(L)) { this.ce.phase = 0; if (this.state.activeBodyLayerId !== L.id || !this.partPicked) this.pickPart(L.id); this.setPointEdit(true); return true; }
+      return false;
+    }
+    if (!u || u.kind !== 'turret') return false;
+    const t = this.state.turrets.find(x => x.id === u.id);
+    if (!t || t.turretType !== 'auto') return false;
+    this.ce.phase = 0;
+    this.enterAutoSubTurretMode(t.id);
+    if (this.onStateChange) this.onStateChange(this.state);
+    return true;
+  }
+
+  public pickTurretForEditing(tur: Turret): void {
+    this.partPicked = false;
+    this.saveGhostBeforePick();
+    this.overlayResetCounter++;
+    const unbaked = this.unbakeStoredTurretForEditing(tur);
+    const { id, angle, animProgress, ...rest } = unbaked;
+    void id; void angle; void animProgress;
+    this.updateState({
+      selectedTurretId: tur.id,
+      selectMode: true,
+      editingTurret: { ...rest } as Turret,
+      mirrorMode: false,
+      autoPlacement: false,
+      snapPlacement: false,
+    });
+  }
+  private selectPickOnTop(): boolean {
     const mx = (this.mouseX - this.width / 2) / this.zoom + (this.cameraX - this.tankPos.x);
     const my = (this.mouseY - this.height / 2) / this.zoom + (this.cameraY - this.tankPos.y);
+    if (!this.partAtPoint(mx, my, 0, false, 4 / (this.zoom || 1))) return false;
+    const h = this.partHit;
+    if (h.kind === 'turret') {
+      const L = this.getLayerForTurret(h.id);
+      const lid = L ? L.id : null;
+      if (lid === this.state.activeBodyLayerId) return false;
+      const t = this.state.turrets.find(x => x.id === h.id);
+      if (!t) return false;
+      this.partPicked = false;
+      this.setActiveBodyLayer(lid);
+      if (h.subId !== '') {
+        const sub = t.autoSubTurrets ? t.autoSubTurrets.find(x => x.id === h.subId) : undefined;
+        if (sub) { this._pickAutoSubFromCanvas(t, sub); return true; }
+      }
+      this.pickTurretForEditing(t);
+      return true;
+    }
+    if (h.kind !== 'layer' && h.kind !== 'body') return false;
+    this.turretPlacing = false;
+    if (this.state.selectMode) this.setSelectMode(false);
+    this.pickPart(h.kind === 'layer' ? h.id : null);
+    return true;
+  }
+
+  private pickPartAtMouse(skip = 0): void {
+    const mx = (this.mouseX - this.width / 2) / this.zoom + (this.cameraX - this.tankPos.x);
+    const my = (this.mouseY - this.height / 2) / this.zoom + (this.cameraY - this.tankPos.y);
+    if (!this.partAtPoint(mx, my, skip, false, 4 / (this.zoom || 1))) {
+      this.partPicked = false;
+      if (this.state.selectedTurretId) this.setSelectMode(false);
+      else if (this.onStateChange) this.onStateChange(this.state);
+      return;
+    }
+    const h = this.partHit;
+    if (h.kind === 'turret') {
+      this.partPicked = false;
+      const L = this.getLayerForTurret(h.id);
+      const lid = L ? L.id : null;
+      if (this.state.activeBodyLayerId !== lid) this.setActiveBodyLayer(lid);
+      const t = this.state.turrets.find(x => x.id === h.id);
+      if (!t) return;
+      if (h.subId !== '') {
+        const sub = t.autoSubTurrets ? t.autoSubTurrets.find(x => x.id === h.subId) : undefined;
+        if (sub) { this._pickAutoSubFromCanvas(t, sub); return; }
+      }
+      if (this.state.selectedTurretId !== t.id) this.pickTurretForEditing(t);
+      return;
+    }
+    this.pickPart(h.kind === 'layer' ? h.id : null);
+  }
+
+  public readonly partHit: { kind: 'body' | 'layer' | 'turret' | ''; id: string; subId: string } = { kind: '', id: '', subId: '' };
+  private static _pickSortBuf: Turret[] = [];
+  private static _pickLayerBuf: BodyLayer[] = [];
+  public partAtPoint(mx: number, my: number, skipTop: number = 0, shapesOnly: boolean = false, tol: number = 0): boolean {
+    const hit = this.partHit;
+    hit.kind = ''; hit.id = ''; hit.subId = '';
+    let skip = skipTop;
+    const R = tankSizeFromSlider(this.state.tankSize) / 2;
+    const ts = GameLogic._pickSortBuf, ls = GameLogic._pickLayerBuf;
+    ts.length = 0; ls.length = 0;
+    if (!shapesOnly) { for (const t of this.state.turrets) ts.push(t); sortInPlace(ts, _pickTurretCmp); }
+    for (const l of this.state.bodyLayers) ls.push(l);
+    sortInPlace(ls, _pickLayerCmp);
+    const take = (kind: 'body' | 'layer' | 'turret', id: string, subId: string): boolean => {
+      if (this.partLocks.size > 0 && this.partLocks.has(id)) return false;
+      if (this.partHides.size > 0 && this.partHides.has(id)) return false;
+      if (skip > 0) { skip--; return false; }
+      hit.kind = kind; hit.id = id; hit.subId = subId;
+      return true;
+    };
+    const turretOf = (t: Turret): boolean => {
+      const L = this.getLayerForTurret(t.id);
+      let x = mx, y = my;
+      if (this.editorLayerPlace(L)) { x -= this.edLayerPlace[0]; y -= this.edLayerPlace[1]; }
+      const r = this._turretHitOne(t, x, y);
+      return r !== undefined && take('turret', t.id, r !== null ? r.id : '');
+    };
+    const turretsOn = (L: BodyLayer | null, above: boolean): boolean => {
+      for (let i = ts.length - 1; i >= 0; i--) {
+        const t = ts[i];
+        if ((t.aboveTankBody ?? false) !== above) continue;
+        const own = this.getLayerForTurret(t.id);
+        if (own !== L) continue;
+        if (turretOf(t)) return true;
+      }
+      return false;
+    };
+    const shapeOf = (L: BodyLayer): boolean => {
+      let x = mx, y = my;
+      if (this.editorLayerPlace(L)) { x -= this.edLayerPlace[0]; y -= this.edLayerPlace[1]; }
+      const a = -(this.tankAngle + layerTurnInBody(L, this.tankAngle)), c = Math.cos(a), sn = Math.sin(a);
+      const lr = R * L.sizeRatio;
+      return layerHasPoint(L, x * c - y * sn, x * sn + y * c, lr + tol) && take('layer', L.id, '');
+    };
+    const layerWhole = (L: BodyLayer): boolean => (!shapesOnly && turretsOn(L, true)) || shapeOf(L) || (!shapesOnly && turretsOn(L, false));
+    for (let i = ls.length - 1; i >= 0; i--) if (ls[i].renderOrder < 0 && layerWhole(ls[i])) return true;
+    if (!shapesOnly && turretsOn(null, true)) return true;
+    {
+      const sides = this.state.tankSides, n = Math.floor(sides);
+      const evenOff = (n >= 4 && n % 2 === 0) ? -Math.PI / n : 0;
+      const a = -(this.tankAngle + (this._baseBodyAngle || 0)), c = Math.cos(a), sn = Math.sin(a);
+      const body = { sides, starDepth: this.state.tankShapeDepth ?? 0, starCurved: this.state.tankShapeCurved ?? false, copies: 1,
+                     initialAngle: evenOff + (sides % 1) * Math.PI * 2, outline: undefined };
+      if (layerHasPoint(body, mx * c - my * sn, mx * sn + my * c, R + tol) && take('body', 'main', '')) return true;
+    }
+    if (!shapesOnly && turretsOn(null, false)) return true;
+    for (let i = ls.length - 1; i >= 0; i--) if (ls[i].renderOrder >= 0 && layerWhole(ls[i])) return true;
+    return false;
+  }
+
+  private _turretHitAtMouse(skipId: string | null = null): { turret: Turret; sub: Turret | null } | null {
+    let mx = (this.mouseX - this.width / 2) / this.zoom + (this.cameraX - this.tankPos.x);
+    let my = (this.mouseY - this.height / 2) / this.zoom + (this.cameraY - this.tankPos.y);
+    if (this.editorLayerPlace(this.activeBodyLayer())) { mx -= this.edLayerPlace[0]; my -= this.edLayerPlace[1]; }
     const _mv = (val: number, inMin: number, inMax: number, outMin: number, outMax: number) =>
       (val - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
     const sizePx = tankSizeFromSlider(this.state.tankSize);
@@ -40770,46 +42484,9 @@ export class GameLogic {
       if (skipId !== null && t.id === skipId) continue;
       if (!this.isTurretOnActiveLayer(t.id)) continue;
 
-      const layer = this.getLayerForTurret(t.id);
-      const layerSizeRatio = layer ? layer.sizeRatio : 1;
-      const layerAngle = layer ? layerTurnInBody(layer, this.tankAngle) : 0;
-      const effectiveSize = sizePx * layerSizeRatio;
-      const baseAngle = this.tankAngle + layerAngle;
-
-      const offX = t.xOffset * effectiveSize / 2;
-      const offY = t.yOffset * effectiveSize / 2;
-      const cosL = Math.cos(baseAngle);
-      const sinL = Math.sin(baseAngle);
-      const baseX = offX * cosL - offY * sinL;
-      const baseY = offX * sinL + offY * cosL;
-      const globalAngle = baseAngle + t.angle;
-      const isAuto = t.turretType === 'auto';
-      const effLen = isAuto ? (t.autoTurretLength ?? 10) : t.length;
-      const effWid = isAuto ? (t.autoTurretWidth ?? 25) : t.width;
-      const lenSize = effectiveSize;
-      const widSize = effectiveSize;
-      const tLen = _mv(effLen, 1, 100, lenSize * 0.01, lenSize / 2 + lenSize * 10);
-      const tWid = _mv(effWid, 0, 50, 0, widSize * 0.96);
-
-      const dmx = mx - baseX;
-      const dmy = my - baseY;
-      const cosG = Math.cos(globalAngle);
-      const sinG = Math.sin(globalAngle);
-      const along = dmx * cosG + dmy * sinG;
-      const perp = -dmx * sinG + dmy * cosG;
-
-      let inside = !isAuto && GameLogic._barrelContains(along, perp, tLen, tWid, t.aspect);
-      if (t.look !== undefined) { const _lr = lookUnit(t.look, effectiveSize) * lookReach(t.look); inside = dmx * dmx + dmy * dmy <= _lr * _lr; }
-
-      let sub: Turret | null = null;
-      if (!inside && isAuto) {
-        const inCircle = this._autoBaseCovers(t, baseX, baseY, effectiveSize, mx, my);
-        sub = this._autoSubAt(t, baseX, baseY, baseAngle, effectiveSize, mx, my);
-        if (sub && sub.aboveBase !== true && inCircle) sub = null;
-        inside = inCircle || sub !== null;
-      }
-
-      if (!inside) continue;
+      const _hit = this._turretHitOne(t, mx, my);
+      if (_hit === undefined) continue;
+      const sub = _hit;
 
       const order = (t.aboveTankBody ? 10000 : 0) + (t.renderLayer ?? 0);
       if (order >= bestOrder) {
@@ -40826,8 +42503,9 @@ export class GameLogic {
       const hit = this._turretHitAtMouse(this.state.inheritTargetTurretId);
       if (hit) { this.completeInherit(hit.turret.id); return; }
     }
-    const mx = (this.mouseX - this.width / 2) / this.zoom + (this.cameraX - this.tankPos.x);
-    const my = (this.mouseY - this.height / 2) / this.zoom + (this.cameraY - this.tankPos.y);
+    let mx = (this.mouseX - this.width / 2) / this.zoom + (this.cameraX - this.tankPos.x);
+    let my = (this.mouseY - this.height / 2) / this.zoom + (this.cameraY - this.tankPos.y);
+    if (this.editorLayerPlace(this.activeBodyLayer())) { mx -= this.edLayerPlace[0]; my -= this.edLayerPlace[1]; }
     const _mv = (val: number, inMin: number, inMax: number, outMin: number, outMax: number) =>
       (val - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
     const sizePx = tankSizeFromSlider(this.state.tankSize);
@@ -40837,6 +42515,7 @@ export class GameLogic {
     let bestTurret: Turret | null = null;
     for (const t of this.state.turrets) {
       if (t.id === this.state.inheritTargetTurretId) continue;
+      if (this.partHidden(t.id)) continue;
       if (!this.isTurretOnActiveLayer(t.id)) continue;
       const layer = this.getLayerForTurret(t.id);
       const layerSizeRatio = layer ? layer.sizeRatio : 1;
@@ -40901,8 +42580,9 @@ export class GameLogic {
     const parentOffY = parent.yOffset * sizePx / 2;
     const cosA = Math.cos(baseAngle);
     const sinA = Math.sin(baseAngle);
-    const circleCX = parentOffX * cosA - parentOffY * sinA;
-    const circleCY = parentOffX * sinA + parentOffY * cosA;
+    let circleCX = parentOffX * cosA - parentOffY * sinA;
+    let circleCY = parentOffX * sinA + parentOffY * cosA;
+    if (this.editorLayerPlace(this.getLayerForTurret(parent.id))) { circleCX += this.edLayerPlace[0]; circleCY += this.edLayerPlace[1]; }
     const circleR = _mv(parent.autoCircleSize ?? 25, 0, 50, 0, sizePx * 0.96) * 0.7;
     const subSizePx = circleR * 2;
     const circleAngle = baseAngle + parent.angle;
@@ -40918,6 +42598,7 @@ export class GameLogic {
     let bestSub: Turret | null = null;
     for (const sub of parent.autoSubTurrets) {
       if (sub.id === this.state.autoSubTurretInheritTargetId) continue;
+      if (this.partHidden(sub.id) || this.partHidden(parent.id)) continue;
       if (_g640 && sub.aboveBase !== true && _inCircle) continue;
       const subGlobalAngle = circleAngle + sub.angle;
       const subOffX = sub.xOffset * subSizePx / 2;
@@ -40962,6 +42643,216 @@ export class GameLogic {
 
   private static _sideSnapBuf: number[] = [];
 
+  public getSnapAngles(count: number, sides: number, firstFace: number | undefined, target: SnapTarget | undefined): number[] {
+    const kind = GameLogic._snapKindBuf;
+    kind.length = 0;
+    if (target !== 'corners' && target !== 'both') {
+      const r = this.getSideSnapAngles(count, sides, firstFace);
+      for (let i = 0; i < r.length; i++) kind.push(0);
+      return r;
+    }
+    const step = (Math.PI * 2) / sides;
+    const face = firstFace ?? ((sides >= 4 && sides % 2 === 0) ? 0 : step / 2);
+    if (target === 'corners') {
+      const r = this.getSideSnapAngles(count, sides, face + step / 2);
+      for (let i = 0; i < r.length; i++) kind.push(1);
+      return r;
+    }
+    const r = this.getSideSnapAngles(count, sides * 2, face);
+    const total = sides * 2, n = r.length;
+    for (let i = 0; i < n; i++) kind.push(Math.floor(i * total / n) & 1);
+    return r;
+  }
+  private static _snapKindBuf: number[] = [];
+  public customSnapLayer(): BodyLayer | null {
+    if (!this.state.snapPlacement || this.state.autoSubTurretEditMode) return null;
+    const L = this.activeBodyLayer();
+    return L !== null && layerOutlineOf(L) !== null && this.layerPathOf(L) !== null ? L : null;
+  }
+  public readonly csPlan = { n: 0, x: [] as number[], y: [] as number[], a: [] as number[] };
+  private readonly _csX: number[] = [];
+  private readonly _csY: number[] = [];
+  private readonly _csA: number[] = [];
+  public customSnapPlaces(L: BodyLayer, target: SnapTarget | undefined): number {
+    const X = this._csX, Y = this._csY, A = this._csA;
+    X.length = 0; Y.length = 0; A.length = 0;
+    const P = this.layerPathOf(L);
+    if (P === null || P.length < 3) return 0;
+    const n = P.length;
+    let area = 0;
+    for (let i = 0; i < n; i++) { const p = P[i], q = P[(i + 1) % n]; area += p[0] * q[1] - q[0] * p[1]; }
+    const out = area >= 0 ? 1 : -1;
+    const ia = L.initialAngle || 0, c = Math.cos(ia), sn = Math.sin(ia);
+    const faces = target !== 'corners', corners = target === 'corners' || target === 'both';
+    for (let i = 0; i < n; i++) {
+      const p = P[i], q = P[(i + 1) % n], r = P[(i + 2) % n];
+      const c1x = p[0] + p[4], c1y = p[1] + p[5], c2x = q[0] + q[2], c2y = q[1] + q[3];
+      if (faces) {
+        const mx = (p[0] + 3 * c1x + 3 * c2x + q[0]) / 8, my = (p[1] + 3 * c1y + 3 * c2y + q[1]) / 8;
+        const tx = q[0] + c2x - c1x - p[0], ty = q[1] + c2y - c1y - p[1];
+        this._csPut(mx, my, out * ty, -out * tx, c, sn);
+      }
+      if (corners) {
+        let ix = q[0] - c2x, iy = q[1] - c2y; if (ix === 0 && iy === 0) { ix = q[0] - p[0]; iy = q[1] - p[1]; }
+        let ox = q[4], oy = q[5]; if (ox === 0 && oy === 0) { ox = r[0] - q[0]; oy = r[1] - q[1]; }
+        const li = Math.hypot(ix, iy) || 1, lo = Math.hypot(ox, oy) || 1;
+        let nx = out * (iy / li + oy / lo), ny = -out * (ix / li + ox / lo);
+        if (Math.abs(nx) < 1e-9 && Math.abs(ny) < 1e-9) { nx = q[0]; ny = q[1]; }
+        this._csPut(q[0], q[1], nx, ny, c, sn);
+      }
+    }
+    return X.length;
+  }
+  private _csPut(x: number, y: number, nx: number, ny: number, c: number, s: number): void {
+    this._csX.push(x * c - y * s); this._csY.push(x * s + y * c); this._csA.push(Math.atan2(nx * s + ny * c, nx * c - ny * s));
+  }
+  public customSnapPlan(): number {
+    const plan = this.csPlan;
+    plan.n = 0; plan.x.length = 0; plan.y.length = 0; plan.a.length = 0;
+    const L = this.customSnapLayer();
+    if (L === null) return 0;
+    const total = this.customSnapPlaces(L, this.state.snapTarget);
+    if (total === 0) return 0;
+    if (this.state.autoPlacement) {
+      const count = Math.min(Math.max(1, this.state.autoPlacementCount), total);
+      for (let i = 0; i < count; i++) this._csPlanPut(Math.floor(i * total / count), false);
+      return plan.n;
+    }
+    let mx = (this.mouseX - this.width / 2) / this.zoom + (this.cameraX - this.tankPos.x);
+    let my = (this.mouseY - this.height / 2) / this.zoom + (this.cameraY - this.tankPos.y);
+    if (this.editorLayerPlace(L)) { mx -= this.edLayerPlace[0]; my -= this.edLayerPlace[1]; }
+    const fa = -(this.tankAngle + layerTurnInBody(L, this.tankAngle)), cf = Math.cos(fa), sf = Math.sin(fa);
+    const half = (tankSizeFromSlider(this.state.tankSize) * L.sizeRatio) / 2 || 1;
+    const ux = (mx * cf - my * sf) / half, uy = (mx * sf + my * cf) / half;
+    let best = 0, bd = Infinity;
+    for (let k = 0; k < total; k++) { const dx = this._csX[k] - ux, dy = this._csY[k] - uy, d = dx * dx + dy * dy; if (d < bd) { bd = d; best = k; } }
+    this._csPlanPut(best, false);
+    if (this.state.mirrorMode) this._csPlanPut(best, true);
+    return plan.n;
+  }
+  private _csPlanPut(k: number, mirror: boolean): void {
+    const T = this.state.editingTurret, plan = this.csPlan;
+    const mx = this._csX[k], my = this._csY[k], a = this._csA[k], nx = Math.cos(a), ny = Math.sin(a);
+    const own = Math.hypot(T.xOffset || 0, T.yOffset || 0);
+    const d = T.turretType === 'auto' ? 0.2 * ((T.autoCircleSize ?? 25) / 50) * 0.96 * 0.7 * 2 : Math.max(0, mx * nx + my * ny);
+    const x = mx + nx * (own - d), y = my + ny * (own - d);
+    plan.x.push(x); plan.y.push(mirror ? -y : y); plan.a.push(mirror ? -a : a); plan.n++;
+  }
+  private readonly _sideF = { mx: 0, my: 0, nx: 0, ny: 0, half: 0, s: 0 };
+  private _sideOfTurret(T: Turret): boolean {
+    if (T.look !== undefined) return false;
+    const L = this.getLayerForTurret(T.id);
+    const f = this._sideF;
+    let best = Infinity;
+    const tryFace = (mx: number, my: number, a: number, half: number) => {
+      let d = T.angle - a; d -= Math.round(d / (Math.PI * 2)) * Math.PI * 2;
+      if (Math.abs(d) > 0.01) return;
+      const nx = Math.cos(a), ny = Math.sin(a), bx = T.xOffset - mx, by = T.yOffset - my;
+      const along = -bx * ny + by * nx, out = bx * nx + by * ny;
+      if (out > 0.35 || Math.abs(along) > half + 1e-6 || Math.abs(along) >= best) return;
+      best = Math.abs(along); f.mx = mx; f.my = my; f.nx = nx; f.ny = ny; f.half = half; f.s = along;
+    };
+    if (L && layerOutlineOf(L) !== null) {
+      const P = this.layerPathOf(L);
+      const n = P === null ? 0 : this.customSnapPlaces(L, 'faces');
+      for (let i = 0; i < n; i++) {
+        const p = P![i], q = P![(i + 1) % P!.length];
+        const curved = p[4] !== 0 || p[5] !== 0 || q[2] !== 0 || q[3] !== 0;
+        if (!curved) tryFace(this._csX[i], this._csY[i], this._csA[i], Math.hypot(q[0] - p[0], q[1] - p[1]) / 2);
+      }
+    } else {
+      const sides = Math.floor(L ? this._shapeSides(L) : this.state.tankSides);
+      const depth = L ? L.starDepth : (this.state.tankShapeDepth ?? 0);
+      if (sides < 3 || depth > 0) return best < Infinity;
+      const step = (Math.PI * 2) / sides, V = getRealSizeFactor(sides);
+      const ff = L ? (L.initialAngle || 0) + step / 2 : (sides >= 4 && sides % 2 === 0 ? 0 : step / 2);
+      const ap = V * Math.cos(Math.PI / sides), half = V * Math.sin(Math.PI / sides);
+      for (let k = 0; k < sides; k++) { const a = ff + k * step; tryFace(ap * Math.cos(a), ap * Math.sin(a), a, half); }
+    }
+    return best < Infinity;
+  }
+  private _sideRange(T: Turret): number {
+    const hw = T.turretType === 'auto' ? ((T.autoCircleSize ?? 25) / 50) * 0.96 * 0.7 * 2 : ((T.width ?? 0) / 50) * 0.96;
+    return Math.max(0, this._sideF.half - hw);
+  }
+  public turretSideOf(id: string): { v: number } | null {
+    const T = this.state.turrets.find(t => t.id === id);
+    if (!T || !this._sideOfTurret(T)) return null;
+    const range = this._sideRange(T);
+    if (range < 1e-4) return null;
+    return { v: Math.max(-1, Math.min(1, this._sideF.s / range)) };
+  }
+  public turretSidePatch(id: string, v: number): { xOffset: number; yOffset: number } | null {
+    const T = this.state.turrets.find(t => t.id === id);
+    if (!T || !this._sideOfTurret(T)) return null;
+    const range = this._sideRange(T);
+    if (range < 1e-4) return null;
+    const f = this._sideF, ds = Math.max(-1, Math.min(1, v)) * range - f.s;
+    const k = T.turretType !== 'auto' && typeof T._bakeScale === 'number' && T._bakeScale > 0 ? T._bakeScale : 1;
+    const ed = this.state.editingTurret;
+    return { xOffset: (ed.xOffset ?? 0) + (-f.ny * ds) / k, yOffset: (ed.yOffset ?? 0) + (f.nx * ds) / k };
+  }
+  private readonly _tfs: number[] = [];
+  public turretFacingSnaps(id: string, out: number[]): number {
+    out.length = 0;
+    const T = this.state.turrets.find(t => t.id === id);
+    if (!T || T.look !== undefined) return 0;
+    const L = this.getLayerForTurret(T.id);
+    const x = T.xOffset || 0, y = T.yOffset || 0;
+    if (Math.abs(x) + Math.abs(y) > 1e-6) out.push(Math.atan2(y, x));
+    let inside = false, reach = 1;
+    const face = (mx: number, my: number, a: number, half: number) => {
+      const nx = Math.cos(a), ny = Math.sin(a), bx = x - mx, by = y - my, o = bx * nx + by * ny, al = Math.abs(-bx * ny + by * nx);
+      if (o <= 0.35 && al <= half + 1e-6 && (inside || o >= -0.35 || (al <= 0.02 && o >= -2 * reach))) out.push(a);
+    };
+    const line = (px: number, py: number, a: number) => {
+      const nx = Math.cos(a), ny = Math.sin(a), bx = x - px, by = y - py, o = bx * nx + by * ny;
+      if (o <= 0.35 && o >= -2 * reach && Math.abs(-bx * ny + by * nx) <= 0.02) out.push(a);
+    };
+    if (L && layerOutlineOf(L) !== null) {
+      const P = this.layerPathOf(L);
+      if (P !== null && P.length >= 3) {
+        const nc = this.customSnapPlaces(L, 'corners');
+        for (let i = 0, j = nc - 1; i < nc; j = i++) {
+          const yi = this._csY[i], yj = this._csY[j];
+          reach = Math.max(reach, Math.hypot(this._csX[i], yi));
+          if ((yi > y) !== (yj > y) && x < (this._csX[j] - this._csX[i]) * (y - yi) / (yj - yi) + this._csX[i]) inside = !inside;
+        }
+        for (let i = 0; i < nc; i++) line(this._csX[i], this._csY[i], this._csA[i]);
+        const nf = this.customSnapPlaces(L, 'faces');
+        for (let i = 0; i < nf; i++) {
+          const p = P[i], q = P[(i + 1) % P.length];
+          if (p[4] !== 0 || p[5] !== 0 || q[2] !== 0 || q[3] !== 0) line(this._csX[i], this._csY[i], this._csA[i]);
+          else face(this._csX[i], this._csY[i], this._csA[i], Math.hypot(q[0] - p[0], q[1] - p[1]) / 2);
+        }
+      }
+    } else {
+      const sides = Math.floor(L ? this._shapeSides(L) : this.state.tankSides);
+      if (sides >= 3) {
+        const depth = L ? L.starDepth : (this.state.tankShapeDepth ?? 0);
+        const step = (Math.PI * 2) / sides, V = getRealSizeFactor(sides);
+        const ff = L ? (L.initialAngle || 0) + step / 2 : (sides >= 4 && sides % 2 === 0 ? 0 : step / 2);
+        const ap = V * Math.cos(Math.PI / sides), half = V * Math.sin(Math.PI / sides);
+        inside = true; reach = V;
+        for (let k = 0; k < sides; k++) { const a = ff + k * step; if (x * Math.cos(a) + y * Math.sin(a) - ap > 1e-6) { inside = false; break; } }
+        for (let k = 0; k < sides; k++) {
+          const a = ff + k * step;
+          if (depth > 0) line(ap * Math.cos(a), ap * Math.sin(a), a);
+          else face(ap * Math.cos(a), ap * Math.sin(a), a, half);
+          const c = a + step / 2;
+          line(V * Math.cos(c), V * Math.sin(c), c);
+        }
+      }
+    }
+    return out.length;
+  }
+  public snapPlaceIsCorner(i: number): boolean { return GameLogic._snapKindBuf[i] === 1; }
+  public computeCornerEdgeOffset(sides: number, autoCircleSize: number, sizePxOverride?: number): number {
+    const sizePx = sizePxOverride ?? tankSizeFromSlider(this.state.tankSize);
+    const visualHalf = (sizePx / 2) * getRealSizeFactor(sides);
+    const circleR = (autoCircleSize / 50) * (sizePx * 0.96) * 0.7;
+    return (visualHalf - 0.2 * circleR) / (sizePx / 2);
+  }
   public getSideSnapAngles(count: number, sides: number, firstFace?: number): number[] {
     const buf = GameLogic._sideSnapBuf;
     buf.length = 0;
@@ -40969,7 +42860,7 @@ export class GameLogic {
     const baseOffset = firstFace ?? ((sides >= 4 && sides % 2 === 0) ? 0 : step / 2);
     const n = Math.min(count, sides);
     for (let i = 0; i < n; i++) {
-      buf.push(baseOffset + i * step);
+      buf.push(baseOffset + Math.floor(i * sides / n) * step);
     }
     return buf;
   }
@@ -40992,18 +42883,19 @@ export class GameLogic {
     const activeSides = this.getActiveLayerSides();
 
     if (this.state.autoPlacement && this.state.snapPlacement && activeSides >= 3) {
-      const count = Math.min(this.state.autoPlacementCount, activeSides);
-      const sideAngles = this.getSideSnapAngles(count, activeSides, this.getActiveFaceOffset(activeSides));
+      const count = Math.min(this.state.autoPlacementCount, snapPointsOf(activeSides, this.state.snapTarget));
+      const sideAngles = this.getSnapAngles(count, activeSides, this.getActiveFaceOffset(activeSides), this.state.snapTarget);
       for (let i = 0; i < sideAngles.length; i++) buf.push(sideAngles[i]);
       return GameLogic._placementAnglesResult(true);
     }
 
-    const mx = (this.mouseX - this.width / 2) / this.zoom + (this.cameraX - this.tankPos.x);
-    const my = (this.mouseY - this.height / 2) / this.zoom + (this.cameraY - this.tankPos.y);
+    let mx = (this.mouseX - this.width / 2) / this.zoom + (this.cameraX - this.tankPos.x);
+    let my = (this.mouseY - this.height / 2) / this.zoom + (this.cameraY - this.tankPos.y);
+    if (this.editorLayerPlace(this.activeBodyLayer())) { mx -= this.edLayerPlace[0]; my -= this.edLayerPlace[1]; }
     let desiredAngle = Math.atan2(my, mx);
     if (this.state.snapPlacement) {
       if (activeSides >= 3) {
-        desiredAngle = snapAngleToFaceMidpoint(desiredAngle, activeSides, this.tankAngle, this.getActiveFaceOffset(activeSides));
+        desiredAngle = snapAngleToSides(desiredAngle, activeSides, this.tankAngle, this.getActiveFaceOffset(activeSides), this.state.snapTarget);
       } else {
         desiredAngle = snapAngleToGrid(desiredAngle, SNAP_COUNTS[this.state.snapPlacementCount]);
       }
@@ -41038,13 +42930,15 @@ export class GameLogic {
   }
 
   private placeTurret() {
-    const mx = (this.mouseX - this.width/2)/this.zoom + (this.cameraX - this.tankPos.x);
-    const my = (this.mouseY - this.height/2)/this.zoom + (this.cameraY - this.tankPos.y);
+    let mx = (this.mouseX - this.width/2)/this.zoom + (this.cameraX - this.tankPos.x);
+    let my = (this.mouseY - this.height/2)/this.zoom + (this.cameraY - this.tankPos.y);
+    if (this.editorLayerPlace(this.activeBodyLayer())) { mx -= this.edLayerPlace[0]; my -= this.edLayerPlace[1]; }
     const activeSides = this.getActiveLayerSides();
+    const _cs = this.customSnapLayer();
     {
       const _combo = this.state.autoPlacement && this.state.snapPlacement && activeSides >= 3;
       const _adding = !this.state.autoPlacement ? (this.state.mirrorMode ? 2 : 1)
-        : _combo ? Math.min(this.state.autoPlacementCount, activeSides)
+        : _combo ? Math.min(this.state.autoPlacementCount, snapPointsOf(activeSides, this.state.snapTarget))
         : Math.min(this.state.autoPlacementCount, activeSides >= 3 ? activeSides : 8);
       if (!this._roomForTurrets(this.state.turrets.length, _adding, 'tank')) return;
     }
@@ -41052,7 +42946,7 @@ export class GameLogic {
     let desiredAngle = Math.atan2(my, mx);
     if (this.state.snapPlacement) {
        if (activeSides >= 3) {
-           desiredAngle = snapAngleToFaceMidpoint(desiredAngle, activeSides, this.tankAngle, this.getActiveFaceOffset(activeSides));
+           desiredAngle = snapAngleToSides(desiredAngle, activeSides, this.tankAngle, this.getActiveFaceOffset(activeSides), this.state.snapTarget);
        } else {
            desiredAngle = snapAngleToGrid(desiredAngle, SNAP_COUNTS[this.state.snapPlacementCount]);
        }
@@ -41063,7 +42957,7 @@ export class GameLogic {
 
     const isAutoTurret = this.state.editingTurret.turretType === 'auto';
     const _eoX = this.state.editingTurret.xOffset, _eoY = this.state.editingTurret.yOffset;
-    const _ratioSideCorr = (this.state.snapPlacement && activeSides >= 3 && !isAutoTurret)
+    const _ratioSideCorr = (this.state.snapPlacement && activeSides >= 3 && !isAutoTurret && _cs === null)
       ? computeSideCorr(activeSides, this.state.tankSides)
       : 1.0;
 
@@ -41081,7 +42975,8 @@ export class GameLogic {
                         && activeSides >= 3
                         && this.state.snapPlacement
                         && !isAutoTurret
-                        && _w18Layer1.sides >= 3);
+                        && _cs === null
+                        && this._shapeSides(_w18Layer1) >= 3);
     let layerShift: number;
     if (_w18UseW18) {
       const refXOff = this.state.editingTurret.xOffset;
@@ -41126,12 +43021,50 @@ export class GameLogic {
     const _fitL = this.state.editingTurret.length * _ratioSideCorr + (1 - _ratioSideCorr) * 0.9056;
     const _baseXOff = this.state.editingTurret.xOffset * _ratioSideCorr;
 
+    if (_cs !== null) {
+      this.customSnapPlan();
+      const plan = this.csPlan, combo = this.state.autoPlacement;
+      let firstId: string | null = null;
+      for (let i = 0; i < plan.n; i++) {
+        const newId = uuidv4();
+        const mirrored = !combo && i > 0;
+        const t: Turret = {
+          id: newId,
+          ...this.state.editingTurret,
+          angle: plan.a[i],
+          xOffset: plan.x[i],
+          yOffset: plan.y[i],
+          width: _fitW,
+          length: _fitL,
+          aboveTankBody: combo && isAutoTurret ? false : (this.state.editingTurret.aboveTankBody ?? false),
+          animProgress: 0,
+          autoSubTurrets: [],
+          explode: cloneExplode(this.state.editingTurret.explode),
+          _origLength: this.state.editingTurret.length,
+          _origWidth: this.state.editingTurret.width,
+          _origXOffset: this.state.editingTurret.xOffset,
+          _origYOffset: mirrored ? -this.state.editingTurret.yOffset : this.state.editingTurret.yOffset,
+        };
+        this.state.turrets.push(t);
+        if (i === 0) firstId = newId;
+        if (i === 0 && !this.state.primaryTurretId) this.state.primaryTurretId = newId;
+      }
+      if (combo) {
+        this.state.autoPlacement = false;
+        const placed = firstId ? this.state.turrets.find(t => t.id === firstId) : undefined;
+        if (placed) {
+          const unbaked = this._unbakeForEditing(placed);
+          const { id: _id, angle: _a, animProgress: _ap, ...rest } = unbaked;
+          this.state.editingTurret = { ...rest, xOffset: this.state.editingTurret.xOffset, yOffset: this.state.editingTurret.yOffset };
+        }
+      }
+    } else
     if (this.state.autoPlacement) {
         const isCombo = this.state.snapPlacement && activeSides >= 3;
 
         if (isCombo) {
-            const count = Math.min(this.state.autoPlacementCount, activeSides);
-            const faceAngles = this.getSideSnapAngles(count, activeSides, this.getActiveFaceOffset(activeSides));
+            const count = Math.min(this.state.autoPlacementCount, snapPointsOf(activeSides, this.state.snapTarget));
+            const faceAngles = this.getSnapAngles(count, activeSides, this.getActiveFaceOffset(activeSides), this.state.snapTarget);
             let firstId: string | null = null;
 
             for (let i = 0; i < faceAngles.length; i++) {
@@ -41142,7 +43075,10 @@ export class GameLogic {
                 let above = this.state.editingTurret.aboveTankBody ?? false;
 
                 if (isAutoTurret) {
-                    const radialDist = Math.sqrt(xOff * xOff + yOff * yOff) || this.computeFaceEdgeOffset(activeSides, this.state.editingTurret.autoCircleSize ?? 25);
+                    const _atCorner = this.snapPlaceIsCorner(i);
+                    const radialDist = Math.sqrt(xOff * xOff + yOff * yOff) || (_atCorner
+                      ? this.computeCornerEdgeOffset(activeSides, this.state.editingTurret.autoCircleSize ?? 25)
+                      : this.computeFaceEdgeOffset(activeSides, this.state.editingTurret.autoCircleSize ?? 25));
                     xOff = radialDist * Math.cos(faceAngle);
                     yOff = radialDist * Math.sin(faceAngle);
                     above = false;
@@ -41297,7 +43233,7 @@ export class GameLogic {
           ox = t.xOffset / _k;
           oy = t.yOffset / _k;
         }
-        this._recordPlacement(t, _k, ox, oy, this.state.snapPlacement);
+        this._recordPlacement(t, _k, ox, oy, this.state.snapPlacement && _cs === null);
       }
     }
 
@@ -41334,14 +43270,14 @@ export class GameLogic {
     const parentOffY = parent.yOffset * sizePx / 2;
     const cosA = Math.cos(this.tankAngle);
     const sinA = Math.sin(this.tankAngle);
-    const circleCX = parentOffX * cosA - parentOffY * sinA;
-    const circleCY = parentOffX * sinA + parentOffY * cosA;
-
+    let circleCX = parentOffX * cosA - parentOffY * sinA;
+    let circleCY = parentOffX * sinA + parentOffY * cosA;
+    if (this.editorLayerPlace(this.getLayerForTurret(parent.id))) { circleCX += this.edLayerPlace[0]; circleCY += this.edLayerPlace[1]; }
     let desiredAngle = Math.atan2(my - circleCY, mx - circleCX);
 
     if (this.state.autoSubTurretSnapPlacement) {
       if (this.state.tankSides >= 3) {
-        desiredAngle = snapAngleToFaceMidpoint(desiredAngle, this.state.tankSides, this.tankAngle);
+        desiredAngle = snapAngleToSides(desiredAngle, this.state.tankSides, this.tankAngle, undefined, this.state.autoSubTurretSnapTarget);
       } else {
         desiredAngle = snapAngleToGrid(desiredAngle, SNAP_COUNTS[this.state.autoSubTurretSnapPlacementCount]);
       }
@@ -41428,14 +43364,14 @@ export class GameLogic {
     const parentOffY = parent.yOffset * sizePx / 2;
     const cosA = Math.cos(this.tankAngle);
     const sinA = Math.sin(this.tankAngle);
-    const circleCX = parentOffX * cosA - parentOffY * sinA;
-    const circleCY = parentOffX * sinA + parentOffY * cosA;
-
+    let circleCX = parentOffX * cosA - parentOffY * sinA;
+    let circleCY = parentOffX * sinA + parentOffY * cosA;
+    if (this.editorLayerPlace(this.getLayerForTurret(parent.id))) { circleCX += this.edLayerPlace[0]; circleCY += this.edLayerPlace[1]; }
     let desiredAngle = Math.atan2(my - circleCY, mx - circleCX);
 
     if (this.state.autoSubTurretSnapPlacement) {
       if (this.state.tankSides >= 3) {
-        desiredAngle = snapAngleToFaceMidpoint(desiredAngle, this.state.tankSides, this.tankAngle);
+        desiredAngle = snapAngleToSides(desiredAngle, this.state.tankSides, this.tankAngle, undefined, this.state.autoSubTurretSnapTarget);
       } else {
         desiredAngle = snapAngleToGrid(desiredAngle, SNAP_COUNTS[this.state.autoSubTurretSnapPlacementCount]);
       }
@@ -41522,9 +43458,9 @@ export class GameLogic {
     const parentOffY = parent.yOffset * effectiveSize / 2;
     const cosA = Math.cos(baseAngle);
     const sinA = Math.sin(baseAngle);
-    const circleCX = parentOffX * cosA - parentOffY * sinA;
-    const circleCY = parentOffX * sinA + parentOffY * cosA;
-
+    let circleCX = parentOffX * cosA - parentOffY * sinA;
+    let circleCY = parentOffX * sinA + parentOffY * cosA;
+    if (this.editorLayerPlace(this.getLayerForTurret(parent.id))) { circleCX += this.edLayerPlace[0]; circleCY += this.edLayerPlace[1]; }
     let selected = this._autoSubAt(parent, circleCX, circleCY, baseAngle, effectiveSize, mx, my);
     if (selected && selected.aboveBase !== true && this._autoBaseCovers(parent, circleCX, circleCY, effectiveSize, mx, my)) selected = null;
     if (selected) {
@@ -41743,6 +43679,32 @@ export class GameLogic {
     }
   }
 
+  private _partWalls(e: EnemyTank | null, ms: MapState, offX: number, offY: number): boolean {
+    const buf = e !== null ? _phBufE : _phBufP;
+    const n = e !== null ? collectPartHits(e.bodyLayers, e.size, e.angle, buf)
+      : collectPartHits(this.state.bodyLayers, tankSizeFromSlider(this.state.tankSize) * this.state.playerGrowthScale, this.tankAngle, buf);
+    let held = false;
+    for (let k = 0; k < n; k++) {
+      const o = k * PART_HIT_STRIDE;
+      const c = resolveWallCollisions((e !== null ? e.position.x : this.tankPos.x) + buf[o + 2], (e !== null ? e.position.y : this.tankPos.y) + buf[o + 3],
+        buf[o + 6], ms, offX, offY);
+      if (!c.hit) continue;
+      held = true;
+      _partWallPushX = c.pushX; _partWallPushY = c.pushY;
+      if (e !== null) {
+        e.position.x += c.pushX; e.position.y += c.pushY;
+        if (c.zeroVelX) { e.velocity.x = 0; if (SMALL_FIX.CH026) e.knockbackVelocity.x = 0; }
+        if (c.zeroVelY) { e.velocity.y = 0; if (SMALL_FIX.CH026) e.knockbackVelocity.y = 0; }
+        if (e._tchMask !== 0) this._tchBotPush(e, TW_WALLS, c.pushX, c.pushY);
+      } else {
+        this.tankPos.x += c.pushX; this.tankPos.y += c.pushY;
+        if (c.zeroVelX) { this.tankVelocity.x = 0; this.knockbackVelocity.x = 0; }
+        if (c.zeroVelY) { this.tankVelocity.y = 0; this.knockbackVelocity.y = 0; }
+      }
+    }
+    return held;
+  }
+
   private applyMapWallCollisions(dtFactor: number): void {
     wallSteerClear();
     const ms = this.mapState;
@@ -41806,6 +43768,13 @@ export class GameLogic {
         _playerWallHit = true;
       } else {
         _playerWallHit = false;
+      }
+      if (PART_HITS.ON !== 0) {
+        if (_wtP) this._wtBodyFor(K_PLAYER, null);
+        if (this._partWalls(null, _pa ? this._areaColMs! : ms, _pa ? this._areaColOffX : 0, _pa ? this._areaColOffY : 0) && !_playerWallHit) {
+          _playerWallHit = true; _playerWallPushX = _partWallPushX; _playerWallPushY = _partWallPushY;
+        }
+        if (_wtP) wallBodyClear();
       }
       } else {
         _playerWallHit = false;
@@ -41968,6 +43937,13 @@ export class GameLogic {
       } else {
         if (_enemyWallHit.length <= i) { _enemyWallHit.push(false); _enemyWallPushX.push(0); _enemyWallPushY.push(0); }
         _enemyWallHit[i] = false;
+      }
+      if (PART_HITS.ON !== 0) {
+        if (_wtE) this._wtBodyFor(K_ENEMY, e);
+        if (this._partWalls(e, _ea ? this._areaColMs! : ms, _ea ? this._areaColOffX : 0, _ea ? this._areaColOffY : 0) && !_enemyWallHit[i]) {
+          _enemyWallHit[i] = true; _enemyWallPushX[i] = _partWallPushX; _enemyWallPushY[i] = _partWallPushY;
+        }
+        if (_wtE) wallBodyClear();
       }
       }
 
@@ -42737,16 +44713,20 @@ export class GameLogic {
         this.tankDamageOverlay = flashDecay(this.tankDamageOverlay, dt);
       }
       this.tankAngle = 0; this._baseBodyAngle = 0;
+      if (this.previewMotion) this._stepPreviewSpin(dtFactor);
       const home = this.getEditorHomePosition();
       this.tankPos.set(home.x, home.y);
       if (MOTION_ARRAS.SIZE_SLIDE && this._playerSizeSlide(1, dt)) {
         this.updateEditorFov(this.state.playerGrowthScale);
       }
+      if (this._edGlide) this._stepEditorGlide(dt);
+      if (this.edZoom !== 1) this.zoom /= this.edZoom;
       this._easeZoom(dt);
+      if (this.edZoom !== 1) this.zoom *= this.edZoom;
       this.cameraShiftX = 0;
       this.cameraShiftY = 0;
-      this.cameraX = this.tankPos.x + this.getEditorPanelOffsetX();
-      this.cameraY = this.tankPos.y + this.getEditorPanelOffsetY();
+      this.cameraX = this.tankPos.x + this.getEditorPanelOffsetX() + this.edPanX;
+      this.cameraY = this.tankPos.y + this.getEditorPanelOffsetY() + this.edPanY;
     }
 
     const _perfBulletT0 = performance.now();
@@ -43810,10 +45790,14 @@ export class GameLogic {
 
   private _rtTurn = 0;
   private _rtSize = 0;
+  private _rtLayer: BodyLayer | null = null;
+  private _rtBase = 0;
   private _roundTurretFrame(b: Bullet, turretId: string | undefined, base: number): void {
     const l = LAYER_TURN !== 0 ? this._roundGunLayer(b, turretId) : null;
     this._rtTurn = l !== null ? base + layerTurnInBody(l, base) : base;
     this._rtSize = l !== null ? b.size * l.sizeRatio : b.size;
+    this._rtLayer = l !== null && layerIsPlaced(l) ? l : null;
+    this._rtBase = base;
   }
 
   private _roundTurretWeld(t: Turret, restNow: number): number {
@@ -44047,9 +46031,9 @@ export class GameLogic {
       const sinA = Math.sin(tBody);
       const offX = t.xOffset * tSize / 2;
       const offY = t.yOffset * tSize / 2;
-      const turretWorldX = parent.position.x + offX * cosA - offY * sinA;
-      const turretWorldY = parent.position.y + offX * sinA + offY * cosA;
-
+      let turretWorldX = parent.position.x + offX * cosA - offY * sinA;
+      let turretWorldY = parent.position.y + offX * sinA + offY * cosA;
+      if (this._rtLayer !== null) { _lpPt.x = turretWorldX; _lpPt.y = turretWorldY; addLayerPlace(_lpPt, this._rtLayer, parent.size / 2, this._rtBase); turretWorldX = _lpPt.x; turretWorldY = _lpPt.y; }
       let fovRange = ((t.fovSize ?? 10) / 10) * AUTO_FOV_BASE_RANGE * this._roundTurretSightK(parent);
       if (ARRAS_PARITY.TURRET_REACH !== 0 && !parent.ownerIsBaseProtector) {
         const _btReach = this._autoTurretReachForBullet(t, parent);
@@ -44318,9 +46302,9 @@ export class GameLogic {
     const sinFA = Math.sin(_gunBase);
     const offX = td.xOffset * _gSize / 2;
     const offY = td.yOffset * _gSize / 2;
-    const turretBaseX = parent.position.x + offX * cosFA - offY * sinFA;
-    const turretBaseY = parent.position.y + offX * sinFA + offY * cosFA;
-
+    let turretBaseX = parent.position.x + offX * cosFA - offY * sinFA;
+    let turretBaseY = parent.position.y + offX * sinFA + offY * cosFA;
+    if (_gLayer !== null && layerIsPlaced(_gLayer)) { _lpPt.x = turretBaseX; _lpPt.y = turretBaseY; addLayerPlace(_lpPt, _gLayer, parent.size / 2, _gRound); turretBaseX = _lpPt.x; turretBaseY = _lpPt.y; }
     let muzzleX: number, muzzleY: number, gunAngle: number;
     if (parent.motionType === 'minion' && parent.controllerHasTarget) {
       const _gAim = ARRAS_PARITY.ROUND_FACE !== 0 ? parent.visualAimAngle : Math.atan2(
@@ -44616,8 +46600,9 @@ export class GameLogic {
     const sinA = Math.sin(_rhBody);
     const offX = t.xOffset * bulletSizePx / 2;
     const offY = t.yOffset * bulletSizePx / 2;
-    const turretBaseX = parent.position.x + offX * cosA - offY * sinA;
-    const turretBaseY = parent.position.y + offX * sinA + offY * cosA;
+    let turretBaseX = parent.position.x + offX * cosA - offY * sinA;
+    let turretBaseY = parent.position.y + offX * sinA + offY * cosA;
+    if (this._rtLayer !== null) { _lpPt.x = turretBaseX; _lpPt.y = turretBaseY; addLayerPlace(_lpPt, this._rtLayer, parent.size / 2, this._rtBase); turretBaseX = _lpPt.x; turretBaseY = _lpPt.y; }
 
     const cosGA = Math.cos(globalAngle);
     const sinGA = Math.sin(globalAngle);
@@ -44843,9 +46828,9 @@ export class GameLogic {
     const sinBody = Math.sin(_rhBody);
     const parentOffX = parentTurret.xOffset * bulletSizePx / 2;
     const parentOffY = parentTurret.yOffset * bulletSizePx / 2;
-    const circleWorldX = parentBullet.position.x + parentOffX * cosBody - parentOffY * sinBody;
-    const circleWorldY = parentBullet.position.y + parentOffX * sinBody + parentOffY * cosBody;
-
+    let circleWorldX = parentBullet.position.x + parentOffX * cosBody - parentOffY * sinBody;
+    let circleWorldY = parentBullet.position.y + parentOffX * sinBody + parentOffY * cosBody;
+    if (this._rtLayer !== null) { _lpPt.x = circleWorldX; _lpPt.y = circleWorldY; addLayerPlace(_lpPt, this._rtLayer, parentBullet.size / 2, this._rtBase); circleWorldX = _lpPt.x; circleWorldY = _lpPt.y; }
     const circleR = _mapVal(parentTurret.autoCircleSize ?? 25, 0, 50, 0, bulletSizePx * 0.96) * 0.7;
     const subSizePx = circleR * 2;
 
@@ -46008,6 +47993,7 @@ export class GameLogic {
         for (let i = 0; i < this.state.bodyLayers.length; i++) {
           if (this.state.bodyLayers[i].stationary) continue;
           if (ARRAS_PARITY.RING_WORLD !== 0 && this.state.bodyLayers[i].spinEnabled) continue;
+          if (SMALL_FIX.R306 !== 0 && !this.state.bodyLayers[i].spinEnabled) continue;
           const _pbl = this.state.bodyLayers[i];
           _pbl._currentAngle -= bodyDelta;
           if (SMALL_FIX.GH346 !== 0) {
@@ -46051,9 +48037,11 @@ export class GameLogic {
     const _rwOn = ARRAS_PARITY.RING_WORLD !== 0;
     let _rwTurn = 0;
     if (_rwOn) { const _d = this.tankAngle - this._ringBodyAt; _rwTurn = _d === _d ? _d - Math.round(_d / (Math.PI * 2)) * Math.PI * 2 : 0; this._ringBodyAt = this.tankAngle; }
+    const _ceHold = !this.state.isTestMode && this.isTurretPlacementEnabled && !this.previewMotion && (this.partPicked || !!this.state.selectedTurretId || this.ce.phase !== 0);
     for (let i = 0; i < this.state.bodyLayers.length; i++) {
       const layer = this.state.bodyLayers[i];
       if (!layer.spinEnabled || layer.stationary) continue;
+      if (_ceHold) continue;
       if (_rwOn) layer._currentAngle -= _rwTurn;
       const spinRate = (layer.spinSpeed / 50) * 0.02 * layer.spinDirection;
       layer._currentAngle += spinRate * dtFactor;
@@ -46207,6 +48195,7 @@ export class GameLogic {
       }
       const ox = t.xOffset * eff / 2, oy = t.yOffset * eff / 2;
       ring.x = this.tankPos.x + ox * c - oy * s; ring.y = this.tankPos.y + ox * s + oy * c;
+      if (host !== null && layerIsPlaced(host)) { _lpPt.x = ring.x; _lpPt.y = ring.y; addLayerPlace(_lpPt, host, sizePx / 2, this.tankAngle); ring.x = _lpPt.x; ring.y = _lpPt.y; }
     }
   }
 
@@ -46221,6 +48210,11 @@ export class GameLogic {
         eff = sizePx * (host !== null ? host.sizeRatio : 1);
       }
       const ox = t.xOffset * eff / 2, oy = t.yOffset * eff / 2;
+      if (host !== null && layerIsPlaced(host)) {
+        _lpPt.x = x + ox * c - oy * s; _lpPt.y = y + ox * s + oy * c; addLayerPlace(_lpPt, host, sizePx / 2, bodyAngle);
+        this._auraPush(_lpPt.x, _lpPt.y, auraRadius(t, sizePx / 2), t);
+        continue;
+      }
       this._auraPush(x + ox * c - oy * s, y + ox * s + oy * c, auraRadius(t, sizePx / 2), t);
     }
   }
@@ -46420,6 +48414,10 @@ export class GameLogic {
         this._roundTurretFrame(b, t.id, h);
         const c = Math.cos(this._rtTurn), s = Math.sin(this._rtTurn);
         const ox = t.xOffset * this._rtSize / 2, oy = t.yOffset * this._rtSize / 2;
+        if (this._rtLayer !== null) {
+          _lpPt.x = b.position.x + ox * c - oy * s; _lpPt.y = b.position.y + ox * s + oy * c; addLayerPlace(_lpPt, this._rtLayer, b.size / 2, this._rtBase);
+          this._auraPush(_lpPt.x, _lpPt.y, auraRadius(t, b.size / 2), t);
+        } else
         this._auraPush(b.position.x + ox * c - oy * s, b.position.y + ox * s + oy * c, auraRadius(t, b.size / 2), t);
       }
       if (from < 0) continue;
@@ -46831,9 +48829,9 @@ export class GameLogic {
       const effectiveSize = tankPixelSize * layerSizeRatio;
       const offX = t.xOffset * effectiveSize / 2;
       const offY = t.yOffset * effectiveSize / 2;
-      const turretWorldX = entityX + offX * cosA - offY * sinA;
-      const turretWorldY = entityY + offX * sinA + offY * cosA;
-
+      let turretWorldX = entityX + offX * cosA - offY * sinA;
+      let turretWorldY = entityY + offX * sinA + offY * cosA;
+      if (hostLayer !== null && layerIsPlaced(hostLayer)) { _lpPt.x = turretWorldX; _lpPt.y = turretWorldY; addLayerPlace(_lpPt, hostLayer, tankPixelSize / 2, bodyAngle); turretWorldX = _lpPt.x; turretWorldY = _lpPt.y; }
       if (t.autoCircleSpin) {
         if (t.autoCircleSpinMode === 'withBody') {
           t.autoCurrentAngle = bodyAngle + layerAngle + t.angle;
@@ -48171,12 +50169,14 @@ export class GameLogic {
     let _layerSizeRatio3p = 1;
     let _sourceLayerId3p = '';
     let _sourceLayerOrder3p = -1;
+    let _sourceLayer3p: BodyLayer | null = null;
     for (let li = 0; li < this.state.bodyLayers.length; li++) {
       if (this.state.bodyLayers[li].turretIds.indexOf(parent.id) !== -1) {
         _layerAngle3p = layerTurnInBody(this.state.bodyLayers[li], this.tankAngle);
         _layerSizeRatio3p = this.state.bodyLayers[li].sizeRatio;
         _sourceLayerId3p = this.state.bodyLayers[li].id;
         _sourceLayerOrder3p = this.state.bodyLayers[li].renderOrder;
+        _sourceLayer3p = this.state.bodyLayers[li];
         break;
       }
     }
@@ -48186,9 +50186,9 @@ export class GameLogic {
     const sinBody = Math.sin(this.tankAngle + _layerAngle3p);
     const parentOffX = parent.xOffset * tankPixelSize / 2;
     const parentOffY = parent.yOffset * tankPixelSize / 2;
-    const circleWorldX = this.tankPos.x + parentOffX * cosBody - parentOffY * sinBody;
-    const circleWorldY = this.tankPos.y + parentOffX * sinBody + parentOffY * cosBody;
-
+    let circleWorldX = this.tankPos.x + parentOffX * cosBody - parentOffY * sinBody;
+    let circleWorldY = this.tankPos.y + parentOffX * sinBody + parentOffY * cosBody;
+    if (_sourceLayer3p !== null && layerIsPlaced(_sourceLayer3p)) { _lpPt.x = circleWorldX; _lpPt.y = circleWorldY; addLayerPlace(_lpPt, _sourceLayer3p, tankSizeFromSlider(this.state.tankSize) * this.state.playerGrowthScale / 2, this.tankAngle); circleWorldX = _lpPt.x; circleWorldY = _lpPt.y; }
     const circleR = _mv(parent.autoCircleSize ?? 25, 0, 50, 0, tankPixelSize * 0.96) * 0.7;
     const subSizePx = circleR * 2;
 
@@ -48561,12 +50561,14 @@ export class GameLogic {
     let _layerSizeRatio4e = 1;
     let _sourceLayerId4e = '';
     let _sourceLayerOrder4e = -1;
+    let _sourceLayer4e: BodyLayer | null = null;
     for (let li = 0; li < enemy.bodyLayers.length; li++) {
       if (enemy.bodyLayers[li].turretIds.indexOf(parent.id) !== -1) {
         _layerAngle4e = layerTurnInBody(enemy.bodyLayers[li], enemy.angle);
         _layerSizeRatio4e = enemy.bodyLayers[li].sizeRatio;
         _sourceLayerId4e = enemy.bodyLayers[li].id;
         _sourceLayerOrder4e = enemy.bodyLayers[li].renderOrder;
+        _sourceLayer4e = enemy.bodyLayers[li];
         break;
       }
     }
@@ -48576,8 +50578,9 @@ export class GameLogic {
     const sinBody = Math.sin(enemy.angle + _layerAngle4e);
     const parentOffX = parent.xOffset * tankPixelSize / 2;
     const parentOffY = parent.yOffset * tankPixelSize / 2;
-    const circleWorldX = enemy.position.x + parentOffX * cosBody - parentOffY * sinBody;
-    const circleWorldY = enemy.position.y + parentOffX * sinBody + parentOffY * cosBody;
+    let circleWorldX = enemy.position.x + parentOffX * cosBody - parentOffY * sinBody;
+    let circleWorldY = enemy.position.y + parentOffX * sinBody + parentOffY * cosBody;
+    if (_sourceLayer4e !== null && layerIsPlaced(_sourceLayer4e)) { _lpPt.x = circleWorldX; _lpPt.y = circleWorldY; addLayerPlace(_lpPt, _sourceLayer4e, enemy.size / 2, enemy.angle); circleWorldX = _lpPt.x; circleWorldY = _lpPt.y; }
 
     const circleR = _mapVal(parent.autoCircleSize ?? 25, 0, 50, 0, tankPixelSize * 0.96) * 0.7;
     const subSizePx = circleR * 2;
@@ -49158,11 +51161,13 @@ export class GameLogic {
             let _tapLayerAngle = 0;
             let _tapLayerSizeRatio = 1;
             let _tapLayerSides = this.state.tankSides;
+            let _tapLayer: BodyLayer | null = null;
             for (let _tli = 0; _tli < this.state.bodyLayers.length; _tli++) {
               if (this.state.bodyLayers[_tli].turretIds.indexOf(t.id) !== -1) {
                 _tapLayerAngle = layerTurnInBody(this.state.bodyLayers[_tli], this.tankAngle);
                 _tapLayerSizeRatio = this.state.bodyLayers[_tli].sizeRatio;
                 _tapLayerSides = this.state.bodyLayers[_tli].sides;
+                _tapLayer = this.state.bodyLayers[_tli];
                 break;
               }
             }
@@ -49175,8 +51180,9 @@ export class GameLogic {
             const _tapBaseAngle = this.tankAngle + _tapLayerAngle;
             const _tapCosBA = Math.cos(_tapBaseAngle);
             const _tapSinBA = Math.sin(_tapBaseAngle);
-            const _tapBaseX = this.tankPos.x + (_tapOffX * _tapCosBA - _tapOffY * _tapSinBA);
-            const _tapBaseY = this.tankPos.y + (_tapOffX * _tapSinBA + _tapOffY * _tapCosBA);
+            let _tapBaseX = this.tankPos.x + (_tapOffX * _tapCosBA - _tapOffY * _tapSinBA);
+            let _tapBaseY = this.tankPos.y + (_tapOffX * _tapSinBA + _tapOffY * _tapCosBA);
+            if (_tapLayer !== null && layerIsPlaced(_tapLayer)) { _lpPt.x = _tapBaseX; _lpPt.y = _tapBaseY; addLayerPlace(_lpPt, _tapLayer, _tapTankSize / 2, this.tankAngle); _tapBaseX = _lpPt.x; _tapBaseY = _lpPt.y; }
             const _tapMapVal = (v: number, a: number, b: number, c: number, d: number) => (v - a) * (d - c) / (b - a) + c;
             const _tapMuzzle = _tapMapVal(t.length, 1, 100, _tapLenSize * 0.01, _tapLenSize / 2 + _tapLenSize * 10);
             const _tapCosGA = Math.cos(_tapGlobalAngle);
@@ -49336,6 +51342,7 @@ export class GameLogic {
     let layerSides = this.state.tankSides;
     let sourceLayerId = '';
     let sourceLayerOrder = -1;
+    let sourceLayer: BodyLayer | null = null;
     for (let li = 0; li < this.state.bodyLayers.length; li++) {
       if (this.state.bodyLayers[li].turretIds.indexOf(t.id) !== -1) {
         layerAngle = layerTurnInBody(this.state.bodyLayers[li], this.tankAngle);
@@ -49343,6 +51350,7 @@ export class GameLogic {
         layerSides = this.state.bodyLayers[li].sides;
         sourceLayerId = this.state.bodyLayers[li].id;
         sourceLayerOrder = this.state.bodyLayers[li].renderOrder;
+        sourceLayer = this.state.bodyLayers[li];
         break;
       }
     }
@@ -49361,8 +51369,9 @@ export class GameLogic {
     const totalBaseAngle = this.tankAngle + layerAngle;
     const cosTA = Math.cos(totalBaseAngle);
     const sinTA = Math.sin(totalBaseAngle);
-    const globalBaseX = this.tankPos.x + (tOffX * cosTA - tOffY * sinTA);
-    const globalBaseY = this.tankPos.y + (tOffX * sinTA + tOffY * cosTA);
+    let globalBaseX = this.tankPos.x + (tOffX * cosTA - tOffY * sinTA);
+    let globalBaseY = this.tankPos.y + (tOffX * sinTA + tOffY * cosTA);
+    if (sourceLayer !== null && layerIsPlaced(sourceLayer)) { _lpPt.x = globalBaseX; _lpPt.y = globalBaseY; addLayerPlace(_lpPt, sourceLayer, tankPixelSize / 2, this.tankAngle); globalBaseX = _lpPt.x; globalBaseY = _lpPt.y; }
     const scaledLayerOffX = 0;
     const scaledLayerOffY = 0;
     const cosGA = Math.cos(globalAngle);
@@ -50308,7 +52317,8 @@ export class GameLogic {
     let reach = _drawnReach(baseR, this.state.tankSides);
     const bl = this.state.bodyLayers;
     for (let i = 0; i < bl.length; i++) {
-      const lr = _drawnReach(baseR * bl[i].sizeRatio, bl[i].sides);
+      const pr = layerPlaceReach(bl[i]);
+      const lr = pr > 0 ? _drawnReach(baseR * bl[i].sizeRatio, bl[i].sides) + pr * baseR : _drawnReach(baseR * bl[i].sizeRatio, bl[i].sides);
       if (lr > reach) reach = lr;
     }
     return reach;
@@ -50319,7 +52329,8 @@ export class GameLogic {
     let reach = _drawnReach(baseR, enemy.sides);
     const bl = enemy.bodyLayers;
     for (let i = 0; i < bl.length; i++) {
-      const lr = _drawnReach(baseR * bl[i].sizeRatio, bl[i].sides);
+      const pr = layerPlaceReach(bl[i]);
+      const lr = pr > 0 ? _drawnReach(baseR * bl[i].sizeRatio, bl[i].sides) + pr * baseR : _drawnReach(baseR * bl[i].sizeRatio, bl[i].sides);
       if (lr > reach) reach = lr;
     }
     return reach;
@@ -52403,9 +54414,11 @@ export class GameLogic {
     let tankR = this.getEffectivePlayerRadius();
 
     if (!this.state.ghostMode && !this.tankDying) {
+    const _phNS = PART_HITS.ON !== 0 ? collectPartHits(this.state.bodyLayers, tankSizeFromSlider(this.state.tankSize) * this.state.playerGrowthScale, this.tankAngle, _phBufP) : 0;
+    const _tqR = _phNS > 0 ? Math.max(tankR, partHitsReach(_phBufP, _phNS)) : tankR;
     let nearbyPolys = SHAPE_FAT_HASH
-      ? this.shapeCollisionHash.queryDedup(this.tankPos.x, this.tankPos.y, tankR)
-      : this.spatialHash.query(this.tankPos.x, this.tankPos.y, tankR + this._maxShapeRadius);
+      ? this.shapeCollisionHash.queryDedup(this.tankPos.x, this.tankPos.y, _tqR)
+      : this.spatialHash.query(this.tankPos.x, this.tankPos.y, _tqR + this._maxShapeRadius);
     let _playerShapeOverlapCount = 0;
     const _admTeamP = this.admin.shapeTeamOn;
 
@@ -52413,17 +54426,22 @@ export class GameLogic {
       if (p.fadingOut) continue;
       if (_admTeamP && this.admin.shapeOnMyTeam(p)) continue;
       let polyR = (p.size * p.growth / 2) * getCollisionFactor(p.baseSides);
-      const _tpDx = this.tankPos.x - p.position.x;
-      const _tpDy = this.tankPos.y - p.position.y;
+      for (let _bk = -1; _bk < _phNS; _bk++) {
+      if (_bk >= 0 && (p.fadingOut || !p.active)) break;
+      const _bcX = _bk < 0 ? this.tankPos.x : this.tankPos.x + _phBufP[_bk * PART_HIT_STRIDE + 2];
+      const _bcY = _bk < 0 ? this.tankPos.y : this.tankPos.y + _phBufP[_bk * PART_HIT_STRIDE + 3];
+      const _bcR = _bk < 0 ? tankR : _phBufP[_bk * PART_HIT_STRIDE + 6];
+      const _tpDx = _bcX - p.position.x;
+      const _tpDy = _bcY - p.position.y;
       const _tpDistSq = _tpDx * _tpDx + _tpDy * _tpDy;
-      let minDist = tankR + polyR;
+      let minDist = _bcR + polyR;
 
       if (_tpDistSq < minDist * minDist && _tpDistSq > 0.00000001) {
         if (ARRAS_PARITY.NECRO_BODY !== 0 && this._necroBodyTake(null, p)) continue;
         let d = Math.sqrt(_tpDistSq);
         const invD = 1 / d;
-        const nx = (this.tankPos.x - p.position.x) * invD;
-        const ny = (this.tankPos.y - p.position.y) * invD;
+        const nx = (_bcX - p.position.x) * invD;
+        const ny = (_bcY - p.position.y) * invD;
 
         const overlap = minDist - d;
 
@@ -52539,7 +54557,7 @@ export class GameLogic {
           _knHpP = p.hp + p.shield;
           const _pMaxHp = this.state.tankHP * this.getStatMultiplier('maxHealth');
           knockMotionNext(this.tankVelocity, this.knockbackVelocity, this._knShareX, this._knShareY, this._playerLnDamp());
-          shapeKnockContact(p, this.state.playerId, this._knTicks, dtFactor, nx, ny, overlap, tankR, polyR,
+          shapeKnockContact(p, this.state.playerId, this._knTicks, dtFactor, nx, ny, overlap, _bcR, polyR,
             _knMotX, _knMotY, this._playerKnockPen(), _pMaxHp > 0 ? this.state.tankCurrentHealth / _pMaxHp : 1,
             this.state.tankPushability ?? 1);
           _knDvP = _knTankDv;
@@ -52558,7 +54576,7 @@ export class GameLogic {
         const effectiveApproach = Math.max(Math.abs(approachSpeed),
                                             shapeVelTowardTank > 0 ? shapeVelTowardTank : 0);
 
-        const sizeRatio = tankR / Math.max(polyR, 1);
+        const sizeRatio = _bcR / Math.max(polyR, 1);
         const penFrac = Math.min(PENETRATION_SIZE_COEFF * sizeRatio * sizeRatio, PENETRATION_MAX_FRAC);
         const penAllowance = minDist * penFrac;
         const effectiveOverlap = overlap - penAllowance;
@@ -52808,6 +54826,7 @@ export class GameLogic {
             p.damageOverlay = (_bhS ? flashOnTickHit : flashOnHit)(p.damageOverlay);
         }
       }
+      }
     }
     }
   }
@@ -52827,12 +54846,14 @@ export class GameLogic {
       if (!enemy.active || enemy.isDying || enemy.isSpawning || enemy.graceActive || this._enemyGhosted(enemy)) continue;
 
       const enemyR = this.getEffectiveEnemyRadius(enemy);
-      let eQueryRange = enemyR + 100;
+      const _phN = PART_HITS.ON !== 0 ? collectPartHits(enemy.bodyLayers, enemy.size, enemy.angle, _phBufE) : 0;
+      const _phReach = _phN > 0 ? Math.max(enemyR, partHitsReach(_phBufE, _phN)) : enemyR;
+      let eQueryRange = _phReach + 100;
       if (SMALL_FIX.GH010 !== 0) {
         const _eqPad = 2 * this._combatMaxRoundR
           + Math.sqrt((enemy.velocity.x + enemy.knockbackVelocity.x) * (enemy.velocity.x + enemy.knockbackVelocity.x)
             + (enemy.velocity.y + enemy.knockbackVelocity.y) * (enemy.velocity.y + enemy.knockbackVelocity.y)) * dtFactor;
-        if (_eqPad > 100) eQueryRange = enemyR + _eqPad;
+        if (_eqPad > 100) eQueryRange = _phReach + _eqPad;
       }
       const eNearby = this.combatHash.query(enemy.position.x, enemy.position.y, eQueryRange);
 
@@ -52853,7 +54874,9 @@ export class GameLogic {
         if (_beIsHealing && (enemy._mevF & MF_NO_HEAL) !== 0) continue;
         if (!_beIsHealing && (this._isNoPvpForEnemy(enemy) || this._isNoPvpAtPosition(b.position.x, b.position.y))) continue;
 
-        const combinedR = (b.size / 2 * b._touchK) + enemyR;
+        let combinedR = (b.size / 2 * b._touchK) + enemyR;
+        let _hitR = enemyR, _hitX = enemy.position.x, _hitY = enemy.position.y;
+        let _beDirD = -1;
         const _beDx = b.position.x - enemy.position.x;
         const _beDy = b.position.y - enemy.position.y;
         const _beDistSq = _beDx * _beDx + _beDy * _beDy;
@@ -52862,7 +54885,7 @@ export class GameLogic {
         const bSpeedBE = bSpeedSqBE > 1.0 ? Math.sqrt(bSpeedSqBE) : 0;
         carryBack(b, this.frameCounter);
         const _beSwX = b.velocity.x * dtFactor + _cbX, _beSwY = b.velocity.y * dtFactor + _cbY, _beCb = _cbL > 0;
-        const ccdRange = combinedR + bSpeedBE * dtFactor + _cbL;
+        const ccdRange = (_phN > 0 ? (b.size / 2 * b._touchK) + _phReach : combinedR) + bSpeedBE * dtFactor + _cbL;
         if (_beDistSq > ccdRange * ccdRange) continue;
         let dBE = Math.sqrt(_beDistSq);
         let collidedBE = dBE < combinedR;
@@ -52889,6 +54912,22 @@ export class GameLogic {
           }
         }
 
+
+        if (!collidedBE && _phN > 0) {
+          const _phBr = b.size / 2 * b._touchK;
+          for (let _phK = 0; _phK < _phN; _phK++) {
+            if (!partHitTouch(enemy.bodyLayers, _phBufE, _phK, enemy.size, b.position.x - enemy.position.x, b.position.y - enemy.position.y, _phBr)) continue;
+            const _phO = _phK * PART_HIT_STRIDE;
+            _hitX = enemy.position.x + _phBufE[_phO + 2]; _hitY = enemy.position.y + _phBufE[_phO + 3]; _hitR = _phBufE[_phO + 6];
+            combinedR = _phBr + _hitR;
+            const _phX = b.position.x - _hitX, _phY = b.position.y - _hitY;
+            dBE = Math.sqrt(_phX * _phX + _phY * _phY);
+            _beDirD = dBE;
+            if (dBE >= combinedR) dBE = combinedR * 0.98;
+            collidedBE = true;
+            break;
+          }
+        }
         if (collidedBE) {
           if (_beIsHealing) {
             const healAmt = Math.abs(b.damage);
@@ -52918,13 +54957,13 @@ export class GameLogic {
           const _beRelVx = (b.velocity.x - enemy.velocity.x - enemy.knockbackVelocity.x) * dtFactor;
           const _beRelVy = (b.velocity.y - enemy.velocity.y - enemy.knockbackVelocity.y) * dtFactor;
           const _beRelSpeed = Math.sqrt(_beRelVx * _beRelVx + _beRelVy * _beRelVy);
-          const beEnemyDiam = Math.max(enemyR * 2, 0.001);
+          const beEnemyDiam = Math.max(_hitR * 2, 0.001);
           const beBulletDiam = Math.max(b.size * b._touchK, 0.001);
           const beDepthN = Math.max(0, Math.min(1, (combinedR - dBE) / beEnemyDiam));
           const beDepthMe = Math.max(0, Math.min(1, (combinedR - dBE) / beBulletDiam));
-          const beInvD = dBE > 0.0001 ? 1 / dBE : 0;
-          const beDirX = (enemy.position.x - b.position.x) * beInvD;
-          const beDirY = (enemy.position.y - b.position.y) * beInvD;
+          const beInvD = _beDirD > 0.0001 ? 1 / _beDirD : dBE > 0.0001 ? 1 / dBE : 0;
+          const beDirX = (_hitX - b.position.x) * beInvD;
+          const beDirY = (_hitY - b.position.y) * beInvD;
           const beComp = Math.max(0, beDirX * _beRelVx + beDirY * _beRelVy);
           const beCompNorm = _beRelSpeed > 0.001 ? beComp / _beRelSpeed : 0;
           const _beRelSpeedTick = COLLISION_DT_NORM > 0.001 ? _beRelSpeed / COLLISION_DT_NORM : _beRelSpeed;
@@ -52979,7 +55018,7 @@ export class GameLogic {
           if (ARRAS_PARITY.BULLET_TANK_PUSH !== 0 && !b.ownerIsBaseProtector) {
             const _bePush = bulletTankPush(
               b, SMALL_FIX.CC020 !== 0 ? pushArrival(b, enemy.id, this.frameCounter) : !b.hitIds.has(enemy.id), _aceA.healthRatio, beDf.deathFactorA, _beOverlap, beComp, COLLISION_DT_NORM,
-              enemyR, enemy.pushability,
+              _hitR, enemy.pushability,
               _beBodyPen,
               arrasHealthRatio(enemy.currentHealth, enemy.maxHealth * getEnemyStatMultiplier(enemy, 'maxHealth')),
               this._enemyArrasDrag(enemy));
@@ -52992,12 +55031,12 @@ export class GameLogic {
           if (OFFENSE_ARRAS.ROUND_PAIR !== 0 && defenseOnBody(enemy.resistBase)) {
             const _brN = slotTicksDue(b._rkKs, b._rkSs, b._rkNs, enemy.id, this._knTicks), _brF = _slotFresh;
             if (_brN > 0 && beDf.deathFactorA >= 1) roundBounceOffTank(
-              b, beDirX, beDirY, beComp, _beOverlap, COLLISION_DT_NORM, 0, _brF, enemyR, _beBodyPen, _aceA.healthRatio,
+              b, beDirX, beDirY, beComp, _beOverlap, COLLISION_DT_NORM, 0, _brF, _hitR, _beBodyPen, _aceA.healthRatio,
               arrasHealthRatio(enemy.currentHealth, enemy.maxHealth * getEnemyStatMultiplier(enemy, 'maxHealth')),
               beDf.deathFactorB, undefined, OFFENSE_ARRAS.TANK_BOUNCE_K * _brN, _brF ? b._bncFound : -1);
           } else if (_beTickEnded && beDf.deathFactorA >= 1) {
             roundBounceOffTank(
-              b, beDirX, beDirY, beComp, _beOverlap, COLLISION_DT_NORM, _rcAfterTick, _rcFirstTick, enemyR, _beBodyPen, _aceA.healthRatio,
+              b, beDirX, beDirY, beComp, _beOverlap, COLLISION_DT_NORM, _rcAfterTick, _rcFirstTick, _hitR, _beBodyPen, _aceA.healthRatio,
               arrasHealthRatio(enemy.currentHealth, enemy.maxHealth * getEnemyStatMultiplier(enemy, 'maxHealth')),
               beDf.deathFactorB, undefined, OFFENSE_ARRAS.ON !== 0 ? OFFENSE_ARRAS.TANK_BOUNCE_K * (OFFENSE_ARRAS.TANK_BOUNCE_KIND !== 0 ? b._offBounce : 1) : 1,
               OFFENSE_ARRAS.ON !== 0 && OFFENSE_ARRAS.TANK_BOUNCE_PHASE !== 0 ? b._bncFound : -1);
@@ -53008,8 +55047,8 @@ export class GameLogic {
             const _bpOwn = BASE_AREAS.ON !== 0 ? this._enemyById.get(b.ownerId) : undefined;
             const _bpImp = _bpOwn !== undefined && (_bpOwn.bpPushImp ?? -1) >= 0 ? _bpOwn.bpPushImp! : baseProtectorPushImpulse(this._mapConfigForAreaIdFast(enemy.areaId));
             if (_bpImp > 0) {
-              const _bpDx = enemy.position.x - b.position.x;
-              const _bpDy = enemy.position.y - b.position.y;
+              const _bpDx = _hitX - b.position.x;
+              const _bpDy = _hitY - b.position.y;
               const _bpD = Math.sqrt(_bpDx * _bpDx + _bpDy * _bpDy) || 1;
               enemy.knockbackVelocity.x += (_bpDx / _bpD) * _bpImp;
               enemy.knockbackVelocity.y += (_bpDy / _bpD) * _bpImp;
@@ -53145,6 +55184,8 @@ export class GameLogic {
     }
 
     if (!this.state.ghostMode && !this.tankDying) {
+      const _phNP = PART_HITS.ON !== 0 ? collectPartHits(this.state.bodyLayers, tankSizeFromSlider(this.state.tankSize) * this.state.playerGrowthScale, this.tankAngle, _phBufP) : 0;
+      const _phReachP = _phNP > 0 ? Math.max(playerR, partHitsReach(_phBufP, _phNP)) : playerR;
       for (let _bpi = 0; _bpi < this.bullets.length; _bpi++) {
         const b = this.bullets[_bpi];
         if (b.health <= 0) continue;
@@ -53162,7 +55203,9 @@ export class GameLogic {
           if (!_bpIsHealing && (this._isNoPvpForPlayer() || this._isNoPvpAtPosition(b.position.x, b.position.y))) continue;
         }
 
-        const combinedR = (b.size / 2 * b._touchK) + playerR;
+        let combinedR = (b.size / 2 * b._touchK) + playerR;
+        let _hitRP = playerR, _hitXP = this.tankPos.x, _hitYP = this.tankPos.y;
+        let _bpDirD = -1;
         const _bpDx = b.position.x - this.tankPos.x;
         const _bpDy = b.position.y - this.tankPos.y;
         const _bpDistSq = _bpDx * _bpDx + _bpDy * _bpDy;
@@ -53171,7 +55214,7 @@ export class GameLogic {
         const bSpeedBP = bSpeedSqBP > 1.0 ? Math.sqrt(bSpeedSqBP) : 0;
         carryBack(b, this.frameCounter);
         const _bpSwX = b.velocity.x * dtFactor + _cbX, _bpSwY = b.velocity.y * dtFactor + _cbY, _bpCb = _cbL > 0;
-        const ccdRangeBP = combinedR + bSpeedBP * dtFactor + _cbL;
+        const ccdRangeBP = (_phNP > 0 ? (b.size / 2 * b._touchK) + _phReachP : combinedR) + bSpeedBP * dtFactor + _cbL;
         if (_bpDistSq > ccdRangeBP * ccdRangeBP) continue;
         if (SMALL_FIX.NH034 !== 0) {
           if (this._bulletGhostExempt(b)) continue;
@@ -53207,6 +55250,22 @@ export class GameLogic {
           }
         }
 
+
+        if (!collidedBP && _phNP > 0) {
+          const _phBr = b.size / 2 * b._touchK;
+          for (let _phK = 0; _phK < _phNP; _phK++) {
+            if (!partHitTouch(this.state.bodyLayers, _phBufP, _phK, tankSizeFromSlider(this.state.tankSize) * this.state.playerGrowthScale, b.position.x - this.tankPos.x, b.position.y - this.tankPos.y, _phBr)) continue;
+            const _phO = _phK * PART_HIT_STRIDE;
+            _hitXP = this.tankPos.x + _phBufP[_phO + 2]; _hitYP = this.tankPos.y + _phBufP[_phO + 3]; _hitRP = _phBufP[_phO + 6];
+            combinedR = _phBr + _hitRP;
+            const _phX = b.position.x - _hitXP, _phY = b.position.y - _hitYP;
+            dBP = Math.sqrt(_phX * _phX + _phY * _phY);
+            _bpDirD = dBP;
+            if (dBP >= combinedR) dBP = combinedR * 0.98;
+            collidedBP = true;
+            break;
+          }
+        }
         if (collidedBP) {
           if (_bpIsHealing && !this.state.godMode) {
             const healAmt = Math.abs(b.damage);
@@ -53258,13 +55317,13 @@ export class GameLogic {
             const _bpRelVx = (b.velocity.x - this.tankVelocity.x - this.knockbackVelocity.x) * dtFactor;
             const _bpRelVy = (b.velocity.y - this.tankVelocity.y - this.knockbackVelocity.y) * dtFactor;
             const _bpRelSpeed = Math.sqrt(_bpRelVx * _bpRelVx + _bpRelVy * _bpRelVy);
-            const bpPlayerDiam = Math.max(playerR * 2, 0.001);
+            const bpPlayerDiam = Math.max(_hitRP * 2, 0.001);
             const bpBulletDiam = Math.max(b.size * b._touchK, 0.001);
             const bpDepthN = Math.max(0, Math.min(1, (combinedR - dBP) / bpPlayerDiam));
             const bpDepthMe = Math.max(0, Math.min(1, (combinedR - dBP) / bpBulletDiam));
-            const bpInvD = dBP > 0.0001 ? 1 / dBP : 0;
-            const bpDirX = (this.tankPos.x - b.position.x) * bpInvD;
-            const bpDirY = (this.tankPos.y - b.position.y) * bpInvD;
+            const bpInvD = _bpDirD > 0.0001 ? 1 / _bpDirD : dBP > 0.0001 ? 1 / dBP : 0;
+            const bpDirX = (_hitXP - b.position.x) * bpInvD;
+            const bpDirY = (_hitYP - b.position.y) * bpInvD;
             const bpComp = Math.max(0, bpDirX * _bpRelVx + bpDirY * _bpRelVy);
             const bpCompNorm = _bpRelSpeed > 0.001 ? bpComp / _bpRelSpeed : 0;
             const _bpRelSpeedTick = COLLISION_DT_NORM > 0.001 ? _bpRelSpeed / COLLISION_DT_NORM : _bpRelSpeed;
@@ -53320,7 +55379,7 @@ export class GameLogic {
             if (ARRAS_PARITY.BULLET_TANK_PUSH !== 0 && !b.ownerIsBaseProtector) {
               const _bpPush = bulletTankPush(
                 b, SMALL_FIX.CC020 !== 0 ? pushArrival(b, this.state.playerId, this.frameCounter) : !b.hitIds.has(this.state.playerId), _aceA.healthRatio, bpDf.deathFactorA, _bpOverlap, bpComp, COLLISION_DT_NORM,
-                playerR, this.state.tankPushability,
+                _hitRP, this.state.tankPushability,
                 _bpBodyPen,
                 arrasHealthRatio(this.state.tankCurrentHealth, _bpMaxHp),
                 this._playerArrasDrag());
@@ -53333,12 +55392,12 @@ export class GameLogic {
             if (OFFENSE_ARRAS.ROUND_PAIR !== 0 && defenseOnBody(this._plResist())) {
               const _brN = slotTicksDue(b._rkKs, b._rkSs, b._rkNs, this.state.playerId, this._knTicks), _brF = _slotFresh;
               if (_brN > 0 && bpDf.deathFactorA >= 1) roundBounceOffTank(
-                b, bpDirX, bpDirY, bpComp, _bpOverlap, COLLISION_DT_NORM, 0, _brF, playerR, _bpBodyPen, _aceA.healthRatio,
+                b, bpDirX, bpDirY, bpComp, _bpOverlap, COLLISION_DT_NORM, 0, _brF, _hitRP, _bpBodyPen, _aceA.healthRatio,
                 arrasHealthRatio(this.state.tankCurrentHealth, _bpMaxHp),
                 bpDf.deathFactorB, undefined, OFFENSE_ARRAS.TANK_BOUNCE_K * _brN, _brF ? b._bncFound : -1);
             } else if (_bpTickEnded && bpDf.deathFactorA >= 1) {
               roundBounceOffTank(
-                b, bpDirX, bpDirY, bpComp, _bpOverlap, COLLISION_DT_NORM, _rcAfterTick, _rcFirstTick, playerR, _bpBodyPen, _aceA.healthRatio,
+                b, bpDirX, bpDirY, bpComp, _bpOverlap, COLLISION_DT_NORM, _rcAfterTick, _rcFirstTick, _hitRP, _bpBodyPen, _aceA.healthRatio,
                 arrasHealthRatio(this.state.tankCurrentHealth, _bpMaxHp),
                 bpDf.deathFactorB, undefined, OFFENSE_ARRAS.ON !== 0 ? OFFENSE_ARRAS.TANK_BOUNCE_K * (OFFENSE_ARRAS.TANK_BOUNCE_KIND !== 0 ? b._offBounce : 1) : 1,
                 OFFENSE_ARRAS.ON !== 0 && OFFENSE_ARRAS.TANK_BOUNCE_PHASE !== 0 ? b._bncFound : -1);
@@ -53348,8 +55407,8 @@ export class GameLogic {
               const _bpiOwn = BASE_AREAS.ON !== 0 ? this._enemyById.get(b.ownerId) : undefined;
               const _bpiImp = _bpiOwn !== undefined && (_bpiOwn.bpPushImp ?? -1) >= 0 ? _bpiOwn.bpPushImp! : baseProtectorPushImpulse(this._mapConfigForAreaIdFast(this.playerAreaId));
               if (_bpiImp > 0) {
-                const _bpiDx = this.tankPos.x - b.position.x;
-                const _bpiDy = this.tankPos.y - b.position.y;
+                const _bpiDx = _hitXP - b.position.x;
+                const _bpiDy = _hitYP - b.position.y;
                 const _bpiD = Math.sqrt(_bpiDx * _bpiDx + _bpiDy * _bpiDy) || 1;
                 this.knockbackVelocity.x += (_bpiDx / _bpiD) * _bpiImp;
                 this.knockbackVelocity.y += (_bpiDy / _bpiD) * _bpiImp;
@@ -53422,9 +55481,11 @@ export class GameLogic {
       if (enemy.camp === CAMP_BOSS) continue;
 
       const enemyR = this.getEffectiveEnemyRadius(enemy);
+      const _phNS3 = PART_HITS.ON !== 0 ? collectPartHits(enemy.bodyLayers, enemy.size, enemy.angle, _phBufE) : 0;
+      const _eqR3 = _phNS3 > 0 ? Math.max(enemyR, partHitsReach(_phBufE, _phNS3)) : enemyR;
       const nearbyPolys = SHAPE_FAT_HASH
-        ? this.shapeCollisionHash.queryDedup(enemy.position.x, enemy.position.y, enemyR)
-        : this.spatialHash.query(enemy.position.x, enemy.position.y, enemyR + this._maxShapeRadius);
+        ? this.shapeCollisionHash.queryDedup(enemy.position.x, enemy.position.y, _eqR3)
+        : this.spatialHash.query(enemy.position.x, enemy.position.y, _eqR3 + this._maxShapeRadius);
       let _enemyShapeOverlapCount = 0;
 
       for (let _pi = 0; _pi < nearbyPolys.length; _pi++) {
@@ -53432,17 +55493,22 @@ export class GameLogic {
         if (p.fadingOut) continue;
 
         const polyR = (p.size * p.growth / 2) * getCollisionFactor(p.baseSides);
-        const _epDx = enemy.position.x - p.position.x;
-        const _epDy = enemy.position.y - p.position.y;
+        for (let _bk = -1; _bk < _phNS3; _bk++) {
+        if (_bk >= 0 && (p.fadingOut || !p.active)) break;
+        const _bcX = _bk < 0 ? enemy.position.x : enemy.position.x + _phBufE[_bk * PART_HIT_STRIDE + 2];
+        const _bcY = _bk < 0 ? enemy.position.y : enemy.position.y + _phBufE[_bk * PART_HIT_STRIDE + 3];
+        const _bcR = _bk < 0 ? enemyR : _phBufE[_bk * PART_HIT_STRIDE + 6];
+        const _epDx = _bcX - p.position.x;
+        const _epDy = _bcY - p.position.y;
         const _epDistSq = _epDx * _epDx + _epDy * _epDy;
-        const minDist = enemyR + polyR;
+        const minDist = _bcR + polyR;
 
         if (_epDistSq < minDist * minDist && _epDistSq > 0.00000001) {
           if (ARRAS_PARITY.NECRO_BODY !== 0 && this._necroBodyTake(enemy, p)) continue;
           const d = Math.sqrt(_epDistSq);
           const invD = 1 / d;
-          const nx = (enemy.position.x - p.position.x) * invD;
-          const ny = (enemy.position.y - p.position.y) * invD;
+          const nx = (_bcX - p.position.x) * invD;
+          const ny = (_bcY - p.position.y) * invD;
 
           const overlap = minDist - d;
 
@@ -53559,7 +55625,7 @@ export class GameLogic {
             _knHpE = p.hp + p.shield;
             const _eMaxHp = enemy.maxHealth * getEnemyStatMultiplier(enemy, 'maxHealth');
             knockMotionNext(enemy.velocity, enemy.knockbackVelocity, enemy._knShareX || 0, enemy._knShareY || 0, this._enemyLnDamp(enemy));
-            shapeKnockContact(p, enemy.id, this._knTicks, dtFactor, nx, ny, overlap, enemyR, polyR,
+            shapeKnockContact(p, enemy.id, this._knTicks, dtFactor, nx, ny, overlap, _bcR, polyR,
               _knMotX, _knMotY, this._enemyKnockPen(enemy), _eMaxHp > 0 ? enemy.currentHealth / _eMaxHp : 1,
               enemy.pushability ?? 1);
             _knDvE = _knTankDv;
@@ -53578,7 +55644,7 @@ export class GameLogic {
           const eEffectiveApproach = Math.max(Math.abs(eApproachSpeed),
                                                eShapeVelToward > 0 ? eShapeVelToward : 0);
 
-          const eSizeRatio = enemyR / Math.max(polyR, 1);
+          const eSizeRatio = _bcR / Math.max(polyR, 1);
           const ePenFrac = Math.min(PENETRATION_SIZE_COEFF * eSizeRatio * eSizeRatio, PENETRATION_MAX_FRAC);
           const ePenAllowance = minDist * ePenFrac;
           const eEffectiveOverlap = overlap - ePenAllowance;
@@ -53827,22 +55893,40 @@ export class GameLogic {
           }
           }
         }
+        }
       }
     }
 
     if (!this.state.ghostMode && !this.tankDying) {
       const _graceSolid4 = graceIsSolid();
+      const _phNP4 = PART_HITS.ON !== 0 ? collectPartHits(this.state.bodyLayers, tankSizeFromSlider(this.state.tankSize) * this.state.playerGrowthScale, this.tankAngle, _phBufP) : 0;
+      const _rchP4 = _phNP4 > 0 ? partHitsReach(_phBufP, _phNP4) : 0;
       for (let _ei = 0; _ei < this.state.enemyTanks.length; _ei++) {
         const enemy = this.state.enemyTanks[_ei];
         if (!enemy.active || enemy.isDying || enemy.isSpawning || (enemy.graceActive && !_graceSolid4) || this._enemyGhosted(enemy)) continue;
 
         const enemyR = this.getEffectiveEnemyRadius(enemy);
-        let _teDx = this.tankPos.x - enemy.position.x;
-        let _teDy = this.tankPos.y - enemy.position.y;
+        let _phNE4 = PART_HITS.ON !== 0 ? collectPartHits(enemy.bodyLayers, enemy.size, enemy.angle, _phBufE) : 0;
+        let _lP4 = _phNP4;
+        if (_phNP4 > 0 || _phNE4 > 0) {
+          const _rE = _phNE4 > 0 ? partHitsReach(_phBufE, _phNE4) : 0;
+          const _rr = (playerR > _rchP4 ? playerR : _rchP4) + (enemyR > _rE ? enemyR : _rE);
+          const _cdx = this.tankPos.x - enemy.position.x, _cdy = this.tankPos.y - enemy.position.y;
+          if (_cdx * _cdx + _cdy * _cdy > _rr * _rr) { _lP4 = 0; _phNE4 = 0; }
+        }
+        for (let _ba = -1; _ba < _lP4; _ba++) {
+        for (let _bb = -1; _bb < _phNE4; _bb++) {
+        if ((_ba >= 0 || _bb >= 0) && (!enemy.active || enemy.isDying || this.tankDying)) break;
+        const _mm = _ba < 0 && _bb < 0;
+        const _aOX = _ba < 0 ? 0 : _phBufP[_ba * PART_HIT_STRIDE + 2], _aOY = _ba < 0 ? 0 : _phBufP[_ba * PART_HIT_STRIDE + 3];
+        const _bOX = _bb < 0 ? 0 : _phBufE[_bb * PART_HIT_STRIDE + 2], _bOY = _bb < 0 ? 0 : _phBufE[_bb * PART_HIT_STRIDE + 3];
+        const _aR = _ba < 0 ? playerR : _phBufP[_ba * PART_HIT_STRIDE + 6], _bR = _bb < 0 ? enemyR : _phBufE[_bb * PART_HIT_STRIDE + 6];
+        let _teDx = _mm ? this.tankPos.x - enemy.position.x : (this.tankPos.x + _aOX) - (enemy.position.x + _bOX);
+        let _teDy = _mm ? this.tankPos.y - enemy.position.y : (this.tankPos.y + _aOY) - (enemy.position.y + _bOY);
         let _teDistSq = _teDx * _teDx + _teDy * _teDy;
-        const minDist = playerR + enemyR;
+        const minDist = _aR + _bR;
         let _teCross = false;
-        if (SMALL_FIX.GH302 !== 0) {
+        if (SMALL_FIX.GH302 !== 0 && _mm) {
           stepMoved(this.tankPos.x, this.tankPos.y, this._stepPX0, this._stepPY0, this.tankVelocity.x + this.knockbackVelocity.x, this.tankVelocity.y + this.knockbackVelocity.y, dtFactor, this._stepPV0);
           const _pvx = _smX, _pvy = _smY;
           stepMoved(enemy.position.x, enemy.position.y, enemy._stepX0, enemy._stepY0, enemy.velocity.x + enemy.knockbackVelocity.x, enemy.velocity.y + enemy.knockbackVelocity.y, dtFactor, enemy._stepV0);
@@ -53861,8 +55945,8 @@ export class GameLogic {
         if ((_teDistSq < minDist * minDist || _teCross) && _teDistSq > 0.00000001) {
           const d = Math.sqrt(_teDistSq);
           const invD = 1 / d;
-          const nx = (this.tankPos.x - enemy.position.x) * invD;
-          const ny = (this.tankPos.y - enemy.position.y) * invD;
+          const nx = (_mm ? this.tankPos.x - enemy.position.x : (this.tankPos.x + _aOX) - (enemy.position.x + _bOX)) * invD;
+          const ny = (_mm ? this.tankPos.y - enemy.position.y : (this.tankPos.y + _aOY) - (enemy.position.y + _bOY)) * invD;
 
           const overlap = minDist - d;
           const _bhTeamP = BODY_HIT.ON !== 0 && (tapFamilyIdOf(enemy) === this.state.playerId
@@ -53870,7 +55954,7 @@ export class GameLogic {
           if (_bhTeamP && !(SMALL_FIX.R965 !== 0 && enemy.bodySolid)) {
             bodyHitMaps(enemy);
             const _bhTk = bodyHitTicksDue(enemy._hitSeen, enemy._hitNext, this.state.playerId, this._knTicks);
-            teamPairPush(dtFactor, _bhTk, nx, ny, overlap, playerR, enemyR, this.tankVelocity.x + this.knockbackVelocity.x, this.tankVelocity.y + this.knockbackVelocity.y,
+            teamPairPush(dtFactor, _bhTk, nx, ny, overlap, _aR, _bR, this.tankVelocity.x + this.knockbackVelocity.x, this.tankVelocity.y + this.knockbackVelocity.y,
               enemy.velocity.x + enemy.knockbackVelocity.x, enemy.velocity.y + enemy.knockbackVelocity.y);
             const _pp = this.state.tankPushability ?? 1, _ep = enemy.pushability ?? 1;
             if (_ttDvA > 0 && _pp > 0) {
@@ -53935,7 +56019,7 @@ export class GameLogic {
                 knockMotionNext(enemy.velocity, enemy.knockbackVelocity, enemy._knShareX || 0, enemy._knShareY || 0, this._enemyLnDamp(enemy));
                 const _bhPMax = this.state.tankHP * this.getStatMultiplier('maxHealth');
                 const _bhEMax = enemy.maxHealth * getEnemyStatMultiplier(enemy, 'maxHealth');
-                tankPairKnock(_bhPEN, nx, ny, overlap, playerR, enemyR, _bhMx, _bhMy, _knMotX, _knMotY, _bhPP, _bhPen,
+                tankPairKnock(_bhPEN, nx, ny, overlap, _aR, _bR, _bhMx, _bhMy, _knMotX, _knMotY, _bhPP, _bhPen,
                   _bhPMax > 0 ? this.state.tankCurrentHealth / _bhPMax : 1, _bhEMax > 0 ? enemy.currentHealth / _bhEMax : 1,
                   this.state.tankPushability ?? 1, enemy.pushability ?? 1);
                 if (_ttDvA > 0) {
@@ -54062,13 +56146,26 @@ export class GameLogic {
             }
           }
         }
+        }}
       }
     }
 
     const _graceSolid5 = graceIsSolid();
+    let _parts5 = false;
+    if (PART_HITS.ON !== 0) {
+      const _ets = this.state.enemyTanks;
+      if (_ph5N.length < _ets.length) { _ph5N = new Int32Array(_ets.length * 2); _ph5R = new Float64Array(_ets.length * 2); }
+      for (let k = 0; k < _ets.length; k++) {
+        const ek = _ets[k];
+        const nk = ek.bodyLayers && ek.bodyLayers.length > 0 ? collectPartHits(ek.bodyLayers, ek.size, ek.angle, _phBufE2) : 0;
+        _ph5N[k] = nk; _ph5R[k] = nk > 0 ? partHitsReach(_phBufE2, nk) : 0;
+        if (nk > 0) _parts5 = true;
+      }
+    }
     for (let i = 0; i < this.state.enemyTanks.length; i++) {
       const e1 = this.state.enemyTanks[i];
       if (!e1.active || e1.isDying || e1.isSpawning || (e1.graceActive && !_graceSolid5) || this._enemyGhosted(e1)) continue;
+      const _n51 = _parts5 && _ph5N[i] > 0 ? collectPartHits(e1.bodyLayers, e1.size, e1.angle, _phBufE) : 0;
 
       for (let j = i + 1; j < this.state.enemyTanks.length; j++) {
         if (e1.isDying) break;
@@ -54077,15 +56174,30 @@ export class GameLogic {
 
         const r1 = SMALL_FIX.GH008 !== 0 ? this.getEffectiveEnemyRadius(e1) : SIZE_ARRAS.TOUCH !== 0 ? e1.size / 2 * bodyTouchOf(e1.touchScale) : e1.size / 2;
         const r2 = SMALL_FIX.GH008 !== 0 ? this.getEffectiveEnemyRadius(e2) : SIZE_ARRAS.TOUCH !== 0 ? e2.size / 2 * bodyTouchOf(e2.touchScale) : e2.size / 2;
-        const minDist = r1 + r2;
+        let _far5 = true;
+        if (_parts5 && (_n51 > 0 || _ph5N[j] > 0)) {
+          const _rr = (r1 > _ph5R[i] ? r1 : _ph5R[i]) + (r2 > _ph5R[j] ? r2 : _ph5R[j]);
+          const _cdx = e1.position.x - e2.position.x, _cdy = e1.position.y - e2.position.y;
+          _far5 = _cdx * _cdx + _cdy * _cdy > _rr * _rr;
+        }
+        const _n52 = !_far5 && _ph5N[j] > 0 ? collectPartHits(e2.bodyLayers, e2.size, e2.angle, _phBufE2) : 0;
+        const _l51 = _far5 ? 0 : _n51;
+        for (let _ba = -1; _ba < _l51; _ba++) {
+        for (let _bb = -1; _bb < _n52; _bb++) {
+        if ((_ba >= 0 || _bb >= 0) && (e1.isDying || e2.isDying || !e2.active)) break;
+        const _mm = _ba < 0 && _bb < 0;
+        const _q1 = _ba < 0 ? r1 : _phBufE[_ba * PART_HIT_STRIDE + 6], _q2 = _bb < 0 ? r2 : _phBufE2[_bb * PART_HIT_STRIDE + 6];
+        const _o1x = _ba < 0 ? 0 : _phBufE[_ba * PART_HIT_STRIDE + 2], _o1y = _ba < 0 ? 0 : _phBufE[_ba * PART_HIT_STRIDE + 3];
+        const _o2x = _bb < 0 ? 0 : _phBufE2[_bb * PART_HIT_STRIDE + 2], _o2y = _bb < 0 ? 0 : _phBufE2[_bb * PART_HIT_STRIDE + 3];
+        const minDist = _q1 + _q2;
 
-        let dx = e1.position.x - e2.position.x;
-        let dy = e1.position.y - e2.position.y;
+        let dx = _mm ? e1.position.x - e2.position.x : (e1.position.x + _o1x) - (e2.position.x + _o2x);
+        let dy = _mm ? e1.position.y - e2.position.y : (e1.position.y + _o1y) - (e2.position.y + _o2y);
         let distSq = dx * dx + dy * dy;
         const minDistSq = minDist * minDist;
 
         let _1vx = 0, _1vy = 0, _2vx = 0, _2vy = 0, _tc = -1;
-        if (SMALL_FIX.GH302 !== 0) {
+        if (SMALL_FIX.GH302 !== 0 && _mm) {
           stepMoved(e1.position.x, e1.position.y, e1._stepX0, e1._stepY0, e1.velocity.x + e1.knockbackVelocity.x, e1.velocity.y + e1.knockbackVelocity.y, dtFactor, e1._stepV0);
           _1vx = _smX; _1vy = _smY;
           stepMoved(e2.position.x, e2.position.y, e2._stepX0, e2._stepY0, e2.velocity.x + e2.knockbackVelocity.x, e2.velocity.y + e2.knockbackVelocity.y, dtFactor, e2._stepV0);
@@ -54115,7 +56227,7 @@ export class GameLogic {
           const _bhHoldT = e1.id < e2.id ? e1 : e2;
           bodyHitMaps(_bhHoldT);
           const _bhTk = bodyHitTicksDue(_bhHoldT._hitSeen, _bhHoldT._hitNext, _bhHoldT === e1 ? e2.id : e1.id, this._knTicks);
-          teamPairPush(dtFactor, _bhTk, nx, ny, overlap, r1, r2, e1.velocity.x + e1.knockbackVelocity.x, e1.velocity.y + e1.knockbackVelocity.y,
+          teamPairPush(dtFactor, _bhTk, nx, ny, overlap, _q1, _q2, e1.velocity.x + e1.knockbackVelocity.x, e1.velocity.y + e1.knockbackVelocity.y,
             e2.velocity.x + e2.knockbackVelocity.x, e2.velocity.y + e2.knockbackVelocity.y);
           const _p1 = e1.pushability ?? 1, _p2 = e2.pushability ?? 1;
           if (_ttDvA > 0 && _p1 > 0) {
@@ -54187,7 +56299,7 @@ export class GameLogic {
               knockMotionNext(e2.velocity, e2.knockbackVelocity, e2._knShareX || 0, e2._knShareY || 0, this._enemyLnDamp(e2));
               const _bh1Max = e1.maxHealth * getEnemyStatMultiplier(e1, 'maxHealth');
               const _bh2Max = e2.maxHealth * getEnemyStatMultiplier(e2, 'maxHealth');
-              tankPairKnock(_bhEEN, nx, ny, overlap, r1, r2, _bhMx, _bhMy, _knMotX, _knMotY, _bhEEP1, _bhPen,
+              tankPairKnock(_bhEEN, nx, ny, overlap, _q1, _q2, _bhMx, _bhMy, _knMotX, _knMotY, _bhEEP1, _bhPen,
                 _bh1Max > 0 ? e1.currentHealth / _bh1Max : 1, _bh2Max > 0 ? e2.currentHealth / _bh2Max : 1,
                 e1.pushability ?? 1, e2.pushability ?? 1);
               if (_ttDvA > 0) {
@@ -54352,6 +56464,7 @@ export class GameLogic {
             e2.damageOverlay = (_bhEE ? flashOnTickHit : flashOnHit)(e2.damageOverlay);
           }
         }
+        }}
       }
     }
   }
@@ -55267,10 +57380,11 @@ export class GameLogic {
       ? MANHUNT_LEVEL_CAP : this._capOnTank(enemy.currentTankName, this.state.gameModeConfig.levelCap ?? 45);
     const _lv0 = enemy.level;
     const _mhCount = SMALL_FIX.GH317 !== 0 && maxLevel === MANHUNT_LEVEL_CAP;
-    const _count = _mhCount || levelHeldIn(this.state.gameModeConfig);
+    const _count = _mhCount || levelHeldIn(this.state.gameModeConfig) || SMALL_FIX.R994 !== 0;
     if (enemy.level >= maxLevel && !_count) return;
 
     enemy.currentXp += amount;
+    if (SMALL_FIX.R994 !== 0 && enemy.currentXp > XP_LIMIT) enemy.currentXp = XP_LIMIT;
     if (_mhCount && enemy.level < maxLevel && enemy.currentXp >= xpThresholdForLevel(enemy.level)) {
       const _to = manhuntLevelFor(enemy.currentXp, enemy.level, maxLevel) - 1;
       if (_to - enemy.level > MANHUNT_JUMP_MIN) {

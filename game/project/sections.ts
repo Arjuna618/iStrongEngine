@@ -2,6 +2,7 @@ import type { GameLogic } from '../GameLogic';
 import { DataRegistry } from '../DataRegistry';
 import { sanitizeImport, clampShapeSpawnLimits } from '../ValueClamp';
 import { SMALL_FIX } from '../smallFixSwitch';
+import { LEVEL_LIMIT } from '../levelLimit';
 import { GAME_MODE_TITLES } from '../gameModeTitles';
 import { MAX_ARENA_TANKS } from '../../types';
 import { CMD_ROOM_MAX } from '../chatCommands';
@@ -78,7 +79,7 @@ export interface PanelsData {
   scroll: Record<string, number>;
 }
 
-export const EMPTY_PANELS: PanelsData = { tool: 'tank', folds: {}, values: {}, scroll: {} };
+export const EMPTY_PANELS: PanelsData = { tool: 'turret', folds: {}, values: {}, scroll: {} };
 
 function sparse(data: Record<string, unknown>, defaults: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -315,7 +316,7 @@ function modeLimits(m: Record<string, unknown>, fresh: Record<string, unknown>):
     if (typeof g.mode !== 'string' || !Object.prototype.hasOwnProperty.call(GAME_MODE_TITLES, g.mode)) g.mode = (fresh.gameModeConfig as Record<string, unknown>).mode;
     limitNum(g, 'teams', 2, 4, true);
     limitNum(g, 'playerTeam', 1, 4, true);
-    limitNum(g, 'levelCap', 1, 1000, true);
+    limitNum(g, 'levelCap', 1, SMALL_FIX.R994 !== 0 ? LEVEL_LIMIT : 1000, true);
     limitNum(g, 'maxTanksAlive', 1, CMD_ROOM_MAX, true);
     limitNum(g, 'growthMaxMultiplier', 1, 1000, false);
     limitNum(g, 'growthPerLevel', 0, 1000, false);

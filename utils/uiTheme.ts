@@ -53,17 +53,32 @@ export function subscribeUiTheme(fn: () => void): () => void {
 
 const PALETTE_KEY = 'istrong-ui-palette';
 
+function lightnessOf(c: readonly number[]): number {
+  const lin = (v: number) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  const y = 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
+  return y > 216 / 24389 ? 116 * Math.cbrt(y) - 16 : y * 24389 / 27;
+}
+function darkStep(body: readonly number[], lightBody: readonly number[], k: number, dark: boolean): number {
+  if (!dark) return k;
+  const want = lightnessOf(lightBody) - lightnessOf(lightBody.map(v => v * k));
+  const top = lightnessOf(body);
+  let lo = 0.3, hi = 1;
+  for (let i = 0; i < 30; i++) { const m = (lo + hi) / 2; if (top - lightnessOf(body.map(v => v * m)) > want) lo = m; else hi = m; }
+  return (lo + hi) / 2;
+}
+
 function paletteOf(dark: boolean): Record<string, string> {
   const G = CM_USE.GENERAL;
   const acc = cmRgb(CM.GREEN, dark, G);
   const body = cmRgb(CM.BARRELS, dark, G);
-  const shade = (c: number, k = 0.88) => Math.round(c * k).toString(16).padStart(2, '0');
+  const kBar = darkStep(body, cmRgb(CM.BARRELS, false, G), 0.88, dark), kSide = darkStep(body, cmRgb(CM.BARRELS, false, G), 0.8, dark);
+  const shade = (c: number, k = kBar) => Math.round(c * k).toString(16).padStart(2, '0');
   const floor = cmRgb(CM.BACKGROUND, dark, G);
   const mm = [0, 1, 2].map(i => (floor[i] * 128 + body[i] * 128) >> 8);
   return {
     '--kc-mm': `rgb(${mm[0]}, ${mm[1]}, ${mm[2]})`,
     '--kc-bar': `#${shade(body[0])}${shade(body[1])}${shade(body[2])}`,
-    '--kc-side': `#${shade(body[0], 0.8)}${shade(body[1], 0.8)}${shade(body[2], 0.8)}`,
+    '--kc-side': `#${shade(body[0], kSide)}${shade(body[1], kSide)}${shade(body[2], kSide)}`,
     '--kc-grey': cmHex(CM.BARRELS, dark, G),
     '--kc-ink': cmHex(CM.BORDERS, dark, G),
     '--kc-white': cmHex(CM.TEXT, dark, G),
@@ -96,3 +111,5 @@ try {
 
 applyClass();
 uiPaletteSync();
+
+export const __uiThemeHooks = { paletteOf };

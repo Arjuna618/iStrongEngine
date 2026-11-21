@@ -149,17 +149,18 @@ export function useSwapStage<K>(key: K, opts?: { glide?: boolean; box?: { readon
   const [phase, setPhase] = useState<SwapPhase>('idle');
   const shownRef = useRef<K>(key), latest = useRef<K>(key), phaseRef = useRef<SwapPhase>('idle'), t = useRef(0);
   const cancelSettle = useRef<() => void>(() => {});
+  const startRef = useRef<() => void>(() => {});
   latest.current = key;
-  useLayoutEffect(() => {
-    if (Object.is(key, shownRef.current) && phaseRef.current !== 'out') return;
-    if (reducedMotion()) { shownRef.current = key; setShown(key); return; }
-    if (phaseRef.current === 'out') return;
+  const start = () => {
     noteMotion(SWAP_OUT_MS + (glide ? GLIDE_MS : 0) + SWAP_IN_MS);
     phaseRef.current = 'out'; setPhase('out');
     window.clearTimeout(t.current);
     const fadeIn = () => {
       phaseRef.current = 'in'; setPhase('in');
-      t.current = window.setTimeout(() => { phaseRef.current = 'idle'; setPhase('idle'); }, SWAP_IN_MS);
+      t.current = window.setTimeout(() => {
+        phaseRef.current = 'idle'; setPhase('idle');
+        if (!Object.is(latest.current, shownRef.current) && !reducedMotion()) startRef.current();
+      }, SWAP_IN_MS);
     };
     t.current = window.setTimeout(() => {
       shownRef.current = latest.current; setShown(latest.current);
@@ -168,6 +169,13 @@ export function useSwapStage<K>(key: K, opts?: { glide?: boolean; box?: { readon
         t.current = window.setTimeout(() => { cancelSettle.current = whenFoldsSettle(boxOpt?.current ?? null, fadeIn); }, GLIDE_MS);
       } else fadeIn();
     }, SWAP_OUT_MS);
+  };
+  startRef.current = start;
+  useLayoutEffect(() => {
+    if (Object.is(key, shownRef.current) && phaseRef.current !== 'out') return;
+    if (reducedMotion()) { shownRef.current = key; setShown(key); return; }
+    if (phaseRef.current !== 'idle') return;
+    start();
   }, [key]);
   useEffect(() => () => { window.clearTimeout(t.current); cancelSettle.current(); }, []);
   const veilCls = useSwapVeil(phase);

@@ -19,7 +19,7 @@ export interface ImportSummary {
 export const KIND_WORD: Record<string, string> = {
   GameMode: 'game mode',
   Tank: 'tanks', TurretPreset: 'turrets', CustomTurret: 'old style turrets', CustomProjectile: 'projectiles',
-  FoodShape: 'food shapes', Other: 'Others', Map: 'maps', MultiAreaMap: 'multi area maps',
+  FoodShape: 'food shapes', Other: 'Others', Map: 'maps', MultiAreaMap: 'multi area maps', Solid: 'solids',
 };
 
 export interface PickedFile { file: File; path: string; }
@@ -34,9 +34,11 @@ export async function importFiles(logic: GameLogic, picked: readonly PickedFile[
   const index = (it: LibraryItem) => { const k = keyOf(it.fileData.type, it.name); let l = byName.get(k); if (!l) { l = []; byName.set(k, l); } l.push(it); };
   for (const it of logic.state.tankLibrary) index(it);
   for (const it of logic.state.otherLibrary) index(it);
+  for (const it of logic.state.solidLibrary) index(it);
   const ids = new Set<string>();
   for (const it of logic.state.tankLibrary) ids.add(it.id);
   for (const it of logic.state.otherLibrary) ids.add(it.id);
+  for (const it of logic.state.solidLibrary) ids.add(it.id);
 
   const items: LibraryItem[] = [];
   const presets: TurretPreset[] = [];
@@ -55,7 +57,7 @@ export async function importFiles(logic: GameLogic, picked: readonly PickedFile[
     }
     const validated: ExportFile | null = DataRegistry.validateImport(json);
     if (!validated) {
-      const why = DataRegistry.lastRejectReason ?? 'It is not a file the game knows: no tank, turret, projectile, food shape, Other, map or game mode inside.';
+      const why = DataRegistry.lastRejectReason ?? 'It is not a file the game knows: no tank, turret, projectile, food shape, Other, solid, map or game mode inside.';
       DataRegistry.lastRejectReason = null;
       sum.refused.push({ file: label, why });
       continue;

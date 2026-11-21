@@ -57,6 +57,7 @@ interface ModalProps {
   defer?: boolean;
   waitHeight?: number;
   phoneFull?: boolean;
+  beforeClose?: (close: () => void) => boolean;
 }
 
 const ModalCloseContext = React.createContext<((after?: () => void) => void) | null>(null);
@@ -67,18 +68,25 @@ export function useModalClose(): (after?: () => void) => void {
 
 const bodyHeights = new Map<string, number>();
 
-export function Modal({ title, icon, onClose, size = 'md', width, headerRight, subtitle, footer, children, bodyClassName, fit, z = 60, closeLabel = 'Close', themeSwitch, surface = 'panel', defer, waitHeight = 240, phoneFull }: ModalProps) {
+export function Modal({ title, icon, onClose, size = 'md', width, headerRight, subtitle, footer, children, bodyClassName, fit, z = 60, closeLabel = 'Close', themeSwitch, surface = 'panel', defer, waitHeight = 240, phoneFull, beforeClose }: ModalProps) {
   const [closing, setClosing] = useState(false);
   const closingRef = useRef(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   useBlurOnUnmount(dialogRef);
-  const close = useCallback((after?: unknown) => {
+  const fadeOut = useCallback((after?: unknown) => {
     if (closingRef.current) return;
     closingRef.current = true;
     blurFocusedField(dialogRef.current);
     setClosing(true);
     window.setTimeout(typeof after === 'function' ? (after as () => void) : onClose, CLOSE_MS);
   }, [onClose]);
+  const beforeRef = useRef(beforeClose);
+  beforeRef.current = beforeClose;
+  const close = useCallback((after?: unknown) => {
+    const ask = beforeRef.current;
+    if (ask !== undefined && !closingRef.current && !ask(() => fadeOut())) return;
+    fadeOut(after);
+  }, [fadeOut]);
   useEscapeOwner(close);
   useFocusScope(dialogRef);
   const layer = useWindowLayer(!closing);
@@ -116,14 +124,14 @@ export function Modal({ title, icon, onClose, size = 'md', width, headerRight, s
           </header>
           <div ref={bodyRef} className={cx('k-modal-body', fit ? 'overflow-hidden' : 'overflow-y-auto popup-scrollbar', bodyClassName, skelOn && 'relative')}
             style={ready ? undefined : { minHeight: waitH }} aria-busy={ready ? undefined : true}>
-            <ModalCloseContext.Provider value={close}><PanelFold on={false}>{ready && children}</PanelFold></ModalCloseContext.Provider>
+            <ModalCloseContext.Provider value={fadeOut}><PanelFold on={false}>{ready && children}</PanelFold></ModalCloseContext.Provider>
             {skelOn && (
               <div ref={skelRef} className="k-skel-delay absolute inset-0 overflow-hidden" aria-hidden={ready || undefined}>
                 <SnapshotSkeleton id={'modal:' + title} fallback={<div className={flush ? 'p-4' : 'px-5 py-4'}><PanelSkeleton /></div>} />
               </div>
             )}
           </div>
-          {footer && <footer className="k-modal-foot">{typeof footer === 'function' ? footer(close) : footer}</footer>}
+          {footer && <footer className="k-modal-foot">{typeof footer === 'function' ? footer(fadeOut) : footer}</footer>}
         </div>
       </div>
     </Backdrop>,

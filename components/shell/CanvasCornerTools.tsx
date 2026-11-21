@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Collapse, Reveal, SwapInPlace, Fade, MotionRow } from '../kit/Collapse';
 import type { GameLogic } from '../../game/GameLogic';
 import { cancelMapEditInteraction, clearMapEditSelection } from '../../game/MapEditor';
-import { SNAP_COUNTS } from '../../types';
-import { MousePointerClick, MousePointer, Focus, FlipHorizontal, Compass, Magnet, Minus, Plus, UndoStep } from '../ui/icons';
+import { SNAP_COUNTS, type SnapTarget } from '../../types';
+import { Segmented } from '../kit/kit';
+import { MousePointer, Focus, FlipHorizontal, Compass, Magnet, Minus, Plus, UndoStep, AreaFree, EditPoints } from '../ui/icons';
 import { ButtonTooltip } from '../shared/HelpTooltip';
 import { TurretActionBar } from '../shared/TurretActionBar';
 import { usePlacementBar, placementBarIsSub } from './PlacementBar';
@@ -62,6 +63,12 @@ const NoteSlide: React.FC<{ want: string | null; hold: boolean; children: React.
   return s.key !== null ? <div key={s.key} className={`k-corner-slide k-note-slide${s.out ? ' k-corner-out' : ''}`}>{live ? children : kept.current}</div> : null;
 };
 
+const SNAP_TARGET_OPTIONS: { value: SnapTarget; label: string; title: string }[] = [
+  { value: 'faces', label: 'Faces', title: 'Locks to the middle of each flat side.' },
+  { value: 'corners', label: 'Corners', title: 'Locks to each corner, the tips of a star.' },
+  { value: 'both', label: 'Both', title: 'Locks to every flat side and every corner.' },
+];
+
 const Stepper: React.FC<{ label: string; value: number; canDown: boolean; canUp: boolean; onDown: () => void; onUp: () => void }> = ({ label, value, canDown, canUp, onDown, onUp }) => (
   <span className="k-canvas-step">
     <span className="k-canvas-step-label">{label}</span>
@@ -80,12 +87,14 @@ export const CanvasCornerTools: React.FC<Props> = ({ logic, rightInset, chromeSc
   const showSelect = !inMatch && logic.shouldShowSelectButton();
   const showMap = !inMatch && logic.isMapDesignerActive;
   const showTank = !inMatch && logic.isTankToolActive && logic.state.canvasEntityKind === 'tank';
-  const shown = showSelect || showMap || showTank;
-  const slide = useCornerSlide(classicUi, shown ? [showMap ? 'map' : '', showSelect ? 'canvas' : '', showTank ? 'tank' : ''].filter(Boolean).join('+') : null);
+  const showRest = !inMatch && !showSelect && logic.isTurretPlacementEnabled && !logic.turretPlacing && logic.state.canvasEntityKind === 'tank';
+  const shown = showSelect || showMap || showTank || showRest;
+  const slide = useCornerSlide(classicUi, shown ? [showMap ? 'map' : '', showSelect ? 'canvas' : '', showTank ? 'tank' : '', showRest ? 'rest' : ''].filter(Boolean).join('+') : null);
   const setNow = slide.key ?? '';
   const dMap = classicUi ? setNow.includes('map') : showMap;
   const dSelect = classicUi ? setNow.includes('canvas') : showSelect;
   const dTank = classicUi ? setNow.includes('tank') : showTank;
+  const dRest = classicUi ? setNow.includes('rest') : showRest;
 
   const s = logic.state;
   const selectOn = s.autoSubTurretEditMode ? s.autoSubTurretSelectMode : s.selectMode;
@@ -105,12 +114,13 @@ export const CanvasCornerTools: React.FC<Props> = ({ logic, rightInset, chromeSc
   const snapPlacement = place?.snapPlacement ?? false;
   const bodySides = place?.bodySides ?? 0;
   const isComboMode = autoPlacement && snapPlacement && bodySides >= 3;
-  const compassMax = bodySides >= 3 ? bodySides : 8;
+  const snapTarget: SnapTarget = place?.snapTarget ?? 'faces';
+  const compassMax = isComboMode ? (snapTarget === 'both' ? bodySides * 2 : bodySides) : bodySides >= 3 ? bodySides : 8;
   const count = Math.min(place?.autoPlacementCount ?? 1, compassMax);
   const snapIdx = Math.max(0, Math.min(SNAP_COUNTS.length - 1, place?.snapPlacementCount ?? 0));
   const showCount = !!place && autoPlacement;
   const showDirs = !!place && snapPlacement && !isComboMode && bodySides < 3;
-  const showPoints = !!place && snapPlacement && !isComboMode && bodySides >= 3;
+  const showPoints = !!place && snapPlacement && bodySides >= 3;
   const showHint = !!place && (!!place.selectMode || !!place.inheritMode);
   const showLayerHint = dTank && logic.layerPickMode;
   const undo = () => { flushDesignHistory(); logic.undoDesign(); };
@@ -123,20 +133,26 @@ export const CanvasCornerTools: React.FC<Props> = ({ logic, rightInset, chromeSc
   };
 
   const countStep = () => (
-    <Stepper label={isComboMode ? `Count (${bodySides} face midpoints)` : 'Count'} value={count} canDown={count > 1} canUp={count < compassMax}
+    <Stepper label="Count" value={count} canDown={count > 1} canUp={count < compassMax}
       onDown={() => { if (current()) place!.onSetAutoPlacementCount?.(Math.max(1, count - 1)); }} onUp={() => { if (current()) place!.onSetAutoPlacementCount?.(Math.min(compassMax, count + 1)); }} />
   );
   const dirStep = () => (
     <Stepper label="Directions" value={SNAP_COUNTS[snapIdx]} canDown={snapIdx > 0} canUp={snapIdx < SNAP_COUNTS.length - 1}
       onDown={() => { if (current()) place!.onSetSnapCount?.(snapIdx - 1); }} onUp={() => { if (current()) place!.onSetSnapCount?.(snapIdx + 1); }} />
   );
-  const pointsLine = () => <span className="k-canvas-step-label">Snaps to {bodySides} face midpoints</span>;
+  const pointsLine = () => (
+    <span className="k-canvas-step">
+      <span className="k-canvas-step-label">Snaps To</span>
+      <Segmented<SnapTarget> value={snapTarget} onChange={v => { if (current()) place!.onSetSnapTarget?.(v); }} options={SNAP_TARGET_OPTIONS} />
+    </span>
+  );
   const anyCount = !!(showCount || showDirs || showPoints);
+  const stackRows = [showCount, showDirs, showPoints].filter(Boolean).length > 1;
   const notes = (<>
         <Collapse open={!!showHint} reveal="none">{showHint ? <div className="k-canvas-note pointer-events-auto"><SwapInPlace swapKey={place!.inheritMode ? 'inherit' : 'select'} hold={false}><TurretActionBar {...place!} part="instructions" /></SwapInPlace></div> : null}</Collapse>
         <Collapse open={showLayerHint} reveal="none">{showLayerHint ? <div className="k-canvas-note pointer-events-auto"><p className="k-hint k-hint-strong">Click a part of the tank to edit it.</p></div> : null}</Collapse>
         <Collapse open={anyCount} reveal="none">{anyCount ? (
-          <div className="k-canvas-note pointer-events-auto">
+          <div className={`k-canvas-note pointer-events-auto${stackRows ? ' k-note-stack' : ''}`}>
             <Reveal when={showCount}>{countStep}</Reveal>
             <Reveal when={showDirs}>{dirStep}</Reveal>
             <Reveal when={showPoints}>{pointsLine}</Reveal>
@@ -148,7 +164,7 @@ export const CanvasCornerTools: React.FC<Props> = ({ logic, rightInset, chromeSc
   const classicNotes = (<>
         {showHint ? <div className="k-canvas-note pointer-events-auto"><TurretActionBar {...place!} part="instructions" /></div> : null}
         {showLayerHint ? <div className="k-canvas-note pointer-events-auto"><p className="k-hint k-hint-strong">Click a part of the tank to edit it.</p></div> : null}
-        {anyCount ? <div className="k-canvas-note pointer-events-auto">{showCount ? countStep() : null}{showDirs ? dirStep() : null}{showPoints ? pointsLine() : null}</div> : null}
+        {anyCount ? <div className={`k-canvas-note pointer-events-auto${stackRows ? ' k-note-stack' : ''}`}>{showCount ? countStep() : null}{showDirs ? dirStep() : null}{showPoints ? pointsLine() : null}</div> : null}
   </>);
   const strip = (
         <MotionRow className="k-canvas-tools pointer-events-auto" glideWidth>
@@ -173,16 +189,28 @@ export const CanvasCornerTools: React.FC<Props> = ({ logic, rightInset, chromeSc
           {place && (
             <MotionRow.Item key="sep"><span className="k-canvas-tools-sep" aria-hidden="true" /></MotionRow.Item>
           )}
-          {(dSelect || dTank) && (
+          {(dSelect || dTank || dRest) && (
             <MotionRow.Item key="undo"><CornerButton tip="Undo: takes back your last step (Ctrl+Z)" disabled={!canUndo} onClick={undo}><UndoStep size={20} /></CornerButton></MotionRow.Item>
           )}
           {dSelect && (
-            <MotionRow.Item key="select"><CornerButton tip="Select from Canvas: click a turret on the tank to edit it" on={selectOn}
-              onClick={() => { if (!selectOn) endPlacement(); logic.toggleSelectModeForCurrentContext(); }}><MousePointerClick size={20} /></CornerButton></MotionRow.Item>
+            <MotionRow.Item key="select"><CornerButton tip={s.autoSubTurretEditMode ? 'Select from Canvas: click a part of the tank to edit it' : 'Select from Canvas: stops placing turrets, as Done does, so a click picks a part of the tank'} on={selectOn}
+              onClick={() => { if (!s.autoSubTurretEditMode) { logic.endTurretPlacing(); return; } if (!selectOn) endPlacement(); logic.toggleSelectModeForCurrentContext(); }}><MousePointer size={20} /></CornerButton></MotionRow.Item>
+          )}
+          {dRest && (
+            <MotionRow.Item key="pen"><CornerButton tip="Pen: click to place points, drag to curve them, click the first point to close (P)" on={logic.pen.on}
+              onClick={() => logic.setPen(!logic.pen.on)}><AreaFree size={20} /></CornerButton></MotionRow.Item>
+          )}
+          {dRest && logic.partPicked && s.activeBodyLayerId !== null && !s.selectedTurretId && (
+            <MotionRow.Item key="points"><CornerButton tip="Edit Points: drag the points and curves of the picked layer's shape (A)" on={logic.pe.on}
+              onClick={() => logic.setPointEdit(!logic.pe.on)}><EditPoints size={20} /></CornerButton></MotionRow.Item>
+          )}
+          {(dSelect || dRest) && (
+            <MotionRow.Item key="fit"><CornerButton tip="Fit View: shows the whole tank again (the wheel zooms, the middle button pans)"
+              onClick={() => logic.resetEditorView()}><Focus size={20} /></CornerButton></MotionRow.Item>
           )}
           {dTank && (
             <MotionRow.Item key="layerSelect"><CornerButton tip="Select from Canvas: click a part of the tank to edit it" on={logic.layerPickMode}
-              onClick={() => logic.setLayerPickMode(!logic.layerPickMode)}><MousePointerClick size={20} /></CornerButton></MotionRow.Item>
+              onClick={() => logic.setLayerPickMode(!logic.layerPickMode)}><MousePointer size={20} /></CornerButton></MotionRow.Item>
           )}
         </MotionRow>
   );

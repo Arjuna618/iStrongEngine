@@ -5,6 +5,7 @@ import { HALLOWEEN_FULL, HALLOWEEN_PUMPKINS, HALLOWEEN_EYES } from '../utils/hal
 import { VAMP_STARTING_SCORE } from './vampirism';
 import { GAME_MODE_TITLES } from './gameModeTitles';
 import { SMALL_FIX } from './smallFixSwitch';
+import { LEVEL_LIMIT } from './levelLimit';
 import { ALL_MODES } from './allModesSwitch';
 import { MODE_WORLDS, WORLD_IDS, worldIdOf, worldPool, shownModeTitle, type WorldId, type ModeWorld, OD_VARIANTS, odVariantOf, type MapPool, type MapPoolRow, SANDBOX_WORLD } from './modeWorlds';
 import { SERVER_DOMINATOR, clampTankDebuffs, type TankDebuffs } from './tankDebuffs';
@@ -216,7 +217,7 @@ export const GAME_MODES: readonly GameModeInfo[] = [
       enableSpawnZones: true,
       teams: 2,
       growth: true,
-      levelCap: 1000,
+      levelCap: SMALL_FIX.R994 !== 0 ? LEVEL_LIMIT : 1000,
       growthMaxMultiplier: 1.7,
       growthPerLevel: 0.7 / 299,
       growthStartLevel: 1,
@@ -285,7 +286,7 @@ export const PLAY_CATEGORIES: readonly PlayCategoryInfo[] = [
   {
     id: 'normal', arras: true,
     title: 'Normal',
-    description: 'Classic arena modes, level cap 45',
+    description: SMALL_FIX.R994 !== 0 ? 'Classic arena modes, no growth' : 'Classic arena modes, level cap 45',
     image: catNormal,
   },
   {
@@ -360,7 +361,7 @@ function siegeEntries(): PlayModeEntry[] {
     const t = SIEGE_MAP_TEXT[map];
     for (const armsRace of [false, true]) for (const growth of [false, true]) {
       const name = `${growth ? 'Growth ' : ''}${armsRace ? 'Arms Race ' : ''}Siege ${t.title}`;
-      const extra = `${growth ? ' Levels go up to 1000 and your tank grows.' : ''}${armsRace ? ' You upgrade along the Arms Race tree.' : ''}`;
+      const extra = `${growth ? (SMALL_FIX.R994 !== 0 ? ' Your tank grows as it levels up.' : ' Levels go up to 1000 and your tank grows.') : ''}${armsRace ? ' You upgrade along the Arms Race tree.' : ''}`;
       const key = `${growth ? 'growth-' : ''}${armsRace ? 'arms-' : ''}siege-${map}`;
       out.push({
         key,
@@ -384,7 +385,7 @@ function siegeEntries(): PlayModeEntry[] {
 function worldEntry(id: WorldId, growth: boolean, armsRace: boolean): PlayModeEntry {
   const w: ModeWorld = MODE_WORLDS[id];
   const title = `${growth ? 'Growth ' : ''}${armsRace ? 'Arms Race ' : ''}${w.title}`;
-  const extra = `${growth ? ' Levels go up to 1000 and your tank grows.' : ''}${armsRace ? ' You and the bots upgrade along the Arms Race tree.' : ''}`;
+  const extra = `${growth ? (SMALL_FIX.R994 !== 0 ? ' Your tank grows as it levels up.' : ' Levels go up to 1000 and your tank grows.') : ''}${armsRace ? ' You and the bots upgrade along the Arms Race tree.' : ''}`;
   const key = `${growth ? 'growth-' : ''}${armsRace ? 'arms-' : ''}${id}`;
   return {
     key,
@@ -460,7 +461,7 @@ const EVENT_CARDS: readonly EventCard[] = [
 function eventEntry(c: EventCard, growth: boolean, armsRace: boolean): PlayModeEntry {
   const base = worldEntry(c.world, growth, armsRace);
   const title = `${growth ? 'Growth ' : ''}${armsRace ? 'Arms Race ' : ''}${c.title}`;
-  const extra = `${growth ? ' Levels go up to 1000 and your tank grows.' : ''}${armsRace ? ' You and the bots upgrade along the Arms Race tree.' : ''}`;
+  const extra = `${growth ? (SMALL_FIX.R994 !== 0 ? ' Your tank grows as it levels up.' : ' Levels go up to 1000 and your tank grows.') : ''}${armsRace ? ' You and the bots upgrade along the Arms Race tree.' : ''}`;
   const key = `${growth ? 'growth-' : ''}${armsRace ? 'arms-' : ''}${c.overlay && c.overlay !== c.world ? c.overlay + '-' : ''}${c.world}`;
   return {
     ...base, key, overlay: c.overlay, title, category: 'others', alsoIn: undefined,
@@ -669,7 +670,7 @@ export function resolvePlayConfig(entry: PlayModeEntry, settingValue?: number, t
   }
   if (entry.growth) {
     cfg.growth = true;
-    cfg.levelCap = 1000;
+    cfg.levelCap = SMALL_FIX.R994 !== 0 ? LEVEL_LIMIT : 1000;
     cfg.growthMaxMultiplier = 5;
     cfg.growthPerLevel = 0.05;
     cfg.growthStartLevel = 1;

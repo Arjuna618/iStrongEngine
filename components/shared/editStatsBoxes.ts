@@ -20,7 +20,8 @@ export function boxesOf(p: EditStatsPreview, t: EditStatsTyped, gm: GameModeConf
     spent += upgrades[stat];
   }
   const level = t.level ?? p.level;
-  const skillPoints = t.skillPoints ?? Math.max(0, p.skillPoints + debugLevelSpDelta(p.level, level, gm,
+  const cap = p.powerCap ?? Infinity;
+  const skillPoints = t.skillPoints ?? Math.max(0, p.skillPoints + debugLevelSpDelta(Math.min(p.level, cap), Math.min(level, cap), gm,
     p.maxSkillPoints, p.bonusSkillPoints, spent + p.skillPoints, p.canEarnSkillPoints));
   return { level, skillPoints, upgrades };
 }

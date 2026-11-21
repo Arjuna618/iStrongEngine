@@ -1,9 +1,48 @@
+import { solidOf, solidPath, HIS_SOLID_ID_RE, SOLID_STILL_X, SOLID_STILL_Y, SOLID_STROKE_OF_BORDER, type ArrasSolid } from './solidArras';
+import { SOLID_GAME_IDS } from './solidDesign';
+
 export const LAYER_OUTLINE_MAX_POINTS = 512;
 export const LAYER_OUTLINE_MAX_REACH = 4;
 
-export function layerOutlineOf(l: { outline?: [number, number][] } | null | undefined): [number, number][] | null {
+export const SOLID_LAYERS = { ON: 1 };
+
+export function layerSolidOf(l: { solidId?: string } | null | undefined): ArrasSolid | null {
+  if (SOLID_LAYERS.ON === 0 || !l || l.solidId === undefined) return null;
+  const s = solidOf(l.solidId);
+  return s === undefined ? null : s;
+}
+
+export function layerOutlineOf(l: { outline?: [number, number][]; solidId?: string } | null | undefined): [number, number][] | null {
   const o = l ? l.outline : undefined;
-  return o !== undefined && o !== null && o.length >= 3 ? o : null;
+  if (o === undefined || o === null || o.length < 3) return null;
+  return l!.solidId !== undefined && layerSolidOf(l) !== null ? null : o;
+}
+
+export function cleanLayerSolid(v: unknown): string | undefined {
+  if (typeof v !== 'string') return undefined;
+  return SOLID_GAME_IDS.includes(v) || HIS_SOLID_ID_RE.test(v) ? v : undefined;
+}
+
+export function strokeFillLayerSolid(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  s: ArrasSolid, r: number, initAngle: number, copies: number,
+  stroke: string, lineWidth: number, fill: string,
+): void {
+  const n = copies > 1 ? copies : 1, k = s.circumradius > 0 ? r / s.circumradius : r;
+  for (let c = 0; c < n; c++) {
+    ctx.save();
+    ctx.rotate(initAngle + (Math.PI * 2 * c) / n);
+    ctx.beginPath();
+    solidPath(ctx, s, SOLID_STILL_X, SOLID_STILL_Y, 0, 0, k);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = lineWidth * SOLID_STROKE_OF_BORDER;
+    ctx.strokeStyle = stroke;
+    ctx.stroke();
+    ctx.restore();
+  }
+  ctx.beginPath();
 }
 
 const _reachByOutline = new WeakMap<object, number>();

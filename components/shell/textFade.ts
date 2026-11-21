@@ -128,9 +128,22 @@ function fadeUnder(t: Element | null): HTMLElement | null {
 function fadeLen(el: HTMLElement): number { return (parseFloat(getComputedStyle(el).fontSize) || 12) * FADE_EM; }
 
 const indents = new WeakMap<HTMLElement, number>();
+const flexLines = new WeakMap<HTMLElement, boolean>();
+function isFlexLine(el: HTMLElement): boolean {
+  let f = flexLines.get(el);
+  if (f === undefined) { const d = getComputedStyle(el).display; f = d === 'flex' || d === 'inline-flex'; flexLines.set(el, f); }
+  return f;
+}
+function shiftTo(el: HTMLElement, v: string): void {
+  if (!isFlexLine(el)) { el.style.textIndent = v; return; }
+  if (el.style.textIndent) el.style.textIndent = '';
+  for (let c = el.firstElementChild; c; c = c.nextElementSibling) {
+    if (c instanceof HTMLElement && !c.hidden) { c.style.marginLeft = v; return; }
+  }
+}
 function setIndent(el: HTMLElement, i: number): void {
   indents.set(el, i);
-  el.style.textIndent = i > 0.01 ? `${(-i).toFixed(2)}px` : '';
+  shiftTo(el, i > 0.01 ? `${(-i).toFixed(2)}px` : '');
 }
 function posOf(el: HTMLElement): number { return (indents.get(el) ?? 0) + el.scrollLeft; }
 const indentsAll = (): boolean => document.documentElement.classList.contains('ui-classic');
@@ -138,9 +151,9 @@ function setPos(el: HTMLElement, x: number): void { if (isTextBox(el) || indents
 function overOf(el: HTMLElement): number {
   const i = indents.get(el) ?? 0;
   if (i <= 0.01) return el.scrollWidth - el.clientWidth;
-  el.style.textIndent = '';
+  shiftTo(el, '');
   const over = el.scrollWidth - el.clientWidth;
-  el.style.textIndent = `${(-i).toFixed(2)}px`;
+  shiftTo(el, `${(-i).toFixed(2)}px`);
   return over;
 }
 function foldScroll(el: HTMLElement): void {
@@ -158,15 +171,35 @@ function unfoldIndent(el: HTMLElement): void {
 function clearFade(el: HTMLElement): void {
   if (el.hasAttribute('data-kfade')) { el.removeAttribute('data-kfade'); el.style.removeProperty('--kf-l'); el.style.removeProperty('--kf-r'); }
 }
+let _fitRange: Range | null = null;
+const ownPad = new WeakMap<HTMLElement, number>();
+function fitsInFractions(el: HTMLElement): boolean {
+  if (_fitRange === null) {
+    if (typeof document === 'undefined' || typeof document.createRange !== 'function') return false;
+    _fitRange = document.createRange();
+  }
+  _fitRange.selectNodeContents(el);
+  const words = _fitRange.getBoundingClientRect().width;
+  const r = el.getBoundingClientRect();
+  if (!(r.width > 0) || !(el.offsetWidth > 0)) return false;
+  const k = r.width / el.offsetWidth;
+  const cs = getComputedStyle(el);
+  const pad = el.hasAttribute('data-kfade') && indentsAll() ? (ownPad.get(el) ?? 0) : parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+  const inner = r.width - (pad + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth)) * k;
+  return words <= inner + 0.5 * k;
+}
 function paint(el: HTMLElement, over: number): void {
   if (typingIn(el)) { clearFade(el); return; }
-  if (over <= 1) {
+  if (over <= 1 || (over <= 3 && !isTextBox(el) && fitsInFractions(el))) {
     if (el.hasAttribute('data-kfade')) { el.removeAttribute('data-kfade'); el.style.removeProperty('--kf-l'); el.style.removeProperty('--kf-r'); }
     if (indents.get(el)) setIndent(el, 0);
     if (el.scrollLeft !== 0) el.scrollLeft = 0;
     return;
   }
-  if (!el.hasAttribute('data-kfade')) el.setAttribute('data-kfade', '');
+  if (!el.hasAttribute('data-kfade')) {
+    if (!isTextBox(el) && indentsAll()) { const cs = getComputedStyle(el); ownPad.set(el, parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight)); }
+    el.setAttribute('data-kfade', '');
+  }
   if (!glides.has(el) && (indents.get(el) ?? 0) > over + 0.5) setIndent(el, over);
   setEnds(el, fadeLen(el), over, posOf(el));
 }

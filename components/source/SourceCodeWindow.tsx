@@ -1,3 +1,4 @@
+import { shortcutKey } from '../../utils/shortcutKey';
 import React, { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { TEXT_LIMITS } from '../kit/textLimits';
 import { PickGlide } from '../kit/TabSlide';
@@ -208,7 +209,7 @@ function SourceBody({ project, touch, narrow }: { project: SourceProject; touch:
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k') {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && shortcutKey(e) === 'k') {
         e.preventDefault(); e.stopPropagation();
         searchRef.current?.focus(); searchRef.current?.select();
       }
@@ -611,7 +612,7 @@ const FilePage: React.FC<{ project: SourceProject; file: SourceFile; find: strin
   useEffect(() => {
     if (!isText) return;
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'f') { e.preventDefault(); e.stopPropagation(); openFind(); }
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && shortcutKey(e) === 'f') { e.preventDefault(); e.stopPropagation(); openFind(); }
       else if (e.key === 'F3') { e.preventDefault(); next(e.shiftKey ? -1 : 1); }
     };
     window.addEventListener('keydown', onKey, true);

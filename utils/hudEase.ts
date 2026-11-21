@@ -59,6 +59,10 @@ export function hudScoreOfXp(xp: number, base: number): number {
   return Math.floor(xp) + base;
 }
 
+export function hudLevelOfXp(xp: number, base: number, coeff: number, offset: number): number {
+  return hudLevelFloor(hudScoreOfXp(xp, base), coeff) + 1 - offset;
+}
+
 export const LB_BLEND_US = 250000;
 
 export function lbBlendValue(old: number, now: number, stampUs: number, clockUs: number): number {
@@ -83,8 +87,17 @@ export function lbU32(v: number): number {
   return !(v >= 0) ? 0 : !(v <= 4294967295) ? 4294967295 : Math.trunc(v);
 }
 
+export function lbWhole(v: number): number {
+  return !(v >= 0) ? 0 : !(v <= Number.MAX_SAFE_INTEGER) ? Number.MAX_SAFE_INTEGER : Math.trunc(v);
+}
+
 export function lbAbbrev(n: number): string {
   if (n < 1000) return String(n);
+  if (n >= 1e12) {
+    const q = n >= 1e15, x = Math.floor(n / (q ? 1e12 : 1e9));
+    const h = Math.floor((x % 1000) / 10);
+    return `${Math.floor(x / 1000)}.${h < 10 ? '0' : ''}${h}${q ? 'q' : 't'}`;
+  }
   if (n >= 1e9) {
     const x = Math.floor(n / 1e6);
     const h = Math.floor((x % 1000) / 10);

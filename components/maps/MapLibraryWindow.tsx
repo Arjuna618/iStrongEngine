@@ -1,3 +1,4 @@
+import { shortcutKey } from '../../utils/shortcutKey';
 import { isTouchScreen } from '../../utils/device';
 import { TEXT_LIMITS } from '../kit/textLimits';
 import { getPlayEntry } from '../../game/gameModeRegistry';
@@ -129,6 +130,7 @@ export interface MapLibraryWindowProps {
   startOnRocks?: boolean;
   pickOnly?: boolean;
   fillPick?: { tip: string; label: string };
+  listed?: (c: MapCard) => boolean;
   onClose: () => void;
 }
 
@@ -185,10 +187,10 @@ export const MapLibraryWindow: React.FC<MapLibraryWindowProps> = (p) => {
       requestMapPicture(key, { kind: 'single', config: mazeCardConfig(c.type, MAP_LIB_BUILD_SEED) });
     }
   }, [p.config]);
-  const isOn = useCallback((c: MapCard) => p.pickOnly ? false : c.kind === 'rock' ? rockCardIsUsed(p.config, c.pattern ?? 'random')
-    : c.kind === 'maze' && (c.type === MAZE_TYPE_CUSTOM ? isCustomNow : mazeCardIsLoaded(p.config, c.type, MAP_LIB_BUILD_SEED)), [isCustomNow, p.config]);
+  const isOn = useCallback((c: MapCard) => p.pickOnly ? !!p.listed?.(c) : c.kind === 'rock' ? rockCardIsUsed(p.config, c.pattern ?? 'random')
+    : c.kind === 'maze' && (c.type === MAZE_TYPE_CUSTOM ? isCustomNow : mazeCardIsLoaded(p.config, c.type, MAP_LIB_BUILD_SEED)), [isCustomNow, p.config, p.listed]);
   const tipOf = useCallback((c: MapCard): string => {
-    if (p.pickOnly) return `${c.name}. ${p.fillPick ? p.fillPick.tip : 'Click to add it to the list.'}`;
+    if (p.pickOnly) return `${c.name}. ${p.fillPick ? p.fillPick.tip : p.listed?.(c) ? 'It is in the list already.' : 'Click to add it to the list.'}`;
     if (c.kind === 'rock') {
       if (isCustomNow) return `${c.name}. Click to scatter rocks in this pattern. Your Custom Editor map is kept for when you open it again.`;
       if (!rocksScattered(p.config) || p.config.enableMaze) return `${c.name}. Click to turn the maze off and scatter rocks in this pattern.`;
@@ -198,7 +200,7 @@ export const MapLibraryWindow: React.FC<MapLibraryWindowProps> = (p) => {
     if (c.kind === 'mine') return `${c.name}. Click to load it.`;
     if (c.type === MAZE_TYPE_CUSTOM) return 'Custom Editor: an empty grid to build on (your own map if you made one). Click to open it.';
     return `${c.name}. Click to load it.`;
-  }, [isCustomNow, p.config, p.pickOnly]);
+  }, [isCustomNow, p.config, p.pickOnly, p.listed]);
 
   const load = useCallback((c: MapCard) => {
     if (c.kind === 'mode') p.onLoadMode(c.modeKey ?? null, c.item);
@@ -315,7 +317,7 @@ export const CardsWindow: React.FC<CardsWindowProps> = (p) => {
   const backdrop = useBackdropClose(close);
   const onKeyDown = (ev: React.KeyboardEvent) => {
     const inField = (ev.target as HTMLElement).closest('input,textarea') !== null;
-    if ((ev.key === 'k' && (ev.ctrlKey || ev.metaKey)) || (ev.key === '/' && !inField)) { ev.preventDefault(); searchRef.current?.focus(); searchRef.current?.select(); }
+    if ((shortcutKey(ev) === 'k' && (ev.ctrlKey || ev.metaKey)) || (shortcutKey(ev) === '/' && !inField)) { ev.preventDefault(); searchRef.current?.focus(); searchRef.current?.select(); }
   };
 
   const { cards: shown, query, setQuery, keyOf, ask, isOn, tipOf } = p;

@@ -1,3 +1,4 @@
+import { shortcutKey } from '../../utils/shortcutKey';
 import React, { useMemo, useState } from 'react';
 import { TEXT_LIMITS } from '../kit/textLimits';
 import type { AreaGroup, EntityType, MapEventsDoc, Named, PlacedEntity, Rule, Sequence, StatusDef, TimerDef, VarDef, WavePlan, ZoneLike } from '../../game/mapEvents/doc';
@@ -237,7 +238,7 @@ export const EventsPage: React.FC<{ ctx: EvCtx; search: string; focus?: number |
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       const { ctx: c, current: id, rules: list } = live.current;
       const i = id === null ? -1 : list.findIndex(r => r.id === id);
-      const mod = e.ctrlKey || e.metaKey, key = e.key.toLowerCase();
+      const mod = e.ctrlKey || e.metaKey, key = shortcutKey(e).toLowerCase();
       if (mod && key === 'v' && _copiedRule) { e.preventDefault(); const clip = _copiedRule; let made = -1; c.commit(d => { const r = pasteRule(d, c.zones, clip, i >= 0 ? i + 1 : -1); made = r.id; return r.doc; }); setPicked(made); return; }
       if (i < 0) return;
       if (mod && key === 'c') { e.preventDefault(); _copiedRule = copyForPaste(list[i], c.doc, c.zones); toast('info', `"${list[i].name}" copied.`); }
@@ -652,7 +653,7 @@ const ClipCard: React.FC<{ clip: { id: number; at: number; step: { id: number; k
         </span>
       </div>
       <Collapse open={!open && facts.length > 0} reveal="none"><div className="k-ev-step-facts"><Facts items={facts} /></div></Collapse>
-      <Collapse open={open} reveal="self">
+      <Collapse open={open} container reveal="self">
         <div className="k-ev-step-body">
           <FieldRow label="At" help="How long after the sequence starts this step runs."><NumBox value={clip.at} min={0} step={0.1} unit="s" onChange={x => ctx.commit(d => setAt(d, [...path, 'at'], x ?? 0))} /></FieldRow>
           <SelectRow label="Change It To" help="Makes this step another one. Its fields start anew." value={clip.step.k} groups={groupsOfKinds('step')} onChange={k => ctx.commit(d => { const r = withIds(d, id => ({ id: id(), k, a: {} })); return setAt(r.doc, [...path, 'step'], r.value); })} />

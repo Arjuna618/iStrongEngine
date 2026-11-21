@@ -97,7 +97,16 @@ export const VirtualList: React.FC<VirtualListProps> = ({ count, rowHeight, maxH
     atEnd.current = top + el.clientHeight >= el.scrollHeight - 2;
     setView(prev => (prev.top === top && prev.h === h ? prev : { top, h }));
   }, [boxH]);
-  const onScroll = useCallback(() => { if (!raf.current) raf.current = requestAnimationFrame(measure); }, [measure]);
+  const scrollingTimer = useRef(0);
+  const onScroll = useCallback(() => {
+    if (!raf.current) raf.current = requestAnimationFrame(measure);
+    const el = ref.current;
+    if (el) {
+      if (!scrollingTimer.current) el.classList.add('k-vl-scrolling');
+      window.clearTimeout(scrollingTimer.current);
+      scrollingTimer.current = window.setTimeout(() => { scrollingTimer.current = 0; if (ref.current) ref.current.classList.remove('k-vl-scrolling'); }, 220);
+    }
+  }, [measure]);
 
   const isEmpty = count === 0 && !!empty;
 
@@ -216,6 +225,7 @@ export const VirtualList: React.FC<VirtualListProps> = ({ count, rowHeight, maxH
   });
   useLayoutEffect(() => () => {
     if (raf.current) cancelAnimationFrame(raf.current);
+    window.clearTimeout(scrollingTimer.current);
     for (const t of timers.current) window.clearTimeout(t);
     if (ref.current) stopScrollGlide(ref.current);
   }, []);

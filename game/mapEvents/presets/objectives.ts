@@ -1,7 +1,6 @@
 import type { BodyTest, EntityType, Id, MapEventsDoc, Named, PlacedEntity, Ref, Row, Rule, StatusDef, TimerDef, VarDef, ZoneLike } from '../doc';
 import { drawingOf, drawingSites, type DrawnSite } from '../../modeDrawings';
-
-
+import { SMALL_FIX } from '../../smallFixSwitch';
 const SLOT_NEUTRAL = 3, SLOT_BLUE = 10, SLOT_GREEN = 11, SLOT_RED = 12, SLOT_PURPLE = 15;
 export function teamSlot(team: number, teams: number): number {
   return team === 1 ? SLOT_BLUE : team === 2 ? (teams === 2 ? SLOT_GREEN : SLOT_RED) : team === 3 ? SLOT_GREEN : SLOT_PURPLE;
@@ -206,10 +205,13 @@ export function buildAssaultWorld(drawingKey: string): ObjectiveWorld | null {
     M.rule(folderWin, 'Blue Wins', [M.row('count.crossed', { tag: M.ref(standing), n: 0, dir: 'fallsTo' })], [], [
       M.say('BLUE HAS WON THE GAME!'), M.row('timer.stop', { timer: M.ref(clock) }), M.row('timer.stop', { timer: M.ref(comeback) }), M.row('match.end', { result: 'win', team: 'team1', then: 'closeArena' })], { once: true }),
   ];
+  let lockedSay: { rule: Rule; text: string } | null = null;
   if (domSites.length > 0) {
     const unlockAt = Math.ceil(domSites.length / 2);
+    const startLocked = M.rule(folderLock, 'The Sanctuaries Start Locked', [M.row('match.started', {})], [], [M.row('status.add', { who: { w: 'tag', ref: M.ref(standing) }, status: M.ref(locked) })]);
+    if (SMALL_FIX.R995 !== 0) lockedSay = { rule: startLocked, text: `The sanctuaries are locked until ${unlockAt} GREEN ${unlockAt === 1 ? 'dominator is' : 'dominators are'} destroyed!` };
     rules.push(
-      M.rule(folderLock, 'The Sanctuaries Start Locked', [M.row('match.started', {})], [], [M.row('status.add', { who: { w: 'tag', ref: M.ref(standing) }, status: M.ref(locked) })]),
+      startLocked,
       M.rule(folderLock, 'The Sanctuaries Unlock', [M.row('count.crossed', { tag: M.ref(blueDom), n: unlockAt, dir: 'risesTo' })], [M.row('cmp', { a: { f: `{${lockedVar.id}}` }, op: 'eq', b: 1 })], [
         M.row('var.set', { var: M.ref(lockedVar), value: 0 }), M.row('status.remove', { who: { w: 'tag', ref: M.ref(standing) }, status: M.ref(locked) }), M.say('The sanctuary has been unlocked!')]),
       M.rule(folderLock, 'The Sanctuaries Lock Again', [M.row('count.crossed', { tag: M.ref(greenHolds), n: total, dir: 'risesTo' })], [M.row('cmp', { a: { f: `{${lockedVar.id}}` }, op: 'eq', b: 0 })], [
@@ -218,6 +220,7 @@ export function buildAssaultWorld(drawingKey: string): ObjectiveWorld | null {
   }
   const roles = roleRules(M, folderBots, greenHolds, greenHolds, { guard: ['team2'], attack: ['team1'], front: ASSAULT.FRONT_SHARE, block: ASSAULT.BLOCK_SHARE, units: ASSAULT.UNIT_SHARE });
   rules.push(...roles.rules);
+  if (lockedSay) lockedSay.rule.then.push(M.say(lockedSay.text));
   const events: MapEventsDoc = {
     v: 1, nextId: 1,
     meta: { title: d.name, seed: 'match', shipped: `assault-${drawingKey}` },

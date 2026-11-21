@@ -1,13 +1,14 @@
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { SMALL_FIX } from '../game/smallFixSwitch';
-import { GameLogic, GRID_SPACING } from '../game/GameLogic';
-import { DEFAULT_PROJECTILE_TYPE, ProjectileTypeConfig, Turret, BehaviorConfig, MotionType } from '../types';
+import { GameLogic, GRID_SPACING, snapPointsOf } from '../game/GameLogic';
+import { DEFAULT_PROJECTILE_TYPE, ProjectileTypeConfig, Turret, BehaviorConfig, MotionType, type SnapTarget } from '../types';
 import { Shapes, ArrowLeft, HdRectangleCircle, HdDashboardSquareSetting, HdArrowAllDirection, HdPaintBoard, HdAsteroid02, BulletCardIcon, DrawOrderIcon, HdMouseRightClick04, HdTarget01, HdDashboardSpeed01, HdCaduceus, HdEye, HdJoker } from './ui/icons';
 import { Group, Button, SelectRow, Crumbs, headerIcon } from './kit/kit';
 import { Reveal, PageSwap, SwapBox } from './kit/Collapse';
 
 import { InstalledTurretsList, NewGroupButton } from './shared/InstalledTurretsList';
 import { TurretPropertiesEditor, turretPropsPartShows, type TurretPropsPart } from './shared/TurretPropertiesEditor';
+import { degreesOf } from './shared/transformRows';
 import { TurretTypeEditor, turretTypePartShows, type TurretTypePart } from './shared/TurretTypeEditor';
 import { ProjectileTypeEditor } from './shared/ProjectileTypeEditor';
 import { BehaviorEditor } from './shared/BehaviorEditor';
@@ -21,10 +22,16 @@ import { getFragmentAt } from '../game/explode';
 import { LibraryWindowSlot, useOpenFlag } from './library/LibraryWindowSlot';
 import { ContentLibraryButton } from './library/ContentLibraryButton';
 import { canvasLibraryDoor } from './shell/doors';
+import { setCanvasMenu } from './shell/canvasMenuBridge';
+import { canvasPartMenu } from './shared/canvasPartMenu';
+import { openContextMenu } from './shell/ContextMenu';
 import { PlacementBar } from './shell/PlacementBar';
 import { HistoryGroup } from './shared/HistoryPanel';
 import { PresetGroupControls } from './shared/PresetGroupControls';
 import { canvasMode } from './library/libraryModes';
+import { TankPartCard, TankPartsTree, TankWideCards } from './TankEditorUI';
+import { FoodShapeEditorUI } from './FoodShapeEditorUI';
+import { PanelScope } from './kit/panelMemory';
 import type { Tool } from './shell/engineTools';
 
 const OTHER_SHOWN_BIGGER_BELOW = 90;
@@ -69,6 +76,10 @@ export const TurretManagerUI: React.FC<Props> = ({ logic, onUpdate, className, p
 
   const libFlag = useOpenFlag();
   useEffect(() => { canvasLibraryDoor.set(() => libFlag.set(true)); return () => canvasLibraryDoor.set(null); }, [libFlag]);
+  useEffect(() => {
+    setCanvasMenu((e) => { const entries = canvasPartMenu(logic); if (entries.length > 0) openContextMenu(e, entries); });
+    return () => setCanvasMenu(null);
+  }, [logic]);
   const [fragDrill, setFragDrill] = useState<FragDrill | null>(null);
   const { showToast } = useToast();
   const _ls = logic ? logic.state : null;
@@ -196,20 +207,10 @@ export const TurretManagerUI: React.FC<Props> = ({ logic, onUpdate, className, p
 
   const shapeMode = !s.isTestMode && s.canvasEntityKind === 'shape' && s.editingShape !== null;
   if (shapeMode && s.editingShape) {
-    const shapeName = s.editingShape.name;
     return (
-      <ScrollArea key="shape" className={className || ''} contentClassName={PAGE}>
-        {renderContentLibrary()}
-        <Group title="Editing food shape" icon={headerIcon(Shapes)}>
-          <p className="k-card-title break-words">{shapeName}</p>
-          <p className="k-row-desc">
-            Your tank is kept exactly as it was. Only food shapes are listed here until you return to it.
-          </p>
-          <Button block size="sm" icon={<ArrowLeft size={14} />} onClick={() => { logic.exitShapeEditing(); onUpdate(); }}>
-            Back to Tank
-          </Button>
-        </Group>
-      </ScrollArea>
+      <PanelScope.Provider key="shape" value="tool:shape">
+        <FoodShapeEditorUI logic={logic} onUpdate={onUpdate} className={className || ''} top={renderContentLibrary()} />
+      </PanelScope.Provider>
     );
   }
 
@@ -286,19 +287,7 @@ export const TurretManagerUI: React.FC<Props> = ({ logic, onUpdate, className, p
     const subEditing = !!s.autoSubTurretSelectedId;
     const subDisabled = s.autoSubTurretSelectMode && !s.autoSubTurretSelectedId;
     const subSpawner = (!!subPT.tankAsProjectile || !!(subPT.cycleProjectilesEnabled && subPT.tankAsProjectileCycle?.length)) && !!subPT.tankAsProjectileUseAI;
-    const subOrientation = s.autoSubTurretSelectedId ? (angleDeg: number) => {
-      const sub = parentTurret.autoSubTurrets.find(st => st.id === s.autoSubTurretSelectedId);
-      if (!sub) return;
-      const newBodyRelAngle = angleDeg * Math.PI / 180;
-      const newSubAngle = newBodyRelAngle - parentTurret.angle;
-      const dist = Math.sqrt(sub.xOffset * sub.xOffset + sub.yOffset * sub.yOffset);
-      updateSubT({
-        angle: newSubAngle,
-        xOffset: dist * Math.cos(newBodyRelAngle),
-        yOffset: dist * Math.sin(newBodyRelAngle),
-      } as Partial<Turret>);
-      onUpdate();
-    } : undefined;
+    const subTurretAngle = s.autoSubTurretSelectedId ? (parentTurret.autoSubTurrets.find(st => st.id === s.autoSubTurretSelectedId)?.angle ?? null) : null;
     const subProps = (part: TurretPropsPart) => (
       <TurretPropertiesEditor
         turret={subT}
@@ -308,7 +297,7 @@ export const TurretManagerUI: React.FC<Props> = ({ logic, onUpdate, className, p
         disabled={subDisabled}
         selectedTurretAngle={selectedSubAngle}
         tankSpawnerMode={subSpawner}
-        onOrientationChange={subOrientation}
+        turretAngle={subTurretAngle}
       />
     );
     const subShows = (part: TurretPropsPart) => turretPropsPartShows(part, subT, { showAboveBase: true });
@@ -339,6 +328,8 @@ export const TurretManagerUI: React.FC<Props> = ({ logic, onUpdate, className, p
       onSetAutoPlacementCount: (v: number) => logic.updateState({ autoSubTurretAutoPlacementCount: v }),
       onToggleSnap: (v: boolean) => logic.updateState({ autoSubTurretSnapPlacement: v }),
       onSetSnapCount: (v: number) => logic.updateState({ autoSubTurretSnapPlacementCount: v }),
+      snapTarget: s.autoSubTurretSnapTarget ?? 'faces',
+      onSetSnapTarget: (v: SnapTarget) => logic.updateState({ autoSubTurretSnapTarget: v }),
       onToggleAbove: (v: boolean) => updateSubT({ aboveTankBody: v }),
       canMakePrimary: !!s.autoSubTurretSelectedId,
       onMakePrimary: () => { logic.makeAutoSubTurretPrimary(); onUpdate(); },
@@ -412,14 +403,13 @@ export const TurretManagerUI: React.FC<Props> = ({ logic, onUpdate, className, p
         </Reveal>
 
         <Reveal when={subShows('look') && !subPreviewing}><Group title="Look" icon={headerIcon(HdEye)}>{subProps('look')}</Group></Reveal>
-        <Group title="Position" icon={headerIcon(HdArrowAllDirection)}>
+        <Group title="Transform" foldKey="Position" icon={headerIcon(HdArrowAllDirection)}>
           <SwapBox swapKey={subPreviewing ? 'preset' : 'turret'} className="k-swap-rows">
-            {subPreviewing ? <PresetGroupControls logic={logic} /> : subProps('position')}
+            {subPreviewing ? <PresetGroupControls logic={logic} /> : <>{subProps('position')}{subProps('shape')}</>}
           </SwapBox>
         </Group>
-        <Reveal when={!subPreviewing && (subShows('shape') || subShows('color'))}>
-          <Group title="Shape and Color" icon={headerIcon(HdPaintBoard)}>
-            {subProps('shape')}
+        <Reveal when={!subPreviewing && subShows('color')}>
+          <Group title="Color" foldKey="Shape and Color" icon={headerIcon(HdPaintBoard)}>
             {subProps('color')}
           </Group>
         </Reveal>
@@ -518,19 +508,15 @@ export const TurretManagerUI: React.FC<Props> = ({ logic, onUpdate, className, p
         return layer ? layer.turretIds.indexOf(t.id) !== -1 : false;
       });
 
+  const turretsOfScope = (scope: string): Turret[] => {
+    if (scope === 'main') return s.turrets.filter((tt: Turret) => { for (let i = 0; i < s.bodyLayers.length; i++) if (s.bodyLayers[i].turretIds.indexOf(tt.id) !== -1) return false; return true; });
+    const layer = s.bodyLayers.find((l: any) => l.id === scope);
+    return layer ? s.turrets.filter((tt: Turret) => layer.turretIds.indexOf(tt.id) !== -1) : [];
+  };
+
   const pickMain = (tur: Turret) => {
-    logic.saveGhostBeforePick();
-    logic.overlayResetCounter++;
-    const unbaked = logic.unbakeStoredTurretForEditing(tur);
-    const { id, angle, animProgress, ...rest } = unbaked;
-    logic.updateState({
-      selectedTurretId: tur.id,
-      selectMode: true,
-      editingTurret: { ...rest },
-      mirrorMode: false,
-      autoPlacement: false,
-      snapPlacement: false,
-    });
+    logic.turretPlacing = false;
+    logic.pickTurretForEditing(tur);
     onUpdate();
   };
 
@@ -567,30 +553,12 @@ export const TurretManagerUI: React.FC<Props> = ({ logic, onUpdate, className, p
   const isAuto = t.turretType === 'auto';
   const mainEditing = !!s.selectedTurretId;
   const mainSpawner = (!!pt.tankAsProjectile || !!(pt.cycleProjectilesEnabled && pt.tankAsProjectileCycle?.length)) && !!pt.tankAsProjectileUseAI;
-  const mainOrientation = s.selectedTurretId ? (angleDeg: number) => {
-    const sel = s.turrets.find(t => t.id === s.selectedTurretId);
-    if (!sel) return;
-    const newAngleRad = angleDeg * Math.PI / 180;
-    const dist = Math.sqrt(sel.xOffset * sel.xOffset + sel.yOffset * sel.yOffset);
-    if (sel.turretType === 'auto') {
-      const primarySub = sel.primarySubTurretId
-        ? sel.autoSubTurrets.find(st => st.id === sel.primarySubTurretId)
-        : null;
-      const subAngle = primarySub ? primarySub.angle : 0;
-      updateT({
-        angle: newAngleRad - subAngle,
-        xOffset: dist * Math.cos(newAngleRad),
-        yOffset: dist * Math.sin(newAngleRad),
-      } as Partial<Turret>);
-    } else {
-      updateT({
-        angle: newAngleRad,
-        xOffset: dist * Math.cos(newAngleRad),
-        yOffset: dist * Math.sin(newAngleRad),
-      } as Partial<Turret>);
-    }
-    onUpdate();
-  } : undefined;
+  const mainTurretAngle = s.selectedTurretId ? (s.turrets.find(tt => tt.id === s.selectedTurretId)?.angle ?? null) : null;
+  const _sideId = s.selectedTurretId;
+  const _side = _sideId ? logic.turretSideOf(_sideId) : null;
+  const mainSide = _sideId && _side ? { v: _side.v, onChange: (v: number) => { const p = logic.turretSidePatch(_sideId, v); if (p) updateT(p); } } : null;
+  const _ways: number[] = [];
+  const mainFacingSnaps = _sideId && logic.turretFacingSnaps(_sideId, _ways) > 0 ? _ways.map(degreesOf) : null;
   const mainProps = (part: TurretPropsPart) => (
     <TurretPropertiesEditor
       turret={t}
@@ -600,7 +568,9 @@ export const TurretManagerUI: React.FC<Props> = ({ logic, onUpdate, className, p
       selectedTurretAngle={selectedAngle ?? comboPreviewAngle}
       hideAmmoStats={isAuto}
       tankSpawnerMode={mainSpawner}
-      onOrientationChange={mainOrientation}
+      turretAngle={mainTurretAngle}
+      sideSlide={mainSide}
+      facingSnaps={mainFacingSnaps}
     />
   );
   const mainShows = (part: TurretPropsPart) => turretPropsPartShows(part, t, { hideAmmoStats: isAuto });
@@ -640,7 +610,7 @@ export const TurretManagerUI: React.FC<Props> = ({ logic, onUpdate, className, p
       const _lt = logic.state.editingTurret ?? t;
       const _snapOn = logic.state.snapPlacement;
       const _cActiveSides = logic.getActiveLayerSides();
-      const compassMax = _cActiveSides >= 3 ? _cActiveSides : 8;
+      const compassMax = _cActiveSides >= 3 ? ((logic.state.snapTarget ?? 'faces') === 'both' ? _cActiveSides * 2 : _cActiveSides) : 8;
       const _w14SnapPatch = (v && _cActiveSides >= 3 && !_snapOn)
         ? { snapPlacement: true } as const
         : null;
@@ -651,7 +621,9 @@ export const TurretManagerUI: React.FC<Props> = ({ logic, onUpdate, className, p
       });
       const _comboNow = _cActiveSides >= 3 && (_snapOn || _w14SnapPatch !== null);
       if (v && _comboNow && _lt.turretType === 'auto') {
-        const offset = logic.computeFaceEdgeOffset(_cActiveSides, _lt.autoCircleSize ?? 25);
+        const _tg = logic.state.snapTarget ?? 'faces';
+        const offset = _tg === 'corners' ? logic.computeCornerEdgeOffset(_cActiveSides, _lt.autoCircleSize ?? 25)
+          : _tg === 'both' ? 0 : logic.computeFaceEdgeOffset(_cActiveSides, _lt.autoCircleSize ?? 25);
         updateT({ xOffset: offset, yOffset: 0, aboveTankBody: false });
       }
       if (!v && _lt.turretType === 'auto') {
@@ -669,7 +641,9 @@ export const TurretManagerUI: React.FC<Props> = ({ logic, onUpdate, className, p
         logic.updateState({ snapPlacement: v });
       }
       if (v && _compassOn && _sActiveSides >= 3 && _lt.turretType === 'auto') {
-        const offset = logic.computeFaceEdgeOffset(_sActiveSides, _lt.autoCircleSize ?? 25);
+        const _tg = logic.state.snapTarget ?? 'faces';
+        const offset = _tg === 'corners' ? logic.computeCornerEdgeOffset(_sActiveSides, _lt.autoCircleSize ?? 25)
+          : _tg === 'both' ? 0 : logic.computeFaceEdgeOffset(_sActiveSides, _lt.autoCircleSize ?? 25);
         updateT({ xOffset: offset, yOffset: 0, aboveTankBody: false });
       }
       if (!v && _lt.turretType === 'auto') {
@@ -677,6 +651,19 @@ export const TurretManagerUI: React.FC<Props> = ({ logic, onUpdate, className, p
       }
     },
     onSetSnapCount: (v: number) => logic.updateState({ snapPlacementCount: v }),
+    snapTarget: s.snapTarget ?? 'faces',
+    onSetSnapTarget: (v: SnapTarget) => {
+      const _ts = logic.getActiveLayerSides();
+      if (logic.state.autoPlacement && logic.state.snapPlacement && _ts >= 3) logic.updateState({ snapTarget: v, autoPlacementCount: snapPointsOf(_ts, v) });
+      else logic.updateState({ snapTarget: v });
+      const _lt = logic.state.editingTurret ?? t;
+      const _sides = logic.getActiveLayerSides();
+      if (logic.state.snapPlacement && logic.state.autoPlacement && _sides >= 3 && _lt.turretType === 'auto') {
+        const offset = v === 'corners' ? logic.computeCornerEdgeOffset(_sides, _lt.autoCircleSize ?? 25)
+          : v === 'both' ? 0 : logic.computeFaceEdgeOffset(_sides, _lt.autoCircleSize ?? 25);
+        updateT({ xOffset: offset, yOffset: 0, aboveTankBody: false });
+      }
+    },
     onToggleAbove: (v: boolean) => updateT({ aboveTankBody: v }),
     autoCircleColorMatch: t.autoCircleColorMatch ?? false,
     isAutoTurret: t.turretType === 'auto',
@@ -727,61 +714,65 @@ export const TurretManagerUI: React.FC<Props> = ({ logic, onUpdate, className, p
   const ms = getSectionState('main');
   const previewing = s.presetPreviewTurrets.length > 0;
 
+  const placing = (logic.turretPlacing && !mainEditing) || previewing;
+  const cardsKey = placing ? 'place' : mainEditing ? 'turret:' + s.selectedTurretId
+    : logic.partPicked ? 'part:' + (s.activeBodyLayerId ?? 'main') + (s.canvasIsProjectile ? ':projectile' : '') : 'none';
+  const addTurret = (part?: string | null) => {
+    if (part !== undefined && part !== s.activeBodyLayerId) logic.setActiveBodyLayer(part);
+    logic.setTurretPlacing(true);
+    onUpdate();
+  };
+
   return (
-    <ScrollArea key={'main:' + (s.activeBodyLayerId ?? 'main')} className={className || ''} contentClassName={PAGE}>
+    <ScrollArea key="main" className={className || ''} contentClassName={PAGE}>
 
-      <Group title="Installed Turrets" icon={headerIcon(HdRectangleCircle)} count={activeTurrets.length}
-        right={!s.inheritMode ? <NewGroupButton logic={logic} scope={s.activeBodyLayerId ?? 'main'} /> : null}>
-        {renderContentLibrary()}
-        <Reveal when={s.bodyLayers.length > 0}>
-          <SelectRow label="Turrets for" help="Which part's turrets the list shows: the main body or one of the body layers."
-            value={s.activeBodyLayerId ?? 'main'}
-            onChange={(val) => {
-              logic.setActiveBodyLayer(val === 'main' ? null : val);
-              onUpdate();
-            }}
-            options={layerOptions}
-          />
-        </Reveal>
-        <InstalledTurretsList
-          logic={logic}
-          scope={s.activeBodyLayerId ?? 'main'}
-          onMakePrimary={(id) => logic.setPrimaryFromList(id)}
-          onInheritInto={(id) => { if (logic.state.selectedTurretId !== id) { const tur = s.turrets.find(x => x.id === id); if (tur) pickMain(tur); } logic.startInheritMode(id); onUpdate(); }}
-          turrets={s.inheritMode ? s.turrets : activeTurrets}
-          layerLabels={inheritLayerLabels}
-          selectedTurretId={s.selectedTurretId}
-          primaryTurretId={s.primaryTurretId}
-          inheritMode={s.inheritMode}
-          inheritTargetId={s.inheritTargetTurretId}
-          onInheritFrom={(sourceId) => {
-            logic.completeInherit(sourceId);
-            onUpdate();
-          }}
-          onSelect={(tur) => {
-            if (tur.id === logic.state.selectedTurretId) {
-              logic.setSelectMode(false);
-              onUpdate();
-              return;
-            }
-            pickMain(tur);
-          }}
-          onRemove={(id) => {
-            logic.removeTurret(id);
-            onUpdate();
-          }}
-          onEditAutoTurret={(turretId) => {
-            logic.enterAutoSubTurretMode(turretId);
-            onUpdate();
-          }}
-        />
-        <TurretActionBar {...mainBar} part="listActions" />
-      </Group>
+      {renderContentLibrary()}
 
-      <PlacementBar bar={mainBar} sub={false} />
+      <TankPartsTree logic={logic} onUpdate={onUpdate} placing={placing} onAddTurret={addTurret}
+        onDone={() => { logic.endTurretPlacing(); onUpdate(); }}
+        headRight={!s.inheritMode ? <NewGroupButton logic={logic} scope={s.activeBodyLayerId ?? 'main'} /> : null}
+        below={<Reveal when={mainEditing}><TurretActionBar {...mainBar} part="listActions" /></Reveal>}
+        turretsOf={(scope) => (
+            <InstalledTurretsList
+              logic={logic}
+              scope={scope}
+              onMakePrimary={(id) => logic.setPrimaryFromList(id)}
+              onInheritInto={(id) => { if (logic.state.selectedTurretId !== id) { const tur = s.turrets.find(x => x.id === id); if (tur) pickMain(tur); } logic.startInheritMode(id); onUpdate(); }}
+              turrets={s.inheritMode ? s.turrets : turretsOfScope(scope)}
+              layerLabels={inheritLayerLabels}
+              selectedTurretId={s.selectedTurretId}
+              primaryTurretId={s.primaryTurretId}
+              inheritMode={s.inheritMode}
+              inheritTargetId={s.inheritTargetTurretId}
+              onInheritFrom={(sourceId) => {
+                logic.completeInherit(sourceId);
+                onUpdate();
+              }}
+              onSelect={(tur) => {
+                if (tur.id === logic.state.selectedTurretId) {
+                  logic.setSelectMode(false);
+                  onUpdate();
+                  return;
+                }
+                pickMain(tur);
+              }}
+              onRemove={(id) => {
+                logic.removeTurret(id);
+                onUpdate();
+              }}
+              onEditAutoTurret={(turretId) => {
+                logic.enterAutoSubTurretMode(turretId);
+                onUpdate();
+              }}
+            />
+        )} />
+
+      <SwapBox swapKey={cardsKey}>
+      {placing || mainEditing ? (<div className="space-y-3">
+      {placing ? <PlacementBar bar={mainBar} sub={false} /> : null}
 
       <Reveal when={!previewing}>
-      <Group title={mainEditing ? 'Editing Turret' : 'Turret Properties'} icon={headerIcon(HdDashboardSquareSetting)}
+      <Group title={mainEditing ? 'Turret' : 'New Turret'} foldKey={mainEditing ? 'Editing Turret' : 'Turret Properties'} icon={headerIcon(HdDashboardSquareSetting)}
         right={mainEditing ? <Button size="sm" onClick={() => logic.setSelectMode(false)} title="Stop editing this turret">Done</Button> : null}>
         {mainTypeEd('type')}
         <Reveal when={typeShows('subTurrets')}><div className="space-y-3">{mainTypeEd('subTurrets')}</div></Reveal>
@@ -789,15 +780,14 @@ export const TurretManagerUI: React.FC<Props> = ({ logic, onUpdate, className, p
       </Reveal>
 
       <Reveal when={mainShows('look') && !previewing}><Group title="Look" icon={headerIcon(HdEye)}>{mainProps('look')}</Group></Reveal>
-      <Group title="Position" icon={headerIcon(HdArrowAllDirection)}>
-        <SwapBox swapKey={previewing ? 'preset' : 'turret'} className="k-swap-rows">
-          {previewing ? <PresetGroupControls logic={logic} /> : mainProps('position')}
+      <Group title="Transform" foldKey="Position" icon={headerIcon(HdArrowAllDirection)}>
+        <SwapBox swapKey={previewing ? 'preset' : 'turret:' + t.turretType} className="k-swap-rows">
+          {previewing ? <PresetGroupControls logic={logic} /> : <>{mainProps('position')}{mainProps('shape')}{mainTypeEd('baseSize')}</>}
         </SwapBox>
       </Group>
-      <Reveal when={!previewing && (mainShows('shape') || mainShows('color') || typeShows('baseShape') || barShows('colorMatch'))}>
-        <Group title="Shape and Color" icon={headerIcon(HdPaintBoard)}>
+      <Reveal when={!previewing && (mainShows('color') || typeShows('baseShape') || barShows('colorMatch'))}>
+        <Group title={typeShows('baseShape') ? 'Shape and Color' : 'Color'} foldKey="Shape and Color" icon={headerIcon(HdPaintBoard)}>
           <SwapBox swapKey={t.turretType} className="k-swap-rows">
-          {mainProps('shape')}
           {mainTypeEd('baseShape')}
           {mainProps('color')}
           <TurretActionBar {...mainBar} part="colorMatch" />
@@ -901,6 +891,13 @@ export const TurretManagerUI: React.FC<Props> = ({ logic, onUpdate, className, p
         <TurretActionBar {...mainBar} part="primary" />
         <TurretActionBar {...mainBar} part="aim" />
       </Group>
+      </div>) : logic.partPicked ? (
+        <PanelScope.Provider value="tool:tank"><div className="space-y-3">
+          <TankPartCard logic={logic} onUpdate={onUpdate} />
+          {s.activeBodyLayerId === null && !s.canvasIsProjectile ? <TankWideCards logic={logic} onUpdate={onUpdate} /> : null}
+        </div></PanelScope.Provider>
+      ) : null}
+      </SwapBox>
 
       <HistoryGroup logic={logic} />
     </ScrollArea>

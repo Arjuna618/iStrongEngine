@@ -1,7 +1,8 @@
-import { lbU32, lbAbbrev, lbScoreOf } from './hudEase';
+import { lbU32, lbWhole, lbAbbrev, lbScoreOf } from './hudEase';
 import { hudColors, hudHpBarAlpha, HUD_FONT_FAMILY } from './hudArras';
 import { drawnOpacity } from './seenRule';
 import { SMALL_FIX } from '../game/smallFixSwitch';
+const tagWhole = SMALL_FIX.R994 !== 0 ? lbWhole : lbU32;
 
 export const TAG_NAME_FONT = 0.55;
 export const TAG_SCORE_FONT = 0.3;
@@ -27,14 +28,14 @@ export function tagReachWorld(t: TagTank, showNames: boolean, showScores: boolea
   const size = t.size * 0.5;
   if (!(size > 0)) return 0;
   const doName = showNames && t.displayName.length > 0;
-  const doScore = showScores && lbU32(lbScoreOf(t, scoreStart)) > 0;
+  const doScore = showScores && tagWhole(lbScoreOf(t, scoreStart)) > 0;
   if (!doName && !doScore) return 0;
   const topR = doName ? (doScore ? TAG_NAME_TOP : TAG_NAME_TOP_ALONE) : TAG_SCORE_TOP;
   return topR * size + tagStrokeWorld((doName ? TAG_NAME_FONT : TAG_SCORE_FONT) * size) * 0.5;
 }
 
 export function tagWanted(name: string, score: number, isPlayer: boolean): boolean {
-  return !isPlayer && (name.length > 0 || lbU32(score) > 0);
+  return !isPlayer && (name.length > 0 || tagWhole(score) > 0);
 }
 
 export function tagNameTop(sy: number, R: number, scoreLine: boolean): number {
@@ -96,11 +97,13 @@ export function tagScoreKey(n: number): number {
   if (n < 1000000) return 200000 + Math.floor(n / 100);
   if (n < 100000000) return 300000 + Math.floor(n / 10000);
   if (n < 1000000000) return 400000 + Math.floor(n / 100000);
-  return 500000 + Math.floor(n / 10000000);
+  if (n < 1e12) return 500000 + Math.floor(n / 10000000);
+  if (n < 1e15) return 700000 + Math.floor(n / 1e10);
+  return 800000 + Math.floor(n / 1e13);
 }
 
 export function tagScoreText(score: number): string {
-  return lbAbbrev(lbU32(score));
+  return lbAbbrev(tagWhole(score));
 }
 
 export const TAG_BUCKETS = 8;
@@ -531,7 +534,7 @@ export function runNameTags(
     if (!tagNamed(t)) continue;
 
     const name = t.displayName;
-    const n32 = lbU32(lbScoreOf(t, v.startOf ? v.startOf(t) : 0));
+    const n32 = tagWhole(lbScoreOf(t, v.startOf ? v.startOf(t) : 0));
     const doName = v.showNames && name.length > 0;
     const doScore = v.showScores && n32 > 0;
     if (!doName && !doScore) continue;
