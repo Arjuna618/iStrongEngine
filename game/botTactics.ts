@@ -1,4 +1,5 @@
 import type { EnemyTank } from '../types';
+import { AI_CONSTANTS } from '../types';
 import { SMALL_FIX } from './smallFixSwitch';
 
 export const BT_HEAL = 1, BT_DUTY = 2, BT_FIGHT = 4, BT_FEAR = 8;
@@ -82,6 +83,7 @@ function btWordsOf(e: EnemyTank, bit: number, a: Record<string, unknown>): void 
     } else if (bit === BT_FIGHT) {
       e._tfHelp = a.help !== false;
       e._tfMap = a.bosses === true; e._tfMapShare = btShare(a.bossShare, 85);
+      e._tfGate = a.gates === true; e._tfGateShare = btShare(a.gateShare, 30);
       if (SMALL_FIX.GH532 !== 0 && !e._tfHelp && e._tfGoalId !== '') btEndGoal(e, '', 0);
     }
     else if (bit === BT_FEAR) { e._flBelow = btShare(a.below, 20); e._flBack = btBackOf(e._flBelow, btShare(a.back, 100)); }
@@ -104,9 +106,10 @@ function btWordsOf(e: EnemyTank, bit: number, a: Record<string, unknown>): void 
       const r = typeof a.radius === 'number' && Number.isFinite(a.radius) ? a.radius : 900;
       e._ogRadius = Math.max(100, Math.min(6000, r)); e._ogId = ''; e._ogLookAt = 0;
       e._ogFront = a.front === true; e._ogFrontShare = btShare(a.frontShare, 92); e._ogPendId = '';
-      e._ogBlockShare = typeof a.blockShare === 'number' && Number.isFinite(a.blockShare) && a.blockShare > 0 ? Math.min(1, a.blockShare / 100) : 0; e._ogBlockUntil = 0; e._ogBlockSpotUntil = 0;
+      e._ogTake = a.takeBack === true;
+      e._ogBlockShare = typeof a.blockShare === 'number' && Number.isFinite(a.blockShare) && a.blockShare > 0 ? Math.min(1, a.blockShare / 100) : 0; e._ogBlockUntil = 0; e._ogBlockSpotUntil = 0; e._ogGo = 0;
       e._ogUnitShare = typeof a.unitShare === 'number' && Number.isFinite(a.unitShare) && a.unitShare > 0 ? Math.min(1, a.unitShare / 100) : 0; e._ogUnitT = '';
-    } else if (bit === BT_ATTACK) { e._oaTag = _idx(a._tag); e._ogId = ''; e._ogLookAt = 0; }
+    } else if (bit === BT_ATTACK) { e._oaTag = _idx(a._tag); e._ogId = ''; e._ogLookAt = 0; e._oaTeam = a.together === true; }
     else if (bit === BT_TAKE) { e._ftTake = _idx(a._tag); e._ftId = ''; e._ftLookAt = 0; }
     else if (bit === BT_SPOIL) { e._ftSpoil = _idx(a._tag); e._ftId = ''; e._ftLookAt = 0; }
     else if (bit === BT_ESCORT) {
@@ -125,8 +128,8 @@ function btOff(e: EnemyTank, bit: number, i: number): void {
   else if (bit === BT_FEAR) e._flLow = false;
   else if (bit === BT_WAVOID) { e._wkMask = 0; e._wkPad = 0; }
   else if (bit === BT_WTOUCH) { e._wqMask = 0; e._wqNext = 0; if (e._mmDo >= 2) e._mmDo = 0; }
-  else if (bit === BT_GUARD) { e._ogTag = -1; e._ogId = ''; e._ogFront = false; e._ogPendId = ''; e._ogBlockShare = 0; e._ogBlockUntil = 0; e._ogBlockSpotUntil = 0; e._ogUnitShare = 0; e._ogUnitT = ''; }
-  else if (bit === BT_ATTACK) { e._oaTag = -1; e._ogId = ''; }
+  else if (bit === BT_GUARD) { e._ogTag = -1; e._ogId = ''; e._ogFront = false; e._ogTake = false; e._ogPendId = ''; e._ogBlockShare = 0; e._ogBlockUntil = 0; e._ogBlockSpotUntil = 0; e._ogGo = 0; e._ogUnitShare = 0; e._ogUnitT = ''; }
+  else if (bit === BT_ATTACK) { e._oaTag = -1; e._ogId = ''; e._oaTeam = false; }
   else if (bit === BT_TAKE) { e._ftTake = -1; e._ftId = ''; }
   else if (bit === BT_SPOIL) { e._ftSpoil = -1; e._ftId = ''; }
   else if (bit === BT_ESCORT) { e._esTag = -1; e._esId = ''; }
@@ -146,12 +149,13 @@ export function btResetLife(e: EnemyTank): void {
   btEndTrip(e, 0); e._hsCoolUntil = 0; e._hsBestD = 0;
   btEndGoal(e, '', 0); e._tfBanId = ''; e._tfBanUntil = 0; e._tfLookAt = 0; e._flLow = false;
   e._hdMateId = ''; e._hdLookAt = 0;
+  e._tfGate = false; e._tfGateZ = -1; e._tfGateHas = false; e._tfGateFireUntil = 0; e._tfGateLookAt = 0; e._tfGateDist = 0;
   e._tfMap = false; e._tfMapId = ''; e._tfMapAt = 0; e._tfMapLookAt = 0; e._tfPendId = ''; e._tfPendAt = 0; e._tfMeetId = ''; e._tfMeetSid = ''; e._tfMeetGoAt = 0;
-  e._btRoute = ''; e._btWAt = 0; e._btWn = 0;
+  e._btRoute = ''; e._btWAt = 0; e._btWn = 0; e._btWRest = 0;
   e._wkMask = 0; e._wkPad = 0; e._wqMask = 0; e._wqNext = 0; if (e._mmDo >= 2) e._mmDo = 0;
   e._ogTag = -1; e._oaTag = -1; e._ogId = ''; e._ogLookAt = 0;
-  e._ogFront = false; e._ogFrontIs = -1; e._ogPendId = ''; e._ogPendAt = 0; e._ogHoldUntil = 0;
-  e._ogBlockShare = 0; e._ogBlockIs = -1; e._ogBlockUntil = 0; e._ogBlockLookAt = 0; e._ogBlockSpotUntil = 0;
+  e._ogFront = false; e._ogTake = false; e._oaTeam = false; e._ogFrontIs = -1; e._ogPendId = ''; e._ogPendAt = 0; e._ogHoldUntil = 0;
+  e._ogBlockShare = 0; e._ogBlockIs = -1; e._ogBlockUntil = 0; e._ogBlockLookAt = 0; e._ogBlockSpotUntil = 0; e._ogGo = 0; e._ogKite = 0; e._ogHelpId = ''; e._ogHelpAt = 0; e._ogQuietAt = 0; e._ogHelpKeepAt = 0; e._ogSideId = ''; e._ogHoldGo = false; e._btStood = false; e._ogHoldSince = 0; e._ogKeepWk = -1; e._wkAt = 0;
   e._ogUnitShare = 0; e._ogUnitIs = -1; e._ogUnitT = ''; e._ogUnitLookAt = 0;
   e._ftTake = -1; e._ftSpoil = -1; e._ftId = ''; e._ftLookAt = 0; e._ctKite = false;
   e._ftGo = false; e._ftBestD = Infinity; e._ftGiveUpAt = 0; e._ftBan = ''; e._ftBanUntil = 0;
@@ -182,7 +186,7 @@ export function btFearNote(e: EnemyTank, share: number): boolean {
 }
 export function btNoFear(e: EnemyTank): boolean {
   if (BOT_TACTICS.ON === 0 || !(e._btBits > 0)) return false;
-  return ((e._btBits & BT_FEAR) !== 0 && !e._flLow) || ((e._btBits & BT_HEAL) !== 0 && e._hsOn === 1);
+  return ((e._btBits & BT_FEAR) !== 0 && !e._flLow) || ((e._btBits & BT_HEAL) !== 0 && (e._hsOn === 1 || (e._hsOn === 2 && e._hsStand === true && AI_CONSTANTS.BT_STAYHOME !== 0)));
 }
 
 export function btWanderPick(e: EnemyTank, cx: number, cy: number, rIn: number, rOut: number, now: number): void {

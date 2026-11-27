@@ -2131,7 +2131,23 @@ export function generateMap(config: MapConfig, forFill = false): MapState {
     const _standing = (q: PortalEntity): boolean => q._placedInArea === true
       || (!_inArea.includes(q) && !_needArea.has(q) && !(SMALL_FIX.G747 !== 0 && _willStandInArea(q.id)));
     if (_inArea.length > 0) {
+      if (SMALL_FIX.G994 !== 0) for (const p of _inArea) {
+        const gx = Math.round((p.x + mapHalf - cellSize * 0.5) / cellSize), gy = Math.round((p.y + mapHalfY - cellSize * 0.5) / cellSize), k = gx * gcY + gy;
+        if (gx >= 0 && gy >= 0 && gx < gc && gy < gcY && tileGrid[k] === TileType.PORTAL) tileGrid[k] = TileType.NORMAL;
+      }
+      const _rockMin2 = (PORTAL_TILE_SIZE * 0.8) * (PORTAL_TILE_SIZE * 0.8);
+      const _offRock = (cx: number, cy: number): boolean => {
+        if (SMALL_FIX.G993 === 0) return true;
+        const tx = -mapHalf + cx * cellSize + cellSize * 0.5, ty = -mapHalfY + cy * cellSize + cellSize * 0.5;
+        for (let ri = 0; ri < rocks.length; ri++) { const dx = tx - rocks[ri].x, dy = ty - rocks[ri].y; if (dx * dx + dy * dy < _rockMin2) return false; }
+        return true;
+      };
       const ok = (c: number): boolean => { const cx = (c / gcY) | 0, cy = c - cx * gcY; return tileGrid[c] !== TileType.WALL && !_wallBeside(tileGrid, gc, gcY, cx, cy); };
+      const _free = new Map<PortalEntity, Int32Array>();
+      if (SMALL_FIX.G993 !== 0) {
+        for (const p of _inArea) { const all = p._inCells!; _free.set(p, all.filter(c => { const cx = (c / gcY) | 0; return _offRock(cx, c - cx * gcY); })); }
+        for (let i = _inArea.length - 1; i >= 0; i--) if (_free.get(_inArea[i])!.length === 0) _inArea.splice(i, 1);
+      }
       const put = (p: PortalEntity, c: number): void => { const gx = (c / gcY) | 0, gy = c - gx * gcY; p.x = -mapHalf + gx * cellSize + cellSize / 2; p.y = -mapHalfY + gy * cellSize + cellSize / 2; };
       let best: number[] | null = null, bestGap = -1;
       for (let attempt = 0; attempt < 40; attempt++) {
@@ -2139,7 +2155,7 @@ export function generateMap(config: MapConfig, forFill = false): MapState {
         const pick: number[] = [];
         let fit = true;
         for (const p of _inArea) {
-          const cells = p._inCells!;
+          const cells = _free.get(p) ?? p._inCells!;
           let ci = -1;
           for (let k = 0; k < 40; k++) {
             const c = cells[(Math.random() * cells.length) | 0];
@@ -3234,6 +3250,7 @@ function _relocateTimedPortal(
     if (tooClose) continue;
     if (inCells !== null && MISSING_MODES.ON !== 0) {
       if (!_portalGapClear(p, tx, ty, areaMs.portals, false)) continue;
+      if (_portalOnGuard(p, tx, ty)) continue;
       p.x = tx; p.y = ty; _portalMoves++; tileGrid[tileIdx] = TileType.PORTAL;
       return;
     }
@@ -3250,6 +3267,7 @@ function _relocateTimedPortal(
       if (near || spawnHazardAt(_NO_PORTAL_LIST, areaMs.customAreas, tx, ty, PORTAL_TILE_SIZE * 0.5, true)) continue;
     }
 
+    if (_portalOnGuard(p, tx, ty)) continue;
     p.x = tx;
     p.y = ty;
     _portalMoves++;
@@ -3328,6 +3346,14 @@ export function resetTimedPortalRuntime(
 
 let _portalModeRoll: (() => string) | null = null;
 export function setPortalModeRoll(fn: (() => string) | null): void { _portalModeRoll = fn; }
+let _portalTakesGuard: ((p: PortalEntity) => boolean) | null = null;
+export function setPortalGuardTest(fn: ((p: PortalEntity) => boolean) | null): void { _portalTakesGuard = fn; }
+function _portalOnGuard(p: PortalEntity, x: number, y: number): boolean {
+  if (SMALL_FIX.G931 === 0 || _portalTakesGuard === null) return false;
+  const ox = p.x, oy = p.y;
+  p.x = x; p.y = y;
+  try { return _portalTakesGuard(p); } finally { p.x = ox; p.y = oy; }
+}
 export function rollPortalMode(p: PortalEntity): void { if (p.toMode === 'random' && _portalModeRoll !== null) p._toModeNow = _portalModeRoll(); }
 export function updateTimedPortals(
   portals: PortalEntity[],

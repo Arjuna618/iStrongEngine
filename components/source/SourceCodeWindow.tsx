@@ -15,6 +15,7 @@ import {
   ArrowUp, ArrowDown, X, Overview, PanelLeft,
 } from '../ui/icons';
 import { CodeView, CodeWait, codeViewPicked, prepareCode } from './CodeView';
+import { SMALL_FIX } from '../../game/smallFixSwitch';
 import {
   loadSourceProject, loadFileText, peekFileText, loadSearchText, searchProject, lineTextOf, visibleRows, foldersOf, urlOf, baseHref,
   kindName, groupOf, fmtCount, fmtBytes, fmtShort,
@@ -354,12 +355,15 @@ function SourceBody({ project, touch, narrow }: { project: SourceProject; touch:
   const searching = query.trim() !== '';
   const deferred = useDeferredValue(query);
   const [text, setText] = useState<SearchText | null>(null);
+  const [failedQ, setFailedQ] = useState<string | null>(null);
+  const retryKey = SMALL_FIX.G767 !== 0 && failedQ !== null ? query : '';
   useEffect(() => {
     if (!searching || text) return;
+    if (SMALL_FIX.G767 !== 0 && failedQ !== null && failedQ === query) return;
     let alive = true;
-    loadSearchText(project).then(t => { if (alive) setText(t); }).catch(() => {});
+    loadSearchText(project).then(t => { if (alive) setText(t); }).catch(() => { if (alive && SMALL_FIX.G767 !== 0) setFailedQ(query); });
     return () => { alive = false; };
-  }, [searching, text, project]);
+  }, [searching, text, project, retryKey]);
   const result = useMemo(() => (deferred.trim() ? searchProject(project, text ? text.lower : null, deferred) : null), [project, text, deferred]);
   type Item = { key: string; h: number; hit: SearchHit; line?: number };
   const items = useMemo(() => {

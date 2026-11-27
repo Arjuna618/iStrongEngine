@@ -54,7 +54,7 @@ ${HUD_MSG_CSS}`;
 import { GameState, FloatingPolygon, Bullet, UpgradeStat, EnemyTank, Turret, SubTurretConfig, MotionType, FacingType, ProjectileVisual, SNAP_COUNTS, BodyLayer, TileType, TEAM_COLORS, TEAM_COLORS_DARK, TEAM_COLORS_LIGHT, getStatLabel, isFfaStyleMode, isManhuntMode, teamColourMode, AI_CONSTANTS, type PortalEntity } from '../types';
 import { SMALL_FIX } from '../game/smallFixSwitch';
 import { layerColourOf, LAYER_BODY, LAYER_TEAM, anyForcedTeamLayer, TEAM_COLOUR } from '../game/teamColourSwitch';
-import { darkenColor, getRealSizeFactor, mixColorToWhite, computeSideCorr, syncDarkenTheme } from '../utils/p5Utils';
+import { darkenColor, getRealSizeFactor, mixColorToWhite, computeSideCorr, syncDarkenTheme, intangibleDarkRGB } from '../utils/p5Utils';
 import { computeWidthFitAdjustment, readAdjustedWidth, readAdjustedYOffset } from '../utils/turretWidthFit';
 import type { WidthFitInput } from '../utils/turretWidthFit';
 import { needsLayerInterleaveSlot, enemyQueueBudget, playerReservesMultiLayerSlot, playerReservesInvisibleSlot, fadesAsOneUnit, nestedShapeFadesAsOneUnit, roundDrawsAsOneUnit } from '../utils/renderQueueAdmission';
@@ -75,7 +75,7 @@ import { kindOf } from '../game/mapEvents/registry';
 import { gameModeTitleOf } from '../game/gameModeTitles';
 import { presetTitle } from '../game/mapEvents/presets/index';
 import { mapEditorClickMoved, mapEditorPointerDown, mapEditorPointerMove, mapEditorPointerUp, mapEditorRightPointerDown, mapEditorRightPointerUp, refreshMapEditorVisuals, dragHideInfo, selectionOutline, effectiveMapEditorTool, toolRockKind, noteMapEditorMods } from '../game/MapEditorInput';
-import { drawMapEditorOverlay, drawMapEditorHint, setMapEditorOverlayGpu, mapEditorHoverColor, mapEditorInk, mapEditorMuted, GHOST_ALPHA, mapRockAt, mapRockTurnAt, mapObjectLabels } from './shared/mapEditorOverlay';
+import { drawMapEditorOverlay, drawMapEditorHint, setMapEditorOverlayGpu, mapEditorHoverColor, mapEditorInk, mapEditorMuted, GHOST_ALPHA, mapRockAt, mapRockTurnAt, mapObjectLabels, ghostPaintOf, GHOST_PAINT } from './shared/mapEditorOverlay';
 import { drawCanvasGesture, canvasGestureCursor, drawMatchHitAreas } from './shared/canvasGestureOverlay';
 import { openCanvasMenu } from './shell/canvasMenuBridge';
 import { setGameDarkMode, canvasBg, gridBg, gridStroke, strokeHex, wallDefault, wallFill, turretGrey, turretFill, healerCrossFill, healthBarColor, shieldBarColor, bodyFill, shapeFill, isGameDark } from '../utils/gameColors';
@@ -202,7 +202,7 @@ function _rlStep(t: Turret, rl: number, cx: number, cy: number, ang: number, sz:
     if (AUTO_BASE_WHOLE === 0) return flush;
     const multi = _rlMultiBatch(t);
     const off = Math.sqrt(t.xOffset * t.xOffset + t.yOffset * t.yOffset) * 0.5;
-    const r = (_gunReachOf(t) - off) * sz;
+    const r = (_gunReachOf(t) - off) * sz + (SMALL_FIX.G944 !== 0 ? 3 : 0);
     const c = Math.cos(ang), sn = Math.sin(ang);
     const mx = t.xOffset * sz / 2, my = t.yOffset * sz / 2;
     const x = cx + mx * c - my * sn, y = cy + mx * sn + my * c;
@@ -248,6 +248,7 @@ function _geoEmit(
     aspect: number,
     alpha: number = 1.0
 ): void {
+    if (scaleX < 0 && batchKey === 'barrel' && SMALL_FIX.G945 !== 0) { rotation += Math.PI; scaleX = -scaleX; }
     const depth = _nextGeoDepth();
     if (_puOpen) { _puRecord(batchKey, worldX, worldY, rotation, scaleX, scaleY, r, g, b, _geoHl ? dmgOverlay + 2 : dmgOverlay, depth, aspect, _puShare * (_entityAlpha > 0 ? alpha / _entityAlpha : 1)); return; }
     webgl.pushGeomInstance(batchKey, worldX, worldY, rotation, scaleX, scaleY, r, g, b, _geoHl ? dmgOverlay + 2 : dmgOverlay, depth, aspect,
@@ -910,7 +911,7 @@ function _geoEmitBodyLayers(
         const layerColor = _layerFill(layer);
         _hexToRGB(layerColor, _gColor, 0);
         let lr = _gColor[0], lg = _gColor[1], lb = _gColor[2];
-        if (_isDarkMode && layer.intangible) { lr = 0; lg = 0; lb = 0; }
+        if (_isDarkMode && layer.intangible) { intangibleDarkRGB(layerColor, _gColor, 0); lr = _gColor[0]; lg = _gColor[1]; lb = _gColor[2]; }
 
         const effectiveAngle = layer.stationary ? -bodyAngle : layer._currentAngle;
         const layerWorldAngle = bodyAngle + effectiveAngle;
@@ -2409,7 +2410,7 @@ function _renderMultiLayerEntity(
         const layerColor = _layerFill(layer);
         _hexToRGB(layerColor, _gColor, 0);
         let lr = _gColor[0], lg = _gColor[1], lb = _gColor[2];
-        if (_isDarkMode && layer.intangible) { lr = 0; lg = 0; lb = 0; }
+        if (_isDarkMode && layer.intangible) { intangibleDarkRGB(layerColor, _gColor, 0); lr = _gColor[0]; lg = _gColor[1]; lb = _gColor[2]; }
 
         const effectiveAngle = layer.stationary ? -bodyAngle : layer._currentAngle;
         const layerWorldAngle = bodyAngle + effectiveAngle;
@@ -2725,7 +2726,7 @@ function _renderMultiLayerEntity(
         const layerColor = _layerFill(layer);
         _hexToRGB(layerColor, _gColor, 0);
         let lr = _gColor[0], lg = _gColor[1], lb = _gColor[2];
-        if (_isDarkMode && layer.intangible) { lr = 0; lg = 0; lb = 0; }
+        if (_isDarkMode && layer.intangible) { intangibleDarkRGB(layerColor, _gColor, 0); lr = _gColor[0]; lg = _gColor[1]; lb = _gColor[2]; }
 
         const effectiveAngle = layer.stationary ? -bodyAngle : layer._currentAngle;
         const layerWorldAngle = bodyAngle + effectiveAngle;
@@ -4235,7 +4236,7 @@ const SkillRow: React.FC<{
     const zones: React.ReactNode[] = [];
     if (points > 0 && !readOnly) {
         for (let j = 0; j < M; j++) {
-            zones.push(<div key={'z' + j} onMouseEnter={() => setHover(j)} style={{
+            zones.push(<div key={'z' + j} onMouseEnter={() => setHover(j)} onMouseLeave={SMALL_FIX.G831 !== 0 ? () => setHover(h => (h === j ? null : h)) : undefined} style={{
                 position: 'absolute', left: (HUD_SK_TRACK_L + seg * j - ox) * u, top: 0, width: seg * u,
                 height: 2 * HUD_SK_OUTLINE_R * u,
             }} />);
@@ -4775,6 +4776,7 @@ export const __dbgTestHooks = {
     CELL: _DBG_GLYPH_CELL,
     CELL_PER_FONT: _DBG_CELL_PER_FONT,
     emitAIVectorGeom: _emitAIVectorGeom,
+    emitOneLight: _emitOneLight,
     pushFleeHeatBar: _pushFleeHeatBar,
     resetFleeHeatBars: () => { _fleeBarCount = 0; },
     rd: _rd,
@@ -4978,14 +4980,34 @@ function _emitOneLight(gl: WebGLBulletRenderer, s: DarkSource | null, L: DarkLig
     if (L.round) { ovlRing(gl, L.x, L.y, roundLightRadius(L, s), w, r, g, b, A, zoom); return; }
     if (s.circle > 0) ovlRing(gl, L.x, L.y, s.circle * L.rad, w, r, g, b, A, zoom);
     const h = s.beamHalf;
-    if (s.beam > 0) _emitCone(gl, L.x, L.y, Math.atan2(L.ay, L.ax), s.beam * L.rad, h, w, r, g, b, A, zoom);
+    const _f870 = SMALL_FIX.G870 !== 0;
+    const _reach870 = _f870 && s.viewReach ? L.view : 1;
+    if (s.beam > 0) _emitCone(gl, L.x, L.y, Math.atan2(L.ay, L.ax), s.beam * L.rad * _reach870, h, w, r, g, b, A, zoom, _f870 ? s.circle * L.rad : 0);
     if (s.gunBeam > 0) {
         const G = L.g;
-        for (let k = 0; k < L.gn; k++) { const o = k * 5; _emitCone(gl, G[o], G[o + 1], Math.atan2(G[o + 3], G[o + 2]), s.gunBeam * G[o + 4], h, w, r, g, b, A * 0.7, zoom); }
+        for (let k = 0; k < L.gn; k++) { const o = k * 5; _emitCone(gl, G[o], G[o + 1], Math.atan2(G[o + 3], G[o + 2]), s.gunBeam * G[o + 4] * _reach870, h, w, r, g, b, A * 0.7, zoom); }
     }
 }
-function _emitCone(gl: WebGLBulletRenderer, x: number, y: number, dir: number, len: number, h: number, w: number, r: number, g: number, b: number, a: number, zoom: number): void {
+function _emitCone(gl: WebGLBulletRenderer, x: number, y: number, dir: number, len: number, h: number, w: number, r: number, g: number, b: number, a: number, zoom: number, minHalf = 0): void {
     if (!(len > 0)) return;
+    if (minHalf > 0) {
+        const m = minHalf < len ? minHalf : len;
+        const c = Math.cos(dir), sn = Math.sin(dir), px = -sn, py = c;
+        const tanH = Math.tan(h), along1 = len * Math.cos(h);
+        let d0 = tanH > 1e-9 ? m / tanH : Infinity;
+        let endA: number, endX: number;
+        if (d0 >= along1) { endA = Math.sqrt(Math.max(0, len * len - m * m)); endX = m; d0 = endA; }
+        else { endA = along1; endX = len * Math.sin(h); }
+        for (let side = -1; side <= 1; side += 2) {
+            const ox = x + px * m * side, oy = y + py * m * side;
+            const kx = x + c * d0 + px * m * side, ky = y + sn * d0 + py * m * side;
+            ovlLine(gl, ox, oy, kx, ky, w, r, g, b, a);
+            if (d0 < endA) ovlLine(gl, kx, ky, x + c * endA + px * endX * side, y + sn * endA + py * endX * side, w, r, g, b, a);
+        }
+        const ha = Math.atan2(endX, endA);
+        ovlArc(gl, x, y, len, dir - ha, dir + ha, w, r, g, b, a, zoom);
+        return;
+    }
     ovlLine(gl, x, y, x + Math.cos(dir - h) * len, y + Math.sin(dir - h) * len, w, r, g, b, a);
     ovlLine(gl, x, y, x + Math.cos(dir + h) * len, y + Math.sin(dir + h) * len, w, r, g, b, a);
     ovlArc(gl, x, y, len, dir - h, dir + h, w, r, g, b, a, zoom);
@@ -5140,9 +5162,11 @@ function _drawWorldDebugLabels(
                 if (reach > 0 && enemy.position.y - reach - 4 * invZoom < anchorY) anchorY = enemy.position.y - reach - 4 * invZoom;
             }
             const _peace = logic.isAskingPeace(enemy);
+            const _doing = showStateLabel && !_peace ? logic.botDebugWord(enemy) : '';
             const label = logic.isHealEngagement(enemy)
                 ? 'HEALING'
                 : _peace ? 'ASKING FOR PEACE'
+                : _doing !== '' ? _doing
                 : (_AI_STATE_LABEL[enemy.aiState] || enemy.aiState);
             const labelColor = _aiStateColor(enemy.aiState);
 
@@ -5998,6 +6022,7 @@ function _applyBulletTeamColors(logic: GameLogic, sortIdx: Int32Array, sortLen: 
       const _hasHardcodedOwners = _hardcodedColorOwnerSet.size > 0;
       for (let si = 0; si < sortLen; si++) {
         const b = bulletsArr[sortIdx[si]];
+        if (SMALL_FIX.G918 !== 0 && b._liveCol) continue;
         const _gi = _guardRoundTeam(b);
         if (_gi >= 0) { _paintRoundTeam(b, _gi); continue; }
         if (b._keepOwn || b._liveCol) continue;
@@ -6536,10 +6561,15 @@ function _edGhosts(pass: 'below' | 'above', both: boolean, layer: BodyLayer | nu
     ctx.save();
     ctx.translate(_rd.posX, _rd.posY);
     ctx.rotate(_rd.bodyAngle);
-    if (layer !== null && layerIsPlaced(layer)) { layerPlaceInto(_lpOut, layer, _rd.sizePx / 2, 1, 0); ctx.translate(_lpOut[0], _lpOut[1]); }
+    if (layer !== null && layerIsPlaced(layer)) {
+        layerPlaceInto(_lpOut, layer, _rd.sizePx / 2, 1, 0); ctx.translate(_lpOut[0], _lpOut[1]);
+        if (SMALL_FIX.G980 !== 0) { _ghLX = _lpOut[0]; _ghLY = _lpOut[1]; _ghShifted = true; }
+    }
     _ghostOn = true;
-    drawPreviewTurret(ctx, logic, pass, true);
-    if (both) drawPresetPreview(ctx, logic, pass, true);
+    try {
+        drawPreviewTurret(ctx, logic, pass, true);
+        if (both) drawPresetPreview(ctx, logic, pass, true);
+    } finally { _ghLX = 0; _ghLY = 0; _ghShifted = false; }
     _ghostOn = false;
     ctx.restore();
     _edSegBegin();
@@ -6605,6 +6635,7 @@ function _ghostEnd(ctx: CanvasRenderingContext2D, alpha: number): void {
     ctx.restore();
 }
 let _ghCos = 1, _ghSin = 0, _ghX = 0, _ghY = 0, _ghAng = 0;
+let _ghLX = 0, _ghLY = 0, _ghShifted = false;
 function _ghostFrameOfTank(logic: GameLogic): void {
     _ghAng = logic.tankAngle; _ghCos = Math.cos(_ghAng); _ghSin = Math.sin(_ghAng);
     _ghX = logic.tankPos.x; _ghY = logic.tankPos.y;
@@ -6612,6 +6643,7 @@ function _ghostFrameOfTank(logic: GameLogic): void {
 type GhostPart = Pick<Turret, 'look' | 'color' | 'colorMap' | 'aspect' | 'autoCircleBaseSides' | 'autoCircleBaseDepth'>;
 function _ghostBarrel(t: GhostPart, lx: number, ly: number, la: number, tLen: number, tWid: number, sizePx: number): void {
     const gl = _edTankGL!;
+    lx += _ghLX; ly += _ghLY;
     const wx = _ghX + lx * _ghCos - ly * _ghSin, wy = _ghY + lx * _ghSin + ly * _ghCos;
     if (t.look !== undefined) { _pushLookParts(gl, t.look, wx, wy, _ghAng + la, sizePx, 0, 1.0); return; }
     _hexToRGB(turretFill(t.color, t.colorMap), _tColor, 0);
@@ -6619,6 +6651,7 @@ function _ghostBarrel(t: GhostPart, lx: number, ly: number, la: number, tLen: nu
 }
 function _ghostBase(t: GhostPart, lx: number, ly: number, circleR: number, color: string, turn: number): void {
     const gl = _edTankGL!;
+    lx += _ghLX; ly += _ghLY;
     const wx = _ghX + lx * _ghCos - ly * _ghSin, wy = _ghY + lx * _ghSin + ly * _ghCos;
     _hexToRGB(color, _tColor, 0);
     const sides = t.autoCircleBaseSides ?? 0;
@@ -6969,7 +7002,8 @@ function _drawEditorMapMarksGL(ctx: CanvasRenderingContext2D, logic: GameLogic, 
     if (tool !== 'none' && me.hasGhost && (me.ghostKind === 'wall' || me.ghostKind === 'rock')) {
         if (open) webgl.beginFrame(); else begin();
         const valid = me.ghostValid;
-        const fillHex = valid ? wallDefault() : mapEditorMuted(_isDarkMode);
+        const _own983 = valid && hw === null && ghostPaintOf(logic, me.ghostKind === 'wall');
+        const fillHex = valid ? (_own983 ? GHOST_PAINT.hex : wallDefault()) : mapEditorMuted(_isDarkMode);
         _hexToRGB(fillHex, _gColor, 0);
         const fr = _gColor[0], fg = _gColor[1], fb = _gColor[2];
         let veil = false;
@@ -7011,7 +7045,7 @@ function _drawEditorMapMarksGL(ctx: CanvasRenderingContext2D, logic: GameLogic, 
             webgl.setSampleAlphaToCoverage(true);
         }
         if (webgl.hasDrawnSinceClear()) {
-            ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = GHOST_ALPHA; _compositeMiniFlush(ctx, webgl); ctx.restore();
+            ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = GHOST_ALPHA * (_own983 ? GHOST_PAINT.alpha : 1); _compositeMiniFlush(ctx, webgl); ctx.restore();
         }
     }
     if (open) _editorGLState(webgl);
@@ -9103,7 +9137,7 @@ function render(ctx: CanvasRenderingContext2D, logic: GameLogic, dt: number, act
         if (polyTransformDirty) { _restoreCameraTransform(ctx, logic, width, height); }
     }
 
-    if (!inDesigner || _edGL) _keptMap.release();
+    if (!inDesigner || _edGL) { _keptMap.release(); if (SMALL_FIX.G961 !== 0) { _kmMap = null; _kmLook = null; } }
     if ((inDesigner && !_edGL) || (logic.state.isTestMode && logic.state.debugMode && logic.state.dbgShowAreaMarks)) _drawEditorAreaMarks(ctx, logic, width, height, dt, _dragHide); else _keptAreaMarks.release();
     if (inDesigner && _edGL && webgl !== null) _drawEditorAreasGL(ctx, logic, webgl, width, height, _dragHide);
     if (!inDesigner || !_edGL) _releaseEditorMapGL(webgl);
@@ -10258,8 +10292,10 @@ interface _MmDot {
     moveMs: number; alphaMs: number;
     color: string;
     seen: number;
+    n: number;
 }
 const _mmDots: _MmDot[] = [];
+let _mmDotSerial = 0;
 const _mmDotById = new Map<string, _MmDot>();
 let _mmSampleGen = 0;
 let _mmLastSampleMs = -1e9;
@@ -10275,7 +10311,7 @@ function _mmDotA(d: _MmDot, nowMs: number): number { return d.a0 + (d.a1 - d.a0)
 function _mmSampleDot(id: string, fx: number, fy: number, color: string, nowMs: number): void {
     let d = _mmDotById.get(id);
     if (d === undefined) {
-        d = { id, fx, fy, tx: fx, ty: fy, a0: 0, a1: 1, moveMs: nowMs, alphaMs: nowMs, color, seen: _mmSampleGen };
+        d = { id, fx, fy, tx: fx, ty: fy, a0: 0, a1: 1, moveMs: nowMs, alphaMs: nowMs, color, seen: _mmSampleGen, n: _mmDotSerial++ };
         _mmDotById.set(id, d);
         _mmDots.push(d);
         return;
@@ -10489,20 +10525,22 @@ function drawMinimap(ctx: CanvasRenderingContext2D, canvasW: number, canvasH: nu
         _mmPaintMoversAt(ctx, logic, _mmAll, ms, _mmPX, _mmPY, _mmPW, _mmPH, areaOffX, areaOffY, _wx0, _wy0, mapW, mapH, true);
     }
 
-    if (_mmDotsMapRef !== ms) {
+    const _mmDotKey: object = SMALL_FIX.G977 !== 0 ? _mmRef : ms;
+    if (_mmDotsMapRef !== _mmDotKey) {
         if (_mmLine < 0 || _mmLine !== _mmDotsLine) {
             _mmDots.length = 0;
             _mmDotById.clear();
             _mmLastSampleMs = -1e9;
         }
-        _mmDotsMapRef = ms;
+        _mmDotsMapRef = _mmDotKey;
         _mmDotsLine = _mmLine;
     }
 
     const _mmGm = logic.state.gameModeConfig;
-    const _mmTeamActive = teamColourMode(_mmGm.mode) && logic.state.isTestMode;
+    const _mmTeamActive = SMALL_FIX.G836 !== 0 ? logic.mmTeamRule() : teamColourMode(_mmGm.mode) && logic.state.isTestMode;
     const _mmPg = logic.playerGroupId;
     const _mmPlayerTeam = _mmTeamActive ? logic.getPlayerTeam() : null;
+    const _mmPDread = logic.mmPlayerIsDread();
     const _mmManhunt = isManhuntMode(_mmGm.mode) && logic.state.isTestMode;
     const _mmLeaderId = _mmManhunt ? logic.state.manhuntLeaderId : null;
 
@@ -10517,7 +10555,9 @@ function drawMinimap(ctx: CanvasRenderingContext2D, canvasW: number, canvasH: nu
         if (enemy.isBaseProtector || (enemy._mevF & 32) !== 0) continue;
         const _isManhunted = _mmLeaderId !== null && enemy.id === _mmLeaderId;
         const _isBoss = enemy.isBossTier === true || (enemy._mevF & 4194304) !== 0;
-        if (!showAll && !_isManhunted && !_isBoss) {
+        const _mmSeen = logic.mmEveryoneSees(enemy);
+        if (!showAll && !_isManhunted && !_isBoss && !_mmSeen && _mmPDread) continue;
+        if (!showAll && !_isManhunted && !_isBoss && !_mmSeen) {
           if (_mmTeamActive) {
             if (enemy.team !== _mmPlayerTeam) continue;
           } else if (_mmGm.mode === 'sandbox') {
@@ -10571,7 +10611,8 @@ function drawMinimap(ctx: CanvasRenderingContext2D, canvasW: number, canvasH: nu
             ctx.fillStyle = col.mmPlayer;
             const sec = Math.floor(nowMs / 1000);
             ctx.beginPath();
-            ctx.arc(mmX + _mmHash(i, sec, 1) * mmW, mmY + _mmHash(i, sec, 2) * mmH, dotR, 0, Math.PI * 2);
+            const _hn = SMALL_FIX.G978 !== 0 ? d.n : i;
+            ctx.arc(mmX + _mmHash(_hn, sec, 1) * mmW, mmY + _mmHash(_hn, sec, 2) * mmH, dotR, 0, Math.PI * 2);
             ctx.fill();
             continue;
         }
@@ -10902,8 +10943,9 @@ function drawTurrettedBulletWithScratch(targetCtx: CanvasRenderingContext2D, log
     if (hasBodyLayers) {
         for (let _li = 0; _li < bLayers!.length; _li++) {
             const _lr = bLayers![_li].sizeRatio;
-            if (_lr > 1) {
-                const layerExtent = (sz / 2) * _lr * 1.2;
+            if (SMALL_FIX.G999 !== 0 ? _lr > 0 : _lr > 1) {
+                const _L999 = bLayers![_li];
+                const layerExtent = (sz / 2) * _lr * (SMALL_FIX.G999 !== 0 ? Math.max(1.2, 1.05 * getRealSizeFactor(_L999.sides), 1.05 * layerOutlineReach(_L999)) : 1.2);
                 if (layerExtent > maxExtent) maxExtent = layerExtent;
             }
         }
@@ -11398,7 +11440,8 @@ function _drawEditorShapePreview(ctx: CanvasRenderingContext2D, logic: GameLogic
     }
 
     const alpha = rm !== undefined ? rm.opacity : 1;
-    const polyType = d.polyhedronType !== undefined && d.polyhedronType !== null ? d.polyhedronType : '';
+    const _pt976 = d.polyhedronType !== undefined && d.polyhedronType !== null ? d.polyhedronType : '';
+    const polyType = SMALL_FIX.G976 !== 0 && _pt976 !== '' && solidOf(_pt976) === undefined ? '' : _pt976;
     const sides = polyType !== '' ? 0 : d.sides >= 3 ? (d.sides | 0) : 0;
     const halfSz = d.size / 2;
     const labyLevel = polyType !== '' ? 0 : d.labyLevel;
@@ -11475,7 +11518,8 @@ function drawTankWithScratch(targetCtx: CanvasRenderingContext2D, scale: number,
     const _scratchLayers = _rd.bodyLayers;
     if (_scratchLayers) {
         for (let i = 0; i < _scratchLayers.length; i++) {
-            const layerExtent = sizePx * _scratchLayers[i].sizeRatio;
+            const _L989 = _scratchLayers[i];
+            const layerExtent = sizePx * _L989.sizeRatio * (SMALL_FIX.G989 !== 0 ? Math.max(1, 0.525 * layerOutlineReach(_L989)) : 1);
             if (layerExtent > maxTurretLen) maxTurretLen = layerExtent;
         }
     }
@@ -11665,7 +11709,7 @@ function _drawSingleTurretOne(ctx: CanvasRenderingContext2D, sizePx: number, aim
         ctx.save();
         if (!t.autoCircleHidden) {
             ctx.beginPath();
-            ctx.rect(-posSz * 10, -posSz * 10, posSz * 20, posSz * 20);
+            { const _k942 = SMALL_FIX.G942 !== 0 ? 1000 : 10; ctx.rect(-posSz * _k942, -posSz * _k942, posSz * 2 * _k942, posSz * 2 * _k942); }
             const _cbSides = t.autoCircleBaseSides ?? 0;
             if (_cbSides >= 3) {
                 const _cbDepth = autoBaseDepth(_cbSides, t.autoCircleBaseDepth);
@@ -11890,7 +11934,10 @@ function _drawLayerShape(ctx: CanvasRenderingContext2D, layer: BodyLayer, layerS
         ctx.fill();
 
         if (layer.showHealerCross) {
+            const _crossTurn = SMALL_FIX.G823 !== 0 ? _layerInitAngle : 0;
+            if (_crossTurn !== 0) ctx.rotate(_crossTurn);
             _drawHealerCross(ctx, layerSizePx);
+            if (_crossTurn !== 0) ctx.rotate(-_crossTurn);
         }
 }
 
@@ -11939,8 +11986,11 @@ function _drawBodyLayers(ctx: CanvasRenderingContext2D, sizePx: number, turrets:
         if (_previewInjectLayerId && layer.id === _previewInjectLayerId && _previewInjectLogic) {
             ctx.save();
             ctx.rotate(-effectiveAngle);
+            _ghShifted = SMALL_FIX.G980 !== 0 && layerIsPlaced(layer);
+            try {
             drawPreviewTurret(ctx, _previewInjectLogic, 'below', true);
             drawPresetPreview(ctx, _previewInjectLogic, 'below', true);
+            } finally { _ghShifted = false; }
             ctx.restore();
         }
 
@@ -12431,7 +12481,7 @@ function drawPreviewTurret(ctx: CanvasRenderingContext2D, logic: GameLogic, pass
 
     const t = logic.state.editingTurret;
 
-    const isAbove = t.aboveTankBody ?? false;
+    const isAbove = (t.aboveTankBody ?? false) && !(SMALL_FIX.G997 !== 0 && t.turretType === 'auto' && logic.state.autoPlacement && logic.state.snapPlacement && logic.getActiveLayerSides() >= 3);
     if (pass === 'below' && isAbove) return;
     if (pass === 'above' && !isAbove) return;
 
@@ -12669,7 +12719,7 @@ function drawPreviewTurret(ctx: CanvasRenderingContext2D, logic: GameLogic, pass
                         && logic.state.snapPlacement
                         && !isAuto
                         && !_csOn
-                        && _w18Layer1.sides >= 3);
+                        && (SMALL_FIX.G982 !== 0 && _w18Layer1.solidId !== undefined && layerSolidOf(_w18Layer1) !== null ? 0 : _w18Layer1.sides) >= 3);
     let layerShift: number;
     if (_w18UseW18) {
       const refXOff = t.xOffset;
@@ -12703,7 +12753,8 @@ function drawPreviewTurret(ctx: CanvasRenderingContext2D, logic: GameLogic, pass
         if (isCombo) {
             const count = Math.min(logic.state.autoPlacementCount, snapPointsOf(activeSides, logic.state.snapTarget));
             const faceAngles = logic.getSnapAngles(count, activeSides, logic.getActiveFaceOffset(activeSides), logic.state.snapTarget);
-            const presetMag = Math.sqrt(t.xOffset * t.xOffset + prevEffY * prevEffY);
+            const _px996 = SMALL_FIX.G996 !== 0 ? prevEffX : t.xOffset;
+            const presetMag = Math.sqrt(_px996 * _px996 + prevEffY * prevEffY);
 
             for (let i = 0; i < faceAngles.length; i++) {
                 const faceAngle = faceAngles[i];
@@ -12877,7 +12928,7 @@ function drawPresetPreview(ctx: CanvasRenderingContext2D, logic: GameLogic, pass
                         && logic.state.activeBodyLayerId !== _w18Layer1.id
                         && activeSides >= 3
                         && logic.state.snapPlacement
-                        && _w18Layer1.sides >= 3
+                        && (SMALL_FIX.G982 !== 0 && _w18Layer1.solidId !== undefined && layerSolidOf(_w18Layer1) !== null ? 0 : _w18Layer1.sides) >= 3
                         && previewTurrets.length > 0);
     let _w15XShift: number;
     if (_w18UseW18) {
@@ -13169,7 +13220,19 @@ function drawPresetPreview(ctx: CanvasRenderingContext2D, logic: GameLogic, pass
     ctx.restore();
 }
 
+function _gh980Set(logic: GameLogic): boolean {
+    if (SMALL_FIX.G980 === 0 || _ghShifted || !logic.state.autoSubTurretParentId) return false;
+    const L = logic.getLayerForTurret(logic.state.autoSubTurretParentId);
+    if (!L || !layerIsPlaced(L)) return false;
+    layerPlaceInto(_lpOut, L, tankSizeFromSlider(logic.state.tankSize) / 2, 1, 0);
+    _ghLX = _lpOut[0]; _ghLY = _lpOut[1];
+    return true;
+}
 function drawAutoSubTurretPreview(ctx: CanvasRenderingContext2D, logic: GameLogic, tankLocal = false) {
+    const _s980 = _gh980Set(logic);
+    try { _drawAutoSubTurretPreview0(ctx, logic, tankLocal); } finally { if (_s980) { _ghLX = 0; _ghLY = 0; } }
+}
+function _drawAutoSubTurretPreview0(ctx: CanvasRenderingContext2D, logic: GameLogic, tankLocal = false) {
     const _ox = tankLocal ? 0 : logic.tankPos.x, _oy = tankLocal ? 0 : logic.tankPos.y;
     if (logic.state.isTestMode) return;
     const parentId = logic.state.autoSubTurretParentId;
@@ -13200,6 +13263,9 @@ function drawAutoSubTurretPreview(ctx: CanvasRenderingContext2D, logic: GameLogi
     let circleCX = parentOffX * cosA - parentOffY * sinA;
     let circleCY = parentOffX * sinA + parentOffY * cosA;
     if (logic.editorLayerPlace(logic.getLayerForTurret(parentId))) { circleCX += logic.edLayerPlace[0]; circleCY += logic.edLayerPlace[1]; }
+    const _sh980 = SMALL_FIX.G980 !== 0 && _ghShifted && logic.editorLayerPlace(logic.getLayerForTurret(parentId));
+    const _dx980 = _sh980 ? logic.edLayerPlace[0] : 0, _dy980 = _sh980 ? logic.edLayerPlace[1] : 0;
+
     const mx = (logic.mouseX - logic.width / 2) / logic.zoom + (logic.cameraX - logic.tankPos.x);
     const my = (logic.mouseY - logic.height / 2) / logic.zoom + (logic.cameraY - logic.tankPos.y);
     let desiredAngle = Math.atan2(my - circleCY, mx - circleCX);
@@ -13265,7 +13331,7 @@ function drawAutoSubTurretPreview(ctx: CanvasRenderingContext2D, logic: GameLogi
     if (subT.aboveBase !== true) {
         ctx.beginPath();
         ctx.rect(_ox - vpW, _oy - vpH, vpW * 2, vpH * 2);
-        ctx.arc(_ox + circleCX, _oy + circleCY, clipR, 0, Math.PI * 2, true);
+        ctx.arc(_ox + circleCX - _dx980, _oy + circleCY - _dy980, clipR, 0, Math.PI * 2, true);
         ctx.clip('evenodd');
     }
 
@@ -13279,7 +13345,7 @@ function drawAutoSubTurretPreview(ctx: CanvasRenderingContext2D, logic: GameLogi
             return;
         }
         ctx.save();
-        ctx.translate(_ox + circleCX, _oy + circleCY);
+        ctx.translate(_ox + circleCX - _dx980, _oy + circleCY - _dy980);
         ctx.rotate(circleAngle);
         ctx.translate(subT.xOffset * subSizePx / 2, yOff * subSizePx / 2);
         ctx.rotate(relAngle);
@@ -13304,6 +13370,10 @@ function drawAutoSubTurretPreview(ctx: CanvasRenderingContext2D, logic: GameLogi
 }
 
 function drawAutoSubTurretPresetPreview(ctx: CanvasRenderingContext2D, logic: GameLogic, tankLocal = false) {
+    const _s980 = _gh980Set(logic);
+    try { _drawAutoSubTurretPresetPreview0(ctx, logic, tankLocal); } finally { if (_s980) { _ghLX = 0; _ghLY = 0; } }
+}
+function _drawAutoSubTurretPresetPreview0(ctx: CanvasRenderingContext2D, logic: GameLogic, tankLocal = false) {
     const _ox = tankLocal ? 0 : logic.tankPos.x, _oy = tankLocal ? 0 : logic.tankPos.y;
     if (logic.state.isTestMode) return;
     const parentId = logic.state.autoSubTurretParentId;
@@ -13334,6 +13404,9 @@ function drawAutoSubTurretPresetPreview(ctx: CanvasRenderingContext2D, logic: Ga
     let circleCX = parentOffX * cosA - parentOffY * sinA;
     let circleCY = parentOffX * sinA + parentOffY * cosA;
     if (logic.editorLayerPlace(logic.getLayerForTurret(parentId))) { circleCX += logic.edLayerPlace[0]; circleCY += logic.edLayerPlace[1]; }
+    const _sh980 = SMALL_FIX.G980 !== 0 && _ghShifted && logic.editorLayerPlace(logic.getLayerForTurret(parentId));
+    const _dx980 = _sh980 ? logic.edLayerPlace[0] : 0, _dy980 = _sh980 ? logic.edLayerPlace[1] : 0;
+
     const mx = (logic.mouseX - logic.width / 2) / logic.zoom + (logic.cameraX - logic.tankPos.x);
     const my = (logic.mouseY - logic.height / 2) / logic.zoom + (logic.cameraY - logic.tankPos.y);
     let desiredAngle = Math.atan2(my - circleCY, mx - circleCX);
@@ -13360,7 +13433,7 @@ function drawAutoSubTurretPresetPreview(ctx: CanvasRenderingContext2D, logic: Ga
         if (t.turretType === 'auto' && t.autoSubTurrets && t.autoSubTurrets.length > 0) continue;
         turretCount++;
 
-        const isAuto = t.turretType === 'auto';
+        const isAuto = SMALL_FIX.G998 !== 0 ? false : t.turretType === 'auto';
         const effLength = isAuto ? (t.autoTurretLength ?? 10) : t.length;
         const effWidth = isAuto ? (t.autoTurretWidth ?? 25) : t.width;
         const tLen = _mapVal(effLength, 1, 100, subSizePx * 0.01, subSizePx / 2 + subSizePx * 10);
@@ -13397,7 +13470,7 @@ function drawAutoSubTurretPresetPreview(ctx: CanvasRenderingContext2D, logic: Ga
     for (let ti = 0; ti < previewTurrets.length; ti++) {
         const t = previewTurrets[ti];
         if (t.turretType === 'auto' && t.autoSubTurrets && t.autoSubTurrets.length > 0) continue;
-        const isAuto = t.turretType === 'auto';
+        const isAuto = SMALL_FIX.G998 !== 0 ? false : t.turretType === 'auto';
         const effLength = isAuto ? (t.autoTurretLength ?? 10) : t.length;
         const effWidth = isAuto ? (t.autoTurretWidth ?? 25) : t.width;
         const tLen = _mapVal(effLength, 1, 100, subSizePx * 0.01, subSizePx / 2 + subSizePx * 10);
@@ -13498,13 +13571,13 @@ function drawAutoSubTurretPresetPreview(ctx: CanvasRenderingContext2D, logic: Ga
     ctx.save();
     ctx.beginPath();
     ctx.rect(_ox - vpW, _oy - vpH, vpW * 2, vpH * 2);
-    ctx.arc(_ox + circleCX, _oy + circleCY, clipR, 0, Math.PI * 2, true);
+    ctx.arc(_ox + circleCX - _dx980, _oy + circleCY - _dy980, clipR, 0, Math.PI * 2, true);
     ctx.clip('evenodd');
 
     if (gpu) { _ghostEnd(ctx, 0.6); ctx.restore(); return; }
 
     ctx.save();
-    ctx.translate(_ox + circleCX, _oy + circleCY);
+    ctx.translate(_ox + circleCX - _dx980, _oy + circleCY - _dy980);
     ctx.rotate(circleAngle);
     ctx.globalAlpha = 0.6;
     ctx.drawImage(_presetCompCanvas!, 0, 0, compSizePx, compSizePx, -compHalf, -compHalf, compSize, compSize);

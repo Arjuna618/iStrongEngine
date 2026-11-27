@@ -847,6 +847,8 @@ export function campsClash(a: number, b: number): boolean {
 export interface Bullet {
   active: boolean;
   bulletId: number;
+  _hit: number; _hitId: number;
+  _fire: number; _fireId: number;
   _fsLag?: number;
   _fsDisp?: number;
   _fsDispX?: number;
@@ -3197,10 +3199,16 @@ export interface EnemyTank {
   _zSwarmLag: number;
   _btBits: number; _btN: Int8Array;
   _ogTag: number; _ogRadius: number; _oaTag: number; _ogId: string; _ogX: number; _ogY: number; _ogLookAt: number;
-  _ogFront: boolean; _ogFrontShare: number; _ogFrontIs: number; _ogPendId: string; _ogPendAt: number; _ogHoldUntil: number;
+  _ogFront: boolean; _ogTake: boolean; _oaTeam: boolean; _ogFrontShare: number; _ogFrontIs: number; _ogPendId: string; _ogPendAt: number; _ogHoldUntil: number;
   _ogBlockShare: number; _ogBlockIs: number; _ogBlockAngle: number; _ogBlockUntil: number; _ogBlockLookAt: number;
   _ogBlockX: number; _ogBlockY: number; _ogBlockSpotUntil: number;
+  _ogGo: number; _ogGoX: number; _ogGoY: number; _ogGoCX: number; _ogGoCY: number; _ogGoKey: string;
+  _ogKite: number; _ogKx: number; _ogKy: number;
+  _ogHelpId: string; _ogHelpAt: number; _ogQuietAt: number; _ogHelpKeepAt: number; _ogSideId: string; _ogSideX: number; _ogSideY: number;
+  _ogHoldGo: boolean; _btStood: boolean; _ogHoldSince: number; _ogKeepX: number; _ogKeepY: number; _ogKeepWk: number; _ofX: number; _ofY: number; _ofWX: number; _ofWY: number; _ofUntil: number; _ofLookAt: number; _ofNoSince: number; _ofUseAt: number; _ofUseA: number; _iaAt: number; _iaSeen: number; _iaGoUntil: number; _agAt: number; _agId: string; _bpAt: number; _bpSeen: number; _bpPath: number; _bpSX: number; _bpSY: number; _bpLX: number; _bpLY: number; _bpUntil: number; _bpX: number; _bpY: number; _bpN: number; _fwAt: number; _fwUntil: number; _fwAngle: number; _tmSt: number; _tmPendSt: number; _tmPendAt: number; _tmBk: number; _thId: string; _thUntil: number; _thLookAt: number; _thNo: number; _thSeen: number; _wkX: number; _wkY: number; _wkAt: number;
   _ogUnitShare: number; _ogUnitIs: number; _ogUnitT: string; _ogUnitLookAt: number;
+  _ufT: string; _ufUntil: number; _ufAt: number; _ufM: string;
+  _ufN: string;
   _ftTake: number; _ftSpoil: number; _ftId: string; _ftLookAt: number; _ctKite: boolean;
   _ftGo: boolean; _ftX: number; _ftY: number; _ftBestD: number; _ftGiveUpAt: number; _ftBan: string; _ftBanUntil: number;
   _esTag: number; _esMax: number; _esRadius: number; _esId: string; _esLookAt: number;
@@ -3211,7 +3219,10 @@ export interface EnemyTank {
   _wtTs: (WallEntity | null)[]; _wtTk: Int8Array; _wtTn: number;
   _carryHMs: MapState | null; _carryHTeam: string; _carryHx: number; _carryHy: number;
   _hsBelow: number; _hsBack: number; _hsHealers: boolean; _hsTag: number; _hsZone: number;
+  _hsStand: boolean;
+  _hsHome: boolean; _hsHomeAt: number;
   _tfHelp: boolean; _flBelow: number; _flBack: number;
+  _tfGate: boolean; _tfGateShare: number; _tfGateLookAt: number; _tfGateZ: number; _tfGateGX: number; _tfGateGY: number; _tfGateX: number; _tfGateY: number; _tfGateHas: boolean; _tfGateAngle: number; _tfGateFireUntil: number; _tfGateDist: number;
   _tfMap: boolean; _tfMapShare: number; _tfMapId: string; _tfMapAt: number; _tfMapLookAt: number; _tfMapN: number;
   _tfPendId: string; _tfPendAt: number;
   _tfMeetId: string; _tfMeetSid: string; _tfMeetX: number; _tfMeetY: number; _tfMeetGoAt: number;
@@ -3219,6 +3230,7 @@ export interface EnemyTank {
   _tfHelpId: string; _tfLookAt: number; _flLow: boolean;
   _tfGoalId: string; _tfGoalX: number; _tfGoalY: number; _tfGoalSeenAt: number; _tfGoalBestD: number; _tfGoalGiveUpAt: number; _tfGoalArriveAt: number; _tfBanId: string; _tfBanUntil: number;
   _btRoute: string; _btWx: number; _btWy: number; _btWAt: number; _btWn: number;
+  _btWRest: number;
   _hdMateId: string; _hdLookAt: number;
   _madeWord: string;
   _mevAimAt: number; _mevAimId: string;
@@ -4771,8 +4783,119 @@ const AI_CONSTANTS_DEF = {
   BT_BLOCKFIRE: 1,
   BT_SENDUNITS: 1,
   HF_RAMSHIFT: 1,
-  BT_BOSSFOE: 0,
-  HF_KEEPSEEN: 0,
+  BT_BOSSFOE: 1,
+  HF_KEEPSEEN: 1,
+  BT_LOCKALONE: 1,
+  KILLZONE_KEEPOUT: 1,
+  HF_GUNOUT: 1,
+  HF_FOODQUIT: 1,
+  HF_BRAVE: 1,
+  HF_HEAVY: 1,
+  HF_HEAVYSEEN: 1,
+  DODGE_WEAKHIT: 1,
+  HF_UNITBACK: 1,
+  HF_CAMPOPEN: 1,
+  BT_GATEFIRE: 1,
+  HF_RAMGUNS: 0.6,
+  HF_WAYMEM: 1,
+  HF_HITRANGE: 1,
+  HF_HEAVYOPEN: 1,
+  HF_STALKFAR: 1,
+  HF_HITCOVER: 1,
+  BT_BLOCKWAY: 1,
+  BT_BLOCKPLACE: 1,
+  BT_GUARDHOLD: 1,
+  HF_GROUP: 1,
+  BT_STAYHOME: 1,
+  BT_GATEMOST: 1,
+  HF_RUNFIRE: 1,
+  HF_UNITFEAR: 1,
+  BT_BLOCKNOW: 1,
+  BT_QUIETHELP: 1,
+  BT_BLOCKSTAND: 1,
+  BT_BLOCKREACH: 1,
+  HF_FIGHTSPOT: 1,
+  BT_GATEWHERE: 1,
+  BT_WALKCALM: 1,
+  NEXUS_JOIN: 1,
+  MINIMAP_DREADS: 1,
+  BT_MEETKEEP: 1,
+  BT_HOMELOW: 1,
+  BT_GATEALL: 1,
+  BT_MEETFIRE: 1,
+  BT_HEALWAIT: 1,
+  HF_DODGEHARD: 1,
+  HF_HEAVYSURE: 1,
+  HF_HEAVYBUSY: 1,
+  HF_UNITSURE: 1,
+  BT_GROUPGO: 1,
+  HF_TRAPROOM: 1,
+  BT_GROUPFOE: 1,
+  BT_GROUPKEEP: 1,
+  BT_GROUPSIDE: 1,
+  BT_TEAMPLAN: 1,
+  BT_TEAMTAKE: 1,
+  BT_TEAMATTACK: 1,
+  BT_GROUPCALM: 1,
+  BT_STANDKEEP: 1,
+  HF_AHEADHOLD: 1,
+  BT_WAYKEEP: 1,
+  HF_SHOTLEAVE: 1,
+  BT_PUSHON: 1,
+  HF_LEAVEAREA: 1,
+  HF_FLEEWIDE: 1,
+  HF_CALMSEES: 1,
+  BT_FRONTLOOK: 1,
+  BT_TEAMHEADED: 1,
+  BT_FIRESPOT: 1,
+  HF_GATHERFIRST: 1,
+  HF_STALKWAY: 1,
+  HF_TRAPPRICE: 1,
+  HF_TRAPDEATH: 1,
+  BT_ATTACKNEAR: 1,
+  BT_INTOAREA: 1,
+  BT_ALLGUNS: 1,
+  HF_RANGELUCK: 1,
+  BT_ATTACKKEEP: 1,
+  TM_LEADER: 1,
+  TM_MIDDLE: 1,
+  HF_SEEKAREA: 1,
+  HF_AREAROUTE: 1,
+  HF_AREAREST: 1,
+  HF_AREACHASE: 1,
+  TM_BACK: 1,
+  TM_HELP: 1,
+  HF_PACKGROUP: 1,
+  HF_PACKLEAVE: 1,
+  BT_UNITHIDE: 1,
+  BT_PACEHOLD: 0,
+  HF_RAMLEAD: 1,
+  BT_BODYSTAND: 1,
+  ROAM_REFUSEMEM: 1,
+  HF_AREAKEEPOUT: 1,
+  UNREACH_AGREE: 1,
+  TM_HELPFOE: 1,
+  BT_LINESTAND: 1,
+  HF_AREAASK: 1,
+  HF_KEEPFOOD: 1,
+  BT_FIREWITH: 1,
+  HF_CAMPDANGER: 1,
+  TM_WITHLEAD: 1,
+  TM_FREE: 1,
+  HF_PEACEKEEP: 1,
+  HF_MINDSELF: 1,
+  HF_WAGMORE: 1,
+  HF_WAGDODGE: 1,
+  HF_UNITOWN: 1,
+  HF_HEAVYWATCH: 1,
+  TM_ALLIN: 1,
+  TM_NOLEAVE: 1,
+  HF_GROUPFRONT: 1,
+  HF_SLOWROUND: 1,
+  HF_CORNERED: 1,
+  BT_UNITFRONT: 1,
+  BT_BOSSKILL: 1,
+  BT_HOLDGROUND: 1,
 };
 const AI_CONST_OFF: boolean = (typeof location !== 'undefined' && /[?&]oldaiconst(?:[=&]|$)/.test(location.search))
   || (typeof process !== 'undefined' && !!process.env && process.env.ISTRONG_OLD_AICONST === '1');
@@ -5268,6 +5391,117 @@ function AiConstantsShell(this: typeof AI_CONSTANTS_DEF, s: typeof AI_CONSTANTS_
   this.HF_RAMSHIFT = s.HF_RAMSHIFT;
   this.BT_BOSSFOE = s.BT_BOSSFOE;
   this.HF_KEEPSEEN = s.HF_KEEPSEEN;
+  this.BT_LOCKALONE = s.BT_LOCKALONE;
+  this.KILLZONE_KEEPOUT = s.KILLZONE_KEEPOUT;
+  this.HF_GUNOUT = s.HF_GUNOUT;
+  this.HF_FOODQUIT = s.HF_FOODQUIT;
+  this.HF_BRAVE = s.HF_BRAVE;
+  this.HF_HEAVY = s.HF_HEAVY;
+  this.HF_HEAVYSEEN = s.HF_HEAVYSEEN;
+  this.DODGE_WEAKHIT = s.DODGE_WEAKHIT;
+  this.HF_UNITBACK = s.HF_UNITBACK;
+  this.HF_CAMPOPEN = s.HF_CAMPOPEN;
+  this.BT_GATEFIRE = s.BT_GATEFIRE;
+  this.HF_RAMGUNS = s.HF_RAMGUNS;
+  this.HF_WAYMEM = s.HF_WAYMEM;
+  this.HF_HITRANGE = s.HF_HITRANGE;
+  this.HF_HEAVYOPEN = s.HF_HEAVYOPEN;
+  this.HF_STALKFAR = s.HF_STALKFAR;
+  this.HF_HITCOVER = s.HF_HITCOVER;
+  this.BT_BLOCKWAY = s.BT_BLOCKWAY;
+  this.BT_BLOCKPLACE = s.BT_BLOCKPLACE;
+  this.BT_GUARDHOLD = s.BT_GUARDHOLD;
+  this.HF_GROUP = s.HF_GROUP;
+  this.BT_STAYHOME = s.BT_STAYHOME;
+  this.BT_GATEMOST = s.BT_GATEMOST;
+  this.HF_RUNFIRE = s.HF_RUNFIRE;
+  this.HF_UNITFEAR = s.HF_UNITFEAR;
+  this.BT_BLOCKNOW = s.BT_BLOCKNOW;
+  this.BT_QUIETHELP = s.BT_QUIETHELP;
+  this.BT_BLOCKSTAND = s.BT_BLOCKSTAND;
+  this.BT_BLOCKREACH = s.BT_BLOCKREACH;
+  this.HF_FIGHTSPOT = s.HF_FIGHTSPOT;
+  this.BT_GATEWHERE = s.BT_GATEWHERE;
+  this.BT_WALKCALM = s.BT_WALKCALM;
+  this.NEXUS_JOIN = s.NEXUS_JOIN;
+  this.MINIMAP_DREADS = s.MINIMAP_DREADS;
+  this.BT_MEETKEEP = s.BT_MEETKEEP;
+  this.BT_HOMELOW = s.BT_HOMELOW;
+  this.BT_GATEALL = s.BT_GATEALL;
+  this.BT_MEETFIRE = s.BT_MEETFIRE;
+  this.BT_HEALWAIT = s.BT_HEALWAIT;
+  this.HF_DODGEHARD = s.HF_DODGEHARD;
+  this.HF_HEAVYSURE = s.HF_HEAVYSURE;
+  this.HF_HEAVYBUSY = s.HF_HEAVYBUSY;
+  this.HF_UNITSURE = s.HF_UNITSURE;
+  this.BT_GROUPGO = s.BT_GROUPGO;
+  this.HF_TRAPROOM = s.HF_TRAPROOM;
+  this.BT_GROUPFOE = s.BT_GROUPFOE;
+  this.BT_GROUPKEEP = s.BT_GROUPKEEP;
+  this.BT_GROUPSIDE = s.BT_GROUPSIDE;
+  this.BT_TEAMPLAN = s.BT_TEAMPLAN;
+  this.BT_TEAMTAKE = s.BT_TEAMTAKE;
+  this.BT_TEAMATTACK = s.BT_TEAMATTACK;
+  this.BT_GROUPCALM = s.BT_GROUPCALM;
+  this.BT_STANDKEEP = s.BT_STANDKEEP;
+  this.HF_AHEADHOLD = s.HF_AHEADHOLD;
+  this.BT_WAYKEEP = s.BT_WAYKEEP;
+  this.HF_SHOTLEAVE = s.HF_SHOTLEAVE;
+  this.BT_PUSHON = s.BT_PUSHON;
+  this.HF_LEAVEAREA = s.HF_LEAVEAREA;
+  this.HF_FLEEWIDE = s.HF_FLEEWIDE;
+  this.HF_CALMSEES = s.HF_CALMSEES;
+  this.BT_FRONTLOOK = s.BT_FRONTLOOK;
+  this.BT_TEAMHEADED = s.BT_TEAMHEADED;
+  this.BT_FIRESPOT = s.BT_FIRESPOT;
+  this.HF_GATHERFIRST = s.HF_GATHERFIRST;
+  this.HF_STALKWAY = s.HF_STALKWAY;
+  this.HF_TRAPPRICE = s.HF_TRAPPRICE;
+  this.HF_TRAPDEATH = s.HF_TRAPDEATH;
+  this.BT_ATTACKNEAR = s.BT_ATTACKNEAR;
+  this.BT_INTOAREA = s.BT_INTOAREA;
+  this.BT_ALLGUNS = s.BT_ALLGUNS;
+  this.HF_RANGELUCK = s.HF_RANGELUCK;
+  this.BT_ATTACKKEEP = s.BT_ATTACKKEEP;
+  this.TM_LEADER = s.TM_LEADER;
+  this.TM_MIDDLE = s.TM_MIDDLE;
+  this.HF_SEEKAREA = s.HF_SEEKAREA;
+  this.HF_AREAROUTE = s.HF_AREAROUTE;
+  this.HF_AREAREST = s.HF_AREAREST;
+  this.HF_AREACHASE = s.HF_AREACHASE;
+  this.TM_BACK = s.TM_BACK;
+  this.TM_HELP = s.TM_HELP;
+  this.HF_PACKGROUP = s.HF_PACKGROUP;
+  this.HF_PACKLEAVE = s.HF_PACKLEAVE;
+  this.BT_UNITHIDE = s.BT_UNITHIDE;
+  this.BT_PACEHOLD = s.BT_PACEHOLD;
+  this.HF_RAMLEAD = s.HF_RAMLEAD;
+  this.BT_BODYSTAND = s.BT_BODYSTAND;
+  this.ROAM_REFUSEMEM = s.ROAM_REFUSEMEM;
+  this.HF_AREAKEEPOUT = s.HF_AREAKEEPOUT;
+  this.UNREACH_AGREE = s.UNREACH_AGREE;
+  this.TM_HELPFOE = s.TM_HELPFOE;
+  this.BT_LINESTAND = s.BT_LINESTAND;
+  this.HF_AREAASK = s.HF_AREAASK;
+  this.HF_KEEPFOOD = s.HF_KEEPFOOD;
+  this.BT_FIREWITH = s.BT_FIREWITH;
+  this.HF_CAMPDANGER = s.HF_CAMPDANGER;
+  this.TM_WITHLEAD = s.TM_WITHLEAD;
+  this.TM_FREE = s.TM_FREE;
+  this.HF_PEACEKEEP = s.HF_PEACEKEEP;
+  this.HF_MINDSELF = s.HF_MINDSELF;
+  this.HF_WAGMORE = s.HF_WAGMORE;
+  this.HF_WAGDODGE = s.HF_WAGDODGE;
+  this.HF_UNITOWN = s.HF_UNITOWN;
+  this.HF_HEAVYWATCH = s.HF_HEAVYWATCH;
+  this.TM_ALLIN = s.TM_ALLIN;
+  this.TM_NOLEAVE = s.TM_NOLEAVE;
+  this.HF_GROUPFRONT = s.HF_GROUPFRONT;
+  this.HF_SLOWROUND = s.HF_SLOWROUND;
+  this.HF_CORNERED = s.HF_CORNERED;
+  this.BT_UNITFRONT = s.BT_UNITFRONT;
+  this.BT_BOSSKILL = s.BT_BOSSKILL;
+  this.BT_HOLDGROUND = s.BT_HOLDGROUND;
 }
 export const AI_CONSTANTS: typeof AI_CONSTANTS_DEF = AI_CONST_OFF ? AI_CONSTANTS_DEF
   : new (AiConstantsShell as unknown as { new (s: typeof AI_CONSTANTS_DEF): typeof AI_CONSTANTS_DEF })(AI_CONSTANTS_DEF);

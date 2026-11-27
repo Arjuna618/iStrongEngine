@@ -3,7 +3,8 @@ import type { MapConfig } from '../types';
 import { magicMazeOf, MM_BOUNDS, type MagicMazeConfig } from '../game/magicMaze';
 import { WALL_RULES } from '../game/wallTypes';
 import { SliderRow, ToggleItem, CollapsibleSection } from './shared/mapDesignerControls';
-import { Reveal } from './kit/Collapse';
+import { Reveal, MotionList } from './kit/Collapse';
+import { SMALL_FIX } from '../game/smallFixSwitch';
 import { Button } from './kit/kit';
 
 const SHOWN_ORDER = [0, 12, 11, 3, 7, 8, 9, 10, 1, 5, 4, 6, 2, 13, 14, 15, 16, 17, 18];
@@ -56,7 +57,15 @@ export const MagicMazeSettings: React.FC<{ config: MapConfig; updateConfig: (p: 
                 onChange={v => put({ slide: v })} tooltip="How long one slide of two cells takes. The default: 1.99 seconds." />
               <SliderRow label="Rest After A Move" value={m.rest} min={MM_BOUNDS.rest[0]} max={MM_BOUNDS.rest[1]} step={0.5} suffix=" s"
                 onChange={v => put({ rest: v })} tooltip="How long a wall stays where it arrived before it may move again." />
-              {SHOWN_ORDER.filter(t => m.types[t] > 0).map(t => (
+              {SMALL_FIX.R877 !== 0 ? (
+                <MotionList gap={12}>
+                  {SHOWN_ORDER.filter(t => m.types[t] > 0).map(t => (
+                    <React.Fragment key={t}><ToggleItem label={`${WALL_RULES[t].name} Moves`} checked={!stillOn(t)}
+                      onChange={v => put({ still: v ? m.still.filter(x => x !== t) : [...m.still, t] })}
+                      desc="Off: walls of this type stay where the map built them." /></React.Fragment>
+                  ))}
+                </MotionList>
+              ) : SHOWN_ORDER.filter(t => m.types[t] > 0).map(t => (
                 <React.Fragment key={t}><ToggleItem label={`${WALL_RULES[t].name} Moves`} checked={!stillOn(t)}
                   onChange={v => put({ still: v ? m.still.filter(x => x !== t) : [...m.still, t] })}
                   desc="Off: walls of this type stay where the map built them." /></React.Fragment>

@@ -146,7 +146,7 @@ const TANK_CONFIG_RANGES: Record<string, Range> = {
   tankShieldCapacity: { min: SMALL_FIX.GH298 !== 0 ? 0 : -Infinity, max: SMALL_FIX.GH304 !== 0 ? 2.171e307 : 5.980551299650688e307, fallback: 65 },
   maxPointsPerSkill:  { min: -Infinity, max: 1000, fallback: 10 },
   cameraZoomDistance: { min: -288230376151711740, max: 288230376151711740, fallback: 225 },
-  tankShapeDepth:     { ...FREE, fallback: 0   },
+  tankShapeDepth:     SMALL_FIX.G822 !== 0 ? { min: 0, max: 1, fallback: 0 } : { ...FREE, fallback: 0   },
   tankMovementSpeed:  SMALL_FIX.GH285 !== 0 ? { min: -1000, max: 1000, fallback: 3 } : { ...FREE, fallback: 3   },
   tankShieldRegen:    { ...FREE, fallback: 3   },
   maxSkillPoints:     { ...FREE, fallback: 42  },
@@ -160,12 +160,13 @@ const TANK_CONFIG_RANGES: Record<string, Range> = {
   globalMaxAlive:     { ...FREE, fallback: 0   },
 };
 
+export const BODY_LAYER_SIZE_MAX = 100;
 const BODY_LAYER_RANGES: Record<string, Range> = {
   opacity:     { min: 0,   max: 1, fallback: 1 },
   hitSize:     { min: 1,   max: 400, fallback: 100 },
   sides:       { min: 0,   max: MAX_POLY_SIDES, fallback: 5 },
   copies:      { min: 1,   max: 64,  fallback: 1   },
-  sizeRatio:   { min: -Infinity, max: 100, fallback: 1.4 },
+  sizeRatio:   { min: -Infinity, max: BODY_LAYER_SIZE_MAX, fallback: 1.4 },
   renderOrder: { min: -128, max: 127, fallback: 0  },
   starDepth:   { min: 0,   max: 1,   fallback: 0   },
   spinSpeed:   { min: -2000, max: 2000, fallback: 50 },

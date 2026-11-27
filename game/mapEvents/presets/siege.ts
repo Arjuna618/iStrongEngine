@@ -2,6 +2,7 @@ import type { AreaGroup, BodyTest, EntityType, Id, MapEventsDoc, Named, PlacedEn
 import { FINAL_TANKS, CELESTIAL_TANKS, TERRESTRIAL_TANKS, ELITE_CRASHER_TANKS, SHINY_TANKS, SIEGE_SCORES, siegeWavePlan } from './siegeWaves';
 import type { SiegeWaveRefs } from './siegeWaves';
 import { SMALL_FIX } from '../../smallFixSwitch';
+import { AI_CONSTANTS } from '../../../types';
 import { bossShares } from '../../statShares';
 
 export type SiegeMapId = 'citadel' | 'fortress' | 'blitz';
@@ -90,7 +91,7 @@ export function buildSiegeWorld(which: SiegeMapId): SiegeWorld {
   const tactics: StatusDef = { ...named('Siege Tactics'), seconds: null, effects: [
     row('seekHeal', { below: T.healBelow, back: T.healBack, healers: true, tag: ref(standing) }),
     row('healerDuty', {}),
-    row('teamFight', { help: true, bosses: true, bossShare: 85 }),
+    row('teamFight', { help: true, bosses: true, bossShare: AI_CONSTANTS.BT_GATEALL !== 0 ? 93 : 85, gates: true, gateShare: AI_CONSTANTS.BT_GATEMOST !== 0 ? (AI_CONSTANTS.BT_GATEALL !== 0 ? 93 : 70) : 30 }),
     row('fearLow', { below: T.fearBelow, back: T.fearBack }),
   ] };
 

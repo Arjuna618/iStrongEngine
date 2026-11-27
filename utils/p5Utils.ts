@@ -4,6 +4,7 @@ import { flashWhite } from "./motionArras";
 import { cmBorderHex, cmBorderRgb } from "./colorMap";
 import { borderBlendFor, gameThemeVersion } from "./gameTheme";
 import { OFFENSE_ARRAS } from "../game/offenseSwitch";
+import { SMALL_FIX } from "../game/smallFixSwitch";
 
 const _BORDER_LIGHT = cmBorderRgb(false);
 const _BORDER_DARK = cmBorderRgb(true);
@@ -52,6 +53,22 @@ export function darkenColor(col: string, factor: number): string {
   }
   _darkenCache[key] = col;
   return col;
+}
+
+const _ilCache: Record<string, number> = {};
+export function intangibleDarkRGB(layerColor: string, out: Float64Array, off: number): void {
+  if (SMALL_FIX.G946 === 0) { out[off] = 0; out[off + 1] = 0; out[off + 2] = 0; return; }
+  const d = darkenColor(layerColor, 0.598);
+  let n = _ilCache[d];
+  if (n === undefined) {
+    const m = /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/.exec(d);
+    if (m) n = ((+m[1] & 0xFF) << 16) | ((+m[2] & 0xFF) << 8) | (+m[3] & 0xFF);
+    else { let c = d.charCodeAt(0) === 35 ? d.slice(1) : d; if (c.length === 3) c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2]; n = parseInt(c, 16) || 0; }
+    _ilCache[d] = n;
+  }
+  out[off] = ((n >> 16) & 0xFF) / 255;
+  out[off + 1] = ((n >> 8) & 0xFF) / 255;
+  out[off + 2] = (n & 0xFF) / 255;
 }
 
 export function mixColorToWhite(hex: string, blend: number): string {

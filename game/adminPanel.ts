@@ -218,6 +218,7 @@ export class AdminPanel {
   get zoom(): number { return this.host.state.debugFovMultiplier ?? 1; }
   set zoom(z: number) { this.host.state.debugFovMultiplier = z; }
   conductor = false;
+  godOn = false;
 
   private host: AdminHost;
   private saidHelpTip = false;
@@ -398,6 +399,7 @@ export class AdminPanel {
     for (let i = 0; i < this.jN; i++) { this.jTRef[i] = null; this.jTKey[i] = null; this.jARef[i] = null; this.jAKey[i] = null; }
     this.jN = 0; this.jointType = 0;
     this.attrs = AT_DEFAULT;
+    this.godOn = false;
     this.sizeSteps = 0; this.size = 1; this.zoom = 1;
     this.lastDesign = 0; this.lastWallType = 0;
     this.saidHelpTip = false;
@@ -525,8 +527,9 @@ export class AdminPanel {
     let points = s.skillPoints;
     switch (code) {
       case 'KeyM': for (const k of keys) ups[k] = capOf(k); break;
-      case 'KeyC': for (const k of keys) ups[k] = 0; break;
+      case 'KeyC': { let _sp = 0; for (const k of keys) { _sp += ups[k]; ups[k] = 0; } if (SMALL_FIX.R1029 !== 0) points = Math.min(999999999, points + _sp); break; }
       case 'KeyR': {
+        { let _sp = 0; for (const k of keys) _sp += ups[k]; if (SMALL_FIX.R1029 !== 0) points = Math.min(999999999, points + _sp); }
         for (const k of keys) ups[k] = 0;
         if (caps && this.capsOwn && this.capsOwnTank === s.currentTankFileName) for (const k of keys) caps[k] = this.capsOwn[k];
         break;
@@ -592,6 +595,7 @@ export class AdminPanel {
     const on = s.gracePeriodActive ? !s._preGraceGodMode : !s.godMode;
     if (s.gracePeriodActive) this.host.updateState({ _preGraceGodMode: on });
     else this.host.updateState({ godMode: on });
+    this.godOn = on;
     this.host.pushMessage(on ? MSG_GOD_ON : MSG_GOD_OFF);
   }
 

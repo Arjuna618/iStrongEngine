@@ -780,6 +780,261 @@ type SmallFixKeys = {
   G783: number;
   G501: number;
   G739: number;
+  G845: number;
+  G843: number;
+  R1006: number;
+  G781: number;
+  G771: number;
+  G782: number;
+  G775: number;
+  G777: number;
+  G865: number;
+  G866: number;
+  R1007: number;
+  G838: number;
+  G873: number;
+  G852: number;
+  G815: number;
+  G837: number;
+  G839: number;
+  G824: number;
+  G825: number;
+  G826: number;
+  G846: number;
+  G851: number;
+  G847: number;
+  G848: number;
+  G849: number;
+  G850: number;
+  G855: number;
+  G863: number;
+  G864: number;
+  G868: number;
+  G869: number;
+  G887: number;
+  G891: number;
+  G892: number;
+  G910: number;
+  G876: number;
+  G877: number;
+  G885: number;
+  G886: number;
+  G827: number;
+  G828: number;
+  G859: number;
+  G860: number;
+  G858: number;
+  G861: number;
+  G874: number;
+  G909: number;
+  G908: number;
+  G939: number;
+  G938: number;
+  G897: number;
+  G795: number;
+  G796: number;
+  G797: number;
+  G814: number;
+  G817: number;
+  G871: number;
+  G816: number;
+  G896: number;
+  G903: number;
+  G879: number;
+  G881: number;
+  G818: number;
+  G882: number;
+  G907: number;
+  G884: number;
+  G935: number;
+  G936: number;
+  G875: number;
+  G840: number;
+  G841: number;
+  G842: number;
+  R1008: number;
+  G880: number;
+  G854: number;
+  G883: number;
+  G878: number;
+  G901: number;
+  G898: number;
+  G856: number;
+  G915: number;
+  G906: number;
+  G923: number;
+  CH048: number;
+  CH050: number;
+  G929: number;
+  G804: number;
+  G805: number;
+  G904: number;
+  G924: number;
+  G917: number;
+  G844: number;
+  G926: number;
+  G822: number;
+  G913: number;
+  G933: number;
+  G931: number;
+  G853: number;
+  G914: number;
+  G899: number;
+  G900: number;
+  G798: number;
+  G807: number;
+  G928: number;
+  G925: number;
+  G937: number;
+  G799: number;
+  G919: number;
+  G658: number;
+  G756: number;
+  G894: number;
+  G932: number;
+  G836: number;
+  G922: number;
+  G911: number;
+  G829: number;
+  G830: number;
+  G770: number;
+  G813: number;
+  G831: number;
+  G832: number;
+  G779: number;
+  G780: number;
+  G774: number;
+  G806: number;
+  G808: number;
+  G772: number;
+  G778: number;
+  G918: number;
+  G768: number;
+  G821: number;
+  G773: number;
+  G767: number;
+  G684: number;
+  G893: number;
+  G862: number;
+  G820: number;
+  G872: number;
+  CH049: number;
+  G812: number;
+  R985: number;
+  R977: number;
+  G857: number;
+  G764: number;
+  G823: number;
+  G889: number;
+  G912: number;
+  R877: number;
+  R878: number;
+  G870: number;
+  R1010: number;
+  G769: number;
+  G776: number;
+  G810: number;
+  G811: number;
+  R977T: number;
+  R1024: number;
+  R1012: number;
+  R1014: number;
+  R1015: number;
+  R1016: number;
+  R1017: number;
+  R1018: number;
+  R1019: number;
+  R1022: number;
+  R1023: number;
+  R1026: number;
+  R1026A: number;
+  R1027: number;
+  R1028: number;
+  G960: number;
+  G962: number;
+  G947: number;
+  G954: number;
+  G955: number;
+  G965: number;
+  G966: number;
+  G995: number;
+  G967: number;
+  G993: number;
+  G994: number;
+  G941: number;
+  G952: number;
+  G963: number;
+  G964: number;
+  G968: number;
+  G969: number;
+  G961: number;
+  G973: number;
+  G974: number;
+  G951: number;
+  G956: number;
+  G957: number;
+  G958: number;
+  G959: number;
+  G970: number;
+  G949: number;
+  G992: number;
+  G953: number;
+  G975: number;
+  G988: number;
+  G800: number;
+  G819: number;
+  G802: number;
+  G803: number;
+  CH051: number;
+  CH053: number;
+  G895: number;
+  G920: number;
+  CH054: number;
+  G833: number;
+  G834: number;
+  G930: number;
+  G942: number;
+  G989: number;
+  G999: number;
+  G991: number;
+  G987: number;
+  G985: number;
+  G977: number;
+  G978: number;
+  G976: number;
+  G945: number;
+  G944: number;
+  G983: number;
+  G643: number;
+  G759: number;
+  G809: number;
+  G921: number;
+  G927: number;
+  G737: number;
+  G801: number;
+  G905: number;
+  G934: number;
+  CH052: number;
+  G980: number;
+  G998: number;
+  G997: number;
+  G982: number;
+  G996: number;
+  G981: number;
+  G984: number;
+  G986: number;
+  G940: number;
+  R1029: number;
+  R1030: number;
+  R1031: number;
+  R1025: number;
+  HG1127: number;
+  MS1127: number;
+  HW1127: number;
+  R1026K: number;
+  G946: number;
+  G971: number;
+  GF1127: number;
 };
 
 const SMALL_FIX_DEF: SmallFixKeys = {
@@ -1560,6 +1815,261 @@ const SMALL_FIX_DEF: SmallFixKeys = {
   G783: _on('G783'),
   G501: _on('G501'),
   G739: _on('G739'),
+  G845: _on('G845'),
+  G843: _on('G843'),
+  R1006: _on('R1006'),
+  G781: _on('G781'),
+  G771: _on('G771'),
+  G782: _on('G782'),
+  G775: _on('G775'),
+  G777: _on('G777'),
+  G865: _on('G865'),
+  G866: _on('G866'),
+  R1007: _on('R1007'),
+  G838: _on('G838'),
+  G873: _on('G873'),
+  G852: _on('G852'),
+  G815: _on('G815'),
+  G837: _on('G837'),
+  G839: _on('G839'),
+  G824: _on('G824'),
+  G825: _on('G825'),
+  G826: _on('G826'),
+  G846: _on('G846'),
+  G851: _on('G851'),
+  G847: _on('G847'),
+  G848: _on('G848'),
+  G849: _on('G849'),
+  G850: _on('G850'),
+  G855: _on('G855'),
+  G863: _on('G863'),
+  G864: _on('G864'),
+  G868: _on('G868'),
+  G869: _on('G869'),
+  G887: _on('G887'),
+  G891: _on('G891'),
+  G892: _on('G892'),
+  G910: _on('G910'),
+  G876: _on('G876'),
+  G877: _on('G877'),
+  G885: _on('G885'),
+  G886: _on('G886'),
+  G827: _on('G827'),
+  G828: _on('G828'),
+  G859: _on('G859'),
+  G860: _on('G860'),
+  G858: _on('G858'),
+  G861: _on('G861'),
+  G874: _on('G874'),
+  G909: _on('G909'),
+  G908: _on('G908'),
+  G939: _on('G939'),
+  G938: _on('G938'),
+  G897: _on('G897'),
+  G795: _on('G795'),
+  G796: _on('G796'),
+  G797: _on('G797'),
+  G814: _on('G814'),
+  G817: _on('G817'),
+  G871: _on('G871'),
+  G816: _on('G816'),
+  G896: _on('G896'),
+  G903: _on('G903'),
+  G879: _on('G879'),
+  G881: _on('G881'),
+  G818: _on('G818'),
+  G882: _on('G882'),
+  G907: _on('G907'),
+  G884: _on('G884'),
+  G935: _on('G935'),
+  G936: _on('G936'),
+  G875: _on('G875'),
+  G840: _on('G840'),
+  G841: _on('G841'),
+  G842: _on('G842'),
+  R1008: _on('R1008'),
+  G880: _on('G880'),
+  G854: _on('G854'),
+  G883: _on('G883'),
+  G878: _on('G878'),
+  G901: _on('G901'),
+  G898: _on('G898'),
+  G856: _on('G856'),
+  G915: _on('G915'),
+  G906: _on('G906'),
+  G923: _on('G923'),
+  CH048: _on('CH048'),
+  CH050: _on('CH050'),
+  G929: _on('G929'),
+  G804: _on('G804'),
+  G805: _on('G805'),
+  G904: _on('G904'),
+  G924: _on('G924'),
+  G917: _on('G917'),
+  G844: _on('G844'),
+  G926: _on('G926'),
+  G822: _on('G822'),
+  G913: _on('G913'),
+  G933: _on('G933'),
+  G931: _on('G931'),
+  G853: _on('G853'),
+  G914: _on('G914'),
+  G899: _on('G899'),
+  G900: _on('G900'),
+  G798: _on('G798'),
+  G807: _on('G807'),
+  G928: _on('G928'),
+  G925: _on('G925'),
+  G937: _on('G937'),
+  G799: _on('G799'),
+  G919: _on('G919'),
+  G658: _on('G658'),
+  G756: _on('G756'),
+  G894: _on('G894'),
+  G932: _on('G932'),
+  G836: _on('G836'),
+  G922: _on('G922'),
+  G911: _on('G911'),
+  G829: _on('G829'),
+  G830: _on('G830'),
+  G770: _on('G770'),
+  G813: _on('G813'),
+  G831: _on('G831'),
+  G832: _on('G832'),
+  G779: _on('G779'),
+  G780: _on('G780'),
+  G774: _on('G774'),
+  G806: _on('G806'),
+  G808: _on('G808'),
+  G772: _on('G772'),
+  G778: _on('G778'),
+  G918: _on('G918'),
+  G768: _on('G768'),
+  G821: _on('G821'),
+  G773: _on('G773'),
+  G767: _on('G767'),
+  G684: _on('G684'),
+  G893: _on('G893'),
+  G862: _on('G862'),
+  G820: _on('G820'),
+  G872: _on('G872'),
+  CH049: _on('CH049'),
+  G812: _on('G812'),
+  R985: _on('R985'),
+  R977: _on('R977'),
+  G857: _on('G857'),
+  G764: _on('G764'),
+  G823: _on('G823'),
+  G889: _on('G889'),
+  G912: _on('G912'),
+  R877: _on('R877'),
+  R878: _on('R878'),
+  G870: _on('G870'),
+  R1010: _on('R1010'),
+  G769: _on('G769'),
+  G776: _on('G776'),
+  G810: _on('G810'),
+  G811: _on('G811'),
+  R977T: _on('R977T'),
+  R1024: _on('R1024'),
+  R1012: _on('R1012'),
+  R1014: _on('R1014'),
+  R1015: _on('R1015'),
+  R1016: _on('R1016'),
+  R1017: _on('R1017'),
+  R1018: _on('R1018'),
+  R1019: _on('R1019'),
+  R1022: _on('R1022'),
+  R1023: _on('R1023'),
+  R1026: _on('R1026'),
+  R1026A: _on('R1026A'),
+  R1027: _on('R1027'),
+  R1028: _on('R1028'),
+  G960: _on('G960'),
+  G962: _on('G962'),
+  G947: _on('G947'),
+  G954: _on('G954'),
+  G955: _on('G955'),
+  G965: _on('G965'),
+  G966: _on('G966'),
+  G995: _on('G995'),
+  G967: _on('G967'),
+  G993: _on('G993'),
+  G994: _on('G994'),
+  G941: _on('G941'),
+  G952: _on('G952'),
+  G963: _on('G963'),
+  G964: _on('G964'),
+  G968: _on('G968'),
+  G969: _on('G969'),
+  G961: _on('G961'),
+  G973: _on('G973'),
+  G974: _on('G974'),
+  G951: _on('G951'),
+  G956: _on('G956'),
+  G957: _on('G957'),
+  G958: _on('G958'),
+  G959: _on('G959'),
+  G970: _on('G970'),
+  G949: _on('G949'),
+  G992: _on('G992'),
+  G953: _on('G953'),
+  G975: _on('G975'),
+  G988: _on('G988'),
+  G800: _on('G800'),
+  G819: _on('G819'),
+  G802: _on('G802'),
+  G803: _on('G803'),
+  CH051: _on('CH051'),
+  CH053: _on('CH053'),
+  G895: _on('G895'),
+  G920: _on('G920'),
+  CH054: _on('CH054'),
+  G833: _on('G833'),
+  G834: _on('G834'),
+  G930: _on('G930'),
+  G942: _on('G942'),
+  G989: _on('G989'),
+  G999: _on('G999'),
+  G991: _on('G991'),
+  G987: _on('G987'),
+  G985: _on('G985'),
+  G977: _on('G977'),
+  G978: _on('G978'),
+  G976: _on('G976'),
+  G945: _on('G945'),
+  G944: _on('G944'),
+  G983: _on('G983'),
+  G643: _on('G643'),
+  G759: _on('G759'),
+  G809: _on('G809'),
+  G921: _on('G921'),
+  G927: _on('G927'),
+  G737: _on('G737'),
+  G801: _on('G801'),
+  G905: _on('G905'),
+  G934: 0,
+  CH052: _on('CH052'),
+  G980: _on('G980'),
+  G998: _on('G998'),
+  G997: _on('G997'),
+  G982: _on('G982'),
+  G996: _on('G996'),
+  G981: _on('G981'),
+  G984: _on('G984'),
+  G986: _on('G986'),
+  G940: _on('G940'),
+  R1029: _on('R1029'),
+  R1030: _on('R1030'),
+  R1031: _on('R1031'),
+  R1025: _on('R1025'),
+  HG1127: _on('HG1127'),
+  MS1127: _on('MS1127'),
+  HW1127: 0,
+  R1026K: _on('R1026K'),
+  G946: _on('G946'),
+  G971: _on('G971'),
+  GF1127: _on('GF1127'),
 };
 
 function SmallFixShell(this: SmallFixKeys, d: SmallFixKeys): void {
@@ -2338,6 +2848,261 @@ function SmallFixShell(this: SmallFixKeys, d: SmallFixKeys): void {
   this.G783 = d.G783;
   this.G501 = d.G501;
   this.G739 = d.G739;
+  this.G845 = d.G845;
+  this.G843 = d.G843;
+  this.R1006 = d.R1006;
+  this.G781 = d.G781;
+  this.G771 = d.G771;
+  this.G782 = d.G782;
+  this.G775 = d.G775;
+  this.G777 = d.G777;
+  this.G865 = d.G865;
+  this.G866 = d.G866;
+  this.R1007 = d.R1007;
+  this.G838 = d.G838;
+  this.G873 = d.G873;
+  this.G852 = d.G852;
+  this.G815 = d.G815;
+  this.G837 = d.G837;
+  this.G839 = d.G839;
+  this.G824 = d.G824;
+  this.G825 = d.G825;
+  this.G826 = d.G826;
+  this.G846 = d.G846;
+  this.G851 = d.G851;
+  this.G847 = d.G847;
+  this.G848 = d.G848;
+  this.G849 = d.G849;
+  this.G850 = d.G850;
+  this.G855 = d.G855;
+  this.G863 = d.G863;
+  this.G864 = d.G864;
+  this.G868 = d.G868;
+  this.G869 = d.G869;
+  this.G887 = d.G887;
+  this.G891 = d.G891;
+  this.G892 = d.G892;
+  this.G910 = d.G910;
+  this.G876 = d.G876;
+  this.G877 = d.G877;
+  this.G885 = d.G885;
+  this.G886 = d.G886;
+  this.G827 = d.G827;
+  this.G828 = d.G828;
+  this.G859 = d.G859;
+  this.G860 = d.G860;
+  this.G858 = d.G858;
+  this.G861 = d.G861;
+  this.G874 = d.G874;
+  this.G909 = d.G909;
+  this.G908 = d.G908;
+  this.G939 = d.G939;
+  this.G938 = d.G938;
+  this.G897 = d.G897;
+  this.G795 = d.G795;
+  this.G796 = d.G796;
+  this.G797 = d.G797;
+  this.G814 = d.G814;
+  this.G817 = d.G817;
+  this.G871 = d.G871;
+  this.G816 = d.G816;
+  this.G896 = d.G896;
+  this.G903 = d.G903;
+  this.G879 = d.G879;
+  this.G881 = d.G881;
+  this.G818 = d.G818;
+  this.G882 = d.G882;
+  this.G907 = d.G907;
+  this.G884 = d.G884;
+  this.G935 = d.G935;
+  this.G936 = d.G936;
+  this.G875 = d.G875;
+  this.G840 = d.G840;
+  this.G841 = d.G841;
+  this.G842 = d.G842;
+  this.R1008 = d.R1008;
+  this.G880 = d.G880;
+  this.G854 = d.G854;
+  this.G883 = d.G883;
+  this.G878 = d.G878;
+  this.G901 = d.G901;
+  this.G898 = d.G898;
+  this.G856 = d.G856;
+  this.G915 = d.G915;
+  this.G906 = d.G906;
+  this.G923 = d.G923;
+  this.CH048 = d.CH048;
+  this.CH050 = d.CH050;
+  this.G929 = d.G929;
+  this.G804 = d.G804;
+  this.G805 = d.G805;
+  this.G904 = d.G904;
+  this.G924 = d.G924;
+  this.G917 = d.G917;
+  this.G844 = d.G844;
+  this.G926 = d.G926;
+  this.G822 = d.G822;
+  this.G913 = d.G913;
+  this.G933 = d.G933;
+  this.G931 = d.G931;
+  this.G853 = d.G853;
+  this.G914 = d.G914;
+  this.G899 = d.G899;
+  this.G900 = d.G900;
+  this.G798 = d.G798;
+  this.G807 = d.G807;
+  this.G928 = d.G928;
+  this.G925 = d.G925;
+  this.G937 = d.G937;
+  this.G799 = d.G799;
+  this.G919 = d.G919;
+  this.G658 = d.G658;
+  this.G756 = d.G756;
+  this.G894 = d.G894;
+  this.G932 = d.G932;
+  this.G836 = d.G836;
+  this.G922 = d.G922;
+  this.G911 = d.G911;
+  this.G829 = d.G829;
+  this.G830 = d.G830;
+  this.G770 = d.G770;
+  this.G813 = d.G813;
+  this.G831 = d.G831;
+  this.G832 = d.G832;
+  this.G779 = d.G779;
+  this.G780 = d.G780;
+  this.G774 = d.G774;
+  this.G806 = d.G806;
+  this.G808 = d.G808;
+  this.G772 = d.G772;
+  this.G778 = d.G778;
+  this.G918 = d.G918;
+  this.G768 = d.G768;
+  this.G821 = d.G821;
+  this.G773 = d.G773;
+  this.G767 = d.G767;
+  this.G684 = d.G684;
+  this.G893 = d.G893;
+  this.G862 = d.G862;
+  this.G820 = d.G820;
+  this.G872 = d.G872;
+  this.CH049 = d.CH049;
+  this.G812 = d.G812;
+  this.R985 = d.R985;
+  this.R977 = d.R977;
+  this.G857 = d.G857;
+  this.G764 = d.G764;
+  this.G823 = d.G823;
+  this.G889 = d.G889;
+  this.G912 = d.G912;
+  this.R877 = d.R877;
+  this.R878 = d.R878;
+  this.G870 = d.G870;
+  this.R1010 = d.R1010;
+  this.G769 = d.G769;
+  this.G776 = d.G776;
+  this.G810 = d.G810;
+  this.G811 = d.G811;
+  this.R977T = d.R977T;
+  this.R1024 = d.R1024;
+  this.R1012 = d.R1012;
+  this.R1014 = d.R1014;
+  this.R1015 = d.R1015;
+  this.R1016 = d.R1016;
+  this.R1017 = d.R1017;
+  this.R1018 = d.R1018;
+  this.R1019 = d.R1019;
+  this.R1022 = d.R1022;
+  this.R1023 = d.R1023;
+  this.R1026 = d.R1026;
+  this.R1026A = d.R1026A;
+  this.R1027 = d.R1027;
+  this.R1028 = d.R1028;
+  this.G960 = d.G960;
+  this.G962 = d.G962;
+  this.G947 = d.G947;
+  this.G954 = d.G954;
+  this.G955 = d.G955;
+  this.G965 = d.G965;
+  this.G966 = d.G966;
+  this.G995 = d.G995;
+  this.G967 = d.G967;
+  this.G993 = d.G993;
+  this.G994 = d.G994;
+  this.G941 = d.G941;
+  this.G952 = d.G952;
+  this.G963 = d.G963;
+  this.G964 = d.G964;
+  this.G968 = d.G968;
+  this.G969 = d.G969;
+  this.G961 = d.G961;
+  this.G973 = d.G973;
+  this.G974 = d.G974;
+  this.G951 = d.G951;
+  this.G956 = d.G956;
+  this.G957 = d.G957;
+  this.G958 = d.G958;
+  this.G959 = d.G959;
+  this.G970 = d.G970;
+  this.G949 = d.G949;
+  this.G992 = d.G992;
+  this.G953 = d.G953;
+  this.G975 = d.G975;
+  this.G988 = d.G988;
+  this.G800 = d.G800;
+  this.G819 = d.G819;
+  this.G802 = d.G802;
+  this.G803 = d.G803;
+  this.CH051 = d.CH051;
+  this.CH053 = d.CH053;
+  this.G895 = d.G895;
+  this.G920 = d.G920;
+  this.CH054 = d.CH054;
+  this.G833 = d.G833;
+  this.G834 = d.G834;
+  this.G930 = d.G930;
+  this.G942 = d.G942;
+  this.G989 = d.G989;
+  this.G999 = d.G999;
+  this.G991 = d.G991;
+  this.G987 = d.G987;
+  this.G985 = d.G985;
+  this.G977 = d.G977;
+  this.G978 = d.G978;
+  this.G976 = d.G976;
+  this.G945 = d.G945;
+  this.G944 = d.G944;
+  this.G983 = d.G983;
+  this.G643 = d.G643;
+  this.G759 = d.G759;
+  this.G809 = d.G809;
+  this.G921 = d.G921;
+  this.G927 = d.G927;
+  this.G737 = d.G737;
+  this.G801 = d.G801;
+  this.G905 = d.G905;
+  this.G934 = d.G934;
+  this.CH052 = d.CH052;
+  this.G980 = d.G980;
+  this.G998 = d.G998;
+  this.G997 = d.G997;
+  this.G982 = d.G982;
+  this.G996 = d.G996;
+  this.G981 = d.G981;
+  this.G984 = d.G984;
+  this.G986 = d.G986;
+  this.G940 = d.G940;
+  this.R1029 = d.R1029;
+  this.R1030 = d.R1030;
+  this.R1031 = d.R1031;
+  this.R1025 = d.R1025;
+  this.HG1127 = d.HG1127;
+  this.MS1127 = d.MS1127;
+  this.HW1127 = d.HW1127;
+  this.R1026K = d.R1026K;
+  this.G946 = d.G946;
+  this.G971 = d.G971;
+  this.GF1127 = d.GF1127;
 }
 export const SMALL_FIX: SmallFixKeys = new (SmallFixShell as unknown as { new (d: SmallFixKeys): SmallFixKeys })(SMALL_FIX_DEF);
 if (Object.keys(SMALL_FIX).length !== Object.keys(SMALL_FIX_DEF).length) {

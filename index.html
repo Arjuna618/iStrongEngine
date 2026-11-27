@@ -1620,10 +1620,15 @@
       .k-parts-branch .k-tline-in { padding-left: 0; }
       .k-parts-branch .k-tline-in > .k-pick { padding-left: 26px; }
       .k-parts-branch .k-tline-in::before { z-index: 1; pointer-events: none; }
-      .k-parts-branch .k-subrow-line { position: relative; overflow: visible; height: auto; align-self: stretch; border-radius: 0; }
-      .k-parts-branch .k-subrow-line::before { content: ""; position: absolute; left: -8px; top: 0; bottom: 0; width: var(--k-line, 1px); background: var(--alpha-divider); }
+      .k-parts-branch .k-subrow-line { position: relative; overflow: visible; margin-left: 0; width: 100%; height: auto; align-self: stretch; border-radius: 0; padding-left: 26px; }
+      .k-parts-branch .k-subrow-line::before { content: ""; position: absolute; left: 6px; top: 0; bottom: 0; width: var(--k-line, 1px); background: var(--alpha-divider); z-index: 1; pointer-events: none; }
       .k-parts-branch .k-vl-row + .k-vl-row > .k-subrow-line { box-shadow: none; }
-      .k-parts-branch .k-vl-row + .k-vl-row > .k-subrow-line::after { content: ""; position: absolute; left: calc(-8px + var(--k-line, 1px)); right: 0; top: 0; height: var(--k-line, 1px); background: var(--alpha-divider); pointer-events: none; }
+      .k-parts-branch .k-vl-row + .k-vl-row > .k-subrow-line::after { content: ""; position: absolute; left: calc(6px + var(--k-line, 1px)); right: 0; top: 0; height: var(--k-line, 1px); background: var(--alpha-divider); pointer-events: none; }
+      .k-parts-branch .k-subrow-line.k-subrow-in { padding-left: 40px; }
+      .k-parts-branch .k-subrow-line.k-subrow-in::before { left: 20px; }
+      .k-parts-branch .k-vl-row + .k-vl-row > .k-subrow-line.k-subrow-in::after { left: calc(20px + var(--k-line, 1px)); }
+      .k-subrow-grail { display: none; }
+      .k-parts-branch .k-subrow-in > .k-subrow-grail { display: block; position: absolute; left: 6px; top: 0; bottom: 0; width: var(--k-line, 1px); background: var(--alpha-divider); z-index: 1; pointer-events: none; }
       .k-canvas-note.k-note-stack { flex-direction: column; align-items: flex-start; gap: 6px; padding-top: 6px; padding-bottom: 6px; }
       .k-canvas-step-label { font-size: 11.5px; color: var(--text-tertiary); padding-right: 4px; white-space: nowrap; }
       .k-canvas-step-value { min-width: 22px; text-align: center; font-size: 12.5px; font-weight: var(--fw-control); font-variant-numeric: tabular-nums; color: var(--text-primary); }
@@ -1968,7 +1973,7 @@
       .k-tgroup-fold { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 5px; color: var(--text-tertiary); flex-shrink: 0; }
       .k-tgroup-fold:hover { background: var(--alpha-hover); color: var(--text-primary); }
       .k-tgroup-icon { flex-shrink: 0; color: var(--text-secondary); }
-      .k-tgroup-name { flex: 1 1 auto; min-width: 0; font-size: 12px; font-weight: var(--fw-head); color: var(--text-primary); }
+      .k-tgroup-name { display: block; flex: 1 1 auto; min-width: 0; font-size: 12px; font-weight: var(--fw-head); color: var(--text-primary); }
       .k-inline-name { flex: 1 1 auto; min-width: 0; height: 24px; padding: 0 6px; font-size: 12px; }
       .k-subrow-line { margin-left: 14px; width: calc(100% - 14px); height: 26px; }
       .k-hist-row {
@@ -3731,8 +3736,6 @@
       :root.ui-classic .k-parts-branch .k-tline > .k-pick { border-width: 0; }
       :root.ui-classic .k-parts-branch .k-vl-row + .k-vl-row > .k-tline:not(.k-tline-in) > .k-pick,
       :root.ui-classic .k-parts-branch .k-vl-row + .k-vl-row > :is(.k-tgroup, .k-subrow:not(.k-subrow-line)) { box-shadow: inset 0 var(--kc-edge) 0 var(--kc-ink); }
-      :root.ui-classic .k-parts-branch .k-subrow-line::before,
-      :root.ui-classic .k-parts-branch .k-vl-row + .k-vl-row > .k-subrow-line::after { display: none; }
       :root.ui-classic .k-play-side-scroll .k-pick-on,
       :root.ui-classic .k-play-side-scroll .k-pick-on:hover { background: transparent; border-color: transparent; }
       :root.ui-classic .k-play-side-scroll > .k-tab-slide { background: var(--kc-lit); border: var(--kc-edge) solid var(--kc-ink); }

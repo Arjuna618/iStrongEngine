@@ -8,7 +8,7 @@ import { sameProjectUndo } from './shared/sameProjectUndo';
 import { isPortalMode } from '../types';
 import { MapConfig, createDefaultMapConfig, ExportFile, LibraryItem, MultiAreaMapConfig, AreaConfig, createDefaultArea, PortalLinkConfig, PortalLevelConfig, DEFAULT_SHAPE_SPAWN_CONFIG, SpawnZoneScale, TEAM_COLORS_DARK, TEAM_COLORS_LIGHT, TEAM_NAMES, MAZE_TYPE_CUSTOM, type CustomMapData } from '../types';
 import { isTeamModeId } from '../game/gameModeRegistry';
-import { MAZE_TYPE_NAMES, MAZE_EROSION_RANGES, MAZE_NATIVE_GRID, MAZE_MIN_GRID } from '../game/MazeGenerator';
+import { MAZE_TYPE_NAMES, MAZE_EROSION_RANGES, MAZE_NATIVE_GRID, MAZE_MIN_GRID, mazeTypeIgnoresErosion, MAZE_EROSION_SLIDER_START } from '../game/MazeGenerator';
 import { computeMapDimensions, gridCellsYOf, areaGapOf, AREA_GAP_MIN, AREA_GAP_MAX, normalizeSpawnZoneScales, resolveSpawnZoneExtent, spawnZoneMaxScale, SPAWN_ZONE_MIN_SCALE, configPaintsBaseTiles, configBaseTeamSpan, builtGridOf } from '../game/MapSystem';
 import {
   isCustomMap, touchesMapGeneration, cancelMapEditInteraction, clearMapEditSelection,
@@ -367,6 +367,7 @@ export const MapDesignerUI: React.FC<Props> = ({ logic, dataRegistry, className 
     const areas = [...multiArea.areas];
     const newArea = createDefaultArea(SMALL_FIX.R802 ? firstFreeName('Area', areas.map(a => a.name)) : `Area ${areas.length + 1}`);
     areas.push(newArea);
+    if (SMALL_FIX.R1014 !== 0) { logic.endMapEditStroke(); cancelMapEditInteraction(logic.mapEditor); clearMapEditSelection(logic.mapEditor); logic.mapEditor.marks = []; }
     updateMultiAreaConfig({ areas, activeAreaId: newArea.id });
     if (logic && !logic.state.isTestMode) {
       if (regenTimerRef.current !== null) clearTimeout(regenTimerRef.current);
@@ -408,6 +409,7 @@ export const MapDesignerUI: React.FC<Props> = ({ logic, dataRegistry, className 
     logic.pushMapWorldUndo();
     cancelMapEditInteraction(logic.mapEditor);
     clearMapEditSelection(logic.mapEditor);
+    if (SMALL_FIX.R1014 !== 0) logic.mapEditor.marks = [];
     logic.updateState({
       multiAreaConfig: newMAC,
       mapConfig: areas.length > 0 ? areas[0].mapConfig : logic.state.mapConfig,
@@ -427,6 +429,7 @@ export const MapDesignerUI: React.FC<Props> = ({ logic, dataRegistry, className 
     logic.endMapEditStroke();
     cancelMapEditInteraction(logic.mapEditor);
     clearMapEditSelection(logic.mapEditor);
+    if (SMALL_FIX.R1014 !== 0) logic.mapEditor.marks = [];
     updateMultiAreaConfig({ activeAreaId: areaId });
     if (logic) logic.fitAreaToView(areaId);
   }, [multiArea, updateMultiAreaConfig, logic]);
@@ -489,6 +492,8 @@ export const MapDesignerUI: React.FC<Props> = ({ logic, dataRegistry, className 
   const pickedPortal = PLACED_PORTALS.ON !== 0 && !isCustomMap(config) && _me && _me.hasSelection && _me.selection.kind === 'portal' && _me.selection.areaId === activeAreaId ? findPlacedPortal(config, _me.selection.id) : null;
 
   const erosionRange = MAZE_EROSION_RANGES[config.mazeType] ?? { min: 0.25, max: 2.0 };
+  const _eroStart = MAZE_EROSION_SLIDER_START[config.mazeType];
+  const erosionMin = _eroStart !== undefined && SMALL_FIX[_eroStart.key] !== 0 ? Math.max(erosionRange.min, _eroStart.at) : erosionRange.min;
 
   const { cellSize, mapHalf, mapHalfY } = computeMapDimensions(config);
   const totalMapSize = mapHalf * 2;
@@ -590,7 +595,7 @@ export const MapDesignerUI: React.FC<Props> = ({ logic, dataRegistry, className 
         multiAreaConfig: imported,
         mapConfig: imported.areas.length > 0 ? imported.areas[0].mapConfig : logic.state.mapConfig,
       });
-      logic.dropLeakedLabyrinthLook(true);
+      logic.dropLeakedLabyrinthLook(true, parsed.timestamp);
       forceRender(n => n + 1);
       if (!logic.state.isTestMode) {
         if (regenTimerRef.current !== null) clearTimeout(regenTimerRef.current);
@@ -608,7 +613,7 @@ export const MapDesignerUI: React.FC<Props> = ({ logic, dataRegistry, className 
           ? { ...logic.state.multiAreaConfig, enableMultiArea: false, areas: [], activeAreaId: '' }
           : { ...logic.state.multiAreaConfig, enableMultiArea: false },
       });
-      logic.dropLeakedLabyrinthLook(true);
+      logic.dropLeakedLabyrinthLook(true, parsed.timestamp);
       { const held = logic.mapEditor.tool;
         if (!isCustomMap(full) && held !== 'select' && !(held === 'eraser' && MAP_EVENTS.ON !== 0) && (held === 'none' || held === 'eraser' || !MAP_KINDS[held as MapEditorKind].onEveryMap)) logic.mapEditor.tool = 'none'; }
       forceRender(n => n + 1);
@@ -773,12 +778,12 @@ export const MapDesignerUI: React.FC<Props> = ({ logic, dataRegistry, className 
         <Reveal when={config.enableMaze && !isCustom && config.mazeType === MAGIC_MAZE_TYPE}>
           <MagicMazeSettings config={config} updateConfig={updateConfig} />
         </Reveal>
-        <Reveal when={config.enableMaze && !isCustom && config.mazeType !== MAGIC_MAZE_TYPE}>
+        <Reveal when={config.enableMaze && !isCustom && config.mazeType !== MAGIC_MAZE_TYPE && !(SMALL_FIX.G871 !== 0 && mazeTypeIgnoresErosion(config.mazeType))}>
           <SliderRow
             label="Erosion"
             value={Math.round((config.erosionIntensity ?? 1.0) * 100)}
             onChange={v => updateConfig({ erosionIntensity: v / 100 })}
-            min={Math.round(erosionRange.min * 100)}
+            min={Math.round(erosionMin * 100)}
             max={Math.round(erosionRange.max * 100)}
             step={5}
             suffix="%"

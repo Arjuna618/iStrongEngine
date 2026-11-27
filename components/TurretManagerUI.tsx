@@ -66,11 +66,19 @@ interface SectionStates { turretType: boolean; projectileType: boolean; behavior
 
 interface FragDrill { owner: string; path: number[] }
 
+const SECTION_STATES_MAX = 256;
+
 export const TurretManagerUI: React.FC<Props> = ({ logic, onUpdate, className, panelVisible, showTool }) => {
   const sectionStatesRef = useRef<Map<string, SectionStates>>(new Map());
   const getSectionState = (key: string): SectionStates => {
     let st = sectionStatesRef.current.get(key);
-    if (!st) { st = { turretType: false, projectileType: false, behaviors: false }; sectionStatesRef.current.set(key, st); }
+    if (!st) {
+      st = { turretType: false, projectileType: false, behaviors: false };
+      if (SMALL_FIX.G769 !== 0 && sectionStatesRef.current.size >= SECTION_STATES_MAX) {
+        for (const k of sectionStatesRef.current.keys()) { if (k !== 'main') { sectionStatesRef.current.delete(k); break; } }
+      }
+      sectionStatesRef.current.set(key, st);
+    }
     return st;
   };
 

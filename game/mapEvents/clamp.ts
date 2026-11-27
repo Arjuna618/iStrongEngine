@@ -3,7 +3,9 @@ import { EVENTS_DOC_VERSION, repairNextId } from './doc';
 import { kindOf } from './registry';
 import { cleanAreaShape, shapeCellBox } from '../areaShape';
 import { cleanShapeSpec, cleanTouchRows } from './thingBody';
+export const ZONE_MORE_MAX = 31;
 import type { Family, Field } from './registry';
+import { cutName } from '../project/hubNaming';
 
 const LIST_MAX = 4096;
 const ROWS_MAX = 2048;
@@ -39,7 +41,7 @@ function cleanField(fd: Field, v: unknown, depth: number, walkRows: (rows: unkno
     case 'int': { const n = finiteInt(v); return n === null ? undefined : Math.max(fd.min, Math.min(fd.max, n)); }
     case 'bool': return typeof v === 'boolean' ? v : undefined;
     case 'enum': return typeof v === 'string' ? v : undefined;
-    case 'text': return typeof v === 'string' ? v.slice(0, Math.max(fd.max, TEXT_MAX)) : undefined;
+    case 'text': return typeof v === 'string' ? cutName(v, Math.max(fd.max, TEXT_MAX)) : undefined;
     case 'tank': case 'team': return typeof v === 'string' && v.length < 200 ? v : undefined;
     case 'teams': case 'words': return Array.isArray(v) ? v.filter(w => typeof w === 'string' && w.length > 0 && w.length < 200).slice(0, 64) : undefined;
     case 'walls': return Array.isArray(v) ? v.filter((t, i, l) => typeof t === 'number' && Number.isInteger(t) && t >= 0 && t < 19 && l.indexOf(t) === i) : undefined;
@@ -83,7 +85,7 @@ function namedList(v: unknown, each?: (t: Record<string, unknown>) => void): Rec
     const id = finiteInt(t.id);
     if (id === null || id < 0 || id > ID_MAX) continue;
     if (typeof t.name !== 'string') t.name = '';
-    else if ((t.name as string).length > 200) t.name = (t.name as string).slice(0, 200);
+    else if ((t.name as string).length > 200) t.name = cutName(t.name as string, 200);
     if (each) each(t);
     out.push(t);
     if (out.length >= LIST_MAX) break;
@@ -158,12 +160,12 @@ export function clampEventsDoc(raw: unknown, zones?: readonly ZoneLike[]): MapEv
 export function keepZoneWords(r: Record<string, unknown>, z: Record<string, unknown>): void {
   const uid = finiteInt(r.uid);
   if (uid !== null && uid >= 0 && uid <= ID_MAX) z.uid = uid;
-  if (typeof r.name === 'string') z.name = r.name.slice(0, 64);
-  if (typeof r.note === 'string') z.note = r.note.slice(0, TEXT_MAX);
+  if (typeof r.name === 'string') z.name = cutName(r.name, 64);
+  if (typeof r.note === 'string') z.note = cutName(r.note, TEXT_MAX);
   if (typeof r.showName === 'boolean') z.showName = r.showName;
   if (typeof r.clearWalls === 'boolean') z.clearWalls = r.clearWalls;
   if (r.modeBase === true) z.modeBase = true;
-  if (typeof r.modeName === 'string') z.modeName = r.modeName.slice(0, 64);
+  if (typeof r.modeName === 'string') z.modeName = cutName(r.modeName, 64);
   if (Array.isArray(r.more)) {
     const more: { gx: number; gy: number; cw: number; ch: number }[] = [];
     for (const m of r.more) {
@@ -171,7 +173,7 @@ export function keepZoneWords(r: Record<string, unknown>, z: Record<string, unkn
       const gx = finiteInt(m.gx), gy = finiteInt(m.gy), cw = finiteInt(m.cw), ch = finiteInt(m.ch);
       if (gx === null || gy === null || cw === null || ch === null || gx < 0 || gy < 0 || cw < 1 || ch < 1) continue;
       more.push({ gx, gy, cw, ch });
-      if (more.length >= 31) break;
+      if (more.length >= ZONE_MORE_MAX) break;
     }
     if (more.length > 0) z.more = more;
   }

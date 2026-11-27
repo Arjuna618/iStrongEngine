@@ -1137,7 +1137,7 @@ class Compiler {
         default: {
           if (row.k === 'wait' || row.k === 'var.set' || row.k === 'var.add' || row.k === 'signal' || row.k === 'rule.set' || row.k === 'timer.start') this.edges(row);
           const at = this.encode(def, row, owner);
-          if (SMALL_FIX.GH385 && at >= 0 && row.k === 'spawn' && this._restStack.some(l => (SMALL_FIX.GH573 !== 0 ? JSON.stringify(l, liveRowsOnly) : JSON.stringify(l)).includes('"lastSpawned"'))) this.p.spawnRead.add(at);
+          if (SMALL_FIX.GH385 && at >= 0 && row.k === 'spawn' && this._restStack.some(l => (SMALL_FIX.GH573 !== 0 ? JSON.stringify(l, liveRowsOnly) : JSON.stringify(l)).includes(SMALL_FIX.G861 !== 0 ? '"w":"lastSpawned"' : '"lastSpawned"') )) this.p.spawnRead.add(at);
         }
       }
     }

@@ -145,6 +145,7 @@ export class ProjectSession {
     const panels = held ? held.panels : this.panels.capture();
     const canvasKey = held ? held.canvasKey : this.logic.projectCanvasKey;
     const libObjs = libraryBlobObjects(engine.library);
+    if (SMALL_FIX.G857 !== 0 && this.kept?.blobs) for (const o of this.kept.blobs.values()) if (o !== null && typeof o === 'object') libObjs.push(o);
     const fresh = libObjs.filter(o => !this.libSha.has(o));
     const newBlobs: BlobRec[] = [];
     const encLib = await this.encode(fresh.map((o, i) => ({ key: 'l' + i, value: o })));

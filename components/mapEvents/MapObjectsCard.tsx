@@ -14,7 +14,7 @@ import { MazeTypeName } from '../maps/mazeTypeName';
 import type { AreaFill } from '../../types';
 import { AREA_SIDES_MIN, AREA_SIDES_MAX } from '../../game/areaShape';
 import type { AreaToolShape } from '../../game/MapEditor';
-import { addAreaGroup, addEntityType, duplicatePlaced, duplicateZone, factsOf, indexOfId, insertAt, removeAt, setAt, setBecome, usedBy, usedByNames, withIds, mirrorPlaced, mirrorZone } from '../../game/mapEvents/docOps';
+import { addAreaGroup, addEntityType, duplicatePlaced, duplicateZone, factsOf, indexOfId, insertAt, removeAt, setAt, setBecome, usedBy, usedByNames, withIds, mirrorPlaced, mirrorZone, zoneRectRowKey } from '../../game/mapEvents/docOps';
 import { builtGridOf } from '../../game/MapSystem';
 import { Button, Chip, FieldRow, Group, IconButton, PickRow, SearchField, SelectRow, TextField, ToggleRow } from '../kit/kit';
 import { DropMenu, useDropMenu } from '../kit/DropMenu';
@@ -27,6 +27,7 @@ import { Tabs } from '../kit/kit';
 import { toast } from '../ui/Toast';
 import { sameProjectUndo } from '../shared/sameProjectUndo';
 import { SMALL_FIX } from '../../game/smallFixSwitch';
+import { ZONE_MORE_MAX } from '../../game/mapEvents/clamp';
 import { markOfLastEdit, undoMarkedEdit } from '../shared/markedUndo';
 import { ColorMapControl, ColorMapSwitch } from '../shared/ColorMapField';
 import { SliderRow } from '../shared/mapDesignerControls';
@@ -65,6 +66,7 @@ const ZoneBehaviors: React.FC<{ z: ZoneLike; i: number; ctx: EvCtx }> = ({ z, i,
   const list = behaviorsOf(z);
   const path = [ZONES_KEY, i, 'behaviors'];
   const [open, setOpen] = useState<number | null>(null);
+  const [openAt, setOpenAt] = useState(-1);
   const written = (d: Parameters<EvCtx['commit']>[0] extends (x: infer D) => unknown ? D : never) => {
     if (Array.isArray(z.behaviors) || list.length === 0) return d;
     const r = withIds(d, id => list.map(b => ({ ...b, id: id() })));
@@ -72,14 +74,15 @@ const ZoneBehaviors: React.FC<{ z: ZoneLike; i: number; ctx: EvCtx }> = ({ z, i,
   };
   const add = (k: string) => ctx.commit(d => {
     const base = written(d);
-    const r = withIds(base, id => ({ id: id(), k, a: {} } as Row));
+    const r = withIds(base, id => ({ id: id(), k, a: SMALL_FIX.G893 !== 0 && k === 'spawn' ? { maxAlive: 0 } : {} } as Row));
     const now = (r.doc as Record<string, unknown>)[ZONES_KEY] as ZoneLike[];
     return setAt(r.doc, path, [...(now[i].behaviors ?? []), r.value]);
   });
-  const shown = open !== null ? list.findIndex(b => b.id === open) : -1;
+  const shownById = open !== null ? list.findIndex(b => b.id === open) : -1;
+  const shown = shownById >= 0 || SMALL_FIX.G778 === 0 || open !== 0 || !(openAt >= 0 && openAt < list.length) ? shownById : openAt;
   return (
     <div className="k-ev-list">
-      <LongList gap={4} estimate={68} empty={<div className="k-ev-note">It only looks. Add what it does.</div>} count={list.length} rowKey={j => String(list[j].id || j)} renderRow={j => { const b = list[j]; return <BehaviorRow b={b} path={[...path, j]} ctx={ctx} onOpen={() => setOpen(b.id)}
+      <LongList gap={4} estimate={68} empty={<div className="k-ev-note">It only looks. Add what it does.</div>} count={list.length} rowKey={j => String(list[j].id || j)} renderRow={j => { const b = list[j]; return <BehaviorRow b={b} path={[...path, j]} ctx={ctx} onOpen={() => { setOpen(b.id); setOpenAt(j); }}
           onRemove={() => { const thing = list[j]; ctx.commit(d => removeAt(written(d), path, j)); void thing; toast('info', `${kindOf('behavior', b.k)?.label ?? 'Behaviour'} removed. Ctrl Z brings it back.`); }} />; }} />
       <EvSelect add="Add A Behaviour" groups={groupsOfKinds('behavior')} onChange={add} />
       {shown >= 0 ? (
@@ -104,7 +107,10 @@ const AreaInspector: React.FC<{ logic: GameLogic; ctx: EvCtx; z: PlacedZone; are
   const groups = ctx.doc?.areaGroups ?? [];
   const inGroups = groups.filter(g => z.uid !== undefined && g.members.some(m => m.id === z.uid));
   const used = z.uid !== undefined ? usedBy(ctx.doc, ctx.zones, z.uid) : 0;
-  const addRect = () => { logic.mapEditor.tool = 'zone'; logic.mapEditor.zoneAddTo = z.id; onUpdate(); };
+  const addRect = () => {
+    if (SMALL_FIX.R1025 !== 0 && (z.more?.length ?? 0) >= ZONE_MORE_MAX) { toast('info', `This area holds as many rectangles as it can (${ZONE_MORE_MAX + 1}).`); return; }
+    logic.mapEditor.tool = 'zone'; logic.mapEditor.zoneAddTo = z.id; onUpdate();
+  };
   const sh = zoneShapeOf(z);
   const shapeKind: AreaToolShape = sh === null ? 'rect' : sh.k === 'ellipse' ? 'ellipse' : sh.sides !== undefined ? 'poly' : 'free';
   const turnDeg = sh !== null ? Math.round(((((sh.rot ?? 0) * 180) / Math.PI) % 360 + 540) % 360 - 180) : 0;
@@ -164,7 +170,7 @@ const AreaInspector: React.FC<{ logic: GameLogic; ctx: EvCtx; z: PlacedZone; are
       <Group title="Size" foldKey="area-size">
         <SliderRow label="Width" value={z.cw} onChange={v => { updateSelectedZone(logic, { cw: v }); onUpdate(); }} min={1} max={Math.max(z.cw, areaRefById(logic, areaId)?.state.gridCells ?? z.cw)} step={1} display={v => `${v} cells`} tooltip="Grows from its top left corner. Or drag a corner on the map." />
         <SliderRow label="Height" value={z.ch} onChange={v => { updateSelectedZone(logic, { ch: v }); onUpdate(); }} min={1} max={Math.max(z.ch, areaRefById(logic, areaId)?.state.gridCellsY ?? z.ch)} step={1} display={v => `${v} cells`} tooltip="Grows down from its top left corner. Or drag a corner on the map." />
-        <LongList gap={4} estimate={32} count={sh === null ? (z.more?.length ?? 0) : 0} rowKey={k => `${z.more![k].gx},${z.more![k].gy}`} renderRow={k => { const m = z.more![k]; return (
+        <LongList gap={4} estimate={32} count={sh === null ? (z.more?.length ?? 0) : 0} rowKey={k => zoneRectRowKey(z.more!, k)} renderRow={k => { const m = z.more![k]; return (
             <div className="k-ev-b-row">
               <span className="k-count">{`${m.cw} by ${m.ch} Cells`}</span>
               <span className="k-ev-grow" />
@@ -256,7 +262,7 @@ const AreaFillCard: React.FC<{ logic: GameLogic; z: PlacedZone; areaId: string; 
 
 const SIDES = [{ value: 'team1', label: 'Blue' }, { value: 'team2', get label() { return SIDE_WORDS[1].shown; } }, { value: 'team3', get label() { return SIDE_WORDS[2].shown; } }, { value: 'team4', label: 'Purple' }, { value: 'team5', label: 'Dreadnoughts' }, { value: 'neutral', label: 'Neutral' }, { value: 'ffa', label: 'Free For All' }, { value: 'player', label: 'The Player\'s Side' }, { value: 'againstPlayer', label: 'Against The Player' }];
 
-const EntityInspector: React.FC<{ logic: GameLogic; ctx: EvCtx; e: PlacedEntity; areaId: string; onUpdate: () => void }> = ({ logic, ctx, e, areaId }) => {
+export const EntityInspector: React.FC<{ logic: GameLogic; ctx: EvCtx; e: PlacedEntity; areaId: string; onUpdate: () => void }> = ({ logic, ctx, e, areaId }) => {
   const pi = (ctx.doc?.placed ?? []).findIndex(x => x.id === e.id);
   const ti = (ctx.doc?.types ?? []).findIndex(x => x.id === e.type?.id);
   const type: EntityType | undefined = ctx.doc?.types?.[ti];
@@ -272,17 +278,24 @@ const EntityInspector: React.FC<{ logic: GameLogic; ctx: EvCtx; e: PlacedEntity;
   const sharedBy = (ctx.doc?.placed ?? []).filter(x => x.type?.id === e.type?.id).length;
   const events = (ctx.doc?.rules ?? []).filter(r => r.owner?.id === e.id || (type && JSON.stringify(r.when).includes(`"id":${type.id},`)));
   const makeUnique = () => ctx.commit(d => {
+    const map = new Map<number, number>();
     const r = withIds(d, (id, base) => {
       const copy: EntityType = JSON.parse(JSON.stringify(type));
       copy.id = id();
       copy.name = `${type!.name} (${(base.types?.length ?? 0) + 1})`;
-      const map = new Map<number, number>();
       for (const f of copy.forms) { const n = id(); map.set(f.id, n); f.id = n; }
       for (const f of copy.forms) { if (f.onDeath && typeof f.onDeath.to === 'number') f.onDeath.to = map.get(f.onDeath.to) ?? f.onDeath.to; if (f.after) f.after.to = map.get(f.after.to) ?? f.after.to; }
       return copy;
     });
     const withType = { ...r.doc, types: [...(r.doc.types ?? []), r.value] };
-    return setAt(withType, ['placed', pi, 'type'], { id: r.value.id, n: r.value.name });
+    const moved = setAt(withType, ['placed', pi, 'type'], { id: r.value.id, n: r.value.name });
+    if (SMALL_FIX.G777 === 0) return moved;
+    const p = moved.placed![pi];
+    const re = (f: number) => map.get(f) ?? f;
+    const fixed: PlacedEntity = { ...p };
+    if (p.startForm !== undefined) fixed.startForm = re(p.startForm);
+    if (p.spots) fixed.spots = p.spots.map(s => ({ ...s, form: re(s.form) }));
+    return setAt(moved, ['placed', pi], fixed);
   });
   if (!type || !form0) return (
     <div className="k-ev-inspector">
@@ -317,11 +330,11 @@ const EntityInspector: React.FC<{ logic: GameLogic; ctx: EvCtx; e: PlacedEntity;
       )}</Reveal>
       <SelectRow label="Team Colour" help="As Its File: the colour of its tank file. Its Side's: the colour of its team." value={form0.colour?.use ?? 'file'} options={[{ value: 'file', label: 'As Its File' }, { value: 'team', label: 'Its Side\'s' }, ...(form0.colour?.use === 'slot' ? [{ value: 'slot', label: 'A Colour Of The Map' }] : [])]} onChange={v => ctx.commit(d => setAt(d, ['types', ti, 'forms', 0, 'colour'], v === 'file' ? undefined : v === 'slot' ? form0.colour : { use: v }))} />
       <Reveal when={!isGuard}><ToggleRow label="Stands Still" help="On: it stays where it was placed. Off: it walks by its order or its mind." checked={type.stands !== false} onChange={v => putType('stands', v)} /></Reveal>
-      <Reveal when={!isGuard}><ToggleRow label="Become Upon Death" help="At its death a new body stands on the very spot, at full health." checked={becomes} onChange={v => ctx.commit(d => setBecome(d!, type.id, v ? (typeof second?.tank === 'string' ? second.tank : typeof form0.tank === 'string' ? form0.tank : 'basic') : null))} /></Reveal>
+      <Reveal when={!isGuard}><ToggleRow label="Become Upon Death" help="At its death a new body stands on the very spot, at full health." checked={becomes} onChange={v => ctx.commit(d => setBecome(d!, type.id, v ? (typeof second?.tank === 'string' ? second.tank : typeof form0.tank === 'string' ? form0.tank : 'basic') : null, undefined, undefined, true))} /></Reveal>
       <Reveal when={becomes && !isGuard}>{() => (<div className="k-ev-inspector-part">
         <FieldRow stacked label="Becomes" help="What the new body is."><ThingField value={typeof second?.tank === 'string' ? second.tank : undefined} ctx={ctx} onChange={w => ctx.commit(d => setBecome(d!, type.id, w, bothWays))} /></FieldRow>
         <SelectRow label="On The Side Of" help="Which side the new body fights for." value={form0.onDeath?.team ?? 'form'} options={[{ value: 'form', label: 'Its Own' }, { value: 'killer', label: 'Its Killer' }]} onChange={v => ctx.commit(d => setAt(d, ['types', ti, 'forms', 0, 'onDeath', 'team'], v))} />
-        <ToggleRow label="Works Both Ways" help="When that one dies, this one comes back." checked={bothWays} onChange={v => ctx.commit(d => setBecome(d!, type.id, typeof second?.tank === 'string' ? second.tank : 'basic', v))} />
+        <ToggleRow label="Works Both Ways" help="When that one dies, this one comes back." checked={bothWays} onChange={v => ctx.commit(d => setBecome(d!, type.id, typeof second?.tank === 'string' ? second.tank : 'basic', v, undefined, true))} />
         <FieldRow label="Cannot Be Hurt For" help="For this long after the change nothing can hurt it."><NumField value={form0.onDeath?.grace ?? 0} unit="s" onChange={v => ctx.commit(d => setAt(d, ['types', ti, 'forms', 0, 'onDeath', 'grace'], v))} /></FieldRow>
       </div>)}</Reveal>
       <Reveal when={plans > 0}>{() => (
@@ -412,6 +425,7 @@ export const MapObjectsCard: React.FC<{ logic: GameLogic; areaId: string; onUpda
   const noteMods = (e: React.MouseEvent) => { mods.current.ctrl = e.ctrlKey || e.metaKey; mods.current.shift = e.shiftKey; };
   const pick = (kind: MapEditorKind, id: number) => {
     const ids = kind === 'zone' ? zones.map(z => z.id) : placed.map(e => e.id);
+    if (SMALL_FIX.R1014 !== 0 && me.hasSelection && me.selection.areaId !== areaId) { clearMapEditSelection(me); me.marks = []; }
     if (mods.current.ctrl) {
       const was = me.marks.length ? me.marks : (me.hasSelection && me.selection.kind === kind ? [me.selection.id] : []);
       me.marks = was.includes(id) ? was.filter(x => x !== id) : [...was, id];
@@ -448,7 +462,7 @@ export const MapObjectsCard: React.FC<{ logic: GameLogic; areaId: string; onUpda
   const remove = (kind: MapEditorKind, id: number, name: string, used: number) => {
     const sel0 = { areaId, kind, id, genKey: '' };
     logic.applyMapEdit(areaId, c => opDelete(c, sel0));
-    if (me.hasSelection && me.selection.kind === kind && me.selection.id === id) clearMapEditSelection(me);
+    if (me.hasSelection && me.selection.kind === kind && me.selection.id === id && (SMALL_FIX.R1014 === 0 || me.selection.areaId === areaId)) clearMapEditSelection(me);
     const mark = markOfLastEdit(logic);
     void mark;
     toast('info', `"${name}" removed.${used ? ` ${used} ${used === 1 ? 'link now finds' : 'links now find'} nothing.` : ''} Ctrl Z brings it back.`);

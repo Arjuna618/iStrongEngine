@@ -2205,6 +2205,7 @@ export class MazeGenerator {
 
 const DRAWN: readonly ModeDrawing[] = MISSING_MODES.ON !== 0 ? MODE_DRAWINGS.filter(d => d.rows !== undefined) : [];
 const DRAWN_BY_TYPE: ReadonlyMap<number, ModeDrawing> = new Map(DRAWN.map(d => [d.type, d]));
+export function mazeTypeIgnoresErosion(type: number): boolean { const d = DRAWN_BY_TYPE.get(type); return d !== undefined && d.kind === 'fixed'; }
 const DRAWN_NAMES: Record<number, string> = Object.fromEntries(DRAWN.map(d => [d.type, d.name]));
 const DRAWN_IDS: readonly number[] = DRAWN.map(d => d.type);
 const DRAWN_WIDE: Record<number, number> = Object.fromEntries(DRAWN.filter(d => Math.max(d.w, d.h) > 32).map(d => [d.type, Math.max(d.w, d.h)]));
@@ -2355,6 +2356,13 @@ export const MAZE_EROSION_RANGES: Record<number, { min: number; max: number }> =
   29: { min: 0.25, max: 2.00 },
   ...Object.fromEntries(DRAWN.map(d => [d.type, { min: 0.25, max: 1.5 }])),
   80: { min: 0.25, max: 1.90 },
+};
+
+export const MAZE_EROSION_SLIDER_START: Record<number, { at: number; key: 'G820' | 'G872' }> = {
+  26: { at: 0.70, key: 'G820' },
+  27: { at: 0.90, key: 'G820' },
+  28: { at: 0.70, key: 'G820' },
+  38: { at: 0.85, key: 'G872' },
 };
 
 export function clampErosion(mazeType: number, intensity: number): number {

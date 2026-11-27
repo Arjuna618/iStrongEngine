@@ -57,7 +57,7 @@ export const FEEL_ROWS: FeelRow[] = [
   { key: 'aim', ai: 'HF_AIM', title: 'Human Aim Lead', step: '3.4', strength: false, moodLo: 1,
     tip: 'Bots lead a moving target only partly, each bot by its own share, as players do. Off: every bot leads its target exactly.' },
   { key: 'stops', ai: 'HF_STOPS', title: 'Short Stops', step: '4.1', strength: true, moodLo: 0.4,
-    tip: 'A bot on its way sometimes stops for a second or two when nothing threatens it, more often in free for all than in team modes. A shot that flies at it ends the stop at once. Off: bots never stop on their way.' },
+    tip: 'A bot on its way sometimes stops for a second or two when nothing threatens it, more often in free for all than in team modes. A shot that flies at it ends the stop at once. In a team fight a gun tank also takes a spot: while it is shooting a tank inside its reach and nothing threatens it, it stands for a while, and walks back in only when its recoil has pushed it out of reach. A bot that shoots a body that stands still, a Dominator or a Sanctuary, does not circle it. It stays at its place and takes a short step to one side now and then. While the gun of that body points at it, or shots of a tank hit it, it keeps moving as in any other fight. Off: bots never stop on their way.' },
   { key: 'together', ai: 'HF_TOGETHER', title: 'No One Mind', step: '5.8', strength: true, moodLo: 0.5,
     tip: 'Teammates that see a mate in trouble each take their own moment before they decide to help, and fewer join when others already help, so a team never moves as one mind. Off: every mate decides in the same instant.' },
   { key: 'lines', ai: 'HF_LINES', title: 'Hold Lines', step: '5.1', strength: true, moodLo: 0.5,
@@ -65,7 +65,7 @@ export const FEEL_ROWS: FeelRow[] = [
   { key: 'odds', ai: 'HF_ODDS', title: 'Team Push And Retreat', step: '5.3', strength: true, moodLo: 0.5,
     tip: 'A bot counts the teammates and the enemies near it. Outnumbered, it falls back. On the stronger side it presses in, slowly. Off: the numbers near it change nothing.' },
   { key: 'mates', ai: 'HF_MATES', title: 'Stays With Mates', step: '5.2', strength: true, moodLo: 0.5,
-    tip: 'A team bot on its way with no teammate near it often walks over to one, more to a mate with a higher score. Off: team bots travel on their own.' },
+    tip: 'A team bot on its way with no teammate near it often walks over to one, more to a mate with a higher score. A team bot and the mates near it are a group, led by the one with the most score. When the enemy tanks the group sees are stronger than the group, the leader calls a fall back to a safer place before anyone is under fire. Each bot follows at its own moment, and they wait there for more mates before they go on. In a plain team match, the TDM and Open TDM cards with no other goal, each side has one leader, picked by chance at the start and then every 30 seconds the bot with the most score. The side gathers at its leader, goes to the middle of the map together, holds it, eats the shapes there and starts no fight far outside it. It closes ranks when a group of enemies comes in, and backs off together when it is clearly losing. A bot that sees a tank hit a mate goes to that tank to help, most of the time, and a fight far from the group is carried back to it. Off: team bots travel on their own, no group falls back and no side fights for the middle.' },
   { key: 'protect', ai: 'HF_PROTECT', title: 'Protectors', step: '5.4', strength: true, moodLo: 0.15,
     tip: 'Tanks that fire to nearly every side (a Hexa Tank, a Septa Trapper) may play protector in a team: they stay with their mates and follow them. How many do so changes from match to match. Off: no bot plays protector.' },
   { key: 'letgo', ai: 'HF_LETGO', title: 'Lets A Runner Go', step: '3.6', strength: true, moodLo: 0.5,
@@ -81,7 +81,7 @@ export const FEEL_ROWS: FeelRow[] = [
   { key: 'focus', ai: 'HF_FOCUS', title: 'One Decision', step: '3.11', strength: true, moodLo: 0.6,
     tip: 'A bot that has picked an opponent stays on it for a few seconds instead of jumping between two targets. Most bots stay on the tank they charge for as long as they fight it. A bot turns to another tank when that one keeps hitting it and is nearer than its own target, or its own target no longer hurts it, or when that one is nearly dead. Off: a bot takes the best target of every moment.' },
   { key: 'goals', ai: 'HF_GOALS', title: 'Always A Goal', step: '7.7', strength: true, moodLo: 0.6,
-    tip: 'A bot with nothing to do does not hang around one spot. It soon heads somewhere with a reason: toward its teammates and their fights, toward the middle of the map, or toward a tank it noticed firing just beyond its screen. Off: bots pick the places they know least.' },
+    tip: 'A bot with nothing to do does not hang around one spot. It soon heads somewhere with a reason: toward its teammates and their fights, toward the middle of the map, or toward a tank it noticed firing just beyond its screen. A bot does not chase one piece of food for ever. After 5 to 9 seconds without reaching it, it leaves that shape and moves on, and it tries three times as long for a rare shape. Off: bots pick the places they know least.' },
   { key: 'spawn', ai: 'HF_SPAWN', title: 'Spawns Like A Player', step: '7.8', strength: false, moodLo: 1,
     tip: 'A bot stays in its spawn protection while an enemy tank is close. If the enemy does not leave before the protection runs out, the bot gives up that tank and spawns somewhere else. Living bots keep away from an enemy tank that is still protected. Teammates never mind each other. Off: a bot starts to play as soon as its upgrades are done.' },
   { key: 'owntime', ai: 'HF_OWNTIME', title: 'Own Moment', step: '2.5', strength: false, moodLo: 1,
@@ -99,13 +99,13 @@ export const FEEL_ROWS: FeelRow[] = [
   { key: 'mind', ai: 'HF_MIND', title: 'Minds Its Friends', step: '6.7', strength: false, moodLo: 1,
     tip: 'A bot keeps a tank it is at peace with out of its fire. When that tank stands in its line of fire, it holds its fire and steps to the side to get a clear line, at food too. It still fires at once to defend itself: at a round coming at it, or at a tank that attacks it. A tank that always fires lets go of its fire button while such a tank could be hit, and while it wiggles. Needs Peace In Free For All. Off: it fires whoever stands in the way.' },
   { key: 'gap', ai: 'HF_GAPDIST', title: 'Distance By Strength', step: '4.9', strength: true, moodLo: 1,
-    tip: 'In a fight with another tank, a bot that is clearly the stronger one moves in closer than its normal distance, and a clearly weaker one stays farther away: 10 to 50 percent, by how far apart the two are in strength and health. A stronger bot that is afraid does not push in. Each bot does it a little differently. Bosses do it too. Tanks that ram are not changed, and a category can opt out (AI Behavior Categories, Keeps Its Own Distance). Off: every bot keeps its normal distance.' },
+    tip: 'In a fight with another tank, a bot that is clearly the stronger one moves in closer than its normal distance, and a clearly weaker one stays farther away: 10 to 50 percent, by how far apart the two are in strength and health. A stronger bot that is afraid does not push in. Each bot does it a little differently. Bosses do it too. Tanks that ram are not changed, and a category can opt out (AI Behavior Categories, Keeps Its Own Distance). Against a tank whose single shot takes a big part of its health a bot fights from farther away, up to almost twice its normal distance, however strong the bot is. A bot that fears a tank\'s hit range, see Picks Its Fights, holds its fight with that tank from outside the distance that shot can fly, as far as the bot\'s own shot still reaches, and from that tank\'s side, where the bot can still see it. Off: every bot keeps its normal distance.' },
   { key: 'risk', ai: 'HF_RISK', title: 'Picks Its Fights', step: '3.14', strength: true, moodLo: 1,
-    tip: 'Before a bot goes for a tank it looks at who else is around that tank. If the other enemies there could together overwhelm it, it leaves that tank alone, and it gives up a fight when the place fills with enemies. Brave bots dare more, careful ones less. Teammates near it count on its side. Every tank counts as what it really is, by the health it has left and its skill points, so a boss is held back by almost nothing. A tank that hurts it is still fought. A bot that runs away takes the way with the least risk: a place it reaches before its attacker where the way leads on, not a corner or a closed end. Off: a bot goes for a target wherever it stands, and runs to the place farthest from its attacker.' },
+    tip: 'Before a bot goes for a tank it looks at who else is around that tank. If the other enemies there could together overwhelm it, it leaves that tank alone, and it gives up a fight when the place fills with enemies. Brave bots dare more, careful ones less. Teammates near it count on its side. Every tank counts as what it really is, by the health it has left and its skill points, so a boss is held back by almost nothing. A tank that hurts it is still fought. A bot that runs away takes the way with the least risk: a place it reaches before its attacker where the way leads on, not a corner or a closed end. A bot remembers the way it walked for a minute and a half. When it runs away or backs off it takes that way before a way it has never walked, which may be a dead end, unless the way it knows has danger on it. It does not hide in a pocket with no way out. In a free for all a bot also thinks twice before it starts a fight with a tank that has more score than it has. The more score the other tank has, the smaller the chance, and brave bots dare more often. The chance never drops under 1 in 20. A tank that hurt it is still fought, and so is one that is nearly dead. A bot stays out of the hit range of a tank whose one shot would take a big part of its health: the area that shot can fly into and that tank can see. A bot that no Map Events effect leads counts that area a little bigger, because a lucky round flies faster than the others, and a shot from a tank that drives toward the bot flies farther. The chance is about that part. A shot that would kill it: almost always. Half of what it has left: about every second bot. A tenth: one bot in ten. Careful bots a little more often than brave ones, and a hurt bot more often than a healthy one. A bot whose own fire is heavier than that tank\'s and that would win the fight pushes in anyway. A bot that fears a hit range stays out of it at peace too, while it roams, at food and when it runs away, also when that tank is not the nearest one, and it remembers for a few seconds where such a tank left its screen. A bot that is hit by a tank it is not fighting takes cover from that tank, and a camping trapper ends its camp. It starts no fight with that tank unless its own shot reaches farther. A tank that stays close behind a bot that is giving way is shot at as the bot goes. Strong drones or minions that come at a bot, counted together, make it back away from them, behind cover when it can. Bots that stand together count their fire together: when it is heavier than the fire of the tank that leads the pack they back away less, and at twice its weight not at all. A bot that had to back away from a pack keeps out of the area of that tank for about a minute. A tank that leads drones, minions or a swarm still attacks, and keeps its body out of the range. A tank that itself hits very hard with one shot, like a Destroyer or a Big Mac, starts no fight with a drone tank that stands on open ground. When such a tank stands behind a wall near the corner ahead, the bot does not walk round that corner. It steps back until that tank could not hit it from the corner, waits, and after a few seconds it gives up and goes back the way it came. Off: a bot goes for a target wherever it stands, and runs to the place farthest from its attacker.' },
   { key: 'early', ai: 'HF_EARLYRUN', title: 'Runs Before It Is Too Late', step: '4.6b', strength: false, moodLo: 1,
     tip: 'A bot that is being hurt in a fight breaks off while it still can: the most careful ones at about 60 percent of their health, the bravest at about 40, a little different every time. It stays longer for a kill it is clearly winning. Tanks whose category never runs (Flee HP Threshold 0) are not changed. Off: a bot runs at the Flee HP Threshold of its category, or when its fear is full.' },
   { key: 'place', ai: 'HF_PLACE', title: 'Likes Its Own Ground', step: '4.4', strength: true, moodLo: 1,
-    tip: 'A bot prefers the kind of place that suits its tank, goes there and stays. A maze map has three areas: the frame, which is its outer edge all the way round, the open middle, and the maze between them. Tanks that fire forward, trappers that fire where they look, smashers and rammers like the maze, then the frame. Swarm drone tanks and trappers that fire to many sides like the frame. Tanks that fire bullets to many sides like the middle. Drone and minion tanks like the maze. Once grown to half a corridor, those with drone guns at their sides like the frame, or the middle when they fire bullets too. Outside its area a bot walks to it, starts no fight and passes food by, less often the more rare the shape. In its area it stays and lets go of a chase that would take it out. About half the bots are born in their own area where they have no team base. On a map with no maze, drone tanks and forward shooters stay near the rocks. Every bot follows it and takes a short break from it now and then. It is weaker in team modes. Off: every tank roams the same way.' },
+    tip: 'A bot prefers the kind of place that suits its tank, goes there and stays. A maze map has three areas: the frame, which is its outer edge all the way round, the open middle, and the maze between them. Tanks that fire forward, trappers that fire where they look, smashers and rammers like the maze, then the frame. Swarm drone tanks and trappers that fire to many sides like the frame. Tanks that fire bullets to many sides like the middle. Drone and minion tanks like the maze. Once grown to half a corridor, those with drone guns at their sides like the frame, or the middle when they fire bullets too. Outside its area a bot walks to it, starts no fight and passes food by, less often the more rare the shape. It does not go to look at a tank it noticed firing beyond its screen. In its area it stays and lets go of a chase that would take it out. About half the bots are born in their own area where they have no team base. On a map with no maze, drone tanks and forward shooters stay near the rocks. Every bot follows it and takes a short break from it now and then. It is weaker in team modes. Off: every tank roams the same way.' },
   { key: 'quiet', ai: 'HF_QUIET', title: 'Goes To The Quiet Side', step: '4.6b', strength: false, moodLo: 1,
     tip: 'A bot that runs away counts enemy shots flying on its screen as danger, not only enemy tanks, and takes the way that is empty. A bot that two enemies shoot at once goes to a spot near it where only one of them can reach it, and fights from there. Food on a way is no danger unless it is hard to go round: eggs, plain squares, squares nested once and plain triangles never count, and a few shapes are walked round. Off: tanks, traps and every food shape but an egg count, shots do not, and a bot shot from two sides backs straight away from one of them.' },
   { key: 'dodge', ai: 'HF_DODGE', title: 'Steps Aside Or Shoots', step: '3.1', strength: false, moodLo: 1,
@@ -119,7 +119,7 @@ export const FEEL_ROWS: FeelRow[] = [
   { key: 'meet', ai: 'HF_MEETDIST', title: 'Fights From Where It Is', step: '4.5', strength: false, moodLo: 1,
     tip: 'A bot that meets a tank farther off than the distance it likes fights it from there, as players do, and does not walk in first. Never from more than 1.7 times the distance it likes, and a bot that likes to fight close still goes in close. It still walks in when its shots do nothing for a while, and when a wall comes between them. Off: every bot first walks in to its own distance.' },
   { key: 'nest', ai: 'HF_NEST', title: 'Trappers Camp', step: '8.3', strength: false, moodLo: 1,
-    tip: 'A bot on a tank that lays traps sometimes camps, as many players on such tanks do. It holds its ground for half a minute or more and keeps laying traps around it, with or without a tank in sight. A camp starts in a fight, or at food it already stands close enough to farm. Small food like a square is shot in passing and starts no camp. When its shots take nothing off its food for a few seconds, the camp ends and the bot walks closer, and if still nothing lands it leaves that food. The bot gives way when a tank comes too close and runs when it is badly hurt. Between two camps it moves like any other bot. Only for a bot alone in a free for all.' },
+    tip: 'A bot on a tank that lays traps sometimes camps, as many players on such tanks do. It holds its ground for half a minute or more and keeps laying traps around it, with or without a tank in sight. A camp starts in a fight, or at food it already stands close enough to farm. Small food like a square is shot in passing and starts no camp. When its shots take nothing off its food for a few seconds, the camp ends and the bot walks closer, and if still nothing lands it leaves that food. The bot gives way when a tank comes too close and runs when it is badly hurt. It camps only where its traps have room, never in a narrow corridor where most of them would land in the walls beside it. With nothing to aim at it turns so that none of its guns points at a wall right beside it. Between two camps it moves like any other bot. Only for a bot alone in a free for all.' },
   { key: 'dronehand', ai: 'HF_DRONEHAND', title: 'Drones Go Round Walls', step: '8.2', strength: false, moodLo: 1,
     tip: 'A bot on a drone tank leads its drones with one pointer, as a player does. It gathers them into a group and walks the group through the corridors, round the walls, to the tank or the food it has decided to fight, while it stays back itself. It only does so when the whole way lies on its own screen. With a clear view it sends them straight at the target. Its pointer never leaves its own screen.' },
   { key: 'dronedist', ai: 'HF_DRONEDIST', title: 'Drone Tanks Stay Back', step: '8.2', strength: false, moodLo: 1,
@@ -129,7 +129,7 @@ export const FEEL_ROWS: FeelRow[] = [
   { key: 'dronekeep', ai: 'HF_DRONEKEEP', title: 'Drones Kept Off Walls', step: '8.2', strength: false, moodLo: 1,
     tip: 'A bot on a drone tank or a minion tank keeps them alive on its way. On a map with walls its pointer stays held while it has no fight. Its drones and its minions stay by its own body while it moves, not in front of it. It turns the pointer round its minions so they close up and do not drift into a wall. It keeps its body away from a wall when it can and does not point its drone guns at a wall close by, so new ones are not born into the wall. On a map with no walls they rest around it and hunt by themselves as before.' },
   { key: 'dronesafe', ai: 'HF_DRONESAFE', title: 'Drone Tanks Take Cover', step: '8.2', strength: false, moodLo: 1,
-    tip: 'A bot on a drone tank or a minion tank asks if the tank it fights can hit it. If so it goes behind the nearest wall from which its drones or minions still have a way on its screen, and fights from there. It paces instead of standing still, steps away from a tank that is a danger to it, and from behind a wall it sends them in groups. A round it cannot step away from is met by its drones, moved by its one pointer as a hand moves a mouse.' },
+    tip: 'A bot on a drone tank or a minion tank asks if the tank it fights can hit it. If so it goes behind the nearest wall from which its drones or minions still have a way on its screen, and fights from there. It paces instead of standing still, steps away from a tank that is a danger to it, and from behind a wall it sends them in groups. A round it cannot step away from is met by its drones, moved by its one pointer as a hand moves a mouse. When its drones or minions are away and a tank comes straight at it, it steps away from that tank and calls them home, whether that tank has fired at it or not.' },
   { key: 'override', ai: 'HF_OVERRIDE', title: 'Drones Spare Friends', step: '8.2', strength: false, moodLo: 1,
     tip: 'In a free for all, a bot whose drones, minions or swarm hunt by themselves holds override while a tank it is at peace with stands near it, as a player presses R. Its rounds then stop hunting by themselves until that tank has gone.' },
   { key: 'swarmhand', ai: 'HF_SWARMHAND', title: 'Swarm Tanks Keep Shooting', step: '8.2', strength: false, moodLo: 1,
@@ -139,7 +139,7 @@ export const FEEL_ROWS: FeelRow[] = [
   { key: 'travel', ai: 'HF_TRAVEL', title: 'Tanks Go To Their Place', step: '4.4', strength: false, moodLo: 1,
     tip: 'A bot on its way to the kind of place its tank likes leaves other tanks alone and chases nobody. If it is hit on the way it shoots back while it keeps going to its place, unless the way leads toward the tank that hits it. Once there it fights as always. One bold bot in a dozen still starts fights on the way. On a maze map Likes Its Own Ground does this by itself, so this matters for a bot the three areas do not rule and on maps with no maze.' },
   { key: 'ram', ai: 'HF_RAM', title: 'Rammers Pick Their Fights', step: '8.1b', strength: false, moodLo: 1,
-    tip: 'A tank of the Rammer Tanks group works out who would win a ram from both tanks as they are right now: health, shield, body damage, how well each takes a hit and how fast each mends. It also asks if it can get to that tank soon: a gun tank that sees it and backs off nearly as fast as it drives is not charged head on. If it would win and can get there it attacks, goes straight at its target, also when the target stands at a wall, and never turns back. It gives up only when it has taken twice what it dealt and its health is low. A tank it cannot beat yet but could beat hurt, or cannot get to in time, is its prey: it keeps that tank near the edge of its screen and strikes when the prey is losing a fight, is under 60 percent of its health or runs from someone. Every other tank it leaves alone and walks away from. Other tanks treat a rammer that drives straight at them as a threat: they shoot at it and back off, also when they were at peace with it. A rammer that only passes nearby does not count. Off: rammers judge and fight as before.' },
+    tip: 'A tank of the Rammer Tanks group works out who would win a ram from both tanks as they are right now: health, shield, body damage, how well each takes a hit and how fast each mends, and what that tank\'s guns would do to it on the way in and during the ram. It also asks if it can get to that tank soon: a gun tank that sees it and backs off nearly as fast as it drives is not charged head on. If it would win and can get there it attacks, goes straight at its target, at the place a moving target will be within the next second, also when the target stands at a wall, and never turns back. It gives up only when it has taken twice what it dealt and its health is low. A tank it cannot beat yet but could beat hurt, or cannot get to in time, is its prey: it keeps that tank near the edge of its screen, outside the distance that tank can shoot, and strikes when the prey is losing a fight, is under 60 percent of its health or runs from someone. Every other tank it leaves alone and walks away from. Other tanks treat a rammer that drives straight at them as a threat: they shoot at it and back off, also when they were at peace with it. A rammer that only passes nearby does not count. Off: rammers judge and fight as before.' },
 ];
 export const FEEL = {
   SIGHT: 0, KEYS: 1, HAND: 2, LOOK: 3, SWING: 4, BOOST: 5, TRUST: 6, CROWD: 7, SPIN: 8, SWEEP: 9, AIM: 10, STOPS: 11, TOGETHER: 12, LINES: 13, ODDS: 14, MATES: 15, PROTECT: 16, LETGO: 17, CALM: 18, SMASH: 19, WAG: 20, JOIN: 21, FOCUS: 22, GOALS: 23, SPAWN: 24, OWNTIME: 25, FINGER: 26, CURSOR: 27, READY: 28, SEES: 29, ONEFOE: 30, MIND: 31, GAP: 32, RISK: 33, EARLY: 34, PLACE: 35, QUIET: 36, DODGE: 37, KEEPHID: 38, HURTAWAY: 39, RINGS: 40, MEET: 41, NEST: 42, DRONEHAND: 43, DRONEDIST: 44, DRONEBACK: 45, DRONEKEEP: 46, DRONESAFE: 47, OVERRIDE: 48, SWARMHAND: 49, MINIONHAND: 50, TRAVEL: 51, RAM: 52,
@@ -229,7 +229,7 @@ export class FeelFrame {
   }
 }
 
-export interface HfAreaFacts { cls: Uint8Array; f1: Uint16Array; f2: Uint16Array; f3: Uint16Array; q: Int32Array; corr: number; ok: boolean; hasC: boolean }
+export interface HfAreaFacts { cls: Uint8Array; f1: Uint16Array; f2: Uint16Array; f3: Uint16Array; q: Int32Array; corr: number; ok: boolean; hasC: boolean; ver: number }
 export interface HfState {
   seed: number;
   dnaTrust: number; dnaGesture: number; dnaSpin: number; dnaStill: number; dnaHand: number;
@@ -253,6 +253,7 @@ export interface HfState {
   leanAt: number; leanX: number; leanY: number;
   cover: number; bpsMax: number;
   placeKind: number; placeP: number;
+  cpAng: number; cpHold: boolean; cpAt: number;
   spinUntil: number; spinNextAt: number; spinDir: number; spinAngle: number; spinRate: number; spinWas: boolean;
   sweepUntil: number; sweepNextAt: number; sweepOff: number;
   leadK: number;
@@ -270,8 +271,8 @@ export interface HfState {
   rmLeftN: number; rmLeftUntil: number; rmOnAt: number; rmGdAt: number; rmGdN: number; rmVN: number[]; rmVV: number[]; rmVUntil: number[]; rmVFrame: number; rmVCnt: number;
   peaceAt: number; lives: number;
   letStr: string; letTurnUntil: number;
-  wagUntil: number; wagBase: number; wagSeen: number; wagNextAt: number;
-  moveHoldUntil: number; paceT: number; lookAbs: number; lookPath0: number; lookSoon: boolean; fixAt: number; strokeWant: number;
+  wagUntil: number; wagBase: number; wagSeen: number; wagNextAt: number; wgNext: number; wgStep: number; wgAt: number;
+  moveHoldUntil: number; paceT: number; lookAbs: number; lookPath0: number; lookSoon: boolean; tlAng: number; tlUntil: number; tlB0: number; fixAt: number; strokeWant: number;
   lostId: string;
   trAsk: Float64Array; wagTo: number; wagAt: number;
   focN: number; focUntil: number; focDmg: number; focHurtAt: number; focLock: number; focOn: boolean; focFree: number; focId: string; focSeenAt: number;
@@ -288,13 +289,33 @@ export interface HfState {
   cvX: number; cvY: number; cvNext: number; cvOk: number;
   h1Id: string; h1At: number; h2Id: string; h2At: number;
   cvGX: number; cvGY: number;
-  dgId: number; dgGo: boolean; avId: number; avGo: boolean;
+  dgId: number; dgGo: boolean; dgHard: boolean; dgAsk: number; avId: number; avGo: boolean;
+  cnId: string; cnUntil: number; cnSince: number; cnPause: number; cnGo: boolean; cnOut: boolean; cnOutX: number; cnOutY: number;
+  bkAskId: string; bkAt: number; bkOk: boolean; bkUntil: number;
   dgX: number; dgY: number; dgUntil: number;
   hsId: string; hsX: number; hsY: number; hsLost: number; hsFor: number;
   hwX: number; hwY: number; hwUntil: number; hwAt: number;
   rnNext: number; rnX: number; rnY: number; rnR: number; rnUntil: number; rhX: number; rhY: number; rhR: number; rhUntil: number; rhAt: number;
   fdN: number; fdD: number; fdAt: number;
   tsUntil: number; tsNextAt: number;
+  gfV: number; gfAt: number;
+  rpV: number; rpAt: number;
+  cbId: string; cbAt: number; cbSeen: number;
+  wmC: Int32Array; wmT: Float64Array; wmH: number; wmN: number; wmArea: string;
+  rfV: number; rlV: number; rbV: number; hvR: number; hrSince: number; hrAt: number;
+  hqId: string; hqR: number; hqAt: number;
+  gAt: number; gLd: string; gN: number; gCall: number; gCallAt: number; gSeen: number; gFx: number; gFy: number; gFoe: number; gOwn: number; gMem: number; gMemAt: number; gPat: number; gGoUntil: number; gBackAt: number; gRx: number; gRy: number; gKey: string;
+  gDo: number; gPend: number; gDoAt: number; gTx: number; gTy: number; gTk: string; gQx: number; gQy: number; gKite: number; gThere: boolean;
+  gB: number; gBAt: number;
+  udNext: number; udUntil: number; udX: number; udY: number; udSum: number; udSince: number; udAt: number;
+  ckN: number; ckSince: number; ckSeen: number;
+  hitId: string; hitX: number; hitY: number; hitUntil: number;
+  hvMem: boolean; hmUntil: number;
+  hvC: number;
+  wfV: number;
+  hvId: string; hvX: number; hvY: number; hvK: number;
+  hkX: number; hkY: number; hkUntil: number; hkSince: number; hkQuitId: string; hkQuitUntil: number;
+  fcId: string; fcSince: number; fcAt: number;
   dKind: number; dMax: number; dwMode: number; dwX: number; dwY: number; dwGX: number; dwGY: number; dwVX: number; dwVY: number; dwCX: number; dwCY: number; dwPress: boolean; dwHold: boolean; dwReach: boolean;
   dwAt: number; dwTick: number; dwSince: number; dwReachAt: number; dwT: string; ddHoldAt: number;
   dFrame: number; dN: number; dAll: number; dRad: number; dX: Float32Array; dY: Float32Array;
@@ -310,7 +331,7 @@ export interface HfState {
   pcNext: number; pcOk: boolean; pcX: number; pcY: number; pcLX: number; pcLY: number;
   awNext: number; awOk: boolean; awX: number; awY: number; nwAt: number; spN: number; spA0: number; spA1: number; spA2: number; spA3: number;
   arRank: number; arPend: number; arPendAt: number; arNext: number; arG: number; arM: number; arL: number; arOk: boolean; arTX: number; arTY: number; arDX: number; arDY: number; arTUntil: number; arBul: number; arSide: boolean;
-  adX: number; adY: number; adUntil: number; adNext: number;
+  adX: number; adY: number; adUntil: number; adNext: number; ahX: number; ahY: number; ahR2: number; ahUntil: number; ahId: string; ahN: number; dtSide: number; dtAt: number; arRest: number; lvId: string; lvX: number; lvY: number; lvR: number; lvUntil: number; lvTurnAt: number; lvBlk: number; lvFh: number; frN: number; frC: Float64Array; frId: string[]; flAt: number; flX: number; flY: number; cdAt: number; cdOn: boolean; slId: string; slFirst: number; slAt: number; slN: number; slPool: number;
   evN: number;
   arLs: number; arLsAt: number;
   owNext: number; owX: number; owY: number; owK: number;
@@ -319,7 +340,7 @@ export interface HfState {
   foeSee: boolean; foeHot: boolean; hidWas: boolean; seeAt: number;
   rvId: string; rvN: number; rvSince: number; rvLast: number; rvHits: number; rvStamp: number; cfCoverAt: number;
   cfIdx: number; cfNext: number; cfAt: number;
-  frHold: boolean; frNext: number; frSince: number; frSide: number; frSX: number; frSY: number; frFree: number; focRhino: boolean;
+  frHold: boolean; frAside: boolean; frAsideAt: number; frNext: number; frSince: number; frSide: number; frSX: number; frSY: number; frFree: number; focRhino: boolean;
   tgR: number;
   tgD: number; tgWeak: boolean; tgAt: number; fdId: string; fdHp: number; fdMiss: number; fdTick: number;
   foodAt: number; lookPrev: string; lookPrevAt: number;
@@ -341,7 +362,7 @@ function HfShell(this: HfState): void {
   this.fightN = 0; this.autos = 0; this.chaseLast = 0;
   this.tanAt = -1; this.tanX = 0; this.tanY = 0; this.tanInX = 0; this.tanInY = 0;
   this.leanAt = -1; this.leanX = 0; this.leanY = 0;
-  this.cover = 1; this.bpsMax = 0; this.placeKind = 0; this.placeP = 0;
+  this.cover = 1; this.bpsMax = 0; this.placeKind = 0; this.placeP = 0; this.cpAng = 0; this.cpHold = false; this.cpAt = 0;
   this.spinUntil = 0; this.spinNextAt = 0; this.spinDir = 1; this.spinAngle = 0; this.spinRate = 0; this.spinWas = false;
   this.sweepUntil = 0; this.sweepNextAt = 0; this.sweepOff = 0;
   this.leadK = 1;
@@ -359,8 +380,8 @@ function HfShell(this: HfState): void {
   this.rmLeftN = 0; this.rmLeftUntil = 0; this.rmOnAt = 0; this.rmGdAt = 0; this.rmGdN = 0; this.rmVN = [0, 0, 0, 0, 0, 0]; this.rmVV = [0, 0, 0, 0, 0, 0]; this.rmVUntil = [0, 0, 0, 0, 0, 0]; this.rmVFrame = -1; this.rmVCnt = 0;
   this.peaceAt = 0; this.lives = 0;
   this.letStr = ''; this.letTurnUntil = 0;
-  this.wagUntil = 0; this.wagBase = 0; this.wagSeen = 0; this.wagNextAt = 0;
-  this.moveHoldUntil = 0; this.paceT = 0; this.lookAbs = 0; this.lookPath0 = 0; this.lookSoon = false; this.fixAt = 0; this.strokeWant = 0;
+  this.wagUntil = 0; this.wagBase = 0; this.wagSeen = 0; this.wagNextAt = 0; this.wgNext = 0; this.wgStep = 0; this.wgAt = 0;
+  this.moveHoldUntil = 0; this.paceT = 0; this.lookAbs = 0; this.lookPath0 = 0; this.lookSoon = false; this.tlAng = 0; this.tlUntil = 0; this.tlB0 = 0; this.fixAt = 0; this.strokeWant = 0;
   this.lostId = '';
   this.trAsk = new Float64Array(HF_TR_SLOTS); this.wagTo = 0; this.wagAt = 0;
   this.focN = 0; this.focUntil = 0; this.focDmg = 0; this.focHurtAt = 0; this.focLock = 0; this.focOn = false; this.focFree = 0; this.focId = ''; this.focSeenAt = 0;
@@ -376,13 +397,30 @@ function HfShell(this: HfState): void {
   this.cvX = 0; this.cvY = 0; this.cvNext = 0; this.cvOk = 0;
   this.h1Id = ''; this.h1At = 0; this.h2Id = ''; this.h2At = 0;
   this.cvGX = -1; this.cvGY = -1;
-  this.dgId = 0; this.dgGo = false; this.avId = 0; this.avGo = false;
+  this.dgId = 0; this.dgGo = false; this.dgHard = false; this.dgAsk = 0; this.avId = 0; this.avGo = false;
+  this.cnId = ''; this.cnUntil = 0; this.cnSince = 0; this.cnPause = 0; this.cnGo = false; this.cnOut = false; this.cnOutX = 0; this.cnOutY = 0;
+  this.bkAskId = ''; this.bkAt = 0; this.bkOk = false; this.bkUntil = 0;
   this.dgX = 0; this.dgY = 0; this.dgUntil = 0;
   this.hsId = ''; this.hsX = 0; this.hsY = 0; this.hsLost = 0; this.hsFor = 0;
   this.hwX = 0; this.hwY = 0; this.hwUntil = 0; this.hwAt = 0;
   this.rnNext = 0; this.rnX = 0; this.rnY = 0; this.rnR = 0; this.rnUntil = 0; this.rhX = 0; this.rhY = 0; this.rhR = 0; this.rhUntil = 0; this.rhAt = 0;
   this.fdN = 0; this.fdD = 0; this.fdAt = 0;
   this.tsUntil = 0; this.tsNextAt = 0;
+  this.gfV = 0; this.gfAt = 0;
+  this.rpV = 0; this.rpAt = 0;
+  this.cbId = ''; this.cbAt = 0; this.cbSeen = 0;
+  this.wmC = new Int32Array(24).fill(-1); this.wmT = new Float64Array(24); this.wmH = 0; this.wmN = 0; this.wmArea = '';
+  this.rfV = 0; this.rlV = 0; this.rbV = 0; this.hvR = 0; this.hrSince = 0; this.hrAt = 0;
+  this.hqId = ''; this.hqR = 0; this.hqAt = 0; this.hvMem = false; this.hmUntil = 0; this.hvC = 0; this.wfV = 0;
+  this.hitId = ''; this.hitX = 0; this.hitY = 0; this.hitUntil = 0;
+  this.gAt = 0; this.gLd = ''; this.gN = 1; this.gCall = 0; this.gCallAt = 0; this.gSeen = 0; this.gFx = 0; this.gFy = 0; this.gFoe = 0; this.gOwn = 0; this.gMem = 0; this.gMemAt = 0; this.gPat = 0; this.gGoUntil = 0; this.gBackAt = 0; this.gRx = 0; this.gRy = 0; this.gKey = '';
+  this.gDo = 0; this.gPend = 0; this.gDoAt = 0; this.gTx = 0; this.gTy = 0; this.gTk = ''; this.gQx = 0; this.gQy = 0; this.gKite = 0; this.gThere = false;
+  this.gB = 0; this.gBAt = 0;
+  this.ckN = 0; this.ckSince = 0; this.ckSeen = 0;
+  this.udNext = 0; this.udUntil = 0; this.udX = 0; this.udY = 0; this.udSum = 0; this.udSince = 0; this.udAt = 0;
+  this.hvId = ''; this.hvX = 0; this.hvY = 0; this.hvK = 0;
+  this.hkX = 0; this.hkY = 0; this.hkUntil = 0; this.hkSince = 0; this.hkQuitId = ''; this.hkQuitUntil = 0;
+  this.fcId = ''; this.fcSince = 0; this.fcAt = 0;
   this.dKind = 0; this.dMax = 0; this.dwMode = 0; this.dwX = 0; this.dwY = 0; this.dwGX = 0; this.dwGY = 0; this.dwVX = 0; this.dwVY = 0; this.dwCX = 0; this.dwCY = 0; this.dwPress = false; this.dwHold = false; this.dwReach = false;
   this.dwAt = 0; this.dwTick = 0; this.dwSince = 0; this.dwReachAt = 0; this.dwT = ''; this.ddHoldAt = -1;
   this.dFrame = -9; this.dN = 0; this.dAll = 0; this.dRad = 0; this.dX = new Float32Array(16); this.dY = new Float32Array(16);
@@ -398,7 +436,7 @@ function HfShell(this: HfState): void {
   this.pcNext = 0; this.pcOk = false; this.pcX = 0; this.pcY = 0; this.pcLX = -1; this.pcLY = -1;
   this.awNext = 0; this.awOk = false; this.awX = 0; this.awY = 0; this.nwAt = 0; this.spN = 0; this.spA0 = 0; this.spA1 = 0; this.spA2 = 0; this.spA3 = 0;
   this.arRank = 0; this.arPend = 0; this.arPendAt = 0; this.arNext = 0; this.arG = 0; this.arM = 0; this.arL = 0; this.arOk = false; this.arTX = 0; this.arTY = 0; this.arDX = 0; this.arDY = 0; this.arTUntil = 0; this.arBul = 0; this.arSide = false;
-  this.adX = 0; this.adY = 0; this.adUntil = 0; this.adNext = 0;
+  this.adX = 0; this.adY = 0; this.adUntil = 0; this.adNext = 0; this.ahX = 0; this.ahY = 0; this.ahR2 = 0; this.ahUntil = 0; this.ahId = ''; this.ahN = 0; this.dtSide = 0; this.dtAt = 0; this.arRest = 0; this.lvId = ''; this.lvX = 0; this.lvY = 0; this.lvR = 0; this.lvUntil = 0; this.lvTurnAt = 0; this.lvBlk = 0; this.lvFh = 0; this.frN = 0; this.frC = new Float64Array(12); this.frId = ['', '', '', '']; this.flAt = 0; this.flX = 0; this.flY = 0; this.cdAt = 0; this.cdOn = false; this.slId = ''; this.slFirst = 0; this.slAt = 0; this.slN = 0; this.slPool = 0;
   this.evN = 0;
   this.arLs = 0; this.arLsAt = 0;
   this.owNext = 0; this.owX = 0; this.owY = 0; this.owK = 0;
@@ -406,7 +444,7 @@ function HfShell(this: HfState): void {
   this.foeD2 = Infinity; this.foeX = 0; this.foeY = 0; this.foeNext = 0; this.fightAt = 0; this.trDone = new Float64Array(HF_TR_SLOTS); this.trHitAt = new Float64Array(HF_TR_SLOTS); this.hbId = ['', '', '', '']; this.hbAt = new Float64Array(4);
   this.foeSee = false; this.foeHot = false; this.hidWas = false; this.seeAt = 0;
   this.rvId = ''; this.rvN = 0; this.rvSince = 0; this.rvLast = 0; this.rvHits = 0; this.rvStamp = 0; this.cfCoverAt = 0; this.cfIdx = -1; this.cfNext = 0; this.cfAt = 0;
-  this.frHold = false; this.frNext = 0; this.frSince = 0; this.frSide = 0; this.frSX = 0; this.frSY = 0; this.frFree = 0; this.focRhino = false; this.tgR = 0; this.tgD = 0; this.tgWeak = false; this.tgAt = 0; this.fdId = ''; this.fdHp = 0; this.fdMiss = 0; this.fdTick = 0; this.foodAt = 0; this.lookPrev = ''; this.lookPrevAt = 0;
+  this.frHold = false; this.frAside = false; this.frAsideAt = 0; this.frNext = 0; this.frSince = 0; this.frSide = 0; this.frSX = 0; this.frSY = 0; this.frFree = 0; this.focRhino = false; this.tgR = 0; this.tgD = 0; this.tgWeak = false; this.tgAt = 0; this.fdId = ''; this.fdHp = 0; this.fdMiss = 0; this.fdTick = 0; this.foodAt = 0; this.lookPrev = ''; this.lookPrevAt = 0;
   this.rkN = new Int32Array(4); this.rkUntil = new Float64Array(4); this.rkV = new Uint8Array(4);
 }
 export function newHfState(): HfState { return new (HfShell as unknown as { new (): HfState })(); }
@@ -447,8 +485,8 @@ export function hfReset(h: HfState, g1: number, g2: number, g3: number, g4: numb
   h.rmLeftN = 0; h.rmLeftUntil = 0; h.rmOnAt = 0; h.rmGdAt = 0; h.rmGdN = 0; for (let i = 0; i < 6; i++) { h.rmVN[i] = 0; h.rmVV[i] = 0; h.rmVUntil[i] = 0; } h.rmVFrame = -1; h.rmVCnt = 0;
   h.peaceAt = 0; h.lives = 0;
   h.letStr = ''; h.letTurnUntil = 0;
-  h.wagUntil = 0; h.wagBase = 0; h.wagSeen = 0; h.wagNextAt = 0;
-  h.moveHoldUntil = 0; h.paceT = 0; h.lookAbs = 0; h.lookPath0 = 0; h.lookSoon = false; h.fixAt = 0; h.strokeWant = 0;
+  h.wagUntil = 0; h.wagBase = 0; h.wagSeen = 0; h.wagNextAt = 0; h.wgNext = 0; h.wgStep = 0; h.wgAt = 0;
+  h.moveHoldUntil = 0; h.paceT = 0; h.lookAbs = 0; h.lookPath0 = 0; h.lookSoon = false; h.tlAng = 0; h.tlUntil = 0; h.tlB0 = 0; h.fixAt = 0; h.strokeWant = 0;
   h.lostId = '';
   h.trAsk.fill(0); h.wagTo = 0; h.wagAt = 0;
   h.focN = 0; h.focUntil = 0; h.focDmg = 0; h.focHurtAt = 0; h.focLock = 0; h.focOn = false; h.focFree = 0; h.focId = ''; h.focSeenAt = 0;
@@ -464,7 +502,9 @@ export function hfReset(h: HfState, g1: number, g2: number, g3: number, g4: numb
   h.cvX = 0; h.cvY = 0; h.cvNext = 0; h.cvOk = 0;
   h.h1Id = ''; h.h1At = 0; h.h2Id = ''; h.h2At = 0;
   h.cvGX = -1; h.cvGY = -1;
-  h.dgId = 0; h.dgGo = false; h.avId = 0; h.avGo = false;
+  h.dgId = 0; h.dgGo = false; h.dgHard = false; h.dgAsk = 0; h.avId = 0; h.avGo = false;
+  h.cnId = ''; h.cnUntil = 0; h.cnSince = 0; h.cnPause = 0; h.cnGo = false; h.cnOut = false; h.cnOutX = 0; h.cnOutY = 0;
+  h.bkAskId = ''; h.bkAt = 0; h.bkOk = false; h.bkUntil = 0;
   h.dgX = 0; h.dgY = 0; h.dgUntil = 0;
   h.hsId = ''; h.hsX = 0; h.hsY = 0; h.hsLost = 0; h.hsFor = 0;
   h.hwX = 0; h.hwY = 0; h.hwUntil = 0; h.hwAt = 0;
@@ -480,16 +520,23 @@ export function hfReset(h: HfState, g1: number, g2: number, g3: number, g4: numb
   h.pcNext = 0; h.pcOk = false; h.pcX = 0; h.pcY = 0; h.pcLX = -1; h.pcLY = -1;
   h.awNext = 0; h.awOk = false; h.awX = 0; h.awY = 0; h.nwAt = 0;
   h.arRank = 0; h.arPend = 0; h.arPendAt = 0; h.arNext = 0; h.arG = 0; h.arM = 0; h.arL = 0; h.arOk = false; h.arTX = 0; h.arTY = 0; h.arDX = 0; h.arDY = 0; h.arTUntil = 0;
-  h.adX = 0; h.adY = 0; h.adUntil = 0; h.adNext = 0;
+  h.adX = 0; h.adY = 0; h.adUntil = 0; h.adNext = 0; h.ahUntil = 0; h.ahId = ''; h.ahN = 0; h.dtSide = 0; h.dtAt = 0; h.arRest = 0; h.lvId = ''; h.lvUntil = 0; h.lvTurnAt = 0; h.lvBlk = 0; h.lvFh = 0; h.frN = 0; h.flAt = 0; h.flX = 0; h.flY = 0; h.cdAt = 0; h.cdOn = false; h.slId = ''; h.slN = 0; h.slAt = 0;
   h.evN = 0;
   h.arLs = 0; h.arLsAt = 0;
   h.owNext = 0; h.owX = 0; h.owY = 0; h.owK = 0;
   h.esL = 0;
   h.dwAt = 0; h.dwTick = 0; h.dwSince = 0; h.dwReachAt = 0; h.dwT = ''; h.ddHoldAt = -1; h.dFrame = -9; h.dN = 0; h.dAll = 0; h.dRad = 0;
   h.foeD2 = Infinity; h.foeX = 0; h.foeY = 0; h.foeNext = 0; h.fightAt = 0; h.trDone.fill(0); h.trHitAt.fill(0); h.hbId[0] = ''; h.hbId[1] = ''; h.hbId[2] = ''; h.hbId[3] = ''; h.hbAt.fill(0);
-  h.foeSee = false; h.foeHot = false; h.hidWas = false; h.seeAt = 0;
+  h.foeSee = false; h.foeHot = false; h.hidWas = false; h.seeAt = 0; h.hvId = ''; h.hkUntil = 0; h.hkQuitId = '';
+  h.hvR = 0; h.hvMem = false; h.hmUntil = 0; h.hqId = ''; h.hqAt = 0; h.hrSince = 0; h.hrAt = 0; h.rpAt = 0; h.gfAt = 0;
+  h.wmC.fill(-1); h.wmH = 0; h.wmN = 0; h.wmArea = '';
+  h.hitId = ''; h.hitUntil = 0;
+  h.gAt = 0; h.gLd = ''; h.gN = 1; h.gCall = 0; h.gCallAt = 0; h.gSeen = 0; h.gFoe = 0; h.gOwn = 0; h.gMem = 0; h.gMemAt = 0; h.gPat = 0; h.gGoUntil = 0; h.gBackAt = 0; h.gKey = '';
+  h.gDo = 0; h.gPend = 0; h.gDoAt = 0; h.gTk = ''; h.gKite = 0; h.gThere = false; h.gB = 0; h.gBAt = 0;
+  h.ckN = 0; h.ckSince = 0; h.ckSeen = 0;
+  h.udNext = 0; h.udUntil = 0; h.udSum = 0; h.udSince = 0; h.udAt = 0;
   h.rvId = ''; h.rvN = 0; h.rvSince = 0; h.rvLast = 0; h.rvHits = 0; h.rvStamp = 0; h.cfCoverAt = 0; h.cfIdx = -1; h.cfNext = 0; h.cfAt = 0;
-  h.frHold = false; h.frNext = 0; h.frSince = 0; h.frSide = 0; h.frSX = 0; h.frSY = 0; h.frFree = 0; h.focRhino = false; h.tgR = 0; h.tgD = 0; h.tgWeak = false; h.tgAt = 0; h.fdId = ''; h.fdHp = 0; h.fdMiss = 0; h.fdTick = 0; h.foodAt = 0; h.lookPrev = ''; h.lookPrevAt = 0;
+  h.frHold = false; h.frAside = false; h.frAsideAt = 0; h.frNext = 0; h.frSince = 0; h.frSide = 0; h.frSX = 0; h.frSY = 0; h.frFree = 0; h.focRhino = false; h.tgR = 0; h.tgD = 0; h.tgWeak = false; h.tgAt = 0; h.fdId = ''; h.fdHp = 0; h.fdMiss = 0; h.fdTick = 0; h.foodAt = 0; h.lookPrev = ''; h.lookPrevAt = 0;
   h.rkN.fill(0); h.rkUntil.fill(0); h.rkV.fill(0);
 }
 export function feelRowOn(botFeel: BotFeelConfig | undefined, i: number): boolean {
@@ -590,7 +637,7 @@ export function hfTankFacts(h: HfState, turrets: ReadonlyArray<Turret>): void {
   h.cover = autos > 0 ? 8 : c; h.bpsMax = bpsMax; h.autos = autos;
   let kind = 0, pp = 0;
   if (swarm) kind = 1;
-  else if (units > 0) { kind = 2; pp = (units - 1) / 5; if (pp > 1) pp = 1; else if (pp < 0) pp = 0; }
+  else if (units > 0 && !(U && AI_CONSTANTS.HF_UNITOWN !== 0 && led === 0 && mled === 0 && (trapSect !== 0 || bulSect !== 0 || autos > 0))) { kind = 2; pp = (units - 1) / 5; if (pp > 1) pp = 1; else if (pp < 0) pp = 0; }
   else if (trapSect !== 0) { let n = 0; for (let b = trapSect; b !== 0; b &= b - 1) n++; kind = n <= 2 ? 3 : 4; }
   else if (bulSect !== 0) kind = (bulSect & ~0x11) === 0 ? 5 : 6;
   else if (autos > 0) kind = AI_CONSTANTS.HF_AREA !== 0 && autoSect !== 0 && (autoSect & ~0x11) === 0 ? 5 : 6;

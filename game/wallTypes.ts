@@ -131,6 +131,7 @@ export function wallSteerSet(slot: number, team: number, ox: number, oy: number,
 }
 export function wallSteerClear(): void { _sb = false; }
 export function wallSteerOn(): boolean { return _sb && _wb === B_NONE; }
+export function wallSteerPadMax(): number { return _sb && _wb === B_NONE && _sbAvoid !== 0 ? _sbPad : 0; }
 export function wallSteerPad(w: WallEntity): number {
   return _sb && _wb === B_NONE && w.kind !== undefined && w.kind > 0 && ((_sbAvoid >> w.kind) & 1) !== 0 ? _sbPad : 0;
 }

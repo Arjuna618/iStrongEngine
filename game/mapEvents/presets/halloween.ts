@@ -5,6 +5,7 @@ import { buildOverlayEvents } from './overlays';
 import { ASYLUM_GRID, ASYLUM_WALLS, ASYLUM_DOORS, ASYLUM_BUTTONS, ASYLUM_GENERATORS, ASYLUM_WORMHOLES, ASYLUM_FLOOR, ASYLUM_WEST_WING, ASYLUM_EAST_WING, ASYLUM_SPLIT, ASYLUM_PATCH, ASYLUM_NESTS, ASYLUM_DOOR_GREEN, ASYLUM_LOOT } from './asylum.generated';
 import { BUTTON_TANK, LOCKED_BUTTON_TANK } from './halloweenTanks.generated';
 import { DEFAULT_SHAPE_SPAWN_CONFIG, SHAPE_SPAWN_CONFIG_OF_BEFORE, MAZE_TYPE_CUSTOM } from '../../../types';
+import { SMALL_FIX } from '../../smallFixSwitch';
 import type { MapConfig, PortalKindConfig } from '../../../types';
 import { CM, CM_FREE } from '../../../utils/colorMap';
 import { HUD_MSG_ALWAYS_INVISIBLE } from '../../../utils/hudArras';
@@ -264,7 +265,9 @@ export function buildHalloweenWorld(): HalloweenWorld {
     ]),
     rule('Halloween: a green button opens its door', [row('body.died', { who: { forms: [ref(greenOpens)] }, cause: 'hit' })], [], [
       row('area.behaviors', { homeOf: SUB, kind: 'door', on: false }),
-      row('forEach', { who: { w: 'homeMates' }, wait: false, do: [
+      row('forEach', { who: { w: 'homeMates' }, wait: false, do: SMALL_FIX.G854 !== 0 ? [
+        whenForm([redLocked], redOpen), row('wait', { seconds: swap }), whenForm([hiddenB], greenShutsB),
+      ] : [
         whenForm([hiddenB], greenShutsB), whenForm([redLocked], redOpen),
       ] }),
     ]),

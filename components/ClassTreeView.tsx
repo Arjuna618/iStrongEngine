@@ -1,4 +1,5 @@
 import { shortcutKey } from '../utils/shortcutKey';
+import { SMALL_FIX } from '../game/smallFixSwitch';
 import React, { useRef, useEffect, useState } from 'react';
 import { TEXT_LIMITS } from './kit/textLimits';
 import { escapeIsOwned } from './shared/escapeStack';
@@ -357,7 +358,7 @@ const ClassTreeView: React.FC<{ logic: GameLogic }> = ({ logic }) => {
       const ink = _BORDER_CSS[dark ? 1 : 0];
       const at = glr.atlas;
       if (at.fontPx !== atlasFont || at.strokePx !== atlasStroke || at.ink !== ink) {
-        at.reset(atlasFont, atlasStroke, ink, _pendingNames ? [..._pendingNames] : [...at.cells.keys()]);
+        at.reset(atlasFont, atlasStroke, ink, _pendingNames ? [..._pendingNames] : SMALL_FIX.G984 !== 0 ? at.allNames() : [...at.cells.keys()]);
         _pendingNames = null;
       } else if (_pendingNames) {
         let missing = false;

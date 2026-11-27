@@ -18,6 +18,7 @@ import { TEAM_COLOUR } from '../teamColourSwitch';
 
 const CHAIN_MAX = 16, SIG_PER_STEP = 512, OPS_PER_STEP = 8192, RUNS_MAX = 2048, FLIPS_MAX = 20, STALL_MS = 10000;
 const HUD_LIVE_MS = 250;
+const SPECIAL_PAST = 8;
 const NO_ROOM_RUN_MS = 500, NO_ROOM_WAVE_MS = 5000;
 const PER_STEP_BIRTHS = 8;
 
@@ -25,6 +26,7 @@ const F_FREE = 1;
 const F_OWN_KILL = 2;
 const F_SKIP = 4;
 const F_JOINING = 8;
+const F_FORK = 16;
 const COUNTED_KINDS: ReadonlySet<string> = new Set(['seekHeal', 'healerDuty', 'teamFight', 'fearLow', 'wallAvoid', 'wallTouch']);
 interface Scene { seq: CSeq; parent: Scene | null; until: number; runs: number; kids: number; }
 const SCENE_HELD = 1, SCENE_GUARD = 2, SCENE_STOP = 4, SCENE_SKIP = 8;
@@ -158,7 +160,7 @@ export class MapEventsVM implements NumCtx {
   private stayClocks: StayClock[] = [];
   private persistStatus: { status: number; type: number; tag: number }[] = [];
 
-  pPhase: Uint8Array; pWave: Int32Array; pNextAt: Float64Array; pLive: Int32Array; pToBorn: Int32Array; pStreams: Int32Array; pHadHolder: Uint8Array; pAllBorn: Uint8Array; pPausedAt: Float64Array; pWaveAt: Float64Array; pSpecial: (string)[]; pStallFor: Float64Array;
+  pPhase: Uint8Array; pWave: Int32Array; pNextAt: Float64Array; pLive: Int32Array; pToBorn: Int32Array; pStreams: Int32Array; pHadHolder: Uint8Array; pAllBorn: Uint8Array; pPausedAt: Float64Array; pWaveAt: Float64Array; pSpecial: (string)[]; pNoStream!: Uint8Array; pSpecialPast!: string[]; pSpecialPastWave!: Int32Array; pSpecialPastN!: Int32Array; pStallFor: Float64Array;
   pRun: Int32Array; private allBornQ: number[] = [];
   pPick: Int32Array;
   private pTotal: Int32Array; private pEmptyNoted: Uint8Array;
@@ -219,7 +221,7 @@ export class MapEventsVM implements NumCtx {
     this.hudTimerText = this.hudTimers.map(() => '');
     this.clockNext = new Float64Array(p.clocks.length).fill(Infinity); this.clockLeft = new Float64Array(p.clocks.length);
     const np = p.plans.length;
-    this.pPhase = new Uint8Array(np); this.pWave = new Int32Array(np); this.pNextAt = new Float64Array(np); this.pLive = new Int32Array(np); this.pToBorn = new Int32Array(np); this.pStreams = new Int32Array(np); this.pHadHolder = new Uint8Array(np); this.pAllBorn = new Uint8Array(np); this.pPausedAt = new Float64Array(np).fill(-1); this.pWaveAt = new Float64Array(np); this.pSpecial = new Array(np).fill(''); this.pStallFor = new Float64Array(np); this.pPick = new Int32Array(np); this.pRun = new Int32Array(np);
+    this.pPhase = new Uint8Array(np); this.pWave = new Int32Array(np); this.pNextAt = new Float64Array(np); this.pLive = new Int32Array(np); this.pToBorn = new Int32Array(np); this.pStreams = new Int32Array(np); this.pHadHolder = new Uint8Array(np); this.pAllBorn = new Uint8Array(np); this.pPausedAt = new Float64Array(np).fill(-1); this.pWaveAt = new Float64Array(np); this.pSpecial = new Array(np).fill(''); this.pNoStream = new Uint8Array(np); this.pSpecialPast = new Array(np * SPECIAL_PAST).fill(''); this.pSpecialPastWave = new Int32Array(np * SPECIAL_PAST).fill(-1); this.pSpecialPastN = new Int32Array(np); this.pStallFor = new Float64Array(np); this.pPick = new Int32Array(np); this.pRun = new Int32Array(np);
     this.pTotal = new Int32Array(np); this.pEmptyNoted = new Uint8Array(np);
     const ns = p.spawners.length;
     this.spNext = new Float64Array(ns).fill(Infinity); this.spBorn = new Int32Array(ns); this.spAlive = new Int32Array(ns); this.spOn = new Uint8Array(ns); this.spWant = new Int32Array(ns);
@@ -443,6 +445,7 @@ export class MapEventsVM implements NumCtx {
     if (this.nextClockDue <= now) this.stepClocks(now);
     this.stepTimers(now);
     if (this.statuses.length > 0) this.stepStatuses(now);
+    if (SMALL_FIX.G862 !== 0 && this._qWakeR.length > 0) this._stepQueues(now);
     this.settle();
     if (SMALL_FIX.GH384 && this.closing) return;
     this.stepWaves(now);
@@ -540,7 +543,8 @@ export class MapEventsVM implements NumCtx {
   }
 
   private fire(r: number, s: number): void {
-    this.startRun(r, this.sigSubject[s], this.sigSubjectId[s], this.sigOther[s], this.sigOtherId[s], this.sigOtherSide[s], this.sigX[s], this.sigY[s], this.sigDepth[s], this.sigWave[s], this.sigNum[s], this.sigKey[s], this.sigRow[s], false);
+    const key = SMALL_FIX.G848 !== 0 && this.sigKind[s] === this.opTrig('area.stayed') && this.sigA[s] > 0 ? this.sigA[s] - 1 : this.sigKey[s];
+    this.startRun(r, this.sigSubject[s], this.sigSubjectId[s], this.sigOther[s], this.sigOtherId[s], this.sigOtherSide[s], this.sigX[s], this.sigY[s], this.sigDepth[s], this.sigWave[s], this.sigNum[s], key, this.sigRow[s], false);
   }
 
   planWaveMatch(ip: number, s: number): boolean {
@@ -656,6 +660,15 @@ export class MapEventsVM implements NumCtx {
       if (rule.cooldownMs > 0 && this.now - this.ruleLast[r] < rule.cooldownMs) return -1;
       if (rule.everyNth > 0) { const n = ++this.ruleNth[r]; if (n % rule.everyNth !== 0) return -1; }
     }
+    if (SMALL_FIX.G975 !== 0 && !called && rule.policy === 3) {
+      const wq = this.ruleQueue[r];
+      if (wq && wq.length > 0 && (!rule.perSubject || wq.some(s => s.subjectId === subjectId)) && wq.length < 64) {
+        const qs: QueuedStart = { rule: r, subject, subjectId, other, otherId, otherSide, x, y, depth, wave, num, key, row, called, alive: !!subject && this.host.isLive(subject, subjectId) };
+        wq.push(qs);
+        this.lastQueued = qs;
+        return -1;
+      }
+    }
     if (this.ruleLive[r] >= rule.maxRuns && rule.policy !== 2) { if (rule.policy !== 1) { this.guard(`"${rule.name}" already has ${rule.maxRuns} runs going. A new one was refused.`, r); this.logRec(LOG_REFUSED, r, 0, 0); } return -1; }
     if (rule.policy !== 0 && this.ruleLive[r] > 0) {
       const same = this.liveRunOf(r, rule.perSubject ? subjectId : null);
@@ -708,6 +721,7 @@ export class MapEventsVM implements NumCtx {
   private liveRunOf(r: number, subjectId: string | null): number {
     for (let f = 0; f < this.fCap; f++) {
       if (!this.fLive[f] || this.fRule[f] !== r) continue;
+      if (subjectId !== null && (this.fFlags[f] & F_FORK)) continue;
       if (subjectId !== null && this.fSubjectId[f] !== subjectId) continue;
       return f;
     }
@@ -716,6 +730,7 @@ export class MapEventsVM implements NumCtx {
   private stopRunsOf(r: number, subjectId: string | null): void {
     for (let f = 0; f < this.fCap; f++) {
       if (!this.fLive[f] || this.fRule[f] !== r) continue;
+      if (subjectId !== null && (this.fFlags[f] & F_FORK)) continue;
       if (subjectId !== null && this.fSubjectId[f] !== subjectId) continue;
       const gen = this.fGen[f];
       this.endRun(f);
@@ -751,6 +766,11 @@ export class MapEventsVM implements NumCtx {
     this.emit(this.opTrig('run.ended'), r, 0, this.fSubject[f], this.fSubjectId[f], null, '', '', this.fX[f], this.fY[f], this.fWave[f], this.fRow[f], 0, 0, 0);
     this.depthNow = was;
     this.releaseRun(f);
+    this._tryQueue(r);
+    void rule;
+  }
+  private _tryQueue(r: number): void {
+    const rule = this.p.rules[r];
     const q = this.ruleQueue[r];
     if (q && q.length > 0 && !this.closing) {
       if (SMALL_FIX.GH555 !== 0 && rule.perSubject) {
@@ -758,6 +778,7 @@ export class MapEventsVM implements NumCtx {
           const n = q[k];
           if (this.queuedDropped(n)) { q.splice(k, 1); continue; }
           if (this.liveRunOf(r, n.subjectId) >= 0) { k++; continue; }
+          if (SMALL_FIX.G862 !== 0) { const left = this._restLeft(n); if (left > 0) { this._noteQueueWake(r, this.now + left); k++; continue; } }
           q.splice(k, 1);
           const c = this.startRun(n.rule, n.subject, n.subjectId, n.other, n.otherId, n.otherSide, n.x, n.y, n.depth, n.wave, n.num, n.key, n.row, true);
           if (SMALL_FIX.GH515) this.queuedBegun(n, c);
@@ -766,6 +787,7 @@ export class MapEventsVM implements NumCtx {
         for (let k = SMALL_FIX.GH413 ? q.length : 1; k > 0 && q.length > 0 && !this.closing; k--) {
           const n = q.shift()!;
           if (this.queuedDropped(n)) { k++; continue; }
+          if (SMALL_FIX.G862 !== 0) { const left = this._restLeft(n); if (left > 0) { q.unshift(n); this._noteQueueWake(r, this.now + left); break; } }
           const c = this.startRun(n.rule, n.subject, n.subjectId, n.other, n.otherId, n.otherSide, n.x, n.y, n.depth, n.wave, n.num, n.key, n.row, true);
           if (SMALL_FIX.GH515) this.queuedBegun(n, c);
           if (c >= 0) break;
@@ -773,7 +795,27 @@ export class MapEventsVM implements NumCtx {
         }
       }
     }
-    void rule;
+  }
+  private _restLeft(n: QueuedStart): number {
+    if (n.called === true) return 0;
+    const rule = this.p.rules[n.rule];
+    if (!(rule.cooldownMs > 0)) return 0;
+    const left = this.ruleLast[n.rule] + rule.cooldownMs - this.now;
+    return left > 0 ? left : 0;
+  }
+  private readonly _qWakeR: number[] = [];
+  private readonly _qWakeT: number[] = [];
+  private _noteQueueWake(r: number, at: number): void {
+    for (let i = 0; i < this._qWakeR.length; i++) if (this._qWakeR[i] === r) { if (at < this._qWakeT[i]) this._qWakeT[i] = at; return; }
+    this._qWakeR.push(r); this._qWakeT.push(at);
+  }
+  private _stepQueues(now: number): void {
+    for (let i = this._qWakeR.length - 1; i >= 0; i--) {
+      if (now < this._qWakeT[i]) continue;
+      const r = this._qWakeR[i], last = this._qWakeR.length - 1;
+      this._qWakeR[i] = this._qWakeR[last]; this._qWakeT[i] = this._qWakeT[last]; this._qWakeR.pop(); this._qWakeT.pop();
+      this._tryQueue(r);
+    }
   }
   private queuedDropped(n: QueuedStart): boolean {
     const rule = this.p.rules[n.rule];
@@ -794,6 +836,7 @@ export class MapEventsVM implements NumCtx {
       if (p >= 0 && this.fLive[p] && this.fGen[p] === n.parentGen) {
         this.fParent[c] = p; this.fParentGen[c] = this.fGen[p];
         this.fFlags[c] |= n.skip ?? 0;
+        if (SMALL_FIX.G938 !== 0) this.fFlags[c] |= this.fFlags[p] & F_SKIP;
         this.fScene[c] = n.scene ?? null;
         return;
       }
@@ -996,6 +1039,7 @@ export class MapEventsVM implements NumCtx {
     const f = this.fFree.pop()!;
     this.fLive[f] = 1;
     this.fPc[f] = at; this.fRule[f] = r; this.fFlags[f] = this.fFlags[parent] & F_SKIP; this.fDepth[f] = this.fDepth[parent]; this.fWaitStart[f] = -1;
+    if (SMALL_FIX.G877 !== 0) this.fFlags[f] |= F_FORK;
     this.fParent[f] = wait ? parent : -1; this.fParentGen[f] = this.fGen[parent]; this.fJoin[f] = 0;
     const sc = this.fScene[parent];
     this.fScene[f] = sc;
@@ -1265,7 +1309,15 @@ export class MapEventsVM implements NumCtx {
         case 'killer': { const b = SMALL_FIX.R953 !== 0 ? this.killerOf(f) : this.fOther[f]; return b && this.fOtherId[f] ? this.host.shownNameOf(b) : ''; }
         case 'area': { const k = this.fKey[f]; return k >= 0 && k < this.p.zones.length ? this.p.zones[k].name : ''; }
         case 'count': return String(Math.floor(this.fNum[f]));
-        case 'special': { const k = this.fKey[f]; return k >= 0 && k < this.pSpecial.length ? this.pSpecial[k] : ''; }
+        case 'special': {
+          const k = this.fKey[f];
+          if (!(k >= 0 && k < this.pSpecial.length)) return '';
+          if (SMALL_FIX.G849 !== 0 && this.pWave[k] !== this.fWave[f]) {
+            for (let i = 0; i < SPECIAL_PAST; i++) if (this.pSpecialPastWave[k * SPECIAL_PAST + i] === this.fWave[f]) return this.pSpecialPast[k * SPECIAL_PAST + i];
+            return '';
+          }
+          return this.pSpecial[k];
+        }
       }
       return all;
     }
@@ -1276,9 +1328,11 @@ export class MapEventsVM implements NumCtx {
     const line = this.p.forms[this.bForm[row]].def.killLine ?? this.p.types[this.bType[row]].def.killLine ?? '';
     return line.includes('{') ? line.replace(/\{(name|tank)\}/g, (_all, w: string) => (w === 'name' && this.bName[row]) || this.host.shownNameOf(b)) : line;
   }
-  madeLineOf(row: number, b: MevBody, tank: string): string {
+  madeLineOf(row: number, b: MevBody, tank: string, killed?: MevBody): string {
     if (row < 0 || row >= this.bN || this.bId[row] !== b.id) return '';
-    return this.p.types[this.bType[row]]?.def.madeLines?.[tank] ?? '';
+    const line = this.p.types[this.bType[row]]?.def.madeLines?.[tank] ?? '';
+    if (SMALL_FIX.G846 === 0 || !killed || !line.includes('{')) return line;
+    return line.replace(/\{(name|tank)\}/g, () => this.host.shownNameOf(killed));
   }
   kindWordOf(row: number, b: MevBody): string {
     if (row < 0 || row >= this.bN || this.bId[row] !== b.id) return '';
@@ -1290,7 +1344,7 @@ export class MapEventsVM implements NumCtx {
   }
   private nameOfSubject(f: number): string {
     const row = this.fRow[f];
-    if (row >= 0 && this.bName[row]) return this.bName[row];
+    if (row >= 0 && this.bName[row] && (SMALL_FIX.G847 === 0 || this.bId[row] === this.fSubjectId[f])) return this.bName[row];
     const b = this.subjectNow(f);
     return b ? this.host.shownNameOf(b) : '';
   }
@@ -1341,9 +1395,12 @@ export class MapEventsVM implements NumCtx {
         const L = this.streams;
         for (let i = 0; i < L.length; i++) {
           const q = L[i];
-          if (q.srcIp !== ip || q.srcRule !== s.srcRule || q.left <= 0 || q.waitingSince < 0 || s.spread > 0 || q.spread > 0 || q.name !== s.name || q.runX !== s.runX || q.runY !== s.runY
+          const spreadApart = SMALL_FIX.G908 !== 0 ? q.spread !== s.spread : (s.spread > 0 || q.spread > 0);
+          const fixedPoint = SMALL_FIX.G939 !== 0 && q.place === s.place && s.place !== null && s.place.w === 'point';
+          if (q.srcIp !== ip || q.srcRule !== s.srcRule || q.left <= 0 || q.waitingSince < 0 || spreadApart || q.name !== s.name || (!fixedPoint && (q.runX !== s.runX || q.runY !== s.runY))
               || q.runHome !== s.runHome || q.runRule !== s.runRule || (q.side?.team ?? '') !== (s.side?.team ?? '')) continue;
           q.left += s.left;
+          if (SMALL_FIX.G908 !== 0 && q.spread > 0) q.spreadN += s.spreadN;
           this.freeStream(s);
           return NEXT;
         }
@@ -1615,7 +1672,7 @@ export class MapEventsVM implements NumCtx {
   }
 
   private drainDeaths(): void {
-    if (this.freeDropId.length > 0) this.freeDrop();
+    if (this.freeDropId.length > 0 && !(SMALL_FIX.G909 !== 0 && this.sigCount > 0)) this.freeDrop();
     const n = this.dN;
     if (n === 0) return;
     this.dN = 0;
@@ -1639,7 +1696,11 @@ export class MapEventsVM implements NumCtx {
     }
   }
   ownsFree(id: string): boolean { return (this.statuses.length > 0 || this.freeTags.size > 0) && this.freeOwns(id); }
-  ruleCanStart(r: number): boolean { return !this.ruleOff[r] && !(this.p.rules[r].once && this.ruleRan[r] > 0); }
+  ruleCanStart(r: number): boolean {
+    const rule = this.p.rules[r];
+    if (SMALL_FIX.G894 !== 0 && rule.cooldownMs > 0 && this.now - this.ruleLast[r] < rule.cooldownMs) return false;
+    return !this.ruleOff[r] && !(rule.once && this.ruleRan[r] > 0);
+  }
   private freeOwns(id: string): boolean {
     if (this.freeTags.has(id)) return true;
     for (let i = 0; i < this.statuses.length; i++) if (this.statuses[i].id === id) return true;
@@ -1935,6 +1996,10 @@ export class MapEventsVM implements NumCtx {
     const r = this.req;
     r.tank = tank; r.refill = refill; r.x = this.host.posX(b); r.y = this.host.posY(b);
     r.team = this.host.sideOf(b);
+    if (SMALL_FIX.G897 !== 0 && row >= 0 && this.bType[row] >= 0) {
+      const def = this.p.types[this.bType[row]].def;
+      r.pushable = typeof def.pushable === 'boolean' ? def.pushable : null; r.solid = typeof def.solid === 'boolean' ? def.solid : null;
+    }
     if (SMALL_FIX.GH436 && !this.host.morph(b, r)) return;
     if (row >= 0) {
       const d = this.bDesign[row];
@@ -2308,9 +2373,12 @@ export class MapEventsVM implements NumCtx {
     this.depthNow = this.fDepth[f];
     const gh = SMALL_FIX.GH522;
     this.emit(this.opTrig('signal.got'), gh ? this.fKey[f] : key, this.fNum[f], b, b ? this.tId[0] : '', this.fOther[f], this.fOtherId[f], this.fOtherSide[f], this.fX[f], this.fY[f], this.fWave[f], b ? b._mev ?? -1 : -1, gh ? key + 1 : 0, 0, 0);
+    this.signalStarts(key);
+    return NEXT;
+  }
+  private signalStarts(key: number): void {
     for (let i = 0; i < this.p.plans.length; i++) if (this.p.plans[i].startSignal === key && this.pPhase[i] === PH_IDLE && !(SMALL_FIX.GH473 && this.p.plans[i].off)) this.startPlan(i, this.now);
     for (const s of this.p.spawners) if (s.signal === key && this.spOn[s.idx]) this.spWant[s.idx] += this.spawnerPer(s);
-    return NEXT;
   }
   private subjectNow(f: number): MevBody | null {
     const b = this.fSubject[f];
@@ -2318,7 +2386,7 @@ export class MapEventsVM implements NumCtx {
   }
   private varKey(vi: number, f: number): string | null {
     const v = this.p.vars[vi];
-    if (f < 0 && v.scope !== 'match' && SMALL_FIX.GH493 && this._ctxBody !== null) return v.scope === 'team' ? vi + ':' + this.host.sideOf(this._ctxBody) : vi + ':' + this._ctxBodyId;
+    if (f < 0 && v.scope !== 'match' && SMALL_FIX.GH493 && this._ctxBody !== null) return v.scope === 'team' ? vi + ':' + (this._ctxSideOver ?? this.host.sideOf(this._ctxBody)) : vi + ':' + this._ctxBodyId;
     if (v.scope === 'match' || f < 0) return null;
     const b = this.subjectNow(f);
     if (v.scope === 'team') return vi + ':' + (b ? this.host.sideOf(b) : '');
@@ -2350,7 +2418,8 @@ export class MapEventsVM implements NumCtx {
         : (this.scopedWas.get(wk) ?? (g565 ? (cmpOp(w.op, prev, target) ? 1 : 0) : 0));
       if (now && !was) {
         this.depthNow = f >= 0 ? this.fDepth[f] : 0;
-        this.emit(this.opTrig('var.crossed'), w.ip, v, f >= 0 ? this.fSubject[f] : null, f >= 0 ? this.fSubjectId[f] : '', null, '', '', 0, 0, this.currentWave(), -1, 0, 0, 0);
+        const g891 = SMALL_FIX.G891 !== 0 && f >= 0;
+        this.emit(this.opTrig('var.crossed'), w.ip, v, f >= 0 ? this.fSubject[f] : null, f >= 0 ? this.fSubjectId[f] : '', null, '', '', g891 ? this.fX[f] : 0, g891 ? this.fY[f] : 0, this.currentWave(), -1, 0, 0, 0);
       }
       if (wk === null) { this.varWas[i] = now ? 1 : 0; this.varWasSet[i] = 1; } else this.scopedWas.set(wk, now ? 1 : 0);
     }
@@ -2570,7 +2639,7 @@ export class MapEventsVM implements NumCtx {
     const next = this.pPick[i] > 0 ? this.pPick[i] : wave + 1;
     this.pPick[i] = 0;
     let d = finished ? 0 : breakSeconds(c.def, next, !this.pHadHolder[i], this.rollCtx);
-    if (!finished && d === 0 && this.pTotal[i] === 0) { if (!this.pEmptyNoted[i]) { this.pEmptyNoted[i] = 1; this.guard(`Wave Plan "${c.name}" has waves with nothing in them and no break. It waits a second between them.`); } d = 1; }
+    if (!finished && d === 0 && (this.pTotal[i] === 0 || (SMALL_FIX.G876 !== 0 && this.pNoStream[i] === 1))) { if (!this.pEmptyNoted[i]) { this.pEmptyNoted[i] = 1; this.guard(`Wave Plan "${c.name}" has waves with nothing in them and no break. It waits a second between them.`); } d = 1; }
     this.depthNow = 0;
     this.logRec(LOG_WAVE, -1, i, wave);
     this.emit(this.opTrig('wave.cleared'), i, Number.isFinite(d) ? Math.floor(d) : 0, null, '', null, '', '', 0, 0, wave, -1, 0, 0, 0);
@@ -2598,8 +2667,10 @@ export class MapEventsVM implements NumCtx {
     this.forcedSpecial[i] = -1;
     for (const pr of roll.problems) this.guard(`Wave Plan "${c.name}": ${pr}`);
     this.pTotal[i] = roll.total;
+    let made876 = 0;
     if (SMALL_FIX.GH511) { this.pRun[i]++; this.pStreams[i] = 0; }
     this.pPhase[i] = PH_RUNNING; this.pWave[i] = wave; this.pWaveAt[i] = now; this.pAllBorn[i] = 0; this.pHadHolder[i] = roll.hasHolder ? 1 : 0; this.pSpecial[i] = roll.special ? roll.special.name : '';
+    { const at = i * SPECIAL_PAST + (this.pSpecialPastN[i]++ % SPECIAL_PAST); this.pSpecialPastWave[at] = wave; this.pSpecialPast[at] = this.pSpecial[i]; }
     this.depthNow = 0;
     this.logRec(LOG_WAVE, -1, i, wave);
     this.tr(`wave ${wave} of ${c.name}: ${roll.total}${roll.special ? ' special ' + roll.special.name : ''}`);
@@ -2637,9 +2708,11 @@ export class MapEventsVM implements NumCtx {
         s.budgetCards = null;
         this.streams.push(s);
         this.pStreams[i]++;
+        made876++;
         if (rs.holds) this.pToBorn[i] += rs.k;
       }
     }
+    this.pNoStream[i] = made876 === 0 ? 1 : 0;
   }
 
   private newStream(): Stream {
@@ -3056,8 +3129,10 @@ export class MapEventsVM implements NumCtx {
       const total = Number.isFinite(totalV) && totalV > 0 ? totalV : Infinity;
       let want = this.spWant[i];
       if (s.mode === 'timer') {
-        if (now >= this.spNext[i]) {
-          want += this.spawnerPer(s);
+        let room893 = Infinity;
+        if (SMALL_FIX.G893 !== 0) { const mv = Math.floor(this.numOfSpawner(s, s.maxAliveOff)); if (Number.isFinite(mv) && mv > 0) room893 = mv - this.spAlive[i] - this.queuedOfSpawner(i); }
+        if (now >= this.spNext[i] && room893 > 0) {
+          want += Math.min(this.spawnerPer(s), room893);
           const d = this.numOfSpawner(s, s.everyOff) * 1000;
           this.spNext[i] = Number.isFinite(d) && d > 0 ? this.spNext[i] + d : Infinity;
           if (this.spNext[i] < now) this.spNext[i] = now;
@@ -3186,7 +3261,8 @@ export class MapEventsVM implements NumCtx {
       if (inside) {
         c.ms += dtMs;
         const due = this.stayDue(st, c.body, c.id);
-        if (Number.isFinite(due) && due > 0) {
+        if (SMALL_FIX.G851 !== 0 && due === 0) { if (!c.fired) { c.fired = true; this.fireStay(st, c.body, c.id, 1, c.ms); } }
+        else if (Number.isFinite(due) && due > 0) {
           if (st.repeat) {
             if (SMALL_FIX.GH369) { if (c.ms >= (c.repeats + 1) * due) { c.repeats++; this.fireStay(st, c.body, c.id, c.repeats, c.ms); } }
             else while (c.ms >= (c.repeats + 1) * due) { c.repeats++; this.fireStay(st, c.body, c.id, c.repeats, c.ms); }
@@ -3206,7 +3282,7 @@ export class MapEventsVM implements NumCtx {
   }
   private fireStay(st: CStay, b: MevBody, id: string, count: number, ms: number): void {
     this.depthNow = 0;
-    this.emit(this.opTrig('area.stayed'), st.ip, count, b, id, null, '', '', this.host.posX(b), this.host.posY(b), this.currentWave(), b._mev ?? -1, 0, 0, 0);
+    this.emit(this.opTrig('area.stayed'), st.ip, count, b, id, null, '', '', this.host.posX(b), this.host.posY(b), this.currentWave(), b._mev ?? -1, SMALL_FIX.G848 !== 0 ? st.zone + 1 : 0, 0, 0);
     void ms;
   }
 
@@ -3216,7 +3292,7 @@ export class MapEventsVM implements NumCtx {
     const to = code[ip + 1];
     const h = this.host;
     const player = h.viewerBody ? h.viewerBody() : h.playerBody();
-    if (to === 2) { const s = this.fSubject[f]; if (!s || !(h.isViewer ? h.isViewer(s) : h.isPlayer(s))) return NEXT; }
+    if (to === 2) { const s = this.fSubject[f]; if (!s || (SMALL_FIX.G869 !== 0 && s.id !== this.fSubjectId[f]) || !(h.isViewer ? h.isViewer(s) : h.isPlayer(s))) return NEXT; }
     else if (to === 1) { const w = code[ip + 4] >= 0 ? this.p.words[code[ip + 4]] : ''; if (!player || !w || this.host.sideOf(player) !== w) return NEXT; }
     else if (to === 3) { const z = code[ip + 5]; if (!player || z < 0 || !this.pointInZone(z, this.host.posX(player), this.host.posY(player))) return NEXT; }
     const life = this.numOf(f, code[ip + 3]);
@@ -3277,6 +3353,7 @@ export class MapEventsVM implements NumCtx {
     const words = this.expand(f, this.code[ip + 1], true);
     this.hudDoc = this.p.rules[this.fRule[f]].doc;
     this.hudBody = SMALL_FIX.G696 !== 0 ? this.subjectNow(f) : null; this.hudBodyId = this.hudBody !== null ? this.fSubjectId[f] : '';
+    this.hudBodySide = this.hudBody !== null ? this.host.sideOf(this.hudBody) : '';
     this.hudPattern = /\{\d+\}/.test(words) ? words : '';
     this.hudLine = this.hudPattern !== '' ? this.hudRead() : _unLink(words);
     this.hudNext = this.now + HUD_LIVE_MS;
@@ -3288,12 +3365,17 @@ export class MapEventsVM implements NumCtx {
   private hudDoc = 0;
   private hudBody: MevBody | null = null;
   private hudBodyId = '';
+  private hudBodySide = '';
+  private _ctxSideOver: string | null = null;
   private hudRead(): string {
     this._ctxDoc = this.hudDoc;
-    const pb = this._ctxBody, pid = this._ctxBodyId;
-    if (this.hudBody !== null) { this._ctxBody = this.hudBody; this._ctxBodyId = this.hudBodyId; }
+    const pb = this._ctxBody, pid = this._ctxBodyId, ps = this._ctxSideOver;
+    if (this.hudBody !== null) {
+      this._ctxBody = this.hudBody; this._ctxBodyId = this.hudBodyId;
+      if (SMALL_FIX.G850 !== 0 && this.hudBody.id !== this.hudBodyId) this._ctxSideOver = this.hudBodySide;
+    }
     try { return _unLink(this.hudPattern.replace(/\{(\d+)\}/g, (all, w: string) => this.chipWords(-1, w, all))); }
-    finally { this._ctxBody = pb; this._ctxBodyId = pid; }
+    finally { this._ctxBody = pb; this._ctxBodyId = pid; this._ctxSideOver = ps; }
   }
   private hudLive(now: number): void {
     if (this.hudPattern === '' || now < this.hudNext) return;
@@ -3343,7 +3425,10 @@ export class MapEventsVM implements NumCtx {
   }
   waveSet(i: number, n: number): void {
     this.pWave[i] = n;
-    if (this.pPhase[i] === PH_RUNNING) { this.pPhase[i] = PH_BREAK; this.pNextAt[i] = this.now; }
+    if (this.pPhase[i] === PH_RUNNING) {
+      this.pPhase[i] = PH_BREAK; this.pNextAt[i] = this.now;
+      if (SMALL_FIX.G887 !== 0 && this.pPausedAt[i] >= 0) this.pPausedAt[i] = this.now;
+    }
   }
   opWavePause(f: number, ip: number): number { const i = this.planOfStep(ip); if (i >= 0) this.wavePause(i); void f; return NEXT; }
   pickWave(i: number, n: number): 'next' | 'after' | 'past' | '' {
@@ -3549,9 +3634,10 @@ export class MapEventsVM implements NumCtx {
     const WORD = ['Not Started', 'First Wait', 'Coming', 'Break', 'Finished', 'Stopped'];
     return this.p.plans.map((c, i) => {
       let holders = 0;
-      for (let r = 0; r < this.bN; r++) if (this.bAlive[r] && this.bHoldPlan[r] === i) holders++;
+      if (SMALL_FIX.G856 !== 0 && SMALL_FIX.GH362 !== 0) { for (let k = 0; k < this.liveN; k++) { const r = this.liveRows[k]; if (this.bAlive[r] && this.bHoldPlan[r] === i) holders++; } }
+      else for (let r = 0; r < this.bN; r++) if (this.bAlive[r] && this.bHoldPlan[r] === i) holders++;
       const waiting = this.pPhase[i] === PH_BREAK || this.pPhase[i] === PH_DELAY;
-      return { index: i, name: c.name, wave: this.pWave[i], phase: WORD[this.pPhase[i]] ?? '', seconds: waiting ? Math.max(0, Math.round((this.pNextAt[i] - this.now) / 1000)) : null, paused: this.pPausedAt[i] >= 0, holders, toBorn: this.pToBorn[i], specials: (c.def.specials ?? []).map(s => ({ id: s.id, name: s.name })), forced: this.forcedSpecial[i] ?? -1 };
+      return { index: i, name: c.name, wave: this.pWave[i], phase: WORD[this.pPhase[i]] ?? '', seconds: waiting ? Math.max(0, Math.round((this.pNextAt[i] - (SMALL_FIX.G855 !== 0 && this.pPausedAt[i] >= 0 ? this.pPausedAt[i] : this.now)) / 1000)) : null, paused: this.pPausedAt[i] >= 0, holders, toBorn: this.pToBorn[i], specials: (c.def.specials ?? []).map(s => ({ id: s.id, name: s.name })), forced: this.forcedSpecial[i] ?? -1 };
     });
   }
   monitorRules(): { index: number; name: string; fired: number; failed: number; ran: number; live: number }[] {
@@ -3601,7 +3687,15 @@ export class MapEventsVM implements NumCtx {
     if (f < 0) return false;
     const r = this.p.rules[rule];
     this.fRule[f] = rule; this.fSubject[f] = null; this.fSubjectId[f] = ''; this.fOther[f] = null; this.fOtherId[f] = ''; this.fFlags[f] = F_FREE;
+    if (SMALL_FIX.G825 !== 0) {
+      this.fNum[f] = 0; this.fWave[f] = this.currentWave(); this.fRow[f] = -1; this.fX[f] = 0; this.fY[f] = 0; this.fKey[f] = -1;
+      this.fParent[f] = -1; this.fLast[f] = null; this.fLastId[f] = ''; this.fOtherSide[f] = '';
+      if (r.nLocals > 0) for (let i = 0; i < r.nLocals; i++) this.fLocal[f * 8 + i] = 0;
+    }
+    const rng = this.ruleRng[rule];
+    const was = SMALL_FIX.G824 !== 0 && rng ? [rng.a, rng.b, rng.c, rng.d] : null;
     const out = this.evalCond(f, r.cond);
+    if (was) { rng.a = was[0]; rng.b = was[1]; rng.c = was[2]; rng.d = was[3]; }
     return out;
   }
   private findFreeRun(): number { for (let f = 0; f < this.fCap; f++) if (!this.fLive[f]) return f; return -1; }
@@ -3613,7 +3707,7 @@ export class MapEventsVM implements NumCtx {
     const r = this.p.rules.findIndex(x => x.name.toLowerCase() === n);
     if (r >= 0) { this.runNow(r, null); return true; }
     const s = this.p.signals.findIndex(x => x.name.toLowerCase() === n);
-    if (s >= 0) { this.depthNow = 0; this.emit(this.opTrig('signal.got'), SMALL_FIX.GH522 ? -1 : s, 0, null, '', null, '', '', 0, 0, this.currentWave(), -1, SMALL_FIX.GH522 ? s + 1 : 0, 0, 0); return true; }
+    if (s >= 0) { this.depthNow = 0; this.emit(this.opTrig('signal.got'), SMALL_FIX.GH522 ? -1 : s, 0, null, '', null, '', '', 0, 0, this.currentWave(), -1, SMALL_FIX.GH522 ? s + 1 : 0, 0, 0); if (SMALL_FIX.G892 !== 0) this.signalStarts(s); return true; }
     return false;
   }
   killByName(name: string): boolean {

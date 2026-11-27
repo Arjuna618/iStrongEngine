@@ -2,11 +2,18 @@ import type {
   AreaGroup, TankGroup, EntityForm, EntityType, Id, MapEventsDoc, Named, PlacedEntity, Ref, Row, Rule, SpawnCard, SpawnGroup, StatusDef, TimerDef, VarDef, WaveOverride, WavePlan, ZoneLike, Num,
 } from './doc';
 import { DEFAULT_PLACE_RULE, SIDE_WORDS, newEventsDoc, shiftShape, flipShape } from './doc';
-import { kindOf, darkStepHides, type Family, type Field, type KindDef } from './registry';
+import { kindOf, darkStepHides, TEXT_TOKENS, type Family, type Field, type KindDef } from './registry';
 import { evalNum } from './num';
 import { WALL_RULES } from '../wallTypes';
 import { SMALL_FIX } from '../smallFixSwitch';
 import { colourWordShown } from './colourWord';
+export function zoneRectRowKey(more: readonly { gx: number; gy: number; cw: number; ch: number }[], k: number): string {
+  const m = more[k];
+  if (SMALL_FIX.R1017 === 0) return `${m.gx},${m.gy}`;
+  let copy = 0;
+  for (let i = 0; i < k; i++) { const o = more[i]; if (o.gx === m.gx && o.gy === m.gy && o.cw === m.cw && o.ch === m.ch) copy++; }
+  return `${m.gx},${m.gy},${m.cw},${m.ch}#${copy}`;
+}
 
 export type Path = readonly (string | number)[];
 
@@ -107,19 +114,50 @@ export function changeRowKind(doc: MapEventsDoc, rowPath: Path, family: Family, 
   const old = getAt(doc, rowPath) as Row;
   const fresh = makeRow(old.id, family, word);
   const d = kindOf(family, word);
-  if (d) for (const k of Object.keys(old.a)) if (d.fields[k]) fresh.a[k] = old.a[k];
+  const was = SMALL_FIX.G845 !== 0 ? kindOf(family, old.k) : undefined;
+  if (d) for (const k of Object.keys(old.a)) if (d.fields[k] && (SMALL_FIX.G845 === 0 || sameWordMeaning(was?.fields[k], d.fields[k], old.a[k]))) fresh.a[k] = old.a[k];
+  if (SMALL_FIX.G843 !== 0) { if (old.note !== undefined) fresh.note = old.note; if (old.off) fresh.off = true; }
   return setAt(doc, rowPath, fresh);
+}
+function sameWordMeaning(from: Field | undefined, to: Field, v: unknown): boolean {
+  if (!from) return true;
+  if (from.t !== to.t) return false;
+  switch (to.t) {
+    case 'ref': case 'refs': return (from as { of: unknown }).of === to.of;
+    case 'enum': return typeof v === 'string' && to.of.includes(v);
+    case 'int': return typeof v === 'number' && v >= to.min && v <= to.max;
+    case 'num': return SMALL_FIX.G966 === 0 || typeof v !== 'number' || ((to.min === undefined || v >= to.min) && (to.max === undefined || v <= to.max));
+    case 'target': return !to.only || (!!v && typeof v === 'object' && to.only.includes((v as { w: string }).w));
+    default: return true;
+  }
 }
 export function duplicateRule(doc: MapEventsDoc, id: Id): { doc: MapEventsDoc; id: Id } {
   const i = indexOfId(doc, 'rules', id);
   if (i < 0) return { doc, id };
   const r = withIds(doc, (take, base) => {
-    const copy = reId(base.rules![i], take) as Rule;
+    const copy = ownParams(base.rules![i], reId(base.rules![i], take) as Rule);
     copy.name = freeName(copy.name, base.rules!);
     delete copy.shipped; delete copy.shortcut;
     return copy;
   });
   return { doc: insertAt(r.doc, ['rules'], i + 1, r.value), id: r.value.id };
+}
+function ownParams(orig: Rule, copy: Rule): Rule {
+  if (SMALL_FIX.G873 === 0 || !Array.isArray(orig.params) || !Array.isArray(copy.params)) return copy;
+  const map = new Map<number, number>();
+  orig.params.forEach((q, k) => { const c = copy.params![k]; if (q && c && typeof q.id === 'number' && q.id !== c.id) map.set(q.id, c.id); });
+  if (map.size === 0) return copy;
+  const walk = (x: unknown): unknown => {
+    if (typeof x === 'string') return x.replace(/\{(\d+)\}/g, (m, d: string) => { const n = map.get(Number(d)); return n !== undefined ? `{${n}}` : m; });
+    if (x === null || typeof x !== 'object') return x;
+    if (Array.isArray(x)) return x.map(walk);
+    const out: Record<string, unknown> = {};
+    for (const k of Object.keys(x as object)) out[k] = walk((x as Record<string, unknown>)[k]);
+    return out;
+  };
+  const out = walk(copy) as Rule;
+  out.name = copy.name;
+  return out;
 }
 function reId(v: unknown, take: () => Id): unknown {
   if (v === null || typeof v !== 'object') return v;
@@ -131,8 +169,28 @@ function reId(v: unknown, take: () => Id): unknown {
   return out;
 }
 
+const _pasteTokens = new WeakMap<object, Map<number, string>>();
+const TOKEN_RE = /\{(\d+)\}/g;
+function tokenNamesOf(doc: MapEventsDoc | undefined): Map<number, string> {
+  const m = new Map<number, string>();
+  if (doc) for (const list of [doc.vars, doc.timers, doc.tags, doc.types]) if (Array.isArray(list)) for (const t of list as { id: number; name: string }[]) m.set(t.id, t.name);
+  return m;
+}
+function eachString(v: unknown, f: (s: string) => string): unknown {
+  if (typeof v === 'string') return f(v);
+  if (v === null || typeof v !== 'object') return v;
+  if (Array.isArray(v)) return v.map(x => eachString(x, f));
+  const out: Record<string, unknown> = {};
+  for (const k of Object.keys(v as object)) out[k] = eachString((v as Record<string, unknown>)[k], f);
+  return out;
+}
 export function copyForPaste<T>(v: T, doc: MapEventsDoc | undefined, zones: readonly ZoneLike[]): T {
   const copy = JSON.parse(JSON.stringify(v)) as T;
+  if (SMALL_FIX.G839 !== 0 && copy !== null && typeof copy === 'object') {
+    const names = tokenNamesOf(doc), seen = new Map<number, string>();
+    eachString(copy, s => { for (const m of s.matchAll(TOKEN_RE)) { const n = names.get(Number(m[1])); if (n !== undefined) seen.set(Number(m[1]), n); } return s; });
+    if (seen.size) _pasteTokens.set(copy as unknown as object, seen);
+  }
   if (!SMALL_FIX.GH500) return copy;
   const byId = namesOf(doc, zones);
   const walk = (x: unknown): void => {
@@ -146,6 +204,17 @@ export function copyForPaste<T>(v: T, doc: MapEventsDoc | undefined, zones: read
   return copy;
 }
 function relink(v: unknown, doc: MapEventsDoc, zones: readonly ZoneLike[], take?: () => Id): unknown {
+  const toks = SMALL_FIX.G839 !== 0 && v !== null && typeof v === 'object' ? _pasteTokens.get(v as object) : undefined;
+  if (toks) {
+    const here = tokenNamesOf(doc), byNameHere = new Map<string, number>();
+    for (const [id, n] of here) if (!byNameHere.has(n)) byNameHere.set(n, id);
+    v = eachString(v, s => s.replace(TOKEN_RE, (m, d: string) => {
+      const n = toks.get(Number(d));
+      if (n === undefined || here.get(Number(d)) === n) return m;
+      const id = byNameHere.get(n);
+      return id !== undefined ? `{${id}}` : `{${n}}`;
+    }));
+  }
   const byId = namesOf(doc, zones);
   const byName = new Map<string, number>();
   for (const list of [doc.types, doc.placed, doc.plans, doc.rules, doc.sequences, doc.vars, doc.timers, doc.statuses, doc.signals, doc.tags, doc.folders, doc.areaGroups, doc.tankGroups]) {
@@ -171,7 +240,8 @@ function relink(v: unknown, doc: MapEventsDoc, zones: readonly ZoneLike[], take?
 }
 export function pasteRule(doc: MapEventsDoc | undefined, zones: readonly ZoneLike[], rule: Rule, at = -1): { doc: MapEventsDoc; id: Id } {
   const r = withIds(doc, (take, base) => {
-    const copy = reId(relink(rule, base, zones, take), take) as Rule;
+    const linked = relink(rule, base, zones, take) as Rule;
+    const copy = ownParams(linked, reId(linked, take) as Rule);
     copy.name = freeName(copy.name, base.rules ?? []);
     delete copy.shipped; delete copy.shortcut; delete copy.folder;
     return copy;
@@ -180,7 +250,20 @@ export function pasteRule(doc: MapEventsDoc | undefined, zones: readonly ZoneLik
 }
 export function pastePlan(doc: MapEventsDoc | undefined, zones: readonly ZoneLike[], plan: WavePlan): { doc: MapEventsDoc; id: Id } {
   const r = withIds(doc, (take, base) => {
-    const copy = reId(relink(plan, base, zones, take), take) as WavePlan;
+    const linked = relink(plan, base, zones, take) as WavePlan;
+    const copy = reId(linked, take) as WavePlan;
+    if (SMALL_FIX.G837 !== 0 && copy.cells?.length) {
+      const map = new Map<number, number>();
+      const pair = (a: unknown, b: unknown): void => {
+        if (a === null || typeof a !== 'object' || b === null || typeof b !== 'object') return;
+        if (Array.isArray(a)) { a.forEach((x, k) => pair(x, (b as unknown[])[k])); return; }
+        const o = a as Record<string, unknown>, p = b as Record<string, unknown>;
+        if (typeof o.id === 'number' && typeof p.id === 'number' && typeof o.n !== 'string') map.set(o.id, p.id);
+        for (const k of Object.keys(o)) if (k !== 'cells') pair(o[k], p[k]);
+      };
+      pair(linked, copy);
+      copy.cells = copy.cells.map(c => ({ ...c, g: map.get(c.g) ?? c.g }));
+    }
     copy.name = freeName(copy.name, base.plans ?? []);
     return copy;
   });
@@ -195,7 +278,9 @@ export function duplicatePlaced(doc: MapEventsDoc, id: Id): { doc: MapEventsDoc;
   if (i < 0) return { doc, id };
   const r = withIds(doc, (take, base) => {
     const p = base.placed![i];
-    return { ...p, id: take(), name: freeName(p.name, base.placed!), cx: p.cx + 1, cy: p.cy + 1 } as PlacedEntity;
+    const copy = { ...p, id: take(), name: freeName(p.name, base.placed!), cx: p.cx + 1, cy: p.cy + 1 } as PlacedEntity;
+    if (SMALL_FIX.G838 !== 0 && p.spots) copy.spots = p.spots.map(s => ({ ...s, cx: s.cx + 1, cy: s.cy + 1 }));
+    return copy;
   });
   return { doc: insertAt(r.doc, ['placed'], i + 1, r.value), id: r.value.id };
 }
@@ -227,7 +312,11 @@ export function mirrorPlaced(doc: MapEventsDoc, id: Id, w: number, h: number): M
     const cx = fx ? w - p.cx : p.cx, cy = fy ? h - p.cy : p.cy;
     if (seen.some(s => Math.abs(s[0] - cx) < 0.01 && Math.abs(s[1] - cy) < 0.01)) continue;
     seen.push([cx, cy]);
-    const r = withIds(next, (take, base) => ({ ...p, id: take(), name: freeName(p.name, base.placed!), cx, cy } as PlacedEntity));
+    const r = withIds(next, (take, base) => {
+      const copy = { ...p, id: take(), name: freeName(p.name, base.placed!), cx, cy } as PlacedEntity;
+      if (SMALL_FIX.G838 !== 0 && p.spots) copy.spots = p.spots.map(s => ({ ...s, cx: fx ? w - s.cx : s.cx, cy: fy ? h - s.cy : s.cy }));
+      return copy;
+    });
     next = { ...r.doc, placed: [...r.doc.placed!, r.value] };
   }
   return next;
@@ -237,10 +326,15 @@ export function mirrorZone(root: MapEventsDoc, index: number, w: number, h: numb
   const z = zones0[index];
   if (!z) return root;
   const flip = (q: { gx: number; gy: number; cw: number; ch: number }, fx: boolean, fy: boolean) => ({ ...q, gx: fx ? w - q.gx - q.cw : q.gx, gy: fy ? h - q.gy - q.ch : q.gy });
-  const seen = [`${z.gx},${z.gy}`];
+  const keyOf = (fx: boolean, fy: boolean): string => {
+    if (SMALL_FIX.G858 === 0) { const s = flip(z, fx, fy); return `${s.gx},${s.gy}`; }
+    const parts = [z, ...(z.more ?? [])].map(q => { const f = flip(q, fx, fy); return `${f.gx},${f.gy},${f.cw},${f.ch}`; }).sort();
+    return parts.join(';') + (z.shape ? '|' + JSON.stringify(flipShape(z.shape, w, h, fx, fy)) : '');
+  };
+  const seen = [keyOf(false, false)];
   let next = root;
   for (const [fx, fy] of FLIPS) {
-    const spot = flip(z, fx, fy), key = `${spot.gx},${spot.gy}`;
+    const spot = flip(z, fx, fy), key = keyOf(fx, fy);
     if (seen.includes(key)) continue;
     seen.push(key);
     const zones = (next as Record<string, unknown>)[zonesKey] as (ZoneLike & { behaviors?: Row[] })[];
@@ -263,8 +357,9 @@ export function tokensToIds(text: string, doc: MapEventsDoc | undefined): string
   if (!doc) return text;
   const by = new Map<string, number>();
   for (const list of [doc.vars, doc.timers, doc.tags, doc.types]) if (Array.isArray(list)) for (const t of list as { id: number; name: string }[]) if (!by.has(t.name)) by.set(t.name, t.id);
-  return text.replace(/\{([^{}]+)\}/g, (m, w: string) => { const id = by.get(w); return id !== undefined ? `{${id}}` : m; });
+  return text.replace(/\{([^{}]+)\}/g, (m, w: string) => { if (SMALL_FIX.G859 !== 0 && BUILT_IN_WORDS.has(w)) return m; const id = by.get(w); return id !== undefined ? `{${id}}` : m; });
 }
+const BUILT_IN_WORDS: ReadonlySet<string> = new Set<string>(TEXT_TOKENS);
 
 export function fillDown(doc: MapEventsDoc, overridesPath: Path, index: number, n: number): MapEventsDoc {
   const list = getAt(doc, overridesPath) as WaveOverride[];
@@ -332,7 +427,7 @@ export function addForm(doc: MapEventsDoc, typeId: Id, name: string, tank: strin
   const r = withIds(doc, id => ({ id: id(), name, tank } as EntityForm));
   return { doc: insertAt(r.doc, ['types', i, 'forms'], -1, r.value), id: r.value.id };
 }
-export function setBecome(doc: MapEventsDoc, typeId: Id, tank: string | null, bothWays = true, name = 'After Death'): MapEventsDoc {
+export function setBecome(doc: MapEventsDoc, typeId: Id, tank: string | null, bothWays = true, name = 'After Death', keepTank = false): MapEventsDoc {
   const i = indexOfId(doc, 'types', typeId);
   if (i < 0) return doc;
   const t = doc.types![i];
@@ -343,7 +438,7 @@ export function setBecome(doc: MapEventsDoc, typeId: Id, tank: string | null, bo
   const first = t.forms[0];
   let next = doc, second = t.forms[1];
   if (!second) { const a = addForm(next, typeId, name, tank); next = a.doc; second = (next.types![i].forms[1]); }
-  else next = setAt(next, ['types', i, 'forms', 1, 'tank'], tank);
+  else if (!(keepTank && SMALL_FIX.G781 !== 0)) next = setAt(next, ['types', i, 'forms', 1, 'tank'], tank);
   next = setAt(next, ['types', i, 'forms', 0, 'onDeath'], { ...(first.onDeath ?? {}), to: second.id, team: first.onDeath?.team ?? 'form' });
   if (bothWays) next = setAt(next, ['types', i, 'forms', 1, 'onDeath'], { ...(second.onDeath ?? {}), to: first.id, team: second.onDeath?.team ?? 'form' });
   else next = setAt(next, ['types', i, 'forms', 1, 'onDeath'], undefined);
@@ -439,6 +534,7 @@ export function messagesOf(doc: MapEventsDoc | undefined, zones: readonly ZoneLi
     (doc.plans ?? []).forEach((pl, i) => {
       groups(pl.name, pl.groups, ['plans', i, 'groups']);
       (pl.specials ?? []).forEach((s, j) => groups(`${pl.name}, ${s.name}`, s.groups, ['plans', i, 'specials', j, 'groups']));
+      if (SMALL_FIX.G844 !== 0) (pl.overrides ?? []).forEach((o, j) => groups(`${pl.name}, Exact Wave ${j + 1}`, o.groups, ['plans', i, 'overrides', j, 'groups']));
     });
   }
   if (zonePath) zones.forEach((z, i) => (z.behaviors ?? []).forEach((b, j) => { if (isRow(b)) one(b, 'behavior', [...zonePath(i), 'behaviors', j], z.name ?? 'Custom Area'); }));
@@ -454,6 +550,13 @@ export function tankWordsOf(doc: MapEventsDoc | undefined, zones: readonly ZoneL
     for (const k of Object.keys(o)) {
       const c = o[k];
       if (k === 'tank' && typeof c === 'string' && c) out.add(c);
+      else if (SMALL_FIX.G860 !== 0 && (k === 'treeSwaps' || k === 'treeAdds') && Array.isArray(c)) {
+        for (const e of c as { from?: unknown; to?: unknown; parent?: unknown; tanks?: unknown }[]) {
+          if (!e || typeof e !== 'object') continue;
+          for (const w of [e.from, e.to, e.parent]) if (typeof w === 'string' && w) out.add(w);
+          if (Array.isArray(e.tanks)) for (const w of e.tanks) if (typeof w === 'string' && w) out.add(w);
+        }
+      }
       else if (k === 'tank' && c && typeof c === 'object' && Array.isArray((c as { list?: unknown[] }).list)) { for (const e of (c as { list: { word?: string }[] }).list) if (e?.word) out.add(e.word); }
       else if (c && typeof c === 'object') walk(c, depth + 1);
     }
@@ -478,15 +581,19 @@ export function namesOf(doc: MapEventsDoc | undefined, zones: readonly ZoneLike[
   _namesKey = { doc, zones, of };
   return of;
 }
+function sideShown(word: string): string { return SIDE_WORDS.find(s => s.word === word)?.shown ?? word; }
 function wordOfBodyTest(v: Record<string, unknown> | undefined, name: (id: number) => string | undefined): string {
   if (!v) return 'Anything';
   const spaced = (w: string): string => w.charAt(0).toUpperCase() + w.slice(1).replace(/([a-z])([A-Z])/g, '$1 $2');
   const named = (list: unknown): string[] => (Array.isArray(list) ? list.map(r => (typeof r === 'string' ? spaced(r) : name((r as Ref).id) ?? (r as Ref).n ?? '')).filter(Boolean) : []);
+  const sides = (list: unknown): string[] => (SMALL_FIX.G965 !== 0 && Array.isArray(list) ? list.map(r => (typeof r === 'string' ? sideShown(r) : '')).filter(Boolean) : named(list));
   const forms = named(v.forms);
-  const words = [...named(v.tags), ...named(v.types), ...(forms.length ? [forms.join(' or ')] : []), ...named(v.groups), ...named(v.tanks), ...named(v.teams)];
+  const words = [...named(v.tags), ...named(v.types), ...(forms.length ? [forms.join(' or ')] : []), ...named(v.groups), ...named(v.tanks), ...sides(v.teams)];
   if (Array.isArray(v.colours)) for (const c of v.colours) words.push(`Colour ${colourWordShown(c)}`);
   if (v.boss === true) words.push('A Boss');
   if (v.player === true) words.push('The Player');
+  if (SMALL_FIX.G863 !== 0 && v.boss === false) words.push('No Bosses');
+  if (SMALL_FIX.G863 !== 0 && v.player === false) words.push('No Player');
   return words.length ? words.join(', ') : 'Anything';
 }
 export function wordOfWalls(v: unknown, none = 'No Walls'): string {
@@ -553,7 +660,7 @@ export function wordOfTarget(t: { w: string; ref?: Ref; word?: string; team?: st
   if (TARGET_WORDS[t.w]) return TARGET_WORDS[t.w];
   if (t.ref) return `${t.w === 'tag' ? 'All Of ' : t.w === 'type' ? 'All Of ' : t.w === 'inArea' ? 'Everything In ' : ''}${name(t.ref.id) ?? t.ref.n}`;
   if (t.word) return t.word;
-  if (t.team) return t.team;
+  if (t.team) return SMALL_FIX.G965 !== 0 ? sideShown(t.team) : t.team;
   return t.w;
 }
 export function sentenceOf(family: Family, row: Row, doc: MapEventsDoc | undefined, zones: readonly ZoneLike[]): string {
@@ -662,7 +769,11 @@ export function usedBy(doc: MapEventsDoc | undefined, zones: readonly ZoneLike[]
       if (Array.isArray(v)) { for (const x of v) walk(x, depth + 1); return; }
       const o = v as Record<string, unknown>;
       if (o.id !== undefined && typeof o.n === 'string') of.set(o.id, (of.get(o.id) ?? 0) + 1);
-      for (const k of Object.keys(o)) { const c = o[k]; if (c && typeof c === 'object') walk(c, depth + 1); }
+      for (const k of Object.keys(o)) {
+        const c = o[k];
+        if (c && typeof c === 'object') walk(c, depth + 1);
+        else if (SMALL_FIX.G827 !== 0 && typeof c === 'string' && c.includes('{')) for (const m of c.matchAll(TOKEN_RE)) { const t = Number(m[1]); of.set(t, (of.get(t) ?? 0) + 1); }
+      }
     };
     walk(doc, 0);
     for (const z of zones) walk(z.behaviors, 0);
@@ -677,11 +788,13 @@ export function usedByNames(doc: MapEventsDoc | undefined, zones: readonly ZoneL
     if (Array.isArray(v)) return v.some(x => holds(x, depth + 1));
     const o = v as Record<string, unknown>;
     if (o.id === id && typeof o.n === 'string') return true;
-    return Object.keys(o).some(k => holds(o[k], depth + 1));
+    return Object.keys(o).some(k => holds(o[k], depth + 1) || (SMALL_FIX.G827 !== 0 && typeof o[k] === 'string' && (o[k] as string).includes(`{${id}}`)));
   };
   const out: string[] = [];
-  for (const list of [doc?.rules, doc?.types, doc?.plans, doc?.placed] as ({ name: string }[] | undefined)[]) for (const t of list ?? []) if (holds(t, 0)) out.push(t.name);
+  const lists = SMALL_FIX.G828 !== 0 ? [doc?.rules, doc?.types, doc?.plans, doc?.placed, doc?.sequences, doc?.statuses, doc?.areaGroups, doc?.tankGroups] : [doc?.rules, doc?.types, doc?.plans, doc?.placed];
+  for (const list of lists as ({ name: string }[] | undefined)[]) for (const t of list ?? []) if (holds(t, 0)) out.push(t.name);
   for (const z of zones) if (holds(z.behaviors, 0)) out.push(z.name ?? 'Custom Area');
+  if (SMALL_FIX.R1018 !== 0 && holds(doc?.match, 0)) out.push('Match Rules');
   return out;
 }
 

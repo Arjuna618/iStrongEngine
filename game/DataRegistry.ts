@@ -228,6 +228,7 @@ export class DataRegistry {
         const handled = await this.loadFromPacks(logic, onProgress);
         if (handled) return;
       }
+      if (SMALL_FIX.G986 !== 0) DataRegistry.looseTap?.();
       await this.loadFileByFile(logic, onProgress);
     } finally {
       this.loadRunning = false;
@@ -237,6 +238,7 @@ export class DataRegistry {
   static PACK_RETRY_WAITS_MS: number[] = [0, 600, 1800];
 
   static packTap: ((file: string, bytes: ArrayBuffer) => void) | null = null;
+  static looseTap: (() => void) | null = null;
   static packListTap: ((list: DataPackList) => void) | null = null;
 
   private async loadFromPacks(logic: GameLogic, onProgress: ProgressCallback): Promise<boolean> {
@@ -324,6 +326,12 @@ export class DataRegistry {
       const res = await fetch(BASE_URL + entry.file);
       if (!res.ok) return null;
       const tap = DataRegistry.packTap;
+      if (SMALL_FIX.G987 !== 0) {
+        const bytes = tap ? res.clone().arrayBuffer().catch(() => null) : null;
+        const recs = DataRegistry.readPack(await res.json(), entry.files);
+        if (tap && bytes !== null && recs !== null) bytes.then(b => { if (b !== null) tap(entry.file, b); });
+        return recs;
+      }
       if (tap) res.clone().arrayBuffer().then(b => tap(entry.file, b), () => { });
       return DataRegistry.readPack(await res.json(), entry.files);
     } catch {

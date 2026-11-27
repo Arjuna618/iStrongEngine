@@ -3,7 +3,7 @@ import type { MapState } from '../types';
 import { checkLineOfSight } from './Navigation';
 import { getBaseTeamFromTile } from './MapSystem';
 import { polyHas } from './areaShape';
-
+import { SMALL_FIX } from './smallFixSwitch';
 export const BASE_THREAT_FEATURE: number = 1;
 
 export function baseThreatTeamBit(teamIndex: number): number {
@@ -87,7 +87,7 @@ export function buildBaseThreatField(
   if (rows) for (let i = 0; i < rows.length; i++) {
     const a = rows[i];
     if (a.kind !== AREA_KIND_KILL || a.off === true) continue;
-    let bits = 0b111111, teamless = 0;
+    let bits = SMALL_FIX.G927 !== 0 ? 0b1111111 : 0b111111, teamless = 0;
     for (let w = 0; w < a.spare.length; w++) {
       const s = a.spare[w];
       if (s === 'team1') bits &= ~1; else if (s === 'team2') bits &= ~2; else if (s === 'team3') bits &= ~4; else if (s === 'team4') bits &= ~8;
@@ -174,7 +174,8 @@ export function baseThreatRectFraction(
 
 export const BASE_DANGER_SLOT_NONE = 4;
 export const BASE_DANGER_SLOT_BOSS = 5;
-export const BASE_DANGER_SLOTS = 6;
+export const BASE_DANGER_SLOT_UNNAMED = 6;
+export const BASE_DANGER_SLOTS = 7;
 
 export function baseDangerSlotOf(teamIndex: number): number {
   return teamIndex >= 0 && teamIndex < 4 ? teamIndex : BASE_DANGER_SLOT_NONE;

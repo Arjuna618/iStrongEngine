@@ -311,7 +311,7 @@ const TankEvolutionMenu: React.FC<{ logic: GameLogic; dark?: boolean }> = ({ log
         {tiles.map(t => {
           const x = hudUpTileX(t.i, lay.cols);
           const y = hudUpTileY(t.i, lay.cols);
-          const key = t.i < HUD_UP_KEYS.length ? HUD_UP_KEYS[t.i] : undefined;
+          const key = !(SMALL_FIX.R1024 !== 0 && phone) && t.i < HUD_UP_KEYS.length ? HUD_UP_KEYS[t.i] : undefined;
           return (
             <React.Fragment key={t.fileName}>
               <div style={{

@@ -1,6 +1,7 @@
 import type { GameLogic } from '../../game/GameLogic';
 import { SMALL_FIX } from '../../game/smallFixSwitch';
 import { DataRegistry } from '../../game/DataRegistry';
+import { savedShapeNameClash, savedLookNameClash } from '../../game/ShapeRegistry';
 import { wasLayerTrimmed } from '../../game/ValueClamp';
 import { importChangesOf, importChangesWords } from '../../utils/importChanges';
 import type { CustomProjectileDesign, ExportFile, LibraryItem, TurretPreset } from '../../types';
@@ -26,7 +27,15 @@ export interface PickedFile { file: File; path: string; }
 
 const _canon = (v: unknown) => JSON.stringify(v);
 
-export async function importFiles(logic: GameLogic, picked: readonly PickedFile[], texts?: (p: PickedFile) => Promise<string>, epochAt?: number): Promise<ImportSummary> {
+let _importChain: Promise<unknown> = Promise.resolve();
+export function importFiles(logic: GameLogic, picked: readonly PickedFile[], texts?: (p: PickedFile) => Promise<string>, epochAt?: number): Promise<ImportSummary> {
+  if (SMALL_FIX.G962 === 0) return _importFilesNow(logic, picked, texts, epochAt);
+  const started = epochAt !== undefined ? epochAt : logic.projectEpoch;
+  const run = _importChain.then(() => _importFilesNow(logic, picked, texts, started));
+  _importChain = run.catch(() => undefined);
+  return run;
+}
+async function _importFilesNow(logic: GameLogic, picked: readonly PickedFile[], texts?: (p: PickedFile) => Promise<string>, epochAt?: number): Promise<ImportSummary> {
   const sum: ImportSummary = { added: {}, addedNames: [], replaced: [], duplicates: [], refused: [], skipped: [], trimmed: [], changed: [] };
   const epoch = SMALL_FIX.G708 !== 0 && epochAt !== undefined ? epochAt : logic.projectEpoch;
   const byName = new Map<string, LibraryItem[]>();
@@ -67,6 +76,14 @@ export async function importFiles(logic: GameLogic, picked: readonly PickedFile[
     const same = byName.get(k);
     const canon = _canon(validated.data);
     if (same && same.some(it => _canon(it.fileData.data) === canon)) { sum.duplicates.push(`${name} (${label})`); continue; }
+    if (SMALL_FIX.G852 !== 0) {
+      const was = savedShapeNameClash([...logic.state.tankLibrary, ...items], validated);
+      if (was !== null) { sum.refused.push({ file: label, why: `Another saved shape already uses this name (${was}). Pick a different name.` }); continue; }
+    }
+    {
+      const was = savedLookNameClash([...logic.state.solidLibrary, ...items], [...logic.state.otherLibrary, ...items], validated);
+      if (was !== null) { sum.refused.push({ file: label, why: `Another saved ${validated.type === 'Solid' ? '3D solid' : 'Others file'} already uses this name (${was}). Pick a different name.` }); continue; }
+    }
     const item: LibraryItem = { id: DataRegistry.libraryIdFor(validated), name, fileData: validated, loadedAt: Date.now(), source: 'manual-import' };
     if (ids.has(item.id)) sum.replaced.push(name);
     ids.add(item.id);

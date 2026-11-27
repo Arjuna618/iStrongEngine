@@ -2052,8 +2052,8 @@ export class WebGLBulletRenderer {
     }
 
     getOrCreateStarBatch(sides: number, starDepth: number, curved: boolean): string {
-        const innerRatio = 1 - starDepth;
         const qDepth = Math.round(starDepth * 100);
+        const innerRatio = 1 - (SMALL_FIX.G821 !== 0 ? qDepth / 100 : starDepth);
         const nk = (sides >= 0 && sides < 1024 && sides === (sides | 0) && qDepth > -100000 && qDepth < 100000)
             ? ((qDepth + 100000) * 1024 + sides) * 2 + (curved ? 1 : 0) : -1;
         let key = nk >= 0 ? this._starKeys.get(nk) : undefined;

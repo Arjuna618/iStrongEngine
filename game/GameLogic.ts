@@ -7,7 +7,7 @@ import type { MapPoolRow } from './modeWorlds';
 import { botStopNext, botStopSeed, botStopValue, stopChanceAt } from './botStop';
 import { treeTierOfUpgrade } from './evolutionTree';
 import { setTeamTwoGreen, modeWearsTeamTwoGreen } from '../types';
-import { MODE_WORLDS, isWorldId, worldIdOf, worldWritesMap, writeWorldMap, writeWorldBases, worldHasBosses, isPlaySandbox } from './modeWorlds';
+import { MODE_WORLDS, isWorldId, worldIdOf, worldWritesMap, writeWorldMap, writeWorldRocks, writeWorldBases, worldHasBosses, isPlaySandbox, worldPool } from './modeWorlds';
 import { TURRET_NAME_MAX, TURRET_TAG_MAX } from '../types';
 import { type SnapTarget, GameState, Turret, Bullet, FloatingPolygon, INITIAL_GAME_STATE, aiCatNoBackBoost, aiCatNoGapDistance, MapSize, TankConfig, ExportFile, UpgradeStat, LibraryItem, EnemyConfig, EnemyTank, TeamId, AIState, FearState, RevivalEntry, AI_CONSTANTS, DamageContribution, XpTextAnimation, DEFAULT_TURRET_CONFIG, DEFAULT_PROJECTILE_TYPE, DEFAULT_BEHAVIOR_CONFIG, BehaviorConfig, BehaviorType, ControlIO, createDefaultControllerData, DroneTracker, PortalEntity, ProjectileVisual, SubTurretConfig, BulletSubTurret, CustomProjectileDesign, TurretPreset, ShapeType, SNAP_COUNTS, GameMessage, BodyLayer, BaseShapeConfig, ShapeSpawnConfig, ShapeSpawnCrowd, FacingType, MotionType, SpawnStats, createEmptySpawnStats, MapState, BaseZoneRect, TileType, GameModeConfig, GameModeType, AIBehavior, TEAM_COLORS, TEAM_NAMES, generateRandomSeed, AreaConfig, MultiAreaMapConfig, MapConfig, createDefaultMapConfig, DEFAULT_SHAPE_SPAWN_CONFIG, createDefaultAreaId, OD_AREA_NAMES, AIBehaviorCategory, TeamBotKey, TeamBotSettings, createDefaultTeamBotSettings, createDefaultTeamBotSettingsMap, DEFAULT_RESPAWN_RULES, RESPAWN_COOLDOWN_MS, AI_CATEGORY_SCHEMA_VERSION, createDefaultAIBehaviorCategories, modeMapDefaults, FoodShapeDesign, OtherDesign, ExplodeConfig, ExplodeRing } from "../types";
 import { EXPLODE_MAX_DEPTH, EXPLODE_MAX_RINGS, EXPLODE_MAX_PIECES_PER_SHOT, EXPLODE_DEFAULT_COUNT, explodeCount, explodeAngleDeg, explodeActive, roundNeverAges, cloneExplode } from './explode';
@@ -17,7 +17,7 @@ function mapDistanceSlider(v: number): number {
   if (v <= 50) return 180 + (v - 5) / 45 * 170;
   return 350 + (v - 50) / 50 * 350;
 }
-import { generateMap, checkWallCollision, resolveWallCollisions, applyPortalPhysics, updatePortalVisuals, updateTimedPortals, makePortal, resetTimedPortalRuntime, getSpawnPosition, findSafeSpawnInArea, releaseMapState, computeMapDimensions, generateMultiAreaMap, getBaseTeamFromTile, getTeamSpawnPosition, PORTAL_MODE_ATTRACT, PORTAL_MODE_REPEL, PORTAL_MODE_FORCE_REPEL, PORTAL_MODE_GHOST, PORTAL_RING_DRAG, PORTAL_RING_PUSH, PORTAL_GRAVITY, portalReaches, spawnHazardAt, magicSpawnBad, SPAWN_HAZARD_PAD, PORTAL_COOLDOWN, MAP_GRID_MAX_SIDE, MAP_SCALE_MAX, portalLeadsSomewhere, portalArrivalAreaId, baseTileOfTeam, resizeMapState, isResizedMap } from "./MapSystem";
+import { setPortalGuardTest, generateMap, checkWallCollision, resolveWallCollisions, applyPortalPhysics, updatePortalVisuals, updateTimedPortals, makePortal, resetTimedPortalRuntime, getSpawnPosition, findSafeSpawnInArea, releaseMapState, computeMapDimensions, generateMultiAreaMap, getBaseTeamFromTile, getTeamSpawnPosition, PORTAL_MODE_ATTRACT, PORTAL_MODE_REPEL, PORTAL_MODE_FORCE_REPEL, PORTAL_MODE_GHOST, PORTAL_RING_DRAG, PORTAL_RING_PUSH, PORTAL_GRAVITY, portalReaches, spawnHazardAt, magicSpawnBad, SPAWN_HAZARD_PAD, PORTAL_COOLDOWN, MAP_GRID_MAX_SIDE, MAP_SCALE_MAX, portalLeadsSomewhere, portalArrivalAreaId, baseTileOfTeam, resizeMapState, isResizedMap } from "./MapSystem";
 import type { AreaBounds } from "./MapSystem";
 import { generateMapAsync, generateMultiAreaMapAsync, abortPendingMapGen } from './mapGenAsync';
 import {
@@ -51,7 +51,7 @@ import { MAP_EVENTS } from './mapEventsSwitch';
 import type { MapEventsDoc, MatchRules, Ref, Row, ZoneLike, TankGroup, EntityType, PlacedEntity } from './mapEvents/doc';
 import type { GameModeFile } from '../types';
 import type { PlacedZone } from '../types';
-import { behaviorsOf, DEFAULT_SIDE, docHasContent, docHasWork, rectsOf, refreshNames, shiftEventsDoc, shiftZoneRows, zoneShapeOf, takeId, newEventsDoc, docIsOnlyGuards, docStockKey, zonesStockKey, CARRY_FOLLOW_DEF, CARRY_FOLLOW_RANGE } from './mapEvents/doc';
+import { behaviorsOf, DEFAULT_SIDE, docHasContent, docHasWork, rectsOf, refreshNames, shiftEventsDoc, shiftZoneRows, zoneShapeOf, takeId, newEventsDoc, docIsOnlyGuards, docStockKey, zonesStockKey, laidBaseKey, CARRY_FOLLOW_DEF, CARRY_FOLLOW_RANGE } from './mapEvents/doc';
 import { polyTouches, polyNearest, polyHas, polyNx, polyNy, polyQx, polyQy, polyD, shapeWorldPoly } from './areaShape';
 import { Sfc32, evalNum, seedStream } from './mapEvents/num';
 import { compileEvents } from './mapEvents/compile';
@@ -66,6 +66,7 @@ import { isShapeThing, SHAPE_HEAD, OTHER_HEAD, PROJECTILE_HEAD, TURRET_HEAD, MAP
 import { TOUCH_KINDS, TOUCH_STRIDE, TW_WALLS, TW_ROCKS, TW_EDGE, TW_TANKS, TW_BOSSES, TW_SHAPES, TT_BOUNCE, TT_DIE, TT_DAMAGE, TT_HEAL, touchMask } from './mapEvents/thingBody';
 import type { ShapeBodySpec } from './mapEvents/thingBody';
 import { makeShapeLook } from '../utils/shapeLook';
+import { mobileActive } from '../utils/mobileMode';
 import { cleanLayerOutline, layerOutlineOf, layerSolidOf, cleanLayerSolid } from '../utils/layerOutline';
 import { partOpacityOf } from '../utils/partOpacity';
 import { collectPartHits, partHitsReach, partHitTouch, PART_HIT_STRIDE, PART_HITS_MAX } from '../utils/partHits';
@@ -108,7 +109,7 @@ import { TANK_KINDS, tankKindOf, debuffResist, debuffHealthK, clampTankDebuffs, 
 import { STAT_SHARES, statKOf, type StatK, type StatShares } from "./statShares";
 import { KILL_SHARE_FLOOR, ksNote, ksClear, ksDrop, ksEarns, ksFresh, KILL_ASSIST_SHARE } from './killShares';
 import { LEVEL_LIMIT, XP_LIMIT } from './levelLimit';
-import { isFixedMapThing } from "./fixedBodies";
+import { isFixedMapThing, bossLeavesBody } from "./fixedBodies";
 import { ACTIVE_GROWTH, growthFactor, growthSkillPointsAt, growthRespawnXp, clampGrowthRules, defaultGrowthRules, type GrowthRules, growthRulesOf, MF_WAVE, MF_NO_GROW } from "./growthRules";
 import { skipTargetXp, SKIP_MAX_MINUTES, SKIP_CLIMB_S, SKIP_CLIMB_MAX_MS } from './skipTime';
 import { MISSING_MODES } from './missingModesSwitch';
@@ -132,7 +133,7 @@ import { BODY_HIT, hitKindOf, bodyHitResist, bodyHitAtk, tankOnTank, tankOnShape
 import { SHAPE_SCORE_SIZE_POWER } from "./shapeBook.generated";
 import { isBuiltInShapeId } from "./ShapeRegistry";
 import { applyOldDreadnoughtsRooms, BossGroupConfig } from "../types";
-import { clampFoodShapeDesign, CANVAS_EXTENT, clampAuraFields, clampShapeSpawnLimits, clampTankConfig } from "./ValueClamp";
+import { clampFoodShapeDesign, CANVAS_EXTENT, clampAuraFields, clampShapeSpawnLimits, clampTankConfig, BODY_LAYER_SIZE_MAX } from "./ValueClamp";
 import { SENTRY_ENEMY_CONFIGS, sentryAimAccuracy } from "./SentryConfigs";
 import {
   BASE_PROTECTOR_FEATURE, baseProtectorsActive, resolveBaseProtectorTeam,
@@ -149,7 +150,7 @@ import {
 import {
   BASE_THREAT_FEATURE, buildBaseThreatField, baseThreatHostile, baseThreatRectFraction,
   buildBaseDangerField, baseDangerCodeAt, baseDangerRectFraction,
-  BASE_DANGER_SLOTS, BASE_DANGER_SLOT_NONE, BASE_DANGER_SLOT_BOSS, BASE_DANGER_ZERO, BASE_DANGER_FAR,
+  BASE_DANGER_SLOTS, BASE_DANGER_SLOT_NONE, BASE_DANGER_SLOT_BOSS, BASE_DANGER_SLOT_UNNAMED, BASE_DANGER_ZERO, BASE_DANGER_FAR,
 } from "./BaseThreat";
 import type { BaseThreatField, BaseThreatSource, BaseDangerField } from "./BaseThreat";
 import { makeBaseProtectorConfig, cloneDefaultBaseProtectorTank, baseProtectorConfigId, BASE_PROTECTOR_DEFAULT_TANK } from "./BaseProtectorConfig";
@@ -243,7 +244,7 @@ import { getEffectiveDPR } from '../utils/zoomCompensation';
 import { getGuiScale, getHudScale } from '../utils/useGuiScale';
 import {
   HUD_MSG_LIFE_MS, HUD_MSG_MAX,
-  hudMsgKillLine, hudMsgShapeKillLine, hudMsgDeathLine, hudMsgProjectileWord, hudMsgBarrelHint, hudMsgAlwaysInvisibleRounds, HUD_MSG_ALWAYS_INVISIBLE,
+  hudMsgKillLine, hudMsgShapeKillLine, hudMsgAssistLine, hudMsgDeathLine, hudMsgProjectileWord, hudMsgBarrelHint, hudMsgAlwaysInvisibleRounds, HUD_MSG_ALWAYS_INVISIBLE,
 } from '../utils/hudArras';
 import { entityEase, ENTITY_EASE_SEC, barGlide, hudLevelOfXp } from '../utils/hudEase';
 import { SEEN, seenBy, shownTo, tankOwnShowing, edgeDistance, nearness } from '../utils/seenRule';
@@ -633,7 +634,7 @@ function _turretTreeHeals(turrets: readonly Turret[] | null | undefined, depth: 
     const subs = t.autoSubTurrets;
     if (subs) {
       for (let s = 0; s < subs.length; s++) {
-        if (subs[s] && subs[s].healer === true) return true;
+        if (subs[s] && subs[s].healer === true && (SMALL_FIX.G658 === 0 || subs[s].bps > 0)) return true;
       }
     }
     const cpd = t.projectileType?.customProjectileDesign;
@@ -1243,6 +1244,7 @@ function edgeAddBeforeKeep(aTick: number, lnDamp: number, dtFactor: number): num
 }
 const _areaNumRng = new Sfc32();
 const _NO_PORTALS: readonly PortalEntity[] = [];
+const _portalOne: PortalEntity[] = [];
 const AREA_BOSS_FOLDERS: ReadonlySet<string> = new Set(['Sentries', 'Elites', 'Mysticals', 'Nesters', 'Rogues', 'Rammers', 'Terrestrials', 'Eternals', 'Celestials',
   'Spawned Entities']);
 const KILL_BOSS_FOLDERS: ReadonlySet<string> = new Set([...AREA_BOSS_FOLDERS].filter(c => c !== 'Sentries'));
@@ -1883,6 +1885,9 @@ const _btShoot: ArrasShootSettings = {
 
 const MIGRATION_DAMAGE_SCALE = 2.0;
 
+const HF_BASIC_ROUND = 30.1487;
+const HF_REST_K = 11;
+const HF_HEAVY_LINE = 2.2, HF_HEAVY_SELF = 11.5;
 function computeBulletTypeStats(
   turret: Turret,
   motionType: string,
@@ -2425,6 +2430,23 @@ const _planW: number[] = [];
 const _crowdBots: EnemyTank[] = [];
 const _crowdG = new Map<number, number>(), _crowdT = new Map<number, number>(), _crowdGT = new Map<number, number>();
 const _crowdTeamIdx = new Map<string, number>();
+const _crowdNB: EnemyTank[] = [], _crowdNBnr: EnemyTank[] = [], _crowdB1: EnemyTank[] = [];
+function _crowdAlliedOf(list: readonly EnemyTank[]): number {
+  _crowdG.clear(); _crowdT.clear(); _crowdGT.clear();
+  let allied = 0;
+  for (let j = 0; j < list.length; j++) {
+    const b = list[j];
+    const g = b.groupId, plain = b.aiBehavior !== 'FFA' && b.aiBehavior !== 'Neutral';
+    let ti = _crowdTeamIdx.get(b.team);
+    if (ti === undefined) { ti = _crowdTeamIdx.size; _crowdTeamIdx.set(b.team, ti); }
+    if (g !== 0) { const c0 = _crowdG.get(g) ?? 0; allied += c0; _crowdG.set(g, c0 + 1); }
+    if (plain) {
+      const t0 = _crowdT.get(ti) ?? 0; allied += t0; _crowdT.set(ti, t0 + 1);
+      if (g !== 0) { const kk = g * 1024 + ti, b0 = _crowdGT.get(kk) ?? 0; allied -= b0; _crowdGT.set(kk, b0 + 1); }
+    }
+  }
+  return allied;
+}
 const PLAN_CROWD_EVERY = 15;
 const PLAN_CRASHER_OF: Record<string, string> = { egg: 'crasherEgg', square: 'crasherSquare', triangle: 'crasherTriangle', pentagon: 'crasherPentagon', hexagon: 'crasherHexagon' };
 
@@ -2437,6 +2459,11 @@ const _fireCandMx = new Float64Array(_FIRE_MAX_TRACES);
 const _fireCandMy = new Float64Array(_FIRE_MAX_TRACES);
 const _OG_LINE_X = new Float64Array(16), _OG_LINE_Y = new Float64Array(16), _ogLineW = new Float64Array(16);
 for (let k = 0; k < 16; k++) { _OG_LINE_X[k] = Math.cos(k * 0.39269908169872414); _OG_LINE_Y[k] = Math.sin(k * 0.39269908169872414); }
+interface OgFlow { oid: string; team: string; beh: string; nav: MapState['navigation']; at: number; use: number; all: number; n: number; fx: Float32Array; fy: Float32Array; st: Uint16Array; pAt: number; pOk: boolean; pX: number; pY: number; pK: number; pS: number; near: number; minWay: number; pWay: number; }
+const _ogFlows: OgFlow[] = [];
+const _ogPath = new Int32Array(512);
+const _OG_FLOW_KEYS = ['block#0', 'block#1', 'block#2', 'block#3', 'block#4', 'block#5'];
+const _hfGrpM: (EnemyTank | null)[] = [null, null, null, null, null, null];
 const _fireCandDx = new Float64Array(_FIRE_MAX_TRACES);
 const _fireCandDy = new Float64Array(_FIRE_MAX_TRACES);
 const _fireCandBr = new Float64Array(_FIRE_MAX_TRACES);
@@ -2610,6 +2637,16 @@ function recoilNoteShot(gun: RecoilGun, power: number): void {
   gun.physRecoilShot = (gun.physRecoilShot ?? 0) + power;
   if (gun.physRecoilRing === undefined) gun.physRecoilRing = SMALL_FIX.GH688 !== 0 ? [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] : [0, 0, 0, 0, 0, 0];
   gun.physRecoilRingOn = true;
+}
+function recoilNoteShotDir(gun: RecoilGun, power: number, dx: number, dy: number): void {
+  const was = gun.physRecoilShot ?? 0;
+  recoilNoteShot(gun, power);
+  if (SMALL_FIX.G913 !== 0 && was > 0) {
+    const vx = gun.physRecoilDirX * was + dx * power, vy = gun.physRecoilDirY * was + dy * power, m = Math.sqrt(vx * vx + vy * vy);
+    gun.physRecoilShot = m;
+    if (m > 1e-12) { gun.physRecoilDirX = vx / m; gun.physRecoilDirY = vy / m; return; }
+  }
+  gun.physRecoilDirX = dx; gun.physRecoilDirY = dy;
 }
 function recoilLive(gun: RecoilGun): boolean {
   return gun.physRecoilPos !== 0 || gun.physRecoilVel !== 0 || gun.physRecoilRingOn === true;
@@ -3318,6 +3355,7 @@ const BOT_LATE_FIELDS: readonly string[] = ['_mev', '_mevF', '_mevIn', '_mevOrde
 function RoundShell(this: Bullet, logic: GameLogic): void {
   this.active = true;
   this.bulletId = 0;
+  this._hit = 0; this._hitId = -1; this._fire = 0; this._fireId = -1;
   this._fsLag = 0;
   this._fsDisp = 0;
   this._fsDispX = 0;
@@ -4063,20 +4101,36 @@ function BotShell(this: EnemyTank, logic: GameLogic): void {
   this._zMind = false; this._zAggWas = 0; this._zCourWas = 0; this._zChargeWas = false; this._hordeLed = false; this._hordeAt = 0; this._zPack = false; this._packTargetId = ''; this._packTargetPlayer = false; this._zSwarmN = 0; this._zSwarmLag = 0;
   this._btBits = 0; this._btN = new Int8Array(11);
   this._ogTag = -1; this._ogRadius = 900; this._oaTag = -1; this._ogId = ''; this._ogX = 0; this._ogY = 0; this._ogLookAt = 0;
-  this._ogFront = false; this._ogFrontShare = 0.92; this._ogFrontIs = -1; this._ogPendId = ''; this._ogPendAt = 0; this._ogHoldUntil = 0;
+  this._ogFront = false; this._ogTake = false; this._oaTeam = false; this._ogFrontShare = 0.92; this._ogFrontIs = -1; this._ogPendId = ''; this._ogPendAt = 0; this._ogHoldUntil = 0;
   this._ogBlockShare = 0; this._ogBlockIs = -1; this._ogBlockAngle = 0; this._ogBlockUntil = 0; this._ogBlockLookAt = 0; this._ogBlockX = 0; this._ogBlockY = 0; this._ogBlockSpotUntil = 0;
+  this._ogGo = 0; this._ogGoX = 0; this._ogGoY = 0; this._ogGoCX = 0; this._ogGoCY = 0; this._ogGoKey = '';
+  this._ogKite = 0; this._ogKx = 0; this._ogKy = 0;
+  this._ogHelpId = ''; this._ogHelpAt = 0; this._ogQuietAt = 0; this._ogHelpKeepAt = 0; this._ogSideId = ''; this._ogSideX = 0; this._ogSideY = 0;
+  this._ogHoldGo = false;
+  this._btStood = false; this._ogHoldSince = 0; this._ogKeepX = 0; this._ogKeepY = 0; this._ogKeepWk = -1;
+  this._ofX = 0; this._ofY = 0; this._ofWX = 0; this._ofWY = 0; this._ofUntil = 0; this._ofLookAt = 0; this._ofNoSince = 0; this._ofUseAt = 0; this._ofUseA = 0;
+  this._iaAt = 0; this._iaSeen = -1e9; this._iaGoUntil = 0;
+  this._agAt = 0; this._agId = '';
+  this._bpAt = 0; this._bpSeen = -1e9; this._bpPath = 0; this._bpSX = 0; this._bpSY = 0; this._bpLX = 0; this._bpLY = 0; this._bpUntil = 0; this._bpX = 0; this._bpY = 0; this._bpN = 0;
+  this._fwAt = 0; this._fwUntil = 0; this._fwAngle = 0;
+  this._tmSt = 0; this._tmPendSt = -1; this._tmPendAt = 0;
+  this._thId = ''; this._thUntil = 0; this._thLookAt = 0; this._thNo = 0; this._thSeen = 0;
+  this._tmBk = 0;
+  this._wkX = 0; this._wkY = 0; this._wkAt = 0;
   this._ogUnitShare = 0; this._ogUnitIs = -1; this._ogUnitT = ''; this._ogUnitLookAt = 0;
+  this._ufT = ''; this._ufUntil = 0; this._ufAt = 0; this._ufM = ''; this._ufN = '';
   this._ftTake = -1; this._ftSpoil = -1; this._ftId = ''; this._ftLookAt = 0; this._ctKite = false;
   this._ftGo = false; this._ftX = 0; this._ftY = 0; this._ftBestD = Infinity; this._ftGiveUpAt = 0; this._ftBan = ''; this._ftBanUntil = 0;
   this._esTag = -1; this._esMax = 3; this._esRadius = 450; this._esId = ''; this._esLookAt = 0;
   this._hsBelow = 0.7; this._hsBack = 1; this._hsHealers = true; this._hsTag = -1; this._hsZone = -1;
   this._tfHelp = true; this._flBelow = 0.2; this._flBack = 1;
+  this._tfGate = false; this._tfGateShare = 0.3; this._tfGateLookAt = 0; this._tfGateZ = -1; this._tfGateGX = 0; this._tfGateGY = 0; this._tfGateX = 0; this._tfGateY = 0; this._tfGateHas = false; this._tfGateAngle = 0; this._tfGateFireUntil = 0; this._tfGateDist = 0;
   this._tfMap = false; this._tfMapShare = 0.85; this._tfMapId = ''; this._tfMapAt = 0; this._tfMapLookAt = 0; this._tfMapN = 0; this._tfPendId = ''; this._tfPendAt = 0;
   this._tfMeetId = ''; this._tfMeetSid = ''; this._tfMeetX = 0; this._tfMeetY = 0; this._tfMeetGoAt = 0;
-  this._hsOn = 0; this._hsId = ''; this._hsArea = -1; this._hsX = 0; this._hsY = 0; this._hsNear = 0; this._hsLeash = 0; this._hsKite = false; this._hsPickAt = 0; this._hsGiveUpAt = 0; this._hsCoolUntil = 0; this._hsBestD = 0;
+  this._hsStand = false; this._hsHome = false; this._hsHomeAt = 0; this._hsOn = 0; this._hsId = ''; this._hsArea = -1; this._hsX = 0; this._hsY = 0; this._hsNear = 0; this._hsLeash = 0; this._hsKite = false; this._hsPickAt = 0; this._hsGiveUpAt = 0; this._hsCoolUntil = 0; this._hsBestD = 0;
   this._tfHelpId = ''; this._tfLookAt = 0; this._flLow = false;
   this._tfGoalId = ''; this._tfGoalX = 0; this._tfGoalY = 0; this._tfGoalSeenAt = 0; this._tfGoalBestD = 0; this._tfGoalGiveUpAt = 0; this._tfGoalArriveAt = 0; this._tfBanId = ''; this._tfBanUntil = 0;
-  this._btRoute = ''; this._btWx = 0; this._btWy = 0; this._btWAt = 0; this._btWn = 0;
+  this._btRoute = ''; this._btWx = 0; this._btWy = 0; this._btWAt = 0; this._btWn = 0; this._btWRest = 0;
   this._hdMateId = ''; this._hdLookAt = 0;
   this._wtView = 1; this._wtViewSet = 0; this._wkMask = 0; this._wkPad = 0;
   this._wqMask = 0; this._wqEvMin = 30000; this._wqEvMax = 120000; this._wqChance = 0.2; this._wqHoldMin = 5000; this._wqHoldMax = 25000; this._wqNext = 0; this._wqN = 0;
@@ -4717,9 +4771,15 @@ export class GameLogic {
     if (!t) return false;
     return this._cfgHasHandRows(t.cfg);
   }
+  private _baseAsLaid(cfg: MapConfig, z: ZoneLike): boolean {
+    const t = z.team ?? zoneBaseTeam(z as unknown as PlacedZone);
+    const stock = { id: 0, gx: 0, gy: 0, cw: 1, ch: 1, team: t, kind: 'cosmetic', opacity: 0, behaviors: [teamBaseRow(0, t)] } as unknown as ZoneLike;
+    return laidBaseKey(this._laidGuardsOff(cfg, z)) === laidBaseKey(stock);
+  }
   private _cfgHasHandRows(cfg: MapConfig): boolean {
     const { events, mapAreas } = cfg;
     const hisZones = BASE_AREAS.ON !== 0 ? (mapAreas?.zones ?? []).filter(z => z.modeBase !== true) : (mapAreas?.zones ?? []);
+    if (BASE_AREAS.ON !== 0 && SMALL_FIX.G865 !== 0) for (const z of mapAreas?.zones ?? []) if (z.modeBase === true && !this._baseAsLaid(cfg, z)) return true;
     if (!events && !hisZones.length) return false;
     const shipped = events?.meta?.shipped;
     if (shipped) {
@@ -4763,7 +4823,7 @@ export class GameLogic {
       for (const [id, c] of list) {
         if (!isCustomMap(c)) continue;
         const st = this._stockMapKeys.get(id);
-        if (st !== undefined) { if (JSON.stringify(c.customMap ?? null) !== st) return true; continue; }
+        if (st !== undefined) { if (this._customMapKey(c) !== st) return true; continue; }
         if (SMALL_FIX.CC041 !== 0 && isPortalWorldAreaId(id)) continue;
         if (SMALL_FIX.R939 !== 0 && this._customIsPresetStock(c)) continue;
         return true;
@@ -4784,7 +4844,27 @@ export class GameLogic {
     this._stockMapKeys.clear();
     const mac = this.state.multiAreaConfig;
     const list: [string, MapConfig][] = mac.enableMultiArea && mac.areas.length > 0 ? mac.areas.map(a => [a.id, a.mapConfig]) : [['', this.state.mapConfig]];
-    for (const [id, c] of list) if (isCustomMap(c)) this._stockMapKeys.set(id, JSON.stringify(c.customMap ?? null));
+    for (const [id, c] of list) if (isCustomMap(c)) this._stockMapKeys.set(id, this._customMapKey(c));
+  }
+  private _customMapKey(c: MapConfig): string {
+    const cm = c.customMap as (CustomMapData & { zones?: PlacedZone[] }) | undefined;
+    if (SMALL_FIX.R1007 === 0 || !cm || !Array.isArray(cm.zones)) return JSON.stringify(cm ?? null);
+    const zones = cm.zones.map(z => (z ? this._laidGuardsOff(c, z) : z));
+    return JSON.stringify({ ...cm, zones });
+  }
+  private _laidGuardsOff<Z extends ZoneLike>(cfg: MapConfig, z: Z): Z {
+    const t = z.team ?? zoneBaseTeam(z as unknown as PlacedZone);
+    const res = resolveBaseProtectorTeam(cfg, t);
+    const def: Record<string, unknown> = { guards: res.enabled && (cfg.enableBaseProtectors ?? true), guardCount: res.count, guardArrange: res.arrangement === 'corners' ? 'corners' : res.smart ? 'smart' : 'spread', guardTank: res.tank, guardTiles: res.tileCells };
+    const rows = (z as { behaviors?: Row[] }).behaviors;
+    if (!Array.isArray(rows)) return z;
+    return { ...z, behaviors: rows.map(r => {
+      if (!r || r.k !== TEAM_BASE_KIND) return r;
+      const a: Record<string, unknown> = { ...r.a };
+      delete a.guardsFor;
+      for (const k of Object.keys(def)) if (a[k] === def[k]) delete a[k];
+      return { ...r, a };
+    }) };
   }
   public worldHoldsWork(activeAreaId: string = ''): boolean {
     if (this._hisCustomMap() || this.worldHasHandRows(activeAreaId)) return true;
@@ -5377,14 +5457,15 @@ export class GameLogic {
     if (rewardId === this.state.playerId) return;
     const killer = this._enemyById.get(rewardId);
     if (!killer || !killer.active) return;
-    if (SMALL_FIX.R962K !== 0 && this._mevOn && this.mevMatch.killsPay === 'risen') return;
+    if (SMALL_FIX.R962K !== 0 && this._mevRulesOn() && this.mevMatch.killsPay === 'risen') return;
     killer.kills++;
     if (killer.kills > this.state.topKills && this._countsForTopKills(killer)) this.state.topKills = killer.kills;
     if (SMALL_FIX.R993 !== 0) this._countKill(rewardId, this._killKindOf(this.state.currentTankFileName ?? 'basic', false), this._plKillShares,
-      this.state.lastTankDamageTime, this.state.tankHP * this.getStatMultiplier('maxHealth'));
+      this.state.lastTankDamageTime, this.state.tankHP * this.getStatMultiplier('maxHealth'), SMALL_FIX.R1026A !== 0 && !(this._mevRulesOn() && this.mevMatch.killsPay === 'risen'));
     const score = this.state.currentXp + _XP_BASE;
-    if (this._mevOn && this.mevMatch.killsPay === 'risen') return;
-    this._payKillOfPlayer(rewardId, isManhuntMode(this.state.gameModeConfig.mode) ? score : getJackpot(score));
+    if (this._mevRulesOn() && this.mevMatch.killsPay === 'risen') return;
+    const full879 = SMALL_FIX.G879 !== 0 && this._mevRulesOn() && this.mevMatch.fullScoreOnKills === true;
+    this._payKillOfPlayer(rewardId, isManhuntMode(this.state.gameModeConfig.mode) || full879 ? score : getJackpot(score));
   }
 
   private _notePlayerAttackerBullet(b: Bullet): void {
@@ -5419,9 +5500,14 @@ export class GameLogic {
     return (enemy.pressMs - start) / (full - start);
   }
 
+  private _lastDmgShapeRef: FloatingPolygon | null = null;
+  private _lastDmgShapeRefId = '';
+  private _lastDmgShapeFrame = -10;
+  private _mevRuleKill = false;
   private _notePlayerAttackerShape(p: FloatingPolygon): void {
     this._lastDmgKind = 'shape';
     this._lastDmgShapeId = p.shapeId || '';
+    if (SMALL_FIX.G885 !== 0) { this._lastDmgShapeRef = p; this._lastDmgShapeRefId = p.id; this._lastDmgShapeFrame = this.frameCounter; }
     this._lastDmgTankFile = ''; this._lastDmgTankName = '';
     this._lastDmgTankId = ''; this._lastDmgProj = ''; this._lastDmgTurretId = '';
   }
@@ -5570,6 +5656,7 @@ export class GameLogic {
     const _wore703 = SMALL_FIX.G703 !== 0 ? this.playerColorTeamIndex() : -1;
     if (MISSING_MODES.ON !== 0 && this.mevMatch.killsTurnSides === true) this._tagPlayerSide();
     this.admin.onOwnerDeath();
+    if (SMALL_FIX.R985 !== 0) this.spawnerCancelHeld(false);
     this.tankDamageOverlay = flashAtDeath(this.tankDamageOverlay);
     this._deathDriftLeftSec = deathDriftSec();
     this.tankDeathStartTime = this.gameNow();
@@ -5929,7 +6016,7 @@ export class GameLogic {
     return this._dkSeenVec.set(e._dkSeenX, e._dkSeenY);
   }
 
-  private _fearless(e: EnemyTank): boolean { return (e.chargeAI === true && AI_CONSTANTS.CHARGE_AI !== 0) || btNoFear(e) || e.hf.rmNoFear; }
+  private _fearless(e: EnemyTank): boolean { return (e.chargeAI === true && AI_CONSTANTS.CHARGE_AI !== 0) || btNoFear(e) || e.hf.rmNoFear || (AI_CONSTANTS.BT_BOSSKILL !== 0 && e.hf.bkUntil > this._hfNow); }
   private _dkNoteHit(e: EnemyTank, b: Bullet, now: number): void {
     if (!this.dark.live) return;
     let sx: number, sy: number, sr: number;
@@ -5937,7 +6024,7 @@ export class GameLogic {
     else { const o = this._enemyById.get(b.ownerId); if (o === undefined) { sx = b.position.x; sy = b.position.y; sr = 0; } else { sx = o.position.x; sy = o.position.y; sr = o.size * 0.5; } }
     if (!this._dkHides(e, sx, sy, sr)) return;
     const W = this.dark;
-    if (W.levelAt(sx, sy) <= 0 && !e._dkInDark) return;
+    if ((SMALL_FIX.G921 !== 0 ? W.levelFor(this._dkLightOf(e), sx, sy, this._boundDarkLos) : W.levelAt(sx, sy)) <= 0 && !e._dkInDark) return;
     const src = W.hit >= 0 ? W.sources[W.hit] : W.sources[0];
     if (!src.feel) return;
     const vx = b.velocity.x, vy = b.velocity.y, v = Math.sqrt(vx * vx + vy * vy);
@@ -5954,7 +6041,7 @@ export class GameLogic {
       if (b.k !== 'darkness') continue;
       const z = p.zones[b.zone];
       const s = new DarkSource();
-      s.read(b.a);
+      s.read(SMALL_FIX.G840 !== 0 ? this._dkWords(b.a, b.idx, vm) : b.a);
       s.rects = Float64Array.from(z.rects);
       s.poly = z.poly !== null ? Float64Array.from(z.poly) : null;
       s.ux0 = z.x0; s.uy0 = z.y0; s.ux1 = z.x1; s.uy1 = z.y1;
@@ -5966,6 +6053,24 @@ export class GameLogic {
     W.ver++;
     W.step(0);
   }
+  private _dkWords(a: Record<string, unknown>, beh: number, vm: MapEventsVM | null): Record<string, unknown> {
+    const words = ['fadeIn', 'fadeOut', 'circle', 'beam', 'beamWidth', 'gunBeam', 'memory', 'followIn', 'followOut', 'spillCells', 'roundLight'];
+    const wave = vm !== null ? Math.max(1, vm.currentWave()) : 1;
+    let out: Record<string, unknown> | null = null;
+    for (let k = 0; k < words.length; k++) {
+      const v = a[words[k]];
+      if (v === undefined || v === null || typeof v !== 'object') continue;
+      if (out === null) out = { ...a };
+      out[words[k]] = this._behNum(v, NaN, beh, k, wave);
+    }
+    return out ?? a;
+  }
+  private _behNum(v: unknown, d: number, beh: number, slot: number, wave: number): number {
+    if (typeof v === 'number') return Number.isFinite(v) ? v : d;
+    if (v === null || typeof v !== 'object') return d;
+    const n = evalNum(v, wave, seedStream(_areaNumRng, 7000 + beh, wave, slot));
+    return Number.isFinite(n) ? n : d;
+  }
   private _glowWanted = false;
   private _glowGrids: DarkGlow[] = [];
   private _glowDirty = false;
@@ -5974,8 +6079,9 @@ export class GameLogic {
     const W = this.dark;
     W.glows.length = 0;
     this._glowDirty = false;
-    const num = (v: unknown, d: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : d);
-    this._glowWanted = p.behaviors.some(b => b.k === 'glow' || (b.k === 'door' && num(b.a.light, 3) > 0) || (b.k === 'darkness' && b.a.spills === true));
+    const wave1008 = vm !== null ? Math.max(1, vm.currentWave()) : 1;
+    const num = (v: unknown, d: number, beh = -1, slot = 0): number => (SMALL_FIX.R1008 !== 0 && v !== null && typeof v === 'object' ? this._behNum(v, d, beh, 20 + slot, wave1008) : typeof v === 'number' && Number.isFinite(v) ? v : d);
+    this._glowWanted = p.behaviors.some(b => b.k === 'glow' || (b.k === 'door' && num(b.a.light, 3, b.idx, 0) > 0) || (b.k === 'darkness' && b.a.spills === true)) || (SMALL_FIX.G842 !== 0 && W.sources.some(q => q.spills));
     if (!this._glowWanted) return;
     const spills = W.sources.some(q => q.spills);
     const multi = this.areaStates.length > 0;
@@ -5990,15 +6096,15 @@ export class GameLogic {
       g.clearSeeds();
       for (const b of p.behaviors) {
         if (b.k === 'door') {
-          const reach = num(b.a.light, 3);
+          const reach = num(b.a.light, 3, b.idx, 0);
           if (reach <= 0) continue;
-          const shutShare = Math.max(0, Math.min(100, num(b.a.lightShut, 50))) / 100;
+          const shutShare = Math.max(0, Math.min(100, num(b.a.lightShut, 50, b.idx, 1))) / 100;
           for (const d of this._doors) if (d.beh === b.idx && d.ms === ms) for (const c of d.cells) g.seed(c, d.shut ? shutShare : 1, reach);
         } else if (b.k === 'glow') {
           if (!(vm !== null ? vm.behaviorIsOn(b.idx) : b.on)) continue;
           const z = p.zones[b.zone];
           if (!z || (multi && z.areaIdx !== ai)) continue;
-          const reach = Math.max(0.5, num(b.a.reach, 4)), strength = Math.max(0, Math.min(100, num(b.a.strength, 100))) / 100;
+          const reach = Math.max(0.5, num(b.a.reach, 4, b.idx, 2)), strength = Math.max(0, Math.min(100, num(b.a.strength, 100, b.idx, 3))) / 100;
           const r = z.rects;
           for (let i = 0; i + 3 < r.length; i += 4) {
             const gx0 = Math.max(0, Math.floor((r[i] - offX + ms.mapHalf) / cs)), gx1 = Math.min(gc - 1, Math.ceil((r[i + 2] - offX + ms.mapHalf) / cs) - 1);
@@ -6055,7 +6161,11 @@ export class GameLogic {
   };
   private _dkBehaviorSet(behaviorRow: number, on: boolean): void {
     const S = this.dark.sources;
-    for (let i = 1; i < S.length; i++) if (S[i].beh === behaviorRow) S[i].target = on ? 1 : 0;
+    const b841 = SMALL_FIX.G841 !== 0 && this._mev !== null ? this._mev.p.behaviors[behaviorRow] : undefined;
+    for (let i = 1; i < S.length; i++) if (S[i].beh === behaviorRow) {
+      if (b841 !== undefined && b841.k === 'darkness') S[i].read(SMALL_FIX.G840 !== 0 ? this._dkWords(b841.a, b841.idx, this._mev) : b841.a);
+      S[i].target = on ? 1 : 0;
+    }
     this.dark.step(0);
     this._glowSoon();
   }
@@ -6070,6 +6180,7 @@ export class GameLogic {
       if (fade >= 0) { if (on) s.fadeIn = fade; else s.fadeOut = fade; }
       s.target = on ? 1 : 0;
     }
+    if (SMALL_FIX.G842 !== 0 && a !== null && a.spills === true) this._glowWanted = true;
     this.dark.step(0);
     this._glowSoon();
   }
@@ -6259,6 +6370,7 @@ export class GameLogic {
     e.roleSeenVictimId = '';
     e.roleWdAggId = '';
     e.unreachTargetId = '';
+    if (SMALL_FIX.G819 !== 0) { e.unreachMoreLive = 0; e.unreachMoreIds[0] = e.unreachMoreIds[1] = e.unreachMoreIds[2] = ''; }
     e.pursuitPathTgtId = '';
     e.aimReactTgtId = null;
     e.lastTankDamageById = '';
@@ -6308,6 +6420,7 @@ export class GameLogic {
     if (o.roleSeenVictimId === ghostId) o.roleSeenVictimId = '';
     if (o.roleWdAggId === ghostId) o.roleWdAggId = '';
     if (o.unreachTargetId === ghostId) o.unreachTargetId = '';
+    if (SMALL_FIX.G819 !== 0) { const ri = o.unreachMoreIds; for (let k = 0; k < ri.length; k++) if (ri[k] === ghostId) ri[k] = ''; }
     if (o.chaseAnchorId === ghostId) o.chaseAnchorId = '';
     if (o.chaseFutileId === ghostId) { o.chaseFutileId = ''; o.chaseFutileUntil = 0; }
     if (o.pursuitPathTgtId === ghostId) o.pursuitPathTgtId = '';
@@ -6369,6 +6482,7 @@ export class GameLogic {
   private _pauseStartMs: number = 0;
 
   private _smartFitDiameter: number = 0;
+  private readonly _smartFitByArea: number[] = [];
 
   private _firingClock: number = 0;
   private _playerBecameAt: number = -1e12;
@@ -6748,6 +6862,7 @@ export class GameLogic {
   private _thVy = new Float64Array(256);
   private _thRad = new Float64Array(256);
   private _thSev = new Float64Array(256);
+  private _thHit = new Float64Array(256);
   private _thLifeMs = new Float64Array(256);
   private _thChase = new Uint8Array(256);
   private _thTopSpd = new Float64Array(256);
@@ -7401,10 +7516,10 @@ export class GameLogic {
 
   private xpFromKill(victim: EnemyTank): number {
     if ((victim._mevF & MF_NO_XP) !== 0) return 0;
-    if (this._mevOn && this.mevMatch.killsPay === 'risen' && (victim._mevF & MF_RISEN) === 0) return 0;
+    if (this._mevRulesOn() && this.mevMatch.killsPay === 'risen' && (victim._mevF & MF_RISEN) === 0) return 0;
     if (victim.xpOverride > 0) return victim.xpOverride;
     const score = victim.currentXp + _XP_BASE + victim._mevScore;
-    return isManhuntMode(this.state.gameModeConfig.mode) || (this._mevOn && this.mevMatch.fullScoreOnKills === true) ? score : getJackpot(score);
+    return isManhuntMode(this.state.gameModeConfig.mode) || (this._mevRulesOn() && this.mevMatch.fullScoreOnKills === true) ? score : getJackpot(score);
   }
 
   private _rewardRecipientId(id: string): string {
@@ -7445,15 +7560,41 @@ export class GameLogic {
     if (rid !== this.state.playerId) ksNote(this._plKillShares, rid, got, at);
   }
   private _ksPayable(id: string, actor: EnemyTank | null): boolean {
-    if (id === this.state.playerId) return !this.tankDying && !this.state.playerDead && !(SMALL_FIX.GH602 !== 0 && this._specId !== '');
+    if (id === this.state.playerId) return !this.tankDying && !this.state.playerDead && !(SMALL_FIX.GH602 !== 0 && this._specId !== '') && !(SMALL_FIX.G818 !== 0 && (this.admin.attrs & AT_SCORE) === 0);
     if (actor !== null && actor.id === id) return true;
     const e = this._enemyById.get(id);
     return e !== undefined && e.active && !e.isDying;
+  }
+  private _ksDepth = 0;
+  private _ksIdsD: string[][] = [];
+  private _ksDmgD: number[][] = [];
+  private _ksPaySnap(m: Map<string, DamageContribution>, now: number, floor: number, actor: EnemyTank | null, xp: number): boolean {
+    const d = this._ksDepth;
+    const ids = this._ksIdsD[d] ?? (this._ksIdsD[d] = []), dmg = this._ksDmgD[d] ?? (this._ksDmgD[d] = []);
+    ids.length = 0; dmg.length = 0;
+    let sum = 0;
+    for (const c of m.values()) if (ksEarns(c, now, floor) && this._ksPayable(c.ownerId, actor)) { ids.push(c.ownerId); dmg.push(c.totalDamage); sum += c.totalDamage; }
+    if (!(sum > 0)) return false;
+    this._ksDepth = d + 1;
+    try {
+      let lost = 0;
+      for (let i = 0; i < ids.length; i++) {
+        if (this._ksPayable(ids[i], actor)) this._addKillXpTo(ids[i], actor, xp * (dmg[i] / sum));
+        else { lost += dmg[i]; dmg[i] = 0; }
+      }
+      if (lost > 0) {
+        let s2 = 0;
+        for (let i = 0; i < ids.length; i++) if (dmg[i] > 0 && this._ksPayable(ids[i], actor)) s2 += dmg[i];
+        if (s2 > 0) for (let i = 0; i < ids.length; i++) if (dmg[i] > 0 && this._ksPayable(ids[i], actor)) this._addKillXpTo(ids[i], actor, xp * (lost / sum) * (dmg[i] / s2));
+      }
+    } finally { this._ksDepth = d; }
+    return true;
   }
   private _payKill(victim: EnemyTank, killerId: string, actor: EnemyTank | null, xp: number): void {
     const m = victim.killShares;
     if (SMALL_FIX.R982 !== 0 && xp > 0 && m.size > 0) {
       const now = victim.deathStartTime, floor = victim.maxHealth * getEnemyStatMultiplier(victim, 'maxHealth') * KILL_SHARE_FLOOR;
+      if (SMALL_FIX.G898 !== 0 && this._ksPaySnap(m, now, floor, actor, xp)) { ksClear(m); return; }
       let sum = 0;
       for (const c of m.values()) if (ksEarns(c, now, floor) && this._ksPayable(c.ownerId, actor)) sum += c.totalDamage;
       if (sum > 0) {
@@ -7469,6 +7610,7 @@ export class GameLogic {
     const m = this._plKillShares, st = this.state;
     if (SMALL_FIX.R982 !== 0 && xp > 0 && m.size > 0) {
       const now = st.lastTankDamageTime, floor = st.tankHP * this.getStatMultiplier('maxHealth') * KILL_SHARE_FLOOR;
+      if (SMALL_FIX.G898 !== 0 && this._ksPaySnap(m, now, floor, null, xp)) { ksClear(m); return; }
       let sum = 0;
       for (const c of m.values()) if (ksEarns(c, now, floor) && this._ksPayable(c.ownerId, null)) sum += c.totalDamage;
       if (sum > 0) {
@@ -7603,22 +7745,25 @@ export class GameLogic {
       if (this._mevOn && victim.spawnedByEntityId && (killerId === this.state.playerId || this._isSpecId(killerId)) && victim.isDying) {
         const maker = this._tankByIdAny(victim.spawnedByEntityId);
         if (maker && (maker._mevF & MF_STAGE) !== 0) {
-          const s = this._mev!.madeLineOf(maker._mev, maker as unknown as MevBody, this.madeTankWord(victim));
+          const s = this._mev!.madeLineOf(maker._mev, maker as unknown as MevBody, this.madeTankWord(victim), victim as unknown as MevBody);
           if (s !== '') this.pushMessage(s, victim.deathStartTime);
         }
       }
       return;
     }
     if ((victim._mevF & MF_NO_KILL) !== 0) return;
-    if (SMALL_FIX.R962K !== 0 && this._mevOn && this.mevMatch.killsPay === 'risen' && (victim._mevF & MF_RISEN) === 0) return;
+    if (SMALL_FIX.R962K !== 0 && this._mevRulesOn() && this.mevMatch.killsPay === 'risen' && (victim._mevF & MF_RISEN) === 0) return;
     if (SMALL_FIX.R993 !== 0) this._countKill(killerId, this._killKindOf(this._areaTankKeyOf(victim), victim.isBossTier),
-      victim.isDying ? victim.killShares : _NO_KILL_SHARES, victim.deathStartTime, victim.maxHealth * getEnemyStatMultiplier(victim, 'maxHealth'));
+      victim.isDying ? victim.killShares : _NO_KILL_SHARES, victim.deathStartTime, victim.maxHealth * getEnemyStatMultiplier(victim, 'maxHealth'),
+      SMALL_FIX.R1026A !== 0 && this.xpFromKill(victim) > 0);
+    if (SMALL_FIX.R1026 !== 0 && victim.isDying) this._sayAssist(killerId, victim);
     if (killerId === this.state.playerId) {
       this.state.kills++;
       if (SMALL_FIX.R993 === 0 && victim.isBossTier) this.state.bossKills++;
       if (this.state.kills > this.state.topKills) this.state.topKills = this.state.kills;
       if (victim.isDying) {
-        const _killSaid = this._killLineFor(victim);
+        let _killSaid = this._killLineFor(victim);
+        if (SMALL_FIX.R1026K !== 0 && this._killHelped(victim, killerId)) _killSaid = hudMsgAssistLine(_killSaid);
         if (_killSaid !== '') this.pushMessage(_killSaid, victim.deathStartTime);
       }
       this._sayBossLeft();
@@ -7629,7 +7774,8 @@ export class GameLogic {
     killer.kills++;
     if (killer.kills > this.state.topKills && this._countsForTopKills(killer)) this.state.topKills = killer.kills;
     if (victim.isDying && this._isSpecId(killerId)) {
-      const _specSaid = this._killLineFor(victim);
+      let _specSaid = this._killLineFor(victim);
+      if (SMALL_FIX.R1026K !== 0 && this._killHelped(victim, killerId)) _specSaid = hudMsgAssistLine(_specSaid);
       if (_specSaid !== '') this.pushMessage(_specSaid, victim.deathStartTime);
     }
   }
@@ -7642,18 +7788,39 @@ export class GameLogic {
     return KILL_BOSS_FOLDERS.has(cat) ? KK_BOSS : KK_TANK;
   }
 
-  private _countKill(killerId: string, kind: number, shares: Map<string, DamageContribution>, now: number, full: number): void {
+  private _countKill(killerId: string, kind: number, shares: Map<string, DamageContribution>, now: number, full: number, pays = false): void {
     if (kind === KK_NONE) return;
     const st = this.state;
     if (killerId === st.playerId) { if (kind === KK_BOSS) st.bossKills++; else st.tankKills++; }
     else { const k = this._enemyById.get(killerId); if (k && k.active) { if (kind === KK_BOSS) k.bossKills++; else k.tankKills++; } }
     if (shares.size === 0 || !(full > 0)) return;
     const need = full * KILL_ASSIST_SHARE;
+    const xpRule = SMALL_FIX.R1026A !== 0, floor = full * KILL_SHARE_FLOOR;
     for (const c of shares.values()) {
-      if (c.ownerId === killerId || c.totalDamage < need || !ksFresh(c, now)) continue;
+      if (c.ownerId === killerId) continue;
+      if (xpRule ? !(pays && SMALL_FIX.R982 !== 0 && ksEarns(c, now, floor) && this._ksPayable(c.ownerId, null)) : (c.totalDamage < need || !ksFresh(c, now))) continue;
       if (c.ownerId === st.playerId) st.assists++;
       else { const e = this._enemyById.get(c.ownerId); if (e && e.active) e.assists++; }
     }
+  }
+
+  private _killHelped(victim: EnemyTank, killerId: string): boolean {
+    if (SMALL_FIX.R982 === 0 || victim.killShares.size === 0 || !(this.xpFromKill(victim) > 0)) return false;
+    const now = victim.deathStartTime, floor = victim.maxHealth * getEnemyStatMultiplier(victim, 'maxHealth') * KILL_SHARE_FLOOR;
+    for (const c of victim.killShares.values()) if (c.ownerId !== killerId && ksEarns(c, now, floor) && this._ksPayable(c.ownerId, null)) return true;
+    return false;
+  }
+  private _sayAssist(killerId: string, victim: EnemyTank): void {
+    if (SMALL_FIX.R982 === 0) return;
+    const st = this.state, m = victim.killShares;
+    if (m.size === 0) return;
+    const now = victim.deathStartTime, floor = victim.maxHealth * getEnemyStatMultiplier(victim, 'maxHealth') * KILL_SHARE_FLOOR;
+    let who = '';
+    if (killerId !== st.playerId) { const c = m.get(st.playerId); if (c !== undefined && ksEarns(c, now, floor) && this._ksPayable(st.playerId, null)) who = st.playerId; }
+    if (who === '' && this._specId !== '' && killerId !== this._specId) { const c = m.get(this._specId); if (c !== undefined && ksEarns(c, now, floor) && this._ksPayable(this._specId, null)) who = this._specId; }
+    if (who === '' || !(this.xpFromKill(victim) > 0)) return;
+    const said = hudMsgAssistLine(this._killLineFor(victim));
+    if (said !== '') this.pushMessage(said, now);
   }
 
   private _countsForTopKills(e: EnemyTank): boolean {
@@ -8038,6 +8205,9 @@ export class GameLogic {
           break;
         }
       }
+      if (SMALL_FIX.G917 !== 0 && d.projectileVisual === 'trap' && !d.bouncy) {
+        for (let sci = 0; sci < bTypes.length; sci++) if (bTypes[sci] === 'goToTarget') { d.softCollisionTrap = true; d.facingType = 'turnWithSpeed'; break; }
+      }
     }
 
     d.hasExitedMuzzle = true;
@@ -8068,7 +8238,7 @@ export class GameLogic {
     const mt = _deriveMotionType(gun.projectileBehaviors, pt?.motionType || 'glide');
     const bs = enemy === null
       ? computeBulletTypeStats(gun, mt, this.state.upgrades, this.state.maxPointsPerSkill || 9, this._gunLevel(this.state.level || 0), ACTIVE_GROWTH.rules, this._plStatK)
-      : computeBulletTypeStats(gun, mt, enemy.upgrades, enemy.maxPointsPerSkill || 9, this._gunLevel(enemy.level || 0), growthRulesOf(enemy), enemy._statK);
+      : computeBulletTypeStats(gun, mt, enemy.upgrades, enemy.maxPointsPerSkill || 9, this._gunLevelOf(enemy), growthRulesOf(enemy), enemy._statK);
     const gss = typeof gun.gunStatScale === 'number' ? gun.gunStatScale : 1;
     T.damage = bs.damage * gss;
     T.penetration = bs.penetration * gss;
@@ -8141,37 +8311,74 @@ export class GameLogic {
 
     const _ks = SMALL_FIX.R982 !== 0;
     const _ksFloor = _ks ? (shape.maxHp + (shape.maxShield > 0 ? shape.maxShield : 0)) * KILL_SHARE_FLOOR : 0;
-    let _ksOnly: DamageContribution | null = null, _ksAll = !_ks;
+    let _ksOnly: DamageContribution | null = null, _ksAll = !_ks, _ksRecv = 0;
     let totalValidDamage = 0;
     for (const contribution of shape.damageContributions.values()) {
-      if (_ksAll || (contribution.totalDamage >= _ksFloor && this._ksPayable(contribution.ownerId, null))) totalValidDamage += contribution.totalDamage;
+      if (_ksAll || (contribution.totalDamage >= _ksFloor && this._ksPayable(contribution.ownerId, null))) { totalValidDamage += contribution.totalDamage; _ksRecv++; }
     }
     if (_ks && totalValidDamage === 0) {
       const k = this._ksShapeLast === shape ? shape.damageContributions.get(this._ksShapeLastId) : undefined;
-      if (k !== undefined) { _ksOnly = k; totalValidDamage = k.totalDamage; }
-      else { _ksAll = true; for (const contribution of shape.damageContributions.values()) totalValidDamage += contribution.totalDamage; }
+      if (k !== undefined) { _ksOnly = k; totalValidDamage = k.totalDamage; _ksRecv = 1; }
+      else { _ksAll = true; _ksRecv = shape.damageContributions.size; for (const contribution of shape.damageContributions.values()) totalValidDamage += contribution.totalDamage; }
     }
 
     if (totalValidDamage === 0) return;
 
+    const _d898 = this._ksDepth;
+    let _c898: number[] | null = null, _lost898 = 0, _i898 = 0;
+    if (SMALL_FIX.G898 !== 0 && _ks && _ksOnly === null && !_ksAll) {
+      _c898 = this._ksDmgD[_d898] ?? (this._ksDmgD[_d898] = []);
+      _c898.length = 0;
+      for (const contribution of shape.damageContributions.values()) _c898.push(contribution.totalDamage >= _ksFloor && this._ksPayable(contribution.ownerId, null) ? contribution.totalDamage : 0);
+      this._ksDepth = _d898 + 1;
+    }
+
     for (const contribution of shape.damageContributions.values()) {
-      if (_ksOnly !== null ? contribution !== _ksOnly : !(_ksAll || (contribution.totalDamage >= _ksFloor && this._ksPayable(contribution.ownerId, null)))) continue;
+      if (_c898 !== null) {
+        const _k = _i898++, _cnt = _c898[_k];
+        if (!(_cnt > 0)) continue;
+        if (!this._ksPayable(contribution.ownerId, null)) { _lost898 += _cnt; _c898[_k] = 0; continue; }
+      } else if (_ksOnly !== null ? contribution !== _ksOnly : !(_ksAll || (contribution.totalDamage >= _ksFloor && this._ksPayable(contribution.ownerId, null)))) continue;
       const damagePercent = contribution.totalDamage / totalValidDamage;
       const xpReward = totalXp * damagePercent;
 
       if (contribution.ownerId === this.state.playerId) {
         if (SMALL_FIX.GH602 !== 0 && this._specId !== '') continue;
         this.state.foodKills++;
-        const _shapeSaid = hudMsgShapeKillLine(shapeKillLineName(SHAPE_DEFINITIONS.get(shape.shapeId)));
+        let _shapeSaid = hudMsgShapeKillLine(shapeKillLineName(SHAPE_DEFINITIONS.get(shape.shapeId)));
+        if (SMALL_FIX.R1026 !== 0 && this._ksShapeLast === shape && this._ksShapeLastId !== contribution.ownerId) _shapeSaid = hudMsgAssistLine(_shapeSaid);
+        else if (SMALL_FIX.R1026K !== 0 && _ksRecv > 1 && this._ksShapeLast === shape && this._ksShapeLastId === contribution.ownerId) _shapeSaid = hudMsgAssistLine(_shapeSaid);
         if (_shapeSaid !== '') this.pushMessage(_shapeSaid, _xpNow);
         this.addXp(xpReward);
         this.spawnXpText(contribution.ownerId, xpReward, shape.position);
       } else {
         const enemy = this._enemyById.get(contribution.ownerId);
         if (enemy && enemy.active) {
-          if (this._isSpecId(enemy.id)) { const _specShape = hudMsgShapeKillLine(shapeKillLineName(SHAPE_DEFINITIONS.get(shape.shapeId))); if (_specShape !== '') this.pushMessage(_specShape, _xpNow); }
+          if (this._isSpecId(enemy.id)) {
+            let _specShape = hudMsgShapeKillLine(shapeKillLineName(SHAPE_DEFINITIONS.get(shape.shapeId)));
+            if (SMALL_FIX.R1026 !== 0 && this._ksShapeLast === shape && this._ksShapeLastId !== enemy.id) _specShape = hudMsgAssistLine(_specShape);
+            else if (SMALL_FIX.R1026K !== 0 && _ksRecv > 1 && this._ksShapeLast === shape && this._ksShapeLastId === enemy.id) _specShape = hudMsgAssistLine(_specShape);
+            if (_specShape !== '') this.pushMessage(_specShape, _xpNow);
+          }
           this.addEnemyXp(enemy, xpReward);
           this.spawnXpText(contribution.ownerId, xpReward, shape.position);
+        }
+      }
+    }
+    if (_c898 !== null) {
+      this._ksDepth = _d898;
+      if (_lost898 > 0) {
+        let s2 = 0, i = 0;
+        for (const contribution of shape.damageContributions.values()) { const c = _c898[i++]; if (c > 0 && this._ksPayable(contribution.ownerId, null)) s2 += c; }
+        if (s2 > 0) {
+          i = 0;
+          for (const contribution of shape.damageContributions.values()) {
+            const c = _c898[i++];
+            if (!(c > 0) || !this._ksPayable(contribution.ownerId, null)) continue;
+            const x = totalXp * (_lost898 / totalValidDamage) * (c / s2);
+            if (contribution.ownerId === this.state.playerId) { if (!(SMALL_FIX.GH602 !== 0 && this._specId !== '')) this.addXp(x); }
+            else { const e = this._enemyById.get(contribution.ownerId); if (e && e.active) this.addEnemyXp(e, x); }
+          }
         }
       }
     }
@@ -8457,6 +8664,7 @@ export class GameLogic {
     if (own !== e._fovOwn) {
       const r = own / e._fovOwn;
       e.fovRadius *= r; e._fovGrown *= r; if (e._wtView !== 1) e._wtViewSet *= r;
+      if (SMALL_FIX.G798 !== 0 && e._mevSightK !== 1) e._mevSightSet *= r;
       e._fovOwn = own;
     }
     h.sightSet = on ? own : 0;
@@ -8492,6 +8700,36 @@ export class GameLogic {
     let s = 0;
     for (let i = 0; i < 4; i++) { if (ids[i] === id) { s = i; break; } if (at[i] < at[s]) s = i; }
     ids[s] = id; at[s] = now;
+    if (AI_CONSTANTS.HF_HITCOVER !== 0 && e.hf.plays && e.isBossTier !== true && e.minAttackDistance !== 0 && e.aiState !== 'fleeing' && this.feel.s[FEEL.RISK] > 0) {
+      const pl = id === this.state.playerId, st = e.aiState;
+      if (!((st === 'attacking' || st === 'following') && (pl ? e.currentTargetType === 'player' : (e.currentTargetType === 'enemy' && e.currentTargetId === id)))) {
+        const o = pl ? null : (this._enemyById.get(id) ?? null);
+        if (pl || (o !== null && o.active && !o.isDying)) { const h = e.hf; h.hitId = pl ? 'P' : id; h.hitX = o === null ? this.tankPos.x : o.position.x; h.hitY = o === null ? this.tankPos.y : o.position.y; h.hitUntil = now + 2500; }
+      }
+    }
+    if (AI_CONSTANTS.HF_SHOTLEAVE !== 0 && FEEL_LIVE && e.hf.plays && e.isBossTier !== true && !e.hf.rmOn && this.feel.s[FEEL.RISK] > 0) {
+      const h = e.hf, pl = id === this.state.playerId, st = e.aiState, key = pl ? 'P' : id;
+      if (st === 'fleeing' || st === 'protecting_base' || ((st === 'attacking' || st === 'following') && (pl ? e.currentTargetType === 'player' : (e.currentTargetType === 'enemy' && e.currentTargetId === id)))) h.slN = 0;
+      else {
+        const pool = e.currentHealth + e.currentShield;
+        if (h.slN === 0 || h.slId !== key || now - h.slAt > 2500) { h.slId = key; h.slFirst = now; h.slN = 0; h.slPool = pool; }
+        h.slN++; h.slAt = now;
+        if (((h.slN >= 3 && now - h.slFirst >= 1200 + 1000 * hfHash(h.seed, 556, hfIdNum(key))) || (h.slN >= 2 && pool <= 0.7 * h.slPool)) &&
+            !(st === 'attacking' && (e.currentTargetType === 'enemy' || e.currentTargetType === 'player')) && !e.fear.isFleeing && !(now < e.fearFleeCooldownUntil) && !this._fearless(e)) {
+          const o = pl ? null : (this._enemyById.get(id) ?? null);
+          if (pl ? !this.state.playerDead : (o !== null && o.active && !o.isDying)) {
+            e.fear.isFleeing = true; e.fear.fleeStartTime = now; e.fear.fearReason = 'heat';
+            e.fear.fleeSourceId = pl ? this.state.playerId : id;
+            if (!e.fear.fleeTarget) e.fear.fleeTarget = new Vector(0, 0);
+            e.fear.fleeTarget.set(o === null ? this.tankPos.x : o.position.x, o === null ? this.tankPos.y : o.position.y);
+            if (e.fearHeat < AI_CONSTANTS.FEAR_LEVEL_THRESHOLD) e.fearHeat = AI_CONSTANTS.FEAR_LEVEL_THRESHOLD;
+            e.navEscapeUntil = 0;
+            this._resetStuckWindow(e, now);
+            h.slN = 0;
+          }
+        }
+      }
+    }
   }
   private _hfRoundOf(e: EnemyTank, t: EnemyTank | null): boolean {
     const b = e.threatDodgeRef;
@@ -8502,13 +8740,263 @@ export class GameLogic {
     for (let i = 0; i < 4; i++) if (ids[i] === id) return e.hf.hbAt[i];
     return 0;
   }
+  private _hfPRpV = 0; private _hfPRpAt = 0;
+  private _hfRoundPower(o: EnemyTank | null, now: number): number {
+    if (o !== null) {
+      const h = o.hf; if (now < h.rpAt) return h.rpV;
+      h.rpAt = now + 3000; h.rpV = this._hfRoundPowerOf(o.turrets, o);
+      if (AI_CONSTANTS.HF_HITRANGE !== 0) { h.rfV = this._hfFlightOf(this._rpGun, getEnemyStatMultiplier(o, 'bulletSpeed')); h.hvC = this._hfGunKind(this._rpGun); h.wfV = this._hfFireWeightOf(o.turrets, o); }
+      if (AI_CONSTANTS.HF_RANGELUCK !== 0 && FEEL_LIVE && AI_CONSTANTS.HF_HITRANGE !== 0 && h.rfV > 0) { this._hfReachMore(this._rpGun, getEnemyStatMultiplier(o, 'bulletSpeed'), o.turrets, o.bodyLayers); h.rlV = this._rmLuck; h.rbV = this._rmBoost; } else { h.rlV = 0; h.rbV = 0; }
+      return h.rpV;
+    }
+    if (now < this._hfPRpAt) return this._hfPRpV;
+    this._hfPRpAt = now + 3000; this._hfPRpV = this._hfRoundPowerOf(this.state.turrets, null);
+    if (AI_CONSTANTS.HF_HITRANGE !== 0) { this._hfPRfV = this._hfFlightOf(this._rpGun, this.getStatMultiplier('bulletSpeed')); this._hfPHvC = this._hfGunKind(this._rpGun); this._hfPWfV = this._hfFireWeightOf(this.state.turrets, null); }
+    if (AI_CONSTANTS.HF_RANGELUCK !== 0 && FEEL_LIVE && AI_CONSTANTS.HF_HITRANGE !== 0 && this._hfPRfV > 0) { this._hfReachMore(this._rpGun, this.getStatMultiplier('bulletSpeed'), this.state.turrets, this.state.bodyLayers); this._hfPRlV = this._rmLuck; this._hfPRbV = this._rmBoost; } else { this._hfPRlV = 0; this._hfPRbV = 0; }
+    return this._hfPRpV;
+  }
+  private _rpGun: Turret | null = null;
+  private _hfPRfV = 0; private _hfPHvC = 0; private _hfPWfV = 0;
+  private _hfPRlV = 0; private _hfPRbV = 0;
+  private _rmLuck = 0; private _rmBoost = 0;
+  private _hfReachMore(gun: Turret | null, speedMult: number, turrets: Turret[], layers: BodyLayer[] | undefined): void {
+    this._rmLuck = 0; this._rmBoost = 0;
+    if (gun === null) return;
+    const pt = gun.projectileType, sct = pt?.statCalculatorType;
+    const s0 = (10 / this.movementZoom) * (sct === 'sustainedLowspeed' ? (gun.speed + 5) + (speedMult - 1) : (gun.speed + 5) * speedMult) / 10;
+    if (!(s0 > 0)) return;
+    let k = glideDampPerFrame();
+    if (AI_CONSTANTS.PROJ_FRICTION_LIVE !== 0 && _motionFrictionAuthored(gun.projectileBehaviors)) {
+      const rf = _deriveMotionFriction(gun.projectileBehaviors, pt?.friction ?? 0);
+      k = rf > 0 ? Math.exp(Math.log(1 / (1 + rf)) * (frictionTickRate() / 60)) : 1;
+    }
+    if (!(k < 1)) return;
+    let life = (sct === 'trap' || sct === 'sustained' || sct === 'sustainedLowspeed') ? (gun.bulletLifetime ?? 3) : (gun.bulletLifetime ?? 3) / Math.sqrt(speedMult);
+    if (pt && pt.lifetime > 0) life = ARRAS_PARITY.LIFE_BY_SPEED !== 0 ? lifeBySpeed(pt.lifetime, speedMult, sct) : pt.lifetime;
+    if (!(life > 0)) return;
+    const G = (1 - Math.pow(k, life * 60)) / (1 - k);
+    this._rmLuck = s0 * 2 * (gun.shudder > 0 ? gun.shudder : 0) * G;
+    let onBody = false;
+    if (turrets) for (let i = 0; i < turrets.length; i++) if (turrets[i] === gun) { onBody = true; break; }
+    if (onBody && layers) for (let i = 0; i < layers.length; i++) if (layers[i].turretIds.indexOf(gun.id) !== -1) { onBody = false; break; }
+    if (onBody) this._rmBoost = (ARRAS_PARITY.TANK_GUN_BOOST !== 0 ? this.state.velocityInheritance / ROUND_GUN_INHERIT_FULL : this.state.velocityInheritance / 100) * G;
+  }
+  private _hfRoundPowerOf(turrets: Turret[], o: EnemyTank | null): number {
+    let best = 0;
+    this._rpGun = null;
+    if (!turrets) return 0;
+    const hr = AI_CONSTANTS.HF_HITRANGE !== 0;
+    for (let i = 0; i < turrets.length; i++) {
+      const t = turrets[i];
+      if (!t) continue;
+      if (hr) {
+        if (t.turretType === 'decorative') continue;
+        if (t.turretType === 'auto') {
+          const subs = t.autoSubTurrets;
+          if (subs) for (let j = 0; j < subs.length; j++) { const s = subs[j] as Turret; if (!s || s.turretType === 'decorative') continue; const q = this._hfGunPower(s, o); if (q > best) { best = q; this._rpGun = s; } }
+          continue;
+        }
+      }
+      const p = this._hfGunPower(t, o);
+      if (p > best) { best = p; this._rpGun = t; }
+    }
+    return best;
+  }
+  private _hfComesBack(t: Turret): boolean {
+    const bh = t.projectileBehaviors;
+    if (bh) for (let i = 0; i < bh.length; i++) if (bh[i].type === 'returnToOwner' && bh[i].enabled !== false) return true;
+    return false;
+  }
+  private _hfGunPower(t: Turret, o: EnemyTank | null): number {
+      const mt = _deriveMotionType(t.projectileBehaviors, t.projectileType?.motionType || 'glide');
+      const bs = o === null
+        ? computeBulletTypeStats(t, mt, this.state.upgrades, this.state.maxPointsPerSkill || 9, this._gunLevel(this.state.level || 0), ACTIVE_GROWTH.rules, this._plStatK)
+        : computeBulletTypeStats(t, mt, o.upgrades, o.maxPointsPerSkill || 9, this._gunLevelOf(o), growthRulesOf(o), o._statK);
+      const k = typeof t.gunStatScale === 'number' ? t.gunStatScale : 1;
+      if (AI_CONSTANTS.HF_TRAPPRICE !== 0 && FEEL_LIVE && t.projectileType?.visual === 'trap' && !this._hfComesBack(t)) return HF_REST_K * bs.damage * k * bs.health * k;
+      return 0.31 * Math.pow(bs.damage * k, 0.64) * Math.pow(bs.health * k, 0.37) * Math.pow(bs.penetration * k, 1.88) * (mt === 'chase' ? 2.54 : 1);
+  }
+  private _hfFlightOf(gun: Turret | null, speedMult: number): number {
+    if (gun === null) return 0;
+    const r = this._gunRoundReach(gun, speedMult);
+    if (r < Infinity) return r;
+    const pt = gun.projectileType, bh = gun.projectileBehaviors;
+    const mt = _deriveMotionType(bh, pt?.motionType || 'glide');
+    if (mt === 'withMaster') return 0;
+    if (mt === 'chase' || mt === 'swarm') return -1;
+    if (bh) for (let i = 0; i < bh.length; i++) {
+      const b = bh[i];
+      if (b.enabled && (b.type === 'followMouse' || b.type === 'autoTargetEnemy' || b.type === 'hangNearOwner' || b.type === 'hangNearOwnerV2' || b.type === 'minionControl' || b.type === 'goToTarget' || b.type === 'swarmAI')) return -1;
+    }
+    const sct = pt?.statCalculatorType;
+    const s0 = (10 / this.movementZoom) * (sct === 'sustainedLowspeed' ? (gun.speed + 5) + (speedMult - 1) : (gun.speed + 5) * speedMult) / 10;
+    if (!(s0 > 0)) return 0;
+    if (!((pt?.topSpeedRatio ?? 1) > 0)) { const k = glideDampPerFrame(); return k < 1 ? s0 / (1 - k) : 0; }
+    let life = (sct === 'trap' || sct === 'sustained' || sct === 'sustainedLowspeed') ? (gun.bulletLifetime ?? 3) : (gun.bulletLifetime ?? 3) / Math.sqrt(speedMult);
+    if (pt && pt.lifetime > 0) life = ARRAS_PARITY.LIFE_BY_SPEED !== 0 ? lifeBySpeed(pt.lifetime, speedMult, pt.statCalculatorType) : pt.lifetime;
+    return life > 0 ? s0 * life * 60 : 0;
+  }
+  private _hfRoundFlight(o: EnemyTank | null, now: number): number {
+    this._hfRoundPower(o, now);
+    return o !== null ? o.hf.rfV : this._hfPRfV;
+  }
+  private _hfHitRange(e: EnemyTank, o: EnemyTank | null, now: number): number {
+    let f = this._hfRoundFlight(o, now);
+    if (f < 0) return Infinity;
+    if (!(f > 0)) return 0;
+    if (AI_CONSTANTS.HF_RANGELUCK !== 0 && FEEL_LIVE && e._btBits === 0) {
+      f += o !== null ? o.hf.rlV : this._hfPRlV;
+      const bk = o !== null ? o.hf.rbV : this._hfPRbV;
+      if (bk > 0) {
+        const dx = e.position.x - (o !== null ? o.position.x : this.tankPos.x), dy = e.position.y - (o !== null ? o.position.y : this.tankPos.y), d = Math.sqrt(dx * dx + dy * dy);
+        if (d > 1) {
+          const al = o !== null ? ((o.velocity.x + o.knockbackVelocity.x) * dx + (o.velocity.y + o.knockbackVelocity.y) * dy) / d : ((this.tankVelocity.x + this.knockbackVelocity.x) * dx + (this.tankVelocity.y + this.knockbackVelocity.y) * dy) / d;
+          if (al > 0) f += al * bk;
+        }
+      }
+    }
+    return 1.6 * (o === null ? this.getEffectivePlayerRadius() : this.getEffectiveEnemyRadius(o)) + f + this.getEffectiveEnemyRadius(e) + 40 + 60 * e.dnaCaution;
+  }
+  private _hfFireWeightOf(turrets: Turret[], o: EnemyTank | null): number {
+    if (!turrets) return 0;
+    let sum = 0;
+    for (let i = 0; i < turrets.length; i++) {
+      const t = turrets[i];
+      if (!t || t.turretType === 'decorative') continue;
+      if (t.turretType === 'auto') { const subs = t.autoSubTurrets; if (subs) for (let j = 0; j < subs.length; j++) { const s = subs[j] as Turret; if (s && s.turretType !== 'decorative') sum += this._hfGunWeight(s, o); } }
+      else sum += this._hfGunWeight(t, o);
+    }
+    return sum;
+  }
+  private _hfGunWeight(t: Turret, o: EnemyTank | null): number {
+    if (!((t.bps || 0) > 0)) return 0;
+    const mt = _deriveMotionType(t.projectileBehaviors, t.projectileType?.motionType || 'glide');
+    const bs = o === null
+      ? computeBulletTypeStats(t, mt, this.state.upgrades, this.state.maxPointsPerSkill || 9, this._gunLevel(this.state.level || 0), ACTIVE_GROWTH.rules, this._plStatK)
+      : computeBulletTypeStats(t, mt, o.upgrades, o.maxPointsPerSkill || 9, this._gunLevelOf(o), growthRulesOf(o), o._statK);
+    const k = typeof t.gunStatScale === 'number' ? t.gunStatScale : 1;
+    return bs.damage * k * bs.health * k * t.bps;
+  }
+  private _hfOpenAt(e: EnemyTank, x: number, y: number): boolean {
+    const ms = this._getEnemyNavMapState(e), ox = this._navOffX, oy = this._navOffY;
+    if (ms === null || ms.walls.length === 0) return false;
+    const lx = x - ox, ly = y - oy, L = 3 * ms.cellSize;
+    let clear = 0;
+    for (let k = 0; k < 8; k++) if (checkLineOfSight(ms, lx, ly, lx + HF_KEY_X[k] * L, ly + HF_KEY_Y[k] * L, ox, oy)) clear++;
+    return clear >= 7;
+  }
+  private _hfStdPts: Record<string, number> = { bodyDamage: 0, maxHealth: 0, bulletSpeed: 5, bulletPenetration: 5, bulletHealth: 5, bulletDamage: 5, reload: 5, movementSpeed: 0, shieldRegen: 0, shieldCapacity: 0 };
+  private _hfGunKind(t: Turret | null): number {
+    if (t === null || !((t.projectileType?.topSpeedRatio ?? 1) > 0)) return 0;
+    const mt = _deriveMotionType(t.projectileBehaviors, t.projectileType?.motionType || 'glide');
+    const bs = computeBulletTypeStats(t, mt, this._hfStdPts, 9, 0, undefined, null);
+    const k = typeof t.gunStatScale === 'number' ? t.gunStatScale : 1;
+    return 0.31 * Math.pow(bs.damage * k, 0.64) * Math.pow(bs.health * k, 0.37) * Math.pow(bs.penetration * k, 1.88) * (mt === 'chase' ? 2.54 : 1) / HF_BASIC_ROUND;
+  }
+  private _hfHitFear(e: EnemyTank, o: EnemyTank | null, now: number, _full: number): boolean {
+    if (e.isBossTier === true || (o !== null && o.isBossTier === true)) return false;
+    const s = this._hfOneHit(e, o, now);
+    if (!(s >= 0.03)) return false;
+    let p = s > 1 ? 1 : s;
+    const h = e.hf;
+    let keep = 0;
+    if (AI_CONSTANTS.HF_HEAVYSURE !== 0) {
+      if (s >= 0.1 && s < 0.5) { const _cm = this._getEnemyNavMapState(e); if (_cm !== null && _cm.walls.length > 0 && !this._hfOpenAt(e, e.position.x, e.position.y)) { p *= 1.5; if (p > 1) p = 1; } }
+      if (s >= 0.34) { keep = s >= 0.5 ? 1 : (s - 0.34) / 0.16; if (p < 0.93) p += (0.93 - p) * keep; }
+    }
+    if (h.dKind === 0 && h.sLed !== true && keep < 1) {
+      this._hfRoundPower(e, now);
+      const We = h.wfV, Wo = o === null ? this._hfPWfV : o.hf.wfV;
+      if (Wo > 0 && We > Wo) {
+        const Ge = this._hfGunFire(e, now), Go = this._hfGunFire(o, now);
+        const pE = e.currentHealth + e.currentShield, pO = o === null ? this.state.tankCurrentHealth + this.state.tankCurrentShield : o.currentHealth + o.currentShield;
+        const bE = 1 + 0.19 * (e.upgrades ? (e.upgrades.bodyDamage || 0) : 0), bO = 1 + 0.19 * (o === null ? (this.state.upgrades.bodyDamage || 0) : (o.upgrades ? (o.upgrades.bodyDamage || 0) : 0));
+        const A = Go > 0 && pO > 0 ? (pE * bE * Ge) / (pO * bO * Go) : 9;
+        const cS = We >= 2 * Wo ? 1 : We / Wo - 1, cA = A <= 0.8 ? 0 : A >= 1.5 ? 1 : (A - 0.8) / 0.7;
+        p *= 1 - (cS < cA ? cS : cA) * (1 - keep);
+      }
+    }
+    p *= 1 + 0.25 * (e.dnaCaution - e.dnaCourage);
+    if (p > 0.97) p = 0.97;
+    if (p < 0.03) return false;
+    const tn = o === null ? 7 : (o.hf.idn === 0 ? 1 : o.hf.idn);
+    const span = 20000 + 20000 * hfHash(h.seed, 513, tn);
+    if (AI_CONSTANTS.HF_HEAVYBUSY !== 0 && h.dKind === 0 && h.bpsMax > 0 &&
+        (o === null ? this._hfFightsPlayer > (e.aiState === 'attacking' && e.currentTargetType === 'player' ? 1 : 0) : (o.aiState === 'attacking' && o.currentTargetId !== e.id && (o.currentTargetType === 'enemy' || o.currentTargetType === 'player'))) &&
+        !this._hfFacesMe(e, o) && hfHash(h.seed, 547, tn * 8191 + ((now / span) | 0)) < 0.25 + 0.3 * e.dnaCourage) return false;
+    return hfHash(h.seed, 514, tn * 8191 + ((now / span) | 0)) < p;
+  }
+  private _hfHitOf(e: EnemyTank, t: EnemyTank | null, now: number): number {
+    const h = e.hf, id = t === null ? 'P' : t.id;
+    if (h.hqId === id && now < h.hqAt) return h.hqR;
+    let R = 0;
+    if ((t === null || t.hf.plays) && this._hfHitFear(e, t, now, 0)) {
+      R = this._hfHitRange(e, t, now); if (R > e.fovRadius) R = e.fovRadius;
+    }
+    h.hqId = id; h.hqAt = now + 300; h.hqR = R;
+    return R;
+  }
+  private _hfInHit(e: EnemyTank, x: number, y: number): boolean {
+    const h = e.hf, dx = x - h.hvX, dy = y - h.hvY;
+    if (dx * dx + dy * dy >= h.hvR * h.hvR) return false;
+    const ms = this._getEnemyNavMapState(e), ox = this._navOffX, oy = this._navOffY;
+    if (ms === null || ms.walls.length === 0) return true;
+    return checkLineOfSight(ms, x - ox, y - oy, h.hvX - ox, h.hvY - oy, ox, oy);
+  }
+  private _hfPGfV = 0; private _hfPGfAt = 0;
+  private _hfGunFire(o: EnemyTank | null, now: number): number {
+    if (o !== null) { const h = o.hf; if (now < h.gfAt) return h.gfV; h.gfAt = now + 3000; h.gfV = this._hfGunFireOf(o.turrets, o); return h.gfV; }
+    if (now < this._hfPGfAt) return this._hfPGfV;
+    this._hfPGfAt = now + 3000; this._hfPGfV = this._hfGunFireOf(this.state.turrets, null);
+    return this._hfPGfV;
+  }
+  private _hfGunFireOf(turrets: Turret[], o: EnemyTank | null): number {
+    if (!turrets) return 0;
+    let sum = 0;
+    for (let i = 0; i < turrets.length; i++) {
+      const t = turrets[i];
+      if (!t || t.turretType === 'decorative') continue;
+      if (t.turretType !== 'auto' && (t.bps || 0) > 0) sum += this._hfGunPower(t, o) * t.bps;
+      const subs = t.autoSubTurrets;
+      if (subs) for (let j = 0; j < subs.length; j++) {
+        const s = subs[j] as Turret;
+        if (!s || s.turretType === 'decorative' || !((s.bps || 0) > 0)) continue;
+        sum += this._hfGunPower(s, o) * s.bps;
+      }
+    }
+    return sum;
+  }
+  private _hfOneHit(e: EnemyTank, o: EnemyTank | null, now: number): number {
+    const pool = e.currentHealth + e.currentShield;
+    if (!(pool > 0)) return 0;
+    if (e.isBossTier === true || (o !== null && o.isBossTier === true)) return 0;
+    return this._hfRoundPower(o, now) / (1 + 0.19 * (e.upgrades ? (e.upgrades.bodyDamage || 0) : 0)) / pool;
+  }
+  private _hfHeavyK(e: EnemyTank, o: EnemyTank | null, now: number): number {
+    const s = this._hfOneHit(e, o, now);
+    return s <= 0.2 ? 1 : s >= 0.8 ? 1.9 : 1 + 0.9 * (s - 0.2) / 0.6;
+  }
+  private _hfScore(t: EnemyTank | null): number { return (t === null ? this.state.currentXp : t.currentXp) + _XP_BASE; }
+  private _hfShies(a: EnemyTank, t: EnemyTank | null, now: number): boolean {
+    if (t !== null && t.isBossTier === true) return false;
+    const mine = this._hfScore(a), his = this._hfScore(t);
+    if (!(his > 1.02 * mine)) return false;
+    if ((t === null ? this._mevHealthShare(null) : t.currentHealth / Math.max(1, aiHealthMax(t, HEALTH_BASIS.AGGRO))) < 0.25) return false;
+    const h = a.hf, tn = t === null ? 7 : (t.hf.idn === 0 ? 1 : t.hf.idn);
+    const more = his / mine - 1;
+    let p = a.dnaCourage * (0.3 + 0.2 * hfHash(h.seed, 506, 0)) * (1 - (more > 1 ? 1 : more));
+    if (p < 0.05) p = 0.05;
+    const span = 20000 + 20000 * hfHash(h.seed, 507, tn);
+    return hfHash(h.seed, 508, tn * 8191 + ((now / span) | 0)) >= p;
+  }
   private _hfSpares(a: EnemyTank, t: EnemyTank | null, isCurrent: boolean): boolean {
     const now = this._hfNow, id = t === null ? 'P' : t.id;
     const h = a.hf, S = this.feel.s;
     const _hmId = t === null ? this.state.playerId : t.id;
     const hurtAt = AI_CONSTANTS.HF_HITMEM !== 0 ? this._hfHurtAt(a, _hmId) : (a.lastTankDamageById === _hmId ? a.lastTankDamageAt : 0);
-    const hurtMe = hurtAt > 0 && now - hurtAt < 5000;
+    const hurtMe = (hurtAt > 0 && now - hurtAt < 5000) || (AI_CONSTANTS.HF_CORNERED !== 0 && h.cnId === id && now < h.cnUntil);
     const pSeen = t === null && this._hfSeesPlayer(a);
+    const chased = !hurtMe && AI_CONSTANTS.HF_RUNFIRE !== 0 && h.plays && !h.rmOn && this._hfRunFire(a, t, now);
     if (h.rmOn && !(t === null && AI_CONSTANTS.HF_RAMFOE !== 0 && !mayAttackPlayer(a, this.state.playerId, this.getPlayerTeam(), this.playerGroupId))) { const rj = this._hfRamJudge(a, t, id, t === null ? 7 : (t.hf.idn === 0 ? 1 : t.hf.idn), hurtMe, isCurrent, now); if (rj !== 0) return rj > 0; }
     if (h.rcUntil > now) {
       if (h.rcId !== id) return true;
@@ -8516,7 +9004,41 @@ export class GameLogic {
       return false;
     }
     if (t !== null && AI_CONSTANTS.BT_BOSSFOE !== 0 && t.isBossTier === true && a._tfMap && (a._btBits & BT_FIGHT) !== 0) return false;
-    if (!isCurrent && !hurtMe && h.tvOn && this._hfTravels(a) && !this._hfTravelBold(a) &&
+    if (t !== null && AI_CONSTANTS.BT_BOSSKILL !== 0 && FEEL_LIVE && t.isBossTier === true && this._bkFinish(a, t, now)) return false;
+    if (AI_CONSTANTS.BT_GROUPFOE !== 0 && AI_CONSTANTS.BT_GROUPGO !== 0 && FEEL_LIVE && a._ogHelpId !== '' && h.plays) {
+      const _gm = this._enemyById.get(a._ogHelpId);
+      if (_gm !== undefined && _gm.active && !_gm.isDying && this._btFightOf(_gm) === _hmId) return false;
+    }
+    if (!isCurrent && !hurtMe && AI_CONSTANTS.HF_GROUP !== 0 && h.gDo === 3 && h.plays && now - h.gAt < 1500 && !h.rmOn && (t === null || t.isBossTier !== true) &&
+        !chased) return true;
+    if (!hurtMe && !chased && AI_CONSTANTS.HF_HEAVYSEEN !== 0 && h.hkQuitId === id && now < h.hkQuitUntil) return true;
+    if (AI_CONSTANTS.TM_HELPFOE !== 0 && AI_CONSTANTS.TM_HELP !== 0 && FEEL_LIVE && h.plays && a._thId !== '' && a._thId === id && now < a._thUntil) return false;
+    if (!isCurrent && !hurtMe && !chased && AI_CONSTANTS.TM_MIDDLE !== 0 && a._tmSt >= 3 && a._btBits === 0 && !(AI_CONSTANTS.TM_HELP !== 0 && a._thId !== '' && a._thId === (t === null ? 'P' : t.id)) && this._tmSparesOut(a, t)) return true;
+    if (!isCurrent && !hurtMe && !chased && AI_CONSTANTS.HF_LEAVEAREA !== 0 && now < h.lvUntil && h.plays && a._btBits === 0) {
+      if (h.lvId === id) return true;
+      const _gx = (t === null ? this.tankPos.x : t.position.x) - h.lvX, _gy = (t === null ? this.tankPos.y : t.position.y) - h.lvY;
+      if (_gx * _gx + _gy * _gy < h.lvR * h.lvR) return true;
+    }
+    if (!isCurrent && !hurtMe && t !== null && AI_CONSTANTS.HF_HEAVYOPEN !== 0 && AI_CONSTANTS.HF_HITRANGE !== 0 && h.plays && h.dKind === 0 && h.sLed !== true && a.minAttackDistance !== 0 &&
+        a._btBits === 0 && a.isBossTier !== true && t.isBossTier !== true && S[FEEL.RISK] > 0 && t.hf.plays && (t.hf.dKind !== 0 || t.hf.sLed === true) &&
+        t.currentHealth / Math.max(1, aiHealthMax(t, HEALTH_BASIS.AGGRO)) >= 0.25 && this._hfScore(t) >= 0.7 * this._hfScore(a)) {
+      this._hfRoundPower(a, now);
+      if (h.hvC >= HF_HEAVY_LINE && this._hfOpenAt(a, t.position.x, t.position.y)) {
+        const tn = t.hf.idn === 0 ? 1 : t.hf.idn, span = 20000 + 20000 * hfHash(h.seed, 516, tn);
+        if (hfHash(h.seed, 517, tn * 8191 + ((now / span) | 0)) < 0.7 + 0.3 * a.dnaCaution) return true;
+      }
+    }
+    if (!isCurrent && !hurtMe && AI_CONSTANTS.HF_HITRANGE !== 0 && h.plays && h.dKind === 0 && h.sLed !== true && a.minAttackDistance !== 0 && a._btBits === 0 && a.isBossTier !== true &&
+        S[FEEL.RISK] > 0 && !this._isHealEngagement(a) && (t === null ? this._mevHealthShare(null) : t.currentHealth / Math.max(1, aiHealthMax(t, HEALTH_BASIS.AGGRO))) >= 0.25) {
+      const hr = this._hfHitOf(a, t, now);
+      if (hr > 0) {
+        const qx = (t === null ? this.tankPos.x : t.position.x) - a.position.x, qy = (t === null ? this.tankPos.y : t.position.y) - a.position.y;
+        if ((this._standoffReach(a) * AI_CONSTANTS.STANDOFF_MAX_FRAC < hr || qx * qx + qy * qy < hr * hr) && !chased) return true;
+        if (AI_CONSTANTS.HF_HEAVYSURE !== 0 && !chased && this._hfOneHit(a, t, now) >= 0.5) { const _cm = this._getEnemyNavMapState(a); if (_cm !== null && _cm.walls.length > 0 && !this._hfOpenAt(a, a.position.x, a.position.y)) return true; }
+      }
+    }
+    if (!isCurrent && !hurtMe && !chased && AI_CONSTANTS.HF_BRAVE !== 0 && S[FEEL.RISK] > 0 && a.aiBehavior === 'FFA' && a._btBits === 0 && a.isBossTier !== true && this._hfShies(a, t, now)) return true;
+    if (!isCurrent && !hurtMe && !chased && h.tvOn && this._hfTravels(a) && !this._hfTravelBold(a) &&
         (t === null ? this._mevHealthShare(null) : t.currentHealth / Math.max(1, aiHealthMax(t, HEALTH_BASIS.AGGRO))) >= 0.25) return true;
     if (!isCurrent && AI_CONSTANTS.HF_KEEPKILL !== 0 && a.aiState === 'attacking' && (a.currentTargetType === 'enemy' || a.currentTargetType === 'player') &&
         (!hurtMe || (t !== null && !((t.aiState === 'attacking' || t.aiState === 'following') && t.currentTargetType === 'enemy' && t.currentTargetId === a.id) &&
@@ -8525,9 +9047,9 @@ export class GameLogic {
       if ((c === null ? a.currentTargetType === 'player' && t !== null : !c.isDying && c !== t) &&
           (c === null ? this._mevHealthShare(null) : c.currentHealth / Math.max(1, aiHealthMax(c, HEALTH_BASIS.AGGRO))) < 0.5) return true;
     }
-    if (!isCurrent && !hurtMe && h.arRank >= 2 && AI_CONSTANTS.HF_AREA !== 0 && S[FEEL.PLACE] > 0 && !this._hfTravelBold(a) &&
+    if (!isCurrent && !hurtMe && !chased && h.arRank >= 2 && AI_CONSTANTS.HF_AREA !== 0 && S[FEEL.PLACE] > 0 && !this._hfTravelBold(a) &&
         (t === null ? this._mevHealthShare(null) : t.currentHealth / Math.max(1, aiHealthMax(t, HEALTH_BASIS.AGGRO))) >= (h.arRank === 3 ? 0.2 : 0.4)) return true;
-    if (!isCurrent && !hurtMe && h.hwAt > 0 && now - h.hwAt < 2500 && AI_CONSTANTS.HF_HURTAWAY !== 0 && S[FEEL.HURTAWAY] > 0 &&
+    if (!isCurrent && !hurtMe && !chased && h.hwAt > 0 && now - h.hwAt < 2500 && AI_CONSTANTS.HF_HURTAWAY !== 0 && S[FEEL.HURTAWAY] > 0 &&
         (t === null ? this._mevHealthShare(null) : t.currentHealth / Math.max(1, aiHealthMax(t, HEALTH_BASIS.AGGRO))) >= 0.25) return true;
     const mayTrust = S[FEEL.TRUST] > 0 && h.autos === 0;
     const wise = AI_CONSTANTS.HF_SURVIVE !== 0;
@@ -8692,6 +9214,389 @@ export class GameLogic {
       else if (d2 <= 1000000) h.tmFoes++;
     }
     h.tmNd = h.tmNId !== '' ? Math.sqrt(nReal) : 0; h.tmPd = h.tmPId !== '' ? Math.sqrt(pd) : 0;
+    if (AI_CONSTANTS.HF_GROUP !== 0 || h.gDo !== 0 || h.gPend !== 0 || h.gCall !== 0) this._hfGroupSense(e, now, tb);
+  }
+  private _bkFinish(a: EnemyTank, t: EnemyTank, now: number): boolean {
+    if (t.isBossTier !== true || (t._mevF & MF_STANDS) !== 0) return false;
+    const h = a.hf;
+    if (h.bkAskId === t.id && now < h.bkAt) { if (h.bkOk) h.bkUntil = now + 1200; return h.bkOk; }
+    h.bkAskId = t.id; h.bkAt = now + 400 + 200 * hfHash(h.seed, 588, (now / 1000) | 0);
+    let ok = false;
+    if (h.plays && !h.rmOn && (a._btBits !== 0 || a._tmSt !== 0) && t.active && !t.isDying && t.currentHealth < 0.3 * aiHealthMax(t, HEALTH_BASIS.AGGRO) &&
+        a.currentHealth >= 0.2 * aiHealthMax(a, HEALTH_BASIS.FEAR)) {
+      const es = this.state.enemyTanks, tx = t.position.x, ty = t.position.y;
+      let n = 0;
+      for (let i = 0; i < es.length && n < 2; i++) {
+        const o = es[i];
+        if (o === a || !o.active || o.isDying || !o.hf.plays || o.currentTargetType !== 'enemy' || o.currentTargetId !== t.id || !(o.aiState === 'attacking' || o.aiState === 'following')) continue;
+        const dx = o.position.x - tx, dy = o.position.y - ty;
+        if (dx * dx + dy * dy <= 810000 && this._btMateOrSelf(a, o)) n++;
+      }
+      ok = n >= 2;
+    }
+    h.bkOk = ok;
+    if (ok) h.bkUntil = now + 1200;
+    return ok;
+  }
+  private _hfGroupSense(e: EnemyTank, now: number, tb: boolean): void {
+    const h = e.hf;
+    if (AI_CONSTANTS.HF_GROUP === 0 || !(this.feel.s[FEEL.MATES] > 0) || e.isBossTier === true) { h.gDo = 0; h.gPend = 0; h.gCall = 0; h.gKite = 0; return; }
+    const sox = this._navOffX, soy = this._navOffY;
+    const es = this.state.enemyTanks, x = e.position.x, y = e.position.y, M = _hfGrpM;
+    h.gAt = now;
+    let ld: EnemyTank = e, ls = this._hfScore(e), own = this._hfStrength(e), n = 1, mn = 0;
+    const _gf = AI_CONSTANTS.HF_GROUPFRONT !== 0;
+    let front = false, _gfOut = false;
+    const _gfAll = SMALL_FIX.GF1127 !== 0;
+    for (let i = 0; i < es.length; i++) {
+      const o = es[i];
+      if (o === e || !o.active || o.isDying || o.isSpawning || !o.hf.plays || o.isBossTier === true || !isTankMate(e, o, tb)) continue;
+      const dx = o.position.x - x, dy = o.position.y - y;
+      if (_gf && !(_gfAll ? _gfOut : front) && dx * dx + dy * dy <= 2250000 && o.aiState === 'attacking' && (o.currentTargetType === 'enemy' || o.currentTargetType === 'player') && !this._acrossGap(x, y, o.position.x, o.position.y)) { front = true; if (dx * dx + dy * dy > 490000) _gfOut = true; }
+      if (dx * dx + dy * dy > 490000 || this._acrossGap(x, y, o.position.x, o.position.y)) continue;
+      n++; own += (o.aiState === 'fleeing' ? 0.33 : 1) * this._hfStrength(o);
+      if (mn < 6) M[mn++] = o;
+      const s = this._hfScore(o);
+      if (s > ls || (s === ls && o.id < ld.id)) { ld = o; ls = s; }
+    }
+    if (this._playerTargetable() && !this.tankDying && !this.state.playerDead && ((e.groupId !== 0 && e.groupId === this.playerGroupId) || (tb && e.team === this._hfPTeam))) {
+      const dx = this.tankPos.x - x, dy = this.tankPos.y - y;
+      if (dx * dx + dy * dy <= 490000) { n++; own += (this.state.tankCurrentHealth + this.state.tankCurrentShield) * (1 + (this.playerRolePower > 0 ? this.playerRolePower : 0) / 42); }
+    }
+    if (ld !== e) {
+      const up = ld.hf.gLd;
+      if (up !== '' && up !== e.id) {
+        const r = this._enemyById.get(up);
+        if (r !== undefined && r.active && !r.isDying && r.hf.plays && now - r.hf.gAt < 1500) { const dx = r.position.x - x, dy = r.position.y - y; if (dx * dx + dy * dy <= 1210000) ld = r; }
+      }
+    }
+    h.gLd = ld === e ? '' : ld.id; h.gN = n;
+    let call = 0, delay = 0;
+    if (ld === e) {
+      this._hfGroupCall(e, now, tb, own, mn);
+      call = h.gCall; delay = 150 + 250 * hfHash(h.seed, 526, now | 0);
+      if (call >= 2) { h.gTx = h.gRx; h.gTy = h.gRy; h.gTk = h.gKey; h.gQx = h.gFx; h.gQy = h.gFy; }
+    } else {
+      const lh = ld.hf, fresh = now - lh.gAt < 1500;
+      if (h.gCall >= 2 && fresh && lh.gCall === 0 && !(lh.gFoe > 0) && lh.gLd === '') {
+        lh.gCall = 2; lh.gCallAt = now; lh.gMem = h.gMem; lh.gMemAt = h.gMemAt; lh.gPat = h.gPat; lh.gRx = h.gRx; lh.gRy = h.gRy; lh.gFx = h.gFx; lh.gFy = h.gFy;
+        if (lh.gKey === '') lh.gKey = 'gb-' + ld.id;
+      }
+      h.gCall = 0;
+      call = fresh ? lh.gCall : 0; delay = 250 + 1050 * hfHash(h.seed, 522, now | 0);
+      if (call >= 2) { h.gTx = lh.gRx; h.gTy = lh.gRy; h.gTk = lh.gKey; h.gQx = lh.gFx; h.gQy = lh.gFy; }
+    }
+    if (front && !(_gfAll && !_gfOut && call >= 2)) { call = 0; if (ld === e && h.gCall !== 0) { h.gCall = 0; h.gCallAt = now; } }
+    if (call !== h.gPend) { h.gPend = call; h.gDoAt = now + delay; }
+    if (h.gDo !== h.gPend && now >= h.gDoAt) h.gDo = h.gPend;
+    for (let k = 0; k < mn; k++) M[k] = null;
+    this._navOffX = sox; this._navOffY = soy;
+  }
+  private _hfFightSpot(e: EnemyTank, now: number): boolean {
+    const h = e.hf;
+    if (e.aiState !== 'attacking' || !h.plays || h.dKind !== 0 || !(h.bpsMax > 0) || h.rmOn || e.isBossTier === true) return false;
+    if (!isTeamBehaviorOf(e) && e.groupId === 0) return false;
+    if (h.gKite !== 0 || e._ogKite !== 0 || e._hsKite || e._ctKite) return false;
+    if (e.threatDodgeRef !== null || now < h.dnUntil || now < h.adUntil || now < h.hitUntil || now < h.udUntil || now < h.hkUntil) return false;
+    if (now - e.lastDamageTime < 900 || e.fearHeat > 45 || now - e.lastFireMs > 700) return false;
+    const tt = e.currentTargetType;
+    if (tt !== 'enemy' && tt !== 'player') return false;
+    const t = tt === 'player' ? null : (this._enemyById.get(e.currentTargetId ?? '') ?? undefined);
+    if (t === undefined || (t !== null && t.isBossTier === true)) return false;
+    const dx = (t === null ? this.tankPos.x : t.position.x) - e.position.x, dy = (t === null ? this.tankPos.y : t.position.y) - e.position.y, d2 = dx * dx + dy * dy;
+    const reach = this._standoffReach(e);
+    if (!(reach > 0) || d2 > 0.7744 * reach * reach || d2 < 0.09 * reach * reach) return false;
+    if (AI_CONSTANTS.HF_HITRANGE !== 0) { const hr = this._hfHitOf(e, t, now); if (hr > 0 && d2 < (hr + 60) * (hr + 60)) return false; }
+    const span = 5000 + 5000 * hfHash(h.seed, 537, 0), w = (now / span) | 0, ph = now / span - w;
+    if (!(hfHash(h.seed, 538, w) < 0.3 + 0.5 * h.dnaStill + (reach >= 900 ? 0.15 : 0))) return false;
+    return ph < 0.45 + 0.4 * hfHash(h.seed, 539, w);
+  }
+  private _hfUnitFire(b: Bullet): number {
+    const subs = b.subTurrets;
+    if (subs === null) return 0;
+    const o = b.ownerId === this.state.playerId ? null : (this._enemyById.get(b.ownerId) ?? undefined);
+    if (o === undefined) return 0;
+    let sum = 0;
+    for (let j = 0; j < subs.length; j++) {
+      const td = subs[j] ? subs[j].turretData : null;
+      if (!td || td.turretType === 'decorative' || !((td.bps || 0) > 0)) continue;
+      sum += this._hfGunPower(td as Turret, o) * td.bps;
+    }
+    return sum;
+  }
+  private _hfGroupFire(e: EnemyTank, now: number): number {
+    const et = this.state.enemyTanks, x = e.position.x, y = e.position.y;
+    let sum = 0;
+    for (let i = 0; i < et.length; i++) {
+      const q = et[i];
+      if (q === e || !q.active || q.isDying || q.isSpawning || q.spawnedByEntityId !== '' || q.aiState === 'fleeing' || (q._mevF & MF_STANDS) !== 0) continue;
+      const dx = q.position.x - x, dy = q.position.y - y;
+      if (dx * dx + dy * dy > 202500 || !this._btMateOrSelf(e, q)) continue;
+      this._hfRoundPower(q, now);
+      sum += q.hf.wfV;
+    }
+    if (isTeamBehaviorOf(e) && !this.state.playerDead && this._playerTargetable() && !mayAttackPlayer(e, this.state.playerId, this.getPlayerTeam(), this.playerGroupId)) {
+      const dx = this.tankPos.x - x, dy = this.tankPos.y - y;
+      if (dx * dx + dy * dy <= 202500) { this._hfRoundPower(null, now); sum += this._hfPWfV; }
+    }
+    return sum;
+  }
+  private _hfUnitLook(e: EnemyTank, now: number): void {
+    const h = e.hf;
+    h.udNext = now + 220 + 120 * hfHash(h.seed, 530, 0);
+    h.udSum = 0;
+    const n = this._threatCount;
+    if (n === 0 || e.isBossTier === true || h.rmNoFear || e.aiState === 'fleeing') return;
+    const pool = e.currentHealth + e.currentShield;
+    if (!(pool > 0)) return;
+    const idx = this._threatIdx, x = e.position.x, y = e.position.y, myR = this.getEffectiveEnemyRadius(e), bvx = e.velocity.x, bvy = e.velocity.y;
+    const r = e.fovRadius, R = r < 900 ? r : 900, ry0 = h.sightBox ? r * 0.5625 : r, RY = ry0 < R ? ry0 : R;
+    let sum = 0, sx = 0, sy = 0, nearT = Infinity, own = '';
+    for (let i = 0; i < n; i++) {
+      if (this._thChase[i] !== 1) continue;
+      const b = idx[i];
+      const dx = b.position.x - x, dy = b.position.y - y;
+      if ((dx < 0 ? -dx : dx) > R || (dy < 0 ? -dy : dy) > RY) continue;
+      if (!b.active || b.health <= 0 || b.isFading || b.inExitPhase || !this._projHostileTo(b, e)) continue;
+      const d2 = dx * dx + dy * dy, vx = this._thVx[i], vy = this._thVy[i];
+      let t = this._threatEtaF(dx, dy, d2, myR + this._thRad[i], vx, vy, bvx, bvy, true, this._thTopSpd[i]);
+      if (b.subTurrets !== null && b.subTurrets.length > 0) { if (d2 > 490000) continue; if (t < 0 || t > 150) t = 150; }
+      else {
+        if (t < 0 || t > 150) continue;
+        const toward = -(vx * dx + vy * dy);
+        if (!(d2 < 62500 || (toward > 0 && toward * toward > 0.25 * (vx * vx + vy * vy) * d2))) continue;
+      }
+      let hit = this._thHit[i] > 0 ? this._thHit[i] : this._thSev[i];
+      if (b.subTurrets !== null && b.subTurrets.length > 0) {
+        if (b._fireId !== b.bulletId) { b._fireId = b.bulletId; b._fire = this._hfUnitFire(b); }
+        hit += (AI_CONSTANTS.HF_UNITSURE !== 0 ? 4 : 1.5) * b._fire;
+      }
+      sum += hit; sx += hit * b.position.x; sy += hit * b.position.y;
+      if (t < nearT) { nearT = t; own = b.ownerId; }
+    }
+    if (!(sum > 0)) return;
+    h.udSum = sum;
+    let p = sum / pool;
+    if (p < 0.12) return;
+    if (AI_CONSTANTS.HF_UNITSURE !== 0) {
+      if (p < 0.5) { const _cm = this._getEnemyNavMapState(e); if (_cm !== null && _cm.walls.length > 0 && !this._hfOpenAt(e, x, y)) p *= 1.5; }
+      if (p >= 0.34 && p < 0.93) p += (0.93 - p) * (p >= 0.5 ? 1 : (p - 0.34) / 0.16);
+    }
+    if (p > 1) p = 1;
+    if (AI_CONSTANTS.HF_PACKGROUP !== 0 && FEEL_LIVE && own !== '') {
+      const _wg = this._hfGroupFire(e, now);
+      if (_wg > 0) {
+        const _po = own === this.state.playerId ? null : (this._enemyById.get(own) ?? undefined);
+        if (_po !== undefined) {
+          this._hfRoundPower(_po, now); this._hfRoundPower(e, now);
+          const _wo = _po === null ? this._hfPWfV : _po.hf.wfV, _w = h.wfV + _wg;
+          if (_wo > 0 && _w > _wo) { p *= 1 - (_w >= 2 * _wo ? 1 : _w / _wo - 1); if (p < 0.12) return; }
+        }
+      }
+    }
+    p *= 1 + 0.25 * (e.dnaCaution - e.dnaCourage);
+    if (p > 0.97) p = 0.97;
+    const tn = hfIdNum(own), span = 20000 + 20000 * hfHash(h.seed, 531, tn);
+    if (!(hfHash(h.seed, 532, tn * 8191 + ((now / span) | 0)) < p)) return;
+    const mx = sx / sum, my = sy / sum;
+    if (!this._hfLosTo(e, mx, my)) return;
+    h.udX = mx; h.udY = my; h.udUntil = now + 900;
+    if (AI_CONSTANTS.HF_UNITSURE !== 0) {
+      if (now - h.udAt > 1500) h.udSince = now;
+      h.udAt = now;
+      if (own !== '' && now - h.udSince > 1200 + 800 * hfHash(h.seed, 548, tn)) {
+        h.udSince = now; h.hkX = mx; h.hkY = my; this._hfHeavyQuit(e, own === this.state.playerId ? 'P' : own, now);
+        if (AI_CONSTANTS.HF_PACKLEAVE !== 0 && FEEL_LIVE) {
+          const _pl = own === this.state.playerId, _po = _pl ? undefined : this._enemyById.get(own);
+          if (_pl) this._hfLeaveArm(e, 'P', this.tankPos.x, this.tankPos.y, e.fovRadius, now);
+          else if (_po !== undefined && _po.active && !_po.isDying) this._hfLeaveArm(e, own, _po.position.x, _po.position.y, _po.fovRadius, now);
+        }
+      }
+    }
+  }
+  private _hfRunFire(a: EnemyTank, t: EnemyTank | null, now: number): boolean {
+    const h = a.hf, tx = t === null ? this.tankPos.x : t.position.x, ty = t === null ? this.tankPos.y : t.position.y;
+    const dx = tx - a.position.x, dy = ty - a.position.y, d2 = dx * dx + dy * dy, reach = 0.85 * this._standoffReach(a);
+    const tn = t === null ? 7 : (t.hf.idn === 0 ? 1 : t.hf.idn);
+    if (!(reach > 0) || d2 > reach * reach || d2 > 422500 || !this._hfGroupSees(a, tx, ty, t)) { if (h.ckN === tn) h.ckN = 0; return false; }
+    if (AI_CONSTANTS.HF_HEAVYSURE !== 0 && !this._hfAfterMe(a, t)) return h.ckN === tn && now - h.ckSeen <= 700 && now - h.ckSince >= 900 + 600 * hfHash(h.seed, 529, tn);
+    if (AI_CONSTANTS.HF_HEAVYSURE !== 0 && h.ckN !== tn && h.ckN !== 0 && now - h.ckSeen <= 700) return false;
+    if (h.ckN !== tn || now - h.ckSeen > 700) { h.ckN = tn; h.ckSince = now; }
+    h.ckSeen = now;
+    return now - h.ckSince >= 900 + 600 * hfHash(h.seed, 529, tn);
+  }
+  private _hfAfterMe(a: EnemyTank, t: EnemyTank | null): boolean {
+    if (t === null && (!this._playerTargetable() || this.state.playerDead)) return false;
+    const tp = t === null ? this.tankPos : t.position, tv = t === null ? this.tankVelocity : t.velocity;
+    const dx = a.position.x - tp.x, dy = a.position.y - tp.y, d = Math.sqrt(dx * dx + dy * dy);
+    return d < 1 || (tv.x * dx + tv.y * dy) * 60 > 0.5 * (t === null ? this._playerBodyRadius() : t.size * 0.5) * d;
+  }
+  private _hfGroupSees(v: EnemyTank, qx: number, qy: number, q: EnemyTank | null): boolean {
+    const dx = qx - v.position.x, dy = qy - v.position.y, r = v.fovRadius;
+    if (v.hf.sightBox ? ((dx < 0 ? -dx : dx) > r || (dy < 0 ? -dy : dy) > r * 0.5625) : dx * dx + dy * dy > r * r) return false;
+    if (q !== null && this._tankHidFrom(v, q, false)) return false;
+    const ms = this._getEnemyNavMapState(v);
+    if (ms === null) return true;
+    const ox = this._navOffX, oy = this._navOffY;
+    return checkLineOfSight(ms, v.position.x - ox, v.position.y - oy, qx - ox, qy - oy, ox, oy);
+  }
+  private _hfGroupCall(e: EnemyTank, now: number, tb: boolean, own: number, mn: number): void {
+    const h = e.hf, es = this.state.enemyTanks, x = e.position.x, y = e.position.y, M = _hfGrpM;
+    let foe = 0, fx = 0, fy = 0, near = Infinity, close = 0;
+    for (let i = 0; i <= es.length; i++) {
+      let q: EnemyTank | null = null, qx: number, qy: number, vx: number, vy: number, w: number;
+      if (i < es.length) {
+        q = es[i];
+        if (q === e || !q.active || q.isDying || q.isSpawning || q.graceActive || !q.hf.plays || q.isBossTier === true || q.aiBehavior === 'Neutral' || isTankMate(e, q, tb) || campsClash(e.camp, q.camp) || this._enemyUnseeable(q)) continue;
+        qx = q.position.x; qy = q.position.y; vx = q.velocity.x; vy = q.velocity.y;
+        w = this._hfStrength(q) * (q.aiState === 'fleeing' ? 0.33 : 1);
+        for (let k = 0; k < HF_TR_SLOTS; k++) if (h.trId[k] === q.id) { if (h.trSt[k] === 1) w *= 0.33; break; }
+      } else {
+        if (!this._playerTargetable() || this.state.gracePeriodActive || this.tankDying || this.state.playerDead || (e.groupId !== 0 && e.groupId === this.playerGroupId) || (tb && e.team === this._hfPTeam)) continue;
+        if (!mayAttackPlayer(e, this.state.playerId, this.getPlayerTeam(), this.playerGroupId)) continue;
+        qx = this.tankPos.x; qy = this.tankPos.y; vx = this.tankVelocity.x; vy = this.tankVelocity.y;
+        w = (this.state.tankCurrentHealth + this.state.tankCurrentShield) * (1 + (this.playerRolePower > 0 ? this.playerRolePower : 0) / 42);
+      }
+      const dx = qx - x, dy = qy - y, d2 = dx * dx + dy * dy;
+      if (d2 > 2250000 || this._acrossGap(x, y, qx, qy)) continue;
+      let seen = this._hfGroupSees(e, qx, qy, q);
+      for (let k = 0; k < mn && !seen; k++) { const m = M[k]; if (m !== null) seen = this._hfGroupSees(m, qx, qy, q); }
+      if (!seen) continue;
+      foe += w; fx += w * qx; fy += w * qy;
+      const d = Math.sqrt(d2);
+      if (d < near) near = d;
+      if (d > 1) close -= (w * (vx * dx + vy * dy)) / d;
+    }
+    const dtB = now - h.gBAt, bel = dtB >= 0 && dtB < 20000 ? h.gB * (1 - dtB / 20000) : 0;
+    if (foe >= bel) { h.gB = foe; h.gBAt = now; }
+    const B = foe > bel ? foe : bel;
+    const ratio = B / (own > 1 ? own : 1);
+    if (foe > 0) { h.gSeen = now; h.gFx = fx / foe; h.gFy = fy / foe; }
+    h.gOwn = own; h.gFoe = B;
+    let bar = 1.2 + 0.5 * e.dnaCourage - 0.4 * e.dnaCaution;
+    if (bar < 0.85) bar = 0.85;
+    if ((e._btBits & BT_GUARD) !== 0 && e._ogId !== '') { const gx = e._ogX - x, gy = e._ogY - y; if (gx * gx + gy * gy <= e._ogRadius * e._ogRadius) bar *= 1.3; }
+    const prev = h.gCall;
+    let call = prev;
+    if (prev === 3) {
+      if (B > h.gMem) h.gMem = B;
+      if (foe <= 0) { if (now - h.gSeen > 2500) call = 2; }
+      else if (ratio < 0.8 * bar) call = 0;
+    } else if (prev === 2) {
+      const fade = 1 - (now - h.gMemAt) / 45000, mem = fade > 0 ? h.gMem * fade : 0, m2 = foe > mem ? foe : mem;
+      if (foe > 0 && ratio >= bar && (close / foe > 1.2 || near < 800)) call = 3;
+      else if (m2 / (own > 1 ? own : 1) < 0.8 * bar || now >= h.gPat) { call = 0; h.gGoUntil = now + 25000 + 15000 * hfHash(h.seed, 525, now | 0); }
+    } else if (foe > 0 && ratio >= (now < h.gGoUntil ? 1.6 * bar : bar)) call = 3;
+    if (call !== prev) {
+      h.gCall = call; h.gCallAt = now;
+      if (call === 3) {
+        if (prev !== 2) { h.gMem = B; h.gPat = now + (12000 + 23000 * (1 - e.dnaCourage)) * (0.6 + 0.8 * hfHash(h.seed, 524, now | 0)); }
+        h.gMemAt = now; h.gBackAt = 0;
+        if (h.gKey === '') h.gKey = 'gb-' + e.id;
+      } else if (call === 2) h.gMemAt = now;
+    }
+    if (call === 3 && now >= h.gBackAt) this._hfGroupBack(e, now);
+  }
+  private _hfGroupBack(e: EnemyTank, now: number): void {
+    const h = e.hf, x = e.position.x, y = e.position.y, fx = h.gFx, fy = h.gFy;
+    const ax = x - fx, ay = y - fy, ad = Math.sqrt(ax * ax + ay * ay), ux = ad > 1 ? ax / ad : 1, uy = ad > 1 ? ay / ad : 0;
+    const ms = this._getEnemyNavMapState(e), ox = this._navOffX, oy = this._navOffY, bodyR = this.getEffectiveEnemyRadius(e);
+    h.gBackAt = now + 1500;
+    let s: EnemyTank | null = null, best = 12250000;
+    if ((e._btBits & BT_GUARD) !== 0 && e._ogId !== '') { const o = this._enemyById.get(e._ogId); if (o !== undefined && o.active && !o.isDying) s = o; }
+    if (s === null) {
+      const es = this.state.enemyTanks;
+      for (let i = 0; i < es.length; i++) {
+        const o = es[i];
+        if (o === e || !o.active || o.isDying || (o._mevF & MF_STANDS) === 0 || !this._btMate(e, o)) continue;
+        const dx = o.position.x - x, dy = o.position.y - y, d2 = dx * dx + dy * dy;
+        if (d2 >= best) continue;
+        const qx = o.position.x - fx, qy = o.position.y - fy;
+        if (qx * qx + qy * qy < (ad + 200) * (ad + 200) || this._acrossGap(x, y, o.position.x, o.position.y)) continue;
+        best = d2; s = o;
+      }
+    }
+    if (s !== null) {
+      const qx = s.position.x - fx, qy = s.position.y - fy, qd = Math.sqrt(qx * qx + qy * qy), vx = qd > 1 ? qx / qd : ux, vy = qd > 1 ? qy / qd : uy;
+      const r = this.getEffectiveEnemyRadius(s) + bodyR;
+      for (let k = 140; k >= 40; k -= 50) {
+        const px = s.position.x + vx * (r + k), py = s.position.y + vy * (r + k);
+        if (ms === null || isWalkable(ms, px - ox, py - oy, ox, oy, bodyR)) { h.gRx = px; h.gRy = py; return; }
+      }
+      h.gRx = s.position.x; h.gRy = s.position.y;
+      return;
+    }
+    if (AI_CONSTANTS.HF_WAYMEM !== 0 && ms !== null && ms.navigation && h.wmN === ms.navigation.gridCells * ms.navigation.gridCellsY) {
+      const nav = ms.navigation, gcY = nav.gridCellsY, cs = nav.cellSize;
+      let far = (ad + 2 * cs) * (ad + 2 * cs), gx = 0, gy = 0, got = false;
+      for (let k = 0; k < 24; k++) {
+        const c = h.wmC[k];
+        if (c < 0 || now - h.wmT[k] >= 90000) continue;
+        const wx = -nav.mapHalf + (((c / gcY) | 0) + 0.5) * cs + ox, wy = -nav.mapHalfY + ((c % gcY) + 0.5) * cs + oy;
+        const bx = wx - fx, by = wy - fy, b2 = bx * bx + by * by;
+        if (b2 > far) { far = b2; gx = wx; gy = wy; got = true; }
+      }
+      if (got) { h.gRx = gx; h.gRy = gy; return; }
+    }
+    for (let k = 0; k < 9; k++) {
+      const L = k < 3 ? 900 : k < 6 ? 700 : 500, a = k % 3 === 0 ? 0 : k % 3 === 1 ? 0.5 : -0.5, c = Math.cos(a), sn = Math.sin(a);
+      const px = x + (ux * c - uy * sn) * L, py = y + (ux * sn + uy * c) * L;
+      if (ms === null || (isWalkable(ms, px - ox, py - oy, ox, oy, bodyR) && botCanReach(e, ms, px, py, ox, oy))) { h.gRx = px; h.gRy = py; return; }
+    }
+    h.gRx = x + ux * 400; h.gRy = y + uy * 400;
+  }
+  private _hfGroupDo(e: EnemyTank, now: number): number {
+    const h = e.hf;
+    if (AI_CONSTANTS.HF_GROUP === 0 || !h.plays || now - h.gAt > 1500) return 0;
+    if (h.gDo !== h.gPend && now >= h.gDoAt) h.gDo = h.gPend;
+    return h.gDo;
+  }
+  private _hfGroupPost(e: EnemyTank, r: AIStateResult, now: number): boolean {
+    const h = e.hf;
+    h.gKite = 0;
+    const g = this._hfGroupDo(e, now);
+    if (g < 2 || r.state === 'fleeing' || r.state === 'protecting_base' || h.rmOn || ((e._btBits & BT_HEAL) !== 0 && e._hsOn !== 0)) return false;
+    if (g === 3) {
+      if (r.state === 'attacking') { h.gKite = 2; return false; }
+      if (r.state === 'following' || r.state === 'targeting_shapes') this._btRoamFill(r);
+      return true;
+    }
+    if (r.state === 'attacking') { h.gKite = 1; return false; }
+    if (r.state === 'following' || r.state === 'targeting_shapes') {
+      const p = r.targetPosition, px = r.state === 'following' ? e.followTargetX : p !== null ? p.x : e.position.x, py = r.state === 'following' ? e.followTargetY : p !== null ? p.y : e.position.y;
+      const ax = px - h.gQx, ay = py - h.gQy, bx = e.position.x - h.gQx, by = e.position.y - h.gQy;
+      if (ax * ax + ay * ay >= bx * bx + by * by) return false;
+      this._btRoamFill(r);
+    }
+    return true;
+  }
+  private _hfGroupRoam(e: EnemyTank, navMs: MapState | null, ox: number, oy: number, bodyR: number, now: number, dtFactor: number): boolean {
+    const h = e.hf, g = this._hfGroupDo(e, now);
+    if (g < 2 || h.rmOn || ((e._btBits & BT_HEAL) !== 0 && e._hsOn !== 0) || (g === 2 && (e._btBits & BT_GUARD) !== 0 && e._ogId !== '') || (this._carried.length !== 0 && this._carriesHome(e))) {
+      if (h.gTk !== '' && e._btRoute === h.gTk) this._btDropRoute(e);
+      h.gThere = false;
+      return false;
+    }
+    const dx = h.gTx - e.position.x, dy = h.gTy - e.position.y, d2 = dx * dx + dy * dy, arr = 120 + 160 * hfHash(h.seed, 523, 0);
+    if (d2 > (arr + 260) * (arr + 260) || (!h.gThere && d2 > arr * arr)) { h.gThere = false; return this._btDrive(e, h.gTx, h.gTy, navMs, ox, oy, bodyR, now, dtFactor, h.gTk); }
+    h.gThere = true;
+    if (e._btRoute !== '') this._btDropRoute(e);
+    if (AI_CONSTANTS.HF_FIGHTSPOT !== 0 && g === 2) { h.standAt = now; e._btStood = true; if (AI_CONSTANTS.HF_STOPS_STUCK !== 0) this._resetStuckWindow(e, now); return true; }
+    return this._btWalkAbout(e, h.gTx, h.gTy, 0, arr + 60, navMs, ox, oy, bodyR, now, dtFactor);
+  }
+  private _hfGroupStep(e: EnemyTank, ms: MapState | null, ox: number, oy: number, now: number): boolean {
+    const h = e.hf, gx = h.gTx - ox, gy = h.gTy - oy;
+    const lx = e.position.x - ox, ly = e.position.y - oy, dx = gx - lx, dy = gy - ly, d = Math.sqrt(dx * dx + dy * dy);
+    if (d < 60) return false;
+    const bodyR = this._routeR(e);
+    if (h.gTk !== '' && ms !== null && ms.navigation && ms.walls.length > 0 && !this._btWayClear(ms, lx, ly, gx, gy, ox, oy, bodyR)) {
+      ensureRegionFields(ms.navigation, ms, ox, oy);
+      const dist = ensureAuxDistField(ms.navigation, ms, h.gTk, gx, gy, now, bodyR);
+      if (dist !== null) { const st = queryDistanceStep(ms.navigation, dist, lx, ly, false, bodyR); if (st.ok) { this._ftDir.x = st.dirX; this._ftDir.y = st.dirY; this._btWayKeep(e, now); return true; } }
+      if (AI_CONSTANTS.BT_WAYKEEP !== 0 && FEEL_LIVE) return false;
+    }
+    this._ftDir.x = dx / d; this._ftDir.y = dy / d;
+    return true;
   }
   private _hfDroneDist(e: EnemyTank, t: EnemyTank | null, pd: number, tx: number, ty: number): number {
     const h = e.hf, now = this._hfNow, tn = t === null ? 7 : (t.hf.idn === 0 ? 1 : t.hf.idn);
@@ -8886,8 +9791,9 @@ export class GameLogic {
     let held = !fight;
     let watch = false, spinNow = false, reacting = false;
     h.trigger = false;
-    if (AI_CONSTANTS.HF_WAGSAFE !== 0 && now < h.wagUntil && (now - e.lastTankDamageAt < 2000 || this._hfBossInSight(e))) h.wagUntil = 0;
-    if (AI_CONSTANTS.HF_WAGSEEN !== 0 && now < h.wagUntil && !this._hfWagSeen(e)) h.wagUntil = 0;
+    if (AI_CONSTANTS.HF_WAGSAFE !== 0 && now < h.wagUntil && (now - e.lastTankDamageAt < 2000 || this._hfBossInSight(e))) { if (AI_CONSTANTS.HF_WAGDODGE !== 0) this._hfWagEnd(e, now); else h.wagUntil = 0; }
+    if (AI_CONSTANTS.HF_WAGDODGE !== 0 && now < h.wagUntil && e.threatDodgeRef !== null && e.threatDodgeUntil - AI_CONSTANTS.THREAT_COMMIT_MS - now < 330) this._hfWagEnd(e, now);
+    if (AI_CONSTANTS.HF_WAGSEEN !== 0 && now < h.wagUntil && !this._hfWagSeen(e)) { if (AI_CONSTANTS.HF_WAGDODGE !== 0) this._hfWagEnd(e, now); else h.wagUntil = 0; }
     const pace = S[FEEL.HAND] > 0 ? (AI_CONSTANTS.HF_HANDSIT !== 0 ? this._hfPace(e, now) : hfHandT(h, now)) : 1;
     if (h.dwMode !== 0 && h.dwPress && now - h.dwTick < 500 && e.facingType !== 'faceMotion' && e.threatAimActive !== true && !(now < h.wagUntil)) {
       const a = this._hfHullFor(e, Math.atan2(h.dwY - e.position.y, h.dwX - e.position.x));
@@ -8899,9 +9805,14 @@ export class GameLogic {
       if (S[FEEL.CURSOR] > 0) this._hfCursor(e, h.heldAngle, 0, false, false, false, false, pace, now, dtFactor / 60); else handStep(e, h.heldAngle, 0, dtFactor / 60, pace);
       return;
     }
-    if (AI_CONSTANTS.BT_BLOCKFIRE !== 0 && e._ogBlockUntil > now && !fight && e.facingType !== 'faceMotion') {
+    const _gf = AI_CONSTANTS.BT_GATEFIRE !== 0 && e._tfGateFireUntil > now && (AI_CONSTANTS.BT_MEETFIRE === 0 || h.dKind === 0);
+    const _bl = AI_CONSTANTS.BT_BLOCKFIRE !== 0 && e._ogBlockUntil > now;
+    let _fw = false;
+    if (AI_CONSTANTS.BT_FIREWITH !== 0 && FEEL_LIVE && !fight && !_gf && !_bl && e.facingType !== 'faceMotion' && !(now < h.wagUntil)) { this._fwLook(e, now); _fw = e._fwUntil > now; }
+    if ((_bl || _gf || _fw) && !fight && e.facingType !== 'faceMotion') {
       const _nose = e.facingType === 'faceTarget' || e.facingType === 'smoothFaceTarget' ? e.aimNoseOff : (e.turrets[e.primaryTurretIndex]?.angle || 0);
-      want = normalizeAngle(e._ogBlockAngle - _nose); rate = 0; held = true;
+      want = normalizeAngle((_gf ? e._tfGateAngle : _bl ? e._ogBlockAngle : e._fwAngle) - _nose); rate = 0; held = true;
+      if (AI_CONSTANTS.HF_TRAPROOM !== 0 && (h.placeKind === 3 || h.placeKind === 4)) want = this._hfCampBearing(e, want, true);
       const off = normalizeAngle(e.angle - want);
       h.trigger = off < 0.35 && off > -0.35;
     } else
@@ -8913,13 +9824,16 @@ export class GameLogic {
       const far = 1.15 * e.fovRadius;
       if (S[FEEL.READY] > 0 && (h.foeD2 < far * far || (now - h.fightAt < 3000 && h.foeD2 < 4 * far * far)) && (S[FEEL.SEES] <= 0 || (h.foeSee && (h.foeHot || now - h.fightAt < 3000))) && (AI_CONSTANTS.HF_GLANCE === 0 || now - h.fightAt < 3000 || this._hfGlance(e, now))) { want = this._hfHullFor(e, Math.atan2(h.foeY - e.position.y, h.foeX - e.position.x)); rate = 0; watch = true; }
       else if (S[FEEL.SEES] > 0 && st === 'following' && this._hfPreAim(e, now)) { want = this._hfHullFor(e, h.pathAngle); rate = 0; }
+      else if (AI_CONSTANTS.BT_FRONTLOOK !== 0 && FEEL_LIVE && e._btBits !== 0 && S[FEEL.LOOK] > 0 && this._btFrontLook(e, now)) { want = this._hfHullFor(e, h.tlAng); rate = 0; }
       else if (S[FEEL.LOOK] > 0) { want = this._hfLook(e, now); rate = 0; } else held = false;
     }
     let free = false;
     let wagNow = false;
+    const _wg0 = want;
     if (S[FEEL.WAG] > 0 && now < h.wagUntil && (!fight || AI_CONSTANTS.HF_SURVIVE !== 0) && e.facingType !== 'faceMotion') {
       if (AI_CONSTANTS.HF_GESTURE !== 0) { want = this._hfGestureWant(e, now, dtFactor / 60); spinNow = now < h.geTurnsUntil; }
       else want = normalizeAngle(h.wagBase + (22 + 25 * hfHash(h.seed, 173, 0)) * (0.7 + 0.6 * hfNoise(h.seed, 175, now, 300)) * (Math.PI / 180) * Math.sin((now / (240 + 160 * hfHash(h.seed, 174, 0))) * 6.283185307179586));
+      if (AI_CONSTANTS.HF_WAGDODGE !== 0 && !spinNow) { const _left = h.wagUntil - now; if (_left < 260) want = normalizeAngle(_wg0 + normalizeAngle(want - _wg0) * (_left > 0 ? _left / 260 : 0)); }
       rate = 0; free = true; wagNow = true; h.trigger = false;
     }
     let hidNow = false;
@@ -8952,7 +9866,10 @@ export class GameLogic {
       if (now < h.reactUntil && (fight || S[FEEL.OWNTIME] > 0) && !wagNow) { want = h.heldHas ? h.heldAngle : e.handAngle; rate = 0; reacting = true; }
     }
     if (hidNow) { want = h.heldHas ? h.heldAngle : e.handAngle; rate = 0; reacting = true; }
-    if (AI_CONSTANTS.HF_CAMPAIM !== 0 && now < h.tsUntil && !wagNow && !spinNow && !reacting && e.threatAimActive !== true && (h.placeKind === 3 || h.placeKind === 4)) want = this._hfCampBearing(e, want);
+    if (AI_CONSTANTS.HF_CAMPAIM !== 0 && now < h.tsUntil && !wagNow && !spinNow && !reacting && e.threatAimActive !== true && (h.placeKind === 3 || h.placeKind === 4)) want = this._hfCampBearing(e, want, !fight);
+    else if (AI_CONSTANTS.HF_TRAPROOM !== 0 && (h.placeKind === 3 || h.placeKind === 4) && !wagNow && !spinNow && !reacting && e.threatAimActive !== true && e.facingType !== 'faceMotion' &&
+             now - e.lastFireMs < 700 && e.velocity.x * e.velocity.x + e.velocity.y * e.velocity.y < 1 &&
+             !(st === 'attacking' && (e.currentTargetType === 'enemy' || e.currentTargetType === 'player') && e.navLosResult !== false)) want = this._hfCampBearing(e, want, true);
     if (S[FEEL.CURSOR] > 0) {
       let dist = 0;
       if (watch) dist = Math.sqrt(h.foeD2);
@@ -8993,6 +9910,27 @@ export class GameLogic {
     } else { h.heldHas = false; h.fixAt = 0; }
     handStep(e, want, rate, dtFactor / 60, pace);
   }
+  private _btFrontLook(e: EnemyTank, now: number): boolean {
+    const h = e.hf;
+    if (h.foeId === '' || !(h.foeD2 < Infinity) || (!isTeamBehaviorOf(e) && e.groupId === 0)) return false;
+    const far = 2.6 * e.fovRadius, ix = e.fgIntentX, iy = e.fgIntentY;
+    const b0 = h.foeD2 > far * far && ix * ix + iy * iy > 1e-12 ? h.pathAngle : Math.atan2(h.foeY - e.position.y, h.foeX - e.position.x);
+    if (now < h.tlUntil) { const d = normalizeAngle(b0 - h.tlB0); if (d < 0.61 && d > -0.61) return true; }
+    const t = now | 0, u = hfHash(h.seed, 558, t), v = hfHash(h.seed, 559, t);
+    let off = (v - 0.5) * 0.5, dur = 1500 + 2500 * u;
+    if (hfHash(h.seed, 560, t) < 0.04) { off = (v < 0.5 ? -1 : 1) * (0.7 + 0.8 * u); dur = 500 + 500 * u; }
+    let a = b0 + off;
+    const ms = this._getEnemyNavMapState(e), ox = this._navOffX, oy = this._navOffY;
+    if (ms !== null && ms.walls.length > 0) {
+      const lx = e.position.x - ox, ly = e.position.y - oy;
+      for (let k = 0; k < 5; k++) {
+        const c = a + (k === 0 ? 0 : k === 1 ? 0.44 : k === 2 ? -0.44 : k === 3 ? 0.87 : -0.87);
+        if (checkLineOfSight(ms, lx, ly, lx + Math.cos(c) * 300, ly + Math.sin(c) * 300, ox, oy)) { a = c; break; }
+      }
+    }
+    h.tlAng = normalizeAngle(a); h.tlUntil = now + dur; h.tlB0 = b0;
+    return true;
+  }
   private _hfLook(e: EnemyTank, now: number): number {
     const h = e.hf;
     if (h.lookMode === 0 || now >= h.lookUntil) {
@@ -9030,9 +9968,25 @@ export class GameLogic {
     h.eyeNext = h.eyeUntil + (3000 + 5000 * hfHash(h.seed, 332, t)) * (h.foeD2 < nr * nr ? 0.6 : 1);
     return true;
   }
-  private _hfCampBearing(e: EnemyTank, want: number): number {
+  private _hfCampBearing(e: EnemyTank, want: number, calm: boolean): number {
     const ms = this._getEnemyNavMapState(e), ox = this._navOffX, oy = this._navOffY;
     if (ms === null || ms.walls.length === 0) return want;
+    if (AI_CONSTANTS.HF_CAMPOPEN !== 0 && calm) {
+      const h = e.hf, now = this._hfNow;
+      if (now - h.cpAt > 1000 || now < h.cpAt) h.cpHold = false;
+      if (now - h.cpAt >= 300 || now < h.cpAt) {
+        h.cpAt = now;
+        const held = h.cpHold ? this._hfCampW(e, ms, h.cpAng) : Infinity;
+        if (!(held === 0)) {
+          this._hfCampFit(e, ms, want);
+          if (this._cfBlocked < held) {
+            if (this._cfOff === 0) h.cpHold = false;
+            else { h.cpHold = true; h.cpAng = normalizeAngle(want + this._cfOff); }
+          }
+        }
+      }
+      return h.cpHold ? h.cpAng : want;
+    }
     const lx = e.position.x - ox, ly = e.position.y - oy, L = 2.5 * e.size + 40;
     const nose = e.facingType === 'faceTarget' || e.facingType === 'smoothFaceTarget' ? e.aimNoseOff : (e.turrets[e.primaryTurretIndex]?.angle || 0);
     for (let k = 0; k < 8; k++) {
@@ -9040,6 +9994,39 @@ export class GameLogic {
       if (checkShotWallsClear(ms, lx, ly, lx + Math.cos(g) * L, ly + Math.sin(g) * L, ox, oy, 6)) return k === 0 ? want : normalizeAngle(a);
     }
     return want;
+  }
+  private _cfOff = 0; private _cfBlocked = 0; private _cfGuns = 0;
+  private _hfCampW(e: EnemyTank, ms: MapState, a: number): number {
+    const ox = this._navOffX, oy = this._navOffY, lx = e.position.x - ox, ly = e.position.y - oy, L = 2.5 * e.size + 40, ts = e.turrets;
+    const _tr = AI_CONSTANTS.HF_TRAPROOM !== 0, _sm = _tr ? getEnemyStatMultiplier(e, 'bulletSpeed') : 1, _mz = 0.8 * e.size;
+    let w = 0, tot = 0;
+    for (let i = 0; i < ts.length; i++) {
+      const t = ts[i], pt = t.projectileType, b = t.bps || 0;
+      if ((t.turretType !== undefined && t.turretType !== 'regular') || t.altFire === true || !(b > 0)) continue;
+      if (pt && (pt.motionType === 'chase' || pt.motionType === 'motor' || pt.motionType === 'swarm' || pt.visual === 'swarm')) continue;
+      tot += b;
+      const g = a + (t.angle || 0);
+      let Lt = L;
+      if (_tr && pt && !((pt.topSpeedRatio ?? 1) > 0)) { const f = this._hfFlightOf(t, _sm); if (f > 0) { const q = _mz + f; Lt = q > 600 ? 600 : q > L ? q : L; } }
+      if (!checkShotWallsClear(ms, lx, ly, lx + Math.cos(g) * Lt, ly + Math.sin(g) * Lt, ox, oy, 6)) w += b;
+    }
+    this._cfGuns = tot;
+    return w;
+  }
+  private _hfCampFit(e: EnemyTank, ms: MapState, want: number): void {
+    let bestOff = 0, bestW = Infinity;
+    for (let k = 0; k < 16 && bestW > 0; k++) {
+      const off = k === 0 ? 0 : ((k + 1) >> 1) * 0.39269908169872414 * ((k & 1) !== 0 ? 1 : -1);
+      const w = this._hfCampW(e, ms, want + off);
+      if (w < bestW) { bestW = w; bestOff = off; }
+    }
+    this._cfOff = bestOff; this._cfBlocked = bestW === Infinity ? 0 : bestW;
+  }
+  private _hfCampOpen(e: EnemyTank): boolean {
+    const ms = this._getEnemyNavMapState(e);
+    if (ms === null || ms.walls.length === 0) return true;
+    this._hfCampFit(e, ms, e.angle);
+    return !(this._cfGuns > 0) || 3 * this._cfBlocked <= this._cfGuns;
   }
   private _hfBoost(e: EnemyTank, now: number): boolean {
     const h = e.hf;
@@ -9164,8 +10151,14 @@ export class GameLogic {
     let tank = (ct === 'enemy' || ct === 'player') && (st === 'attacking' || st === 'following');
     const food = ct === 'shape' && (st === 'targeting_shapes' || (st === 'following' && (AI_CONSTANTS.HF_FOODWALK === 0 || now < e.pokeUntil || e.sightHoldSince !== 0))) && e.targetPosition !== null;
     let tid = ct === 'player' ? this.state.playerId : (e.currentTargetId ?? '');
-    const sent = !tank && !food && st === 'roaming' && e._ogUnitT !== '' && AI_CONSTANTS.BT_SENDUNITS !== 0 && now < e._ogUnitLookAt + 2500;
+    let sent = !tank && !food && st === 'roaming' && e._ogUnitT !== '' && (AI_CONSTANTS.BT_SENDUNITS !== 0 || AI_CONSTANTS.BT_UNITHIDE !== 0) && now < e._ogUnitLookAt + 2500;
     if (sent) { tank = true; if (e._ogUnitT === 'P') { ct = 'player'; tid = this.state.playerId; } else { ct = 'enemy'; tid = e._ogUnitT; } }
+    let front = false;
+    if (!tank && !food && st === 'roaming' && AI_CONSTANTS.BT_UNITFRONT !== 0 && FEEL_LIVE && (e._btBits !== 0 || e._tmSt !== 0)) {
+      this._ufLook(e, now);
+      if (e._ufT !== '' && now < e._ufUntil) { front = true; sent = true; tank = true; if (e._ufT === 'P') { ct = 'player'; tid = this.state.playerId; } else { ct = 'enemy'; tid = e._ufT; } }
+    }
+    const edge = AI_CONSTANTS.BT_UNITFRONT !== 0 && FEEL_LIVE && tank && (e._btBits !== 0 || e._tmSt !== 0);
     let tx = 0, ty = 0, tvx = 0, tvy = 0, live = (tank || food) && tid !== '';
     if (live) {
       if (ct === 'player') { tx = this.tankPos.x; ty = this.tankPos.y; tvx = this.tankVelocity.x; tvy = this.tankVelocity.y; }
@@ -9174,6 +10167,7 @@ export class GameLogic {
     }
     const fresh = h.dFrame >= this.frameCounter - 2, n = fresh ? h.dN : 0, X = h.dX, Y = h.dY;
     const dr = fresh && h.dRad > 0 ? h.dRad : 12;
+    const gunOut = live && tank && !sent && ct !== 'shape' && this._hfGunOut(e, ct === 'player' ? null : (this._enemyById.get(tid) ?? null));
     const ESC = AI_CONSTANTS.HF_ESCORT !== 0 && S[FEEL.DRONEKEEP] > 0 && (h.dKind === 2 || AI_CONSTANTS.HF_DRONEKEEP !== 0);
     const BACK = (h.dKind === 1 || ESC) && AI_CONSTANTS.HF_DRONEBACK !== 0 && S[FEEL.DRONEBACK] > 0;
     const KEEP = h.dKind === 1 && AI_CONSTANTS.HF_DRONEKEEP !== 0 && S[FEEL.DRONEKEEP] > 0;
@@ -9183,6 +10177,7 @@ export class GameLogic {
         if (BACK && !dgr && h.dwMode >= 1 && h.dwMode <= 3 && h.dwPress && n > 0) { h.dwMode = 8; h.dwSince = now; h.dwT = ''; h.dwHold = true; return; }
         if (h.dwMode === 8 && !dgr && now - h.dwSince < 350 + 600 * hfHash(h.seed, 393, h.dwSince | 0)) return;
         const ms0 = this._getEnemyNavMapState(e), ox0 = this._navOffX, oy0 = this._navOffY;
+        if (!dgr && AI_CONSTANTS.BT_MEETFIRE !== 0 && e._tfGateFireUntil > now && st === 'roaming') { this._hfDroneHoldBy(e, ms0, ox0, oy0, n, dr, Math.cos(e._tfGateAngle), Math.sin(e._tfGateAngle), false, now); return; }
         if (BACK && this._hfDroneBack(e, ms0, ox0, oy0, n, dr, dgr, now)) return;
         if (ESC && this._hfEscort(e, ms0, ox0, oy0, n, dr, dgr, now)) return;
         if (dgr) { this._hfDroneHoldBy(e, ms0, ox0, oy0, n, dr, h.dnX - e.position.x, h.dnY - e.position.y, true, now); return; }
@@ -9246,17 +10241,18 @@ export class GameLogic {
             const s = queryDistanceStep(nav, dist, wx, wy, false, dr); if (!s.ok) { reach = false; break; }
             wx += s.dirX * cs; wy += s.dirY * cs;
             const sx = wx - lx, sy = wy - ly;
-            if (h.sightBox ? ((sx < 0 ? -sx : sx) > fov || (sy < 0 ? -sy : sy) > fy) : (sx * sx + sy * sy > fov * fov)) { reach = false; break; }
+            if (h.sightBox ? ((sx < 0 ? -sx : sx) > fov || (sy < 0 ? -sy : sy) > fy) : (sx * sx + sy * sy > fov * fov)) { reach = edge; break; }
           }
-          if (k >= 120) reach = false;
+          if (k >= 120) reach = edge;
         }
       }
       h.dwReach = reach;
     }
     if (!h.dwReach) {
       h.dwMode = 1; h.dwSince = now; h.dwPress = false; h.dwHold = false;
+      if (front) { this._ufHoldAhead(e, ms, nav, ox, oy, n, dr, tid, tlx, tly, now); return; }
       if (sent) { e._ogUnitT = ''; e._ogUnitLookAt = now + 2500; }
-      else if (AI_CONSTANTS.HF_NOPUSH !== 0 && tank) {
+      else if (AI_CONSTANTS.HF_NOPUSH !== 0 && tank && !gunOut) {
         h.dwHold = true;
         if (h.nwAt === 0) h.nwAt = now;
         else if (st === 'following' && !h.pcOk && h.dcGoUntil <= now && now - h.nwAt > 3000 + 2000 * hfHash(h.seed, 403, h.nwAt | 0)) { e.followStartTime = now - e.followMaxDuration - 1; h.nwAt = 0; }
@@ -9265,10 +10261,12 @@ export class GameLogic {
       return;
     }
     h.nwAt = 0;
-    h.dwPress = true; h.dwHold = st === 'following';
-    const regroup = allSee && gN <= 1 && h.dMax > 2 && AI_CONSTANTS.HF_ESCORT !== 0 && (MIN || AI_CONSTANTS.HF_DRONEKEEP !== 0) && !checkShotWallsClear(ms, lx, ly, tlx, tly, ox, oy, sr);
+    h.dwPress = true; h.dwHold = st === 'following' && !gunOut;
+    const _gfOn = AI_CONSTANTS.HF_GATHERFIRST !== 0 && FEEL_LIVE && tank && !sent && h.dMax > 2 && AI_CONSTANTS.HF_ESCORT !== 0 && (MIN || AI_CONSTANTS.HF_DRONEKEEP !== 0);
+    const _gfFar = _gfOn && (tlx - lx) * (tlx - lx) + (tly - ly) * (tly - ly) > 250000 && now - e.lastTankDamageAt > 1500;
+    const regroup = allSee && gN <= 1 && h.dMax > 2 && AI_CONSTANTS.HF_ESCORT !== 0 && (MIN || AI_CONSTANTS.HF_DRONEKEEP !== 0) && ((MIN && _gfFar) || !checkShotWallsClear(ms, lx, ly, tlx, tly, ox, oy, sr));
     if (regroup && h.dwMode !== 1) { h.dwMode = 1; h.dwSince = now; }
-    if (allSee && !regroup) {
+    if (allSee && !regroup && !(_gfFar && h.dwMode === 1 && n > 0 && now - h.dwSince < 4000)) {
       const mx = gx / gN, my = gy / gN, ddx = tx - mx, ddy = ty - my, lt = skill * Math.min(0.5, Math.sqrt(ddx * ddx + ddy * ddy) / 700) * 60;
       if (h.dwMode === 1) { h.dwCX = mx; h.dwCY = my; }
       h.dwMode = 3; h.dwGX = tx + tvx * lt; h.dwGY = ty + tvy * lt;
@@ -9300,7 +10298,7 @@ export class GameLogic {
       for (let i = 0; i < n; i++) { const dx = X[i] - h.dwGX, dy = Y[i] - h.dwGY; if (dx * dx + dy * dy > c2) { far = true; break; } }
       const el = now - h.dwSince, wait = 2200 + 1400 * hfHash(h.seed, 382, h.dwSince | 0);
       const full = h.dMax < 16 ? h.dMax : 16, half = (full + 1) >> 1;
-      if (n > 0 && ((!far && el > 350 && (n >= full || (el > wait && n >= half))) || el > wait + 4000)) { h.dwMode = 2; h.dwSince = now; h.dwCX = gx / gN; h.dwCY = gy / gN; }
+      if (n > 0 && ((!far && el > 350 && (n >= full || (el > wait && n >= half) || (front && el > 900))) || el > wait + 4000 || (front && el > 2200))) { h.dwMode = 2; h.dwSince = now; h.dwCX = gx / gN; h.dwCY = gy / gN; }
       if (MIN && n > 0) {
         if (AI_CONSTANTS.HF_ESCORT !== 0) {
           if (now >= h.esNext) { h.esNext = now + 200; const v = (h.dSpd > 0.5 ? h.dSpd : 4) * 60, fat = 0.8 * circ, need = fat + dr + 26;
@@ -9316,6 +10314,10 @@ export class GameLogic {
     const cxl = h.dwCX - ox, cyl = h.dwCY - oy;
     this._hfDroneMarch(h, ms, nav, ox, oy, dist, cxl, cyl, lmax, n, gm, sr, dr, RK, circ, now);
     h.dwGX = this._dmX + ox; h.dwGY = this._dmY + oy;
+    if (edge) {
+      const _fx = h.dwGX - e.position.x, _fy = h.dwGY - e.position.y, _hw = 0.9 * e.fovRadius, _hh = h.sightBox ? _hw * 0.5625 : _hw;
+      if ((_fx < 0 ? -_fx : _fx) > _hw || (_fy < 0 ? -_fy : _fy) > _hh) { h.dwGX = h.dwCX; h.dwGY = h.dwCY; }
+    }
     if (FOOD) this._hfDroneRound(e, ms, ox, oy, h.dwCX, h.dwCY, circ, dr, n, gm, sr, food ? tid : '', lmax);
     if (MIN) this._hfMinionAim(h, h.dwCX, h.dwCY, h.dwX - h.dwCX, h.dwY - h.dwCY, true);
   }
@@ -9416,6 +10418,25 @@ export class GameLogic {
       if (ok) { h.dwGX = wx; h.dwGY = wy; return; }
     }
   }
+  private _hfUnitsAway(e: EnemyTank): boolean {
+    const h = e.hf, n = h.dFrame >= this.frameCounter - 2 ? h.dN : 0;
+    if (n === 0) return true;
+    const r = 4 * this.getEffectiveEnemyRadius(e) + 200, r2 = r * r, x = e.position.x, y = e.position.y;
+    let near = 0;
+    for (let i = 0; i < n; i++) { const dx = h.dX[i] - x, dy = h.dY[i] - y; if (dx * dx + dy * dy <= r2) near++; }
+    return 2 * near < n;
+  }
+  private _hfComesAt(e: EnemyTank, o: EnemyTank | null): boolean {
+    const tp = o === null ? this.tankPos : o.position, dx = e.position.x - tp.x, dy = e.position.y - tp.y, d2 = dx * dx + dy * dy;
+    if (d2 < 1) return true;
+    const vx = o === null ? this.tankVelocity.x : o.velocity.x + o.knockbackVelocity.x, vy = o === null ? this.tankVelocity.y : o.velocity.y + o.knockbackVelocity.y, v2 = vx * vx + vy * vy;
+    const top = o === null ? (this.state.tankMovementSpeed / this.movementZoom) * this._playerDriveMult() * this._playerTermFactor() / this._playerSizeSpeedReduce() : (getEnemyMoveSpeed(o) / this.movementZoom) * this._enemyTermFactor(o);
+    if (v2 < 0.25 * top * top) return false;
+    const pv = vx * dx + vy * dy;
+    if (pv <= 0) return false;
+    const W = this.getEffectiveEnemyRadius(e) + (o === null ? this.getEffectivePlayerRadius() : this.getEffectiveEnemyRadius(o)), d = Math.sqrt(d2), v = Math.sqrt(v2), al = pv / (d * v);
+    return d2 * (1 - al * al) <= 1.5625 * W * W && d - W <= v * 180;
+  }
   private _hfDroneDanger(e: EnemyTank, hasTank: boolean, now: number): boolean {
     const h = e.hf, mine = e.currentTargetType === 'player' ? this.state.playerId : (e.currentTargetId ?? '');
     let on = false, ax = 0, ay = 0;
@@ -9436,6 +10457,14 @@ export class GameLogic {
       if (h.foeD2 < n2) {
         const o = h.foeId === 'P' ? null : (this._enemyById.get(h.foeId) ?? null);
         if ((h.foeId === 'P' || o !== null) && (!this._hfAtPeace(e, h.foeId) || e.dnaCaution > 0.8) && (h.foeD2 < 0.25 * n2 || this._hfFacesMe(e, o))) { on = true; ax = h.foeX; ay = h.foeY; }
+      }
+    }
+    if (!on && AI_CONSTANTS.HF_UNITBACK !== 0 && h.foeSee && h.foeD2 < Infinity && h.foeId !== '' && !(hasTank && (h.foeId === 'P' ? this.state.playerId : h.foeId) === mine)) {
+      const o = h.foeId === 'P' ? null : (this._enemyById.get(h.foeId) ?? null);
+      if ((h.foeId === 'P' || o !== null) && this._hfUnitsAway(e) && this._hfComesAt(e, o)) {
+        if (h.cbId !== h.foeId || now - h.cbSeen > 400) { h.cbId = h.foeId; h.cbAt = now; }
+        h.cbSeen = now;
+        if (now - h.cbAt >= 150) { on = true; ax = o === null ? this.tankPos.x : o.position.x; ay = o === null ? this.tankPos.y : o.position.y; }
       }
     }
     if (!on && AI_CONSTANTS.HF_UNITAWAY !== 0 && h.foeSee && h.foeD2 < Infinity && h.foeId !== '' && !(hasTank && (h.foeId === 'P' ? this.state.playerId : h.foeId) === mine) && !this._hfAtPeace(e, h.foeId)) {
@@ -9710,6 +10739,100 @@ export class GameLogic {
     for (let i = 0; i < n; i++) if (!checkShotWallsClear(ms, X[i] - ox, Y[i] - oy, px, py, ox, oy, sr)) return false;
     return true;
   }
+  private _hgHold(e: EnemyTank, v0x: number, v0y: number, now: number): void {
+    const h = e.hf;
+    if (!h.plays || h.rmOn || h.dKind !== 0 || e._ogId === '' || e.graceActive || e.isSpawning || e.aiState === 'fleeing' || e.fear.isFleeing) return;
+    if (SMALL_FIX.HG1127 !== 0 && (e._btBits & (BT_TAKE | BT_SPOIL | BT_ESCORT)) !== 0) return;
+    if (!h.tmHas || h.tmMates < 1 || h.gDo === 3 || now < h.udUntil || h.rcUntil > now || this._btShare(e) < 0.4) return;
+    const dvx = e.velocity.x - v0x, dvy = e.velocity.y - v0y, d2 = dvx * dvx + dvy * dvy;
+    if (d2 < 1e-12) return;
+    const o = this._enemyById.get(e._ogId);
+    if (o === undefined || !o.active || o.isDying) return;
+    let fx = o.position.x - e.position.x, fy = o.position.y - e.position.y;
+    const ms = this._getEnemyNavMapState(e), ox = this._navOffX, oy = this._navOffY;
+    if (ms !== null && ms.navigation && ms.walls.length > 0) {
+      const nav = ms.navigation, R = this.getEffectiveEnemyRadius(e);
+      ensureRegionFields(nav, ms, ox, oy);
+      const dist = ensureAuxDistField(nav, ms, o.id, o.position.x - ox, o.position.y - oy, now, R);
+      if (dist !== null) { const s = queryDistanceStep(nav, dist, e.position.x - ox, e.position.y - oy, false, R); if (s.ok) { fx = s.dirX; fy = s.dirY; } }
+    }
+    const fl = Math.sqrt(fx * fx + fy * fy);
+    if (fl < 1e-6) return;
+    fx /= fl; fy /= fl;
+    const along = dvx * fx + dvy * fy;
+    if (along >= -0.3 * Math.sqrt(d2)) return;
+    const nx = dvx - along * fx, ny = dvy - along * fy;
+    e.velocity.x = v0x + nx; e.velocity.y = v0y + ny;
+    if (nx * nx + ny * ny < 0.04 * d2) { this._resetStuckWindow(e, now); h.standAt = now; }
+  }
+  private _cnX = 0;
+  private _cnY = 0;
+  private _hfCornerStep(e: EnemyTank, now: number): boolean {
+    const h = e.hf;
+    if (!h.plays || h.rmOn || e._btBits !== 0 || e.isBossTier === true || e.graceActive || e.isSpawning || now < h.tsUntil) { if (h.cnGo) { h.cnGo = false; h.cnOut = false; } return false; }
+    const ms = this._getEnemyNavMapState(e), ox = this._navOffX, oy = this._navOffY;
+    if (ms === null || !ms.navigation || ms.walls.length === 0) { if (h.cnGo) { h.cnGo = false; h.cnOut = false; } return false; }
+    const nav = ms.navigation, gc = nav.gridCells, gcY = nav.gridCellsY, dep = nav.deadEndDepth;
+    if (dep.length !== gc * gcY) return false;
+    const cs = nav.cellSize, mh = nav.mapHalf, mhY = nav.mapHalfY, lx = e.position.x - ox, ly = e.position.y - oy;
+    const cx = Math.floor((lx + mh) / cs), cy = Math.floor((ly + mhY) / cs);
+    if (cx < 0 || cy < 0 || cx >= gc || cy >= gcY) { if (h.cnGo) { h.cnGo = false; h.cnOut = false; } return false; }
+    const c0 = cx * gcY + cy, d0 = dep[c0];
+    if (d0 > 0 && now >= h.cnPause) {
+      const b = e.threatDodgeRef !== null ? e.threatDodgeRef : e.threatShootRef;
+      let id = '';
+      if (b !== null && b.active) id = b.ownerId === this.state.playerId ? 'P' : b.ownerId;
+      else if (e.lastTankDamageById !== '' && now - e.lastTankDamageAt < 2500) id = e.lastTankDamageById === this.state.playerId ? 'P' : e.lastTankDamageById;
+      if (id !== '' && id !== e.id) { if (!(now < h.cnUntil)) h.cnSince = now; h.cnId = id; h.cnUntil = now + 2500; }
+    }
+    if (!(now < h.cnUntil)) { if (h.cnGo) { h.cnGo = false; h.cnOut = false; } return false; }
+    let sx = 0, sy = 0;
+    if (h.cnId === 'P') { if (this.state.playerDead) { h.cnUntil = 0; h.cnGo = false; h.cnOut = false; return false; } sx = this.tankPos.x - ox; sy = this.tankPos.y - oy; }
+    else { const t = this._enemyById.get(h.cnId); if (t === undefined || !t.active || t.isDying) { h.cnUntil = 0; h.cnGo = false; h.cnOut = false; return false; } sx = t.position.x - ox; sy = t.position.y - oy; }
+    if (now - h.cnSince > 12000) { h.cnUntil = 0; h.cnPause = now + 5000; h.cnGo = false; h.cnOut = false; return false; }
+    if (d0 > 0) {
+      const ex = nav.deadEndExitDirX, ey = nav.deadEndExitDirY, scx = Math.floor((sx + mh) / cs), scy = Math.floor((sy + mhY) / cs);
+      let ix = cx, iy = cy;
+      for (let g = 0; g < 64; g++) {
+        const i = ix * gcY + iy;
+        if (g > 0 && ix === scx && iy === scy) { h.cnGo = false; h.cnOut = false; return false; }
+        if (dep[i] === 0) break;
+        const qx = ex[i], qy = ey[i];
+        if (qx === 0 && qy === 0) break;
+        ix += qx; iy += qy;
+        if (ix < 0 || iy < 0 || ix >= gc || iy >= gcY) break;
+      }
+      const dx = ex[c0], dy = ey[c0];
+      if (dx === 0 && dy === 0) { h.cnGo = false; h.cnOut = false; return false; }
+      let nx = cx + dx, ny = cy + dy;
+      if (nx >= 0 && ny >= 0 && nx < gc && ny < gcY) { const n1 = nx * gcY + ny; if (dep[n1] > 0 && ex[n1] === dx && ey[n1] === dy) { nx += dx; ny += dy; } }
+      this._cnX = -mh + (nx + 0.5) * cs + ox; this._cnY = -mhY + (ny + 0.5) * cs + oy;
+      h.cnGo = true; h.cnOut = false;
+      if (h.cnUntil < now + 700) h.cnUntil = now + 700;
+      return true;
+    }
+    if (!h.cnGo) return false;
+    if (!h.cnOut) {
+      let best = -1, bs = -1;
+      for (let k = 0; k < 4; k++) {
+        const jx = cx + (k === 0 ? 1 : k === 1 ? -1 : 0), jy = cy + (k === 2 ? 1 : k === 3 ? -1 : 0);
+        if (jx < 0 || jy < 0 || jx >= gc || jy >= gcY) continue;
+        const j = jx * gcY + jy;
+        if (dep[j] !== 0 || ms.tileGrid[j] === TileType.WALL || ms.rockGrid[j] >= 0) continue;
+        const wx = -mh + (jx + 0.5) * cs, wy = -mhY + (jy + 0.5) * cs, qx = wx - sx, qy = wy - sy;
+        const sc = (checkLineOfSight(ms, wx, wy, sx, sy, ox, oy) ? 0 : 1e9) + qx * qx + qy * qy;
+        if (sc > bs) { bs = sc; best = j; }
+      }
+      if (best < 0) { h.cnUntil = 0; h.cnGo = false; h.cnPause = now + 3000; return false; }
+      const bx = (best / gcY) | 0, by = best - bx * gcY;
+      h.cnOutX = -mh + (bx + 0.5) * cs + ox; h.cnOutY = -mhY + (by + 0.5) * cs + oy; h.cnOut = true;
+    }
+    const gx = h.cnOutX - e.position.x, gy = h.cnOutY - e.position.y;
+    if (gx * gx + gy * gy <= 0.1225 * cs * cs) { h.cnUntil = 0; h.cnGo = false; h.cnOut = false; h.cnPause = now + 3000; return false; }
+    this._cnX = h.cnOutX; this._cnY = h.cnOutY;
+    if (h.cnUntil < now + 700) h.cnUntil = now + 700;
+    return true;
+  }
   private _hfWalkTo(e: EnemyTank, v0x: number, v0y: number, gx: number, gy: number, dtFactor: number): boolean {
     const dx = gx - e.position.x, dy = gy - e.position.y, d = Math.sqrt(dx * dx + dy * dy);
     if (d < 6) return false;
@@ -9731,6 +10854,7 @@ export class GameLogic {
     if ((e.aiState !== 'attacking' && !(UC && e.aiState === 'following')) || (ct !== 'enemy' && ct !== 'player') || (UC ? (h.dwMode < 1 || h.dwMode > 3) : h.dwMode !== 3) || e.dnaCaution < 0.15) return;
     const t = ct === 'player' ? null : (this._enemyById.get(e.currentTargetId ?? '') ?? null);
     if (ct === 'enemy' && (t === null || t.isDying)) return;
+    if (this._hfGunOut(e, t)) return;
     const ms = this._getEnemyNavMapState(e), ox = this._navOffX, oy = this._navOffY;
     if (ms === null || !ms.navigation || ms.walls.length === 0) return;
     const nav = ms.navigation, gc = nav.gridCells, gcY = nav.gridCellsY, cs = nav.cellSize, mh = nav.mapHalf, mhY = nav.mapHalfY;
@@ -9872,6 +10996,7 @@ export class GameLogic {
       const d0 = Math.sqrt((lx - dlx) * (lx - dlx) + (ly - dly) * (ly - dly)), bodyR = this._routeR(e);
       const total = gc * gcY, mask = nav.regionsBuilt && nav.navBlocked.length === total ? nav.navBlocked : null;
       let bs = -Infinity, bx = 0, by = 0, bk = -1;
+      const wm = AI_CONSTANTS.HF_WAYMEM !== 0 && walled && h.wmN === total && nav.deadEndDepth.length === total, de0 = wm ? nav.deadEndDepth[cx0 * gcY + cy0] : 0;
       const gvl = Math.sqrt(e.velocity.x * e.velocity.x + e.velocity.y * e.velocity.y), gvx = gvl > 0.5 ? e.velocity.x / gvl : 0, gvy = gvl > 0.5 ? e.velocity.y / gvl : 0;
       for (let k = 0; k < 5; k++) {
         const nx = cx0 + (k === 1 ? 1 : k === 2 ? -1 : 0), ny = cy0 + (k === 3 ? 1 : k === 4 ? -1 : 0);
@@ -9885,7 +11010,8 @@ export class GameLogic {
         const hid = walled && this._hfCellHid(ms, px, py, dlx, dly, ox, oy, cs);
         if ((!hid && d < d0 - 4) || this._hfIntoOther(e, px + ox, py + oy)) continue;
         const wl = Math.sqrt((px - lx) * (px - lx) + (py - ly) * (py - ly)), along = wl > 1 ? ((px - lx) * gvx + (py - ly) * gvy) / wl : 0;
-        const sc = (hid ? 100 : 0) + 20 * (d - d0) / cs + (k === 0 ? (hidNow ? 5 : -5) : 0) + (along > 0 ? 7 * along : 0);
+        let sc = (hid ? 100 : 0) + 20 * (d - d0) / cs + (k === 0 ? (hidNow ? 5 : -5) : 0) + (along > 0 ? 7 * along : 0);
+        if (wm && k !== 0) { if (hid && nav.deadEndDepth[idx] > de0) sc -= 90; if (this._hfWayKnows(e, idx, now)) sc += 15; }
         if (sc > bs) { bs = sc; bx = px; by = py; bk = k; }
       }
       if (bk < 0 || (bk === 0 && hidNow)) return 0;
@@ -9894,13 +11020,25 @@ export class GameLogic {
     if (!h.awOk) return 0;
     return this._hfWalkTo(e, v0x, v0y, h.awX, h.awY, dtFactor) ? 1 : 2;
   }
+  private _hfGunOut(e: EnemyTank, t: EnemyTank | null): boolean {
+    const h = e.hf;
+    if (AI_CONSTANTS.HF_GUNOUT === 0 || h.dKind === 0 || (h.arBul === 0 && h.autos === 0)) return false;
+    if (e.size >= 1.25 * (t === null ? 2 * this._playerBodyRadius() : t.size)) return true;
+    if (this.roleSenseActive && e.rolePowerCeilRef !== 0 && e.rolePower > 0) {
+      const his = t === null ? this.playerRolePower : (t.rolePowerCeilRef === 0 ? -1 : t.rolePower);
+      if (his >= 0) return e.rolePower >= 1.3 * his;
+    }
+    return false;
+  }
   private _hfOutguns(e: EnemyTank, o: EnemyTank | null, player: boolean): boolean {
     if (o === null && !player) return false;
+    if (AI_CONSTANTS.HF_HEAVY !== 0 && this._hfOneHit(e, o, this._hfNow) >= 0.35) return true;
     if (this.roleSenseActive && e.rolePowerCeilRef !== 0 && e.rolePower > 0) {
       const his = o === null ? this.playerRolePower : (o.rolePowerCeilRef === 0 ? -1 : o.rolePower);
       if (his >= 0) return his >= 1.3 * e.rolePower;
     }
-    return o !== null && o.size >= 1.25 * e.size;
+    if (o === null) return SMALL_FIX.G799 !== 0 && player && tankSizeFromSlider(this.state.tankSize) * this.state.playerGrowthScale >= 1.25 * e.size;
+    return o.size >= 1.25 * e.size;
   }
   private _hfGunsClear(e: EnemyTank, ms: MapState, lx: number, ly: number, ox: number, oy: number, bearing: number, L: number, sr: number): boolean {
     const h = e.hf, ha = this._hfHullFor(e, bearing);
@@ -9973,19 +11111,148 @@ export class GameLogic {
     }
     return false;
   }
+  private _hfHeavyAhead(e: EnemyTank, now: number): boolean {
+    const h = e.hf, id = h.hvId, o = id === 'P' ? null : (this._enemyById.get(id) ?? null);
+    if (id !== 'P' && (o === null || !o.active || o.isDying)) return false;
+    const st = e.aiState;
+    const isT = id === 'P' ? e.currentTargetType === 'player' : (e.currentTargetType === 'enemy' && e.currentTargetId === id);
+    if (isT && (e.minAttackDistance === 0 || (st === 'attacking' && !(AI_CONSTANTS.HF_HITRANGE !== 0 && h.hvR > 0 && (h.dKind !== 0 || h.sLed === true || AI_CONSTANTS.HF_HEAVYSURE !== 0))))) return false;
+    const HR = AI_CONSTANTS.HF_HITRANGE !== 0 && h.hvR > 0;
+    if (!HR && this._hfAtPeace(e, id) && !this._hfFacesMe(e, o)) return false;
+    if ((o === null ? this._mevHealthShare(null) : o.currentHealth / Math.max(1, aiHealthMax(o, HEALTH_BASIS.AGGRO))) < 0.3) return false;
+    const mem = AI_CONSTANTS.HF_HITRANGE !== 0 && h.hvMem;
+    const tx0 = mem ? h.hvX : o === null ? this.tankPos.x : o.position.x, ty0 = mem ? h.hvY : o === null ? this.tankPos.y : o.position.y;
+    const dx = tx0 - e.position.x, dy = ty0 - e.position.y;
+    let K = h.hvK * (now < h.adUntil + 600 ? 1.28 : 1);
+    if (HR && !mem) {
+      const dl = Math.sqrt(dx * dx + dy * dy);
+      if (dl > 1) { const cl = -(((o === null ? this.tankVelocity.x : o.velocity.x) - e.velocity.x) * dx + ((o === null ? this.tankVelocity.y : o.velocity.y) - e.velocity.y) * dy) / dl; if (cl > 0) K += cl * 48 < 200 ? cl * 48 : 200; }
+    }
+    if (dx * dx + dy * dy >= K * K) return false;
+    if (this._hfLosTo(e, tx0, ty0)) {
+      h.adX = tx0; h.adY = ty0; h.adUntil = now + 800; h.adNext = now + 110;
+      this._hfAheadHold(e, id, tx0, ty0, h.hvK * 1.28, now);
+      if (!isT) this._hfLeaveArm(e, id, tx0, ty0, h.hvR > 0 ? h.hvR : h.hvK * 1.28, now);
+      if (HR && !isT) {
+        if (now > h.hrAt + 6000) h.hrSince = now;
+        h.hrAt = now;
+        if (now - h.hrSince > 400 + 800 * hfHash(h.seed, 515, hfIdNum(id))) { h.hrSince = now; h.hkX = tx0; h.hkY = ty0; this._hfHeavyQuit(e, id, now); }
+      }
+      return true;
+    }
+    const quit = !isT && h.hkQuitId === id && now < h.hkQuitUntil;
+    if (quit && !HR) return false;
+    const ms = this._getEnemyNavMapState(e), ax = this._navOffX, ay = this._navOffY;
+    if (ms === null || ms.walls.length === 0) return false;
+    const lx = e.position.x - ax, ly = e.position.y - ay, tx = tx0 - ax, ty = ty0 - ay, stp = ms.cellSize * 0.75, K0 = h.hvK;
+    let qm = 0, mL = Infinity, mx = 0, my = 0;
+    if (HR) {
+      const ovx = mem ? 0 : o === null ? this.tankVelocity.x : o.velocity.x, ovy = mem ? 0 : o === null ? this.tankVelocity.y : o.velocity.y;
+      qm = 150 * Math.sqrt(ovx * ovx + ovy * ovy);
+      if (qm < 0.35 * h.hvR) qm = 0.35 * h.hvR; else if (qm > h.hvR) qm = h.hvR;
+    }
+    const RM = HR ? h.hvR * (now < h.adUntil + 600 ? 1.15 : 1) : 0;
+    let best = K0, bx = 0, by = 0;
+    for (let k = 0; k < 8; k++) {
+      for (let j = 1; j <= 8; j++) {
+        const L = j * stp;
+        if (L >= best && L >= RM) break;
+        const px = lx + HF_KEY_X[k] * L, py = ly + HF_KEY_Y[k] * L;
+        if (!checkLineOfSight(ms, lx, ly, px, py, ax, ay)) break;
+        const qx = tx - px, qy = ty - py, q = Math.sqrt(qx * qx + qy * qy), w = L + q;
+        const way = w < best, mouth = L < RM && L < mL && q < qm;
+        if ((way || mouth) && checkLineOfSight(ms, px, py, tx, ty, ax, ay)) { if (way) { best = w; bx = px; by = py; } if (mouth) { mL = L; mx = px; my = py; } }
+      }
+    }
+    if (mL < Infinity) {
+      if (now > h.hkUntil + 1200) h.hkSince = now;
+      h.hkX = mx + ax; h.hkY = my + ay; h.hkUntil = now + 600; h.adNext = now + 110;
+      h.adX = h.hkX; h.adY = h.hkY; h.adUntil = now + 800;
+      this._hfAheadHold(e, '', h.hkX, h.hkY, 0, now);
+      if (!isT) this._hfLeaveArm(e, id, tx0, ty0, h.hvR > 0 ? h.hvR : h.hvK * 1.28, now);
+      if (now - h.hkSince > 2500 + 3500 * hfHash(h.seed, 509, hfIdNum(id))) { h.hkSince = now; this._hfHeavyQuit(e, id, now); }
+      return true;
+    }
+    if (!(best < K0)) return false;
+    if (now > h.hkUntil + 1200) h.hkSince = now;
+    h.hkX = bx + ax; h.hkY = by + ay; h.hkUntil = now + 600; h.adNext = now + 110;
+    if (best < 0.75 * K0) { h.adX = h.hkX; h.adY = h.hkY; h.adUntil = now + 800; this._hfAheadHold(e, '', h.hkX, h.hkY, 0, now); }
+    if (!isT) this._hfLeaveArm(e, id, tx0, ty0, h.hvR > 0 ? h.hvR : h.hvK * 1.28, now);
+    if (now - h.hkSince > 2500 + 3500 * hfHash(h.seed, 509, hfIdNum(id))) { h.hkSince = now; this._hfHeavyQuit(e, id, now); }
+    return true;
+  }
+  private _hfHeavyQuit(e: EnemyTank, id: string, now: number): void {
+    const h = e.hf;
+    h.hkQuitId = id; h.hkQuitUntil = now + 10000 + 8000 * hfHash(h.seed, 510, now | 0);
+    if (e._btBits !== 0) return;
+    const st = e.aiState;
+    if (st === 'targeting_shapes' && e.currentTargetType === 'shape' && e.currentTargetId) this._unreachNote(e, e.currentTargetId, now);
+    if (e.navGoalRegion >= 0) { e.navRegionBlockedUntil[e.navGoalRegion] = now + 20000; e.navGoalRegion = -1; }
+    const ms = this._getEnemyNavMapState(e), ox = this._navOffX, oy = this._navOffY;
+    const ab = this.areaBounds.length > 0 ? this._getEnemyAreaBounds(e.areaId) : null;
+    const cx = h.hkX - e.position.x, cy = h.hkY - e.position.y, cl = Math.sqrt(cx * cx + cy * cy), ux = cl > 1 ? -cx / cl : 0, uy = cl > 1 ? -cy / cl : 0;
+    if (AI_CONSTANTS.HF_WAYMEM !== 0 && e.roamTarget && ms !== null && ms.navigation && h.wmN === ms.navigation.gridCells * ms.navigation.gridCellsY) {
+      const nav = ms.navigation, gcY = nav.gridCellsY, cs = nav.cellSize;
+      let far = 4 * cs * cs, fx = 0, fy = 0, got = false;
+      for (let k = 0; k < 24; k++) {
+        const c = h.wmC[k];
+        if (c < 0 || now - h.wmT[k] >= 90000) continue;
+        const wx = -nav.mapHalf + (((c / gcY) | 0) + 0.5) * cs + ox, wy = -nav.mapHalfY + ((c % gcY) + 0.5) * cs + oy;
+        const bx = wx - e.position.x, by = wy - e.position.y, b2 = bx * bx + by * by;
+        if (b2 < far || bx * cx + by * cy > 0) continue;
+        if (AI_CONSTANTS.HF_LEAVEAREA !== 0 && now < h.lvUntil && (wx - h.lvX) * (wx - h.lvX) + (wy - h.lvY) * (wy - h.lvY) < h.lvR * h.lvR) continue;
+        far = b2; fx = wx; fy = wy; got = true;
+      }
+      if (got) {
+        e.roamTarget.set(fx, fy);
+        if (st === 'roaming') { e.navTravelDirX = 0; e.navTravelDirY = 0; }
+        return;
+      }
+    }
+    for (let i = 0; i < 3; i++) {
+      e.roamTarget = calculateRoamTarget(this.getMapLimit(), ab, ms, ox, oy, e.position.x, e.position.y, e.roamTarget, ux, uy, this.getEffectiveEnemyRadius(e), this._roamAvoidFor(e));
+      if (e.roamTarget && AI_CONSTANTS.HF_HITRANGE !== 0 && h.hvR > 0 && h.hvId === id && (e.roamTarget.x - h.hkX) * (e.roamTarget.x - h.hkX) + (e.roamTarget.y - h.hkY) * (e.roamTarget.y - h.hkY) < h.hvR * h.hvR) continue;
+      if (e.roamTarget && AI_CONSTANTS.HF_LEAVEAREA !== 0 && now < h.lvUntil && (e.roamTarget.x - h.lvX) * (e.roamTarget.x - h.lvX) + (e.roamTarget.y - h.lvY) * (e.roamTarget.y - h.lvY) < h.lvR * h.lvR) continue;
+      if (!e.roamTarget || (e.roamTarget.x - e.position.x) * cx + (e.roamTarget.y - e.position.y) * cy <= 0) break;
+    }
+    if (st === 'roaming') { e.navTravelDirX = 0; e.navTravelDirY = 0; }
+  }
   private _hfAheadTick(e: EnemyTank, now: number): void {
     const h = e.hf;
+    if (AI_CONSTANTS.BT_INTOAREA !== 0 && now < e._iaGoUntil) { h.adUntil = 0; h.ahUntil = 0; h.hkUntil = 0; return; }
     if (now < h.adNext) return;
     h.adNext = now + 240 + 140 * hfHash(h.seed, 430, now | 0);
     const st = e.aiState;
-    if (h.rcUntil > now && st !== 'fleeing' && st !== 'protecting_base' && !e.graceActive && !this._isHealEngagement(e)) { h.adX = h.rcX; h.adY = h.rcY; h.adUntil = now + 800; h.adNext = now + 110; return; }
+    if (now < h.lvUntil) {
+      const _lq = h.lvId === 'P' ? null : (this._enemyById.get(h.lvId) ?? undefined);
+      if (_lq === undefined || (_lq !== null && (!_lq.active || _lq.isDying)) || (_lq === null && (this.state.playerDead || !this._playerTargetable()))) h.lvUntil = 0;
+      else { const _lx = _lq === null ? this.tankPos.x : _lq.position.x, _ly = _lq === null ? this.tankPos.y : _lq.position.y; if (!this._hfOffScreen(e, _lx, _ly) && this._hfLosTo(e, _lx, _ly)) { h.lvX = _lx; h.lvY = _ly; if (h.lvUntil < now + 20000) h.lvUntil = now + 20000; } }
+    }
+    if (now < h.ahUntil && h.ahId !== '') {
+      const _aq = h.ahId === 'P' ? null : (this._enemyById.get(h.ahId) ?? undefined);
+      if (_aq === undefined || (_aq !== null && (!_aq.active || _aq.isDying)) || (_aq === null && this.state.playerDead)) h.ahUntil = 0;
+      else { const _ax = _aq === null ? this.tankPos.x : _aq.position.x, _ay = _aq === null ? this.tankPos.y : _aq.position.y; if (!this._hfOffScreen(e, _ax, _ay)) { h.ahX = _ax; h.ahY = _ay; } }
+    }
+    if (h.rcUntil > now && st !== 'fleeing' && st !== 'protecting_base' && !e.graceActive && !this._isHealEngagement(e)) { h.adX = h.rcX; h.adY = h.rcY; h.adUntil = now + 800; h.adNext = now + 110; this._hfAheadHold(e, h.rcId, h.rcX, h.rcY, 0, now); return; }
     if (st === 'fleeing' || st === 'protecting_base' || e.graceActive || this.feel.s[FEEL.RISK] <= 0 || this._isHealEngagement(e)) return;
+    if (AI_CONSTANTS.HF_HEAVYSEEN !== 0 && h.hvId !== '' && this._hfHeavyAhead(e, now)) return;
     if (!h.foeSee || h.foeId === '' || !(h.foeD2 < Infinity)) return;
     const o = h.foeId === 'P' ? null : (this._enemyById.get(h.foeId) ?? null);
     if (h.foeId !== 'P' && (o === null || !o.active || o.isDying)) return;
     const fight = st === 'attacking' || st === 'following';
     const isT = fight && (h.foeId === 'P' ? e.currentTargetType === 'player' : (e.currentTargetType === 'enemy' && e.currentTargetId === h.foeId));
     if (isT && (e.minAttackDistance === 0 || h.placeKind === 0)) return;
+    if (!isT && AI_CONSTANTS.HF_LEAVEAREA !== 0 && FEEL_LIVE && e._btBits === 0 && h.plays && !h.rmOn && e.isBossTier !== true) {
+      let _lr = this._hfHitRange(e, o, now);
+      if (!(_lr > 0)) _lr = 3.2 * (2 * this.getEffectiveEnemyRadius(e) + 2 * (o === null ? this.getEffectivePlayerRadius() : this.getEffectiveEnemyRadius(o))); else if (_lr > e.fovRadius) _lr = e.fovRadius;
+      if (h.foeD2 < (_lr + 150) * (_lr + 150) && this._hfOutguns(e, o, h.foeId === 'P') && !this._hfAtPeace(e, h.foeId) &&
+          !((o === null ? this._mevHealthShare(null) : o.currentHealth / Math.max(1, aiHealthMax(o, HEALTH_BASIS.AGGRO))) < 0.3) &&
+          ((AI_CONSTANTS.HF_BRAVE !== 0 && e.aiBehavior === 'FFA' && this._hfShies(e, o, now)) || (h.hkQuitId === h.foeId && now < h.hkQuitUntil) || (AI_CONSTANTS.HF_HITRANGE !== 0 && this._hfHitOf(e, o, now) > 0))) {
+        h.adX = h.foeX; h.adY = h.foeY; h.adUntil = now + 800;
+        this._hfLeaveArm(e, h.foeId, h.foeX, h.foeY, _lr, now);
+        return;
+      }
+    }
     const lim = e.fovRadius * (0.5 + 0.35 * e.dnaCaution);
     if (h.foeD2 > lim * lim || !this._hfOutguns(e, o, h.foeId === 'P')) return;
     const pce = this._hfAtPeace(e, h.foeId);
@@ -10002,6 +11269,80 @@ export class GameLogic {
     }
     if (!risk) return;
     h.adX = h.foeX; h.adY = h.foeY; h.adUntil = now + 800;
+    this._hfAheadHold(e, h.foeId, h.foeX, h.foeY, (pce ? 2 : 3.2) * W, now);
+  }
+  private _hfLeaveArm(e: EnemyTank, id: string, x: number, y: number, r0: number, now: number): void {
+    if (AI_CONSTANTS.HF_LEAVEAREA === 0 || !FEEL_LIVE || e._btBits !== 0) return;
+    if (AI_CONSTANTS.TM_NOLEAVE !== 0 && e._tmSt !== 0) return;
+    const h = e.hf;
+    if (!h.plays || h.rmOn || e.isBossTier === true) return;
+    const fresh = !(now < h.lvUntil) || h.lvId !== id;
+    let r = r0 + 300;
+    if (r > 1400) r = 1400; else if (r < 500) r = 500;
+    h.lvId = id; h.lvX = x; h.lvY = y; h.lvR = r;
+    if (fresh) {
+      h.lvUntil = now + 45000 + 30000 * hfHash(h.seed, 557, hfIdNum(id)); h.lvBlk = 0; if (SMALL_FIX.CH053 !== 0) h.lvFh = 0;
+      h.hkX = x; h.hkY = y; this._hfHeavyQuit(e, id, now); e.navGoalRepickAt = 0; e.navGoalDwellUntil = 0;
+    } else if (h.lvUntil < now + 20000) h.lvUntil = now + 20000;
+  }
+  private _hfLeaveHeld(e: EnemyTank, v0x: number, v0y: number, now: number, dtFactor: number, feelWalk: boolean): boolean {
+    const h = e.hf, qx = h.lvX - e.position.x, qy = h.lvY - e.position.y;
+    const st = e.aiState;
+    if (qx * qx + qy * qy >= (h.lvR + 300) * (h.lvR + 300) || !((e.velocity.x - v0x) * qx + (e.velocity.y - v0y) * qy > 0) ||
+        ((st === 'attacking' || st === 'following') && (h.lvId === 'P' ? e.currentTargetType === 'player' : (e.currentTargetType === 'enemy' && e.currentTargetId === h.lvId)))) {
+      if (h.lvBlk > 0) { h.lvBlk -= 8.3 * dtFactor; if (h.lvBlk < 0) h.lvBlk = 0; }
+      return false;
+    }
+    if (st === 'attacking' || st === 'following') {
+      if (st === 'following' && e.currentTargetType === 'enemy' && e.currentTargetId) {
+        h.lvFh += 16.7 * dtFactor;
+        if (h.lvFh > 1500) { h.lvFh = 0; h.hkQuitId = e.currentTargetId; h.hkQuitUntil = now + 10000 + 8000 * hfHash(h.seed, 510, now | 0); }
+      }
+      else if (AI_CONSTANTS.HF_KEEPFOOD !== 0 && FEEL_LIVE && st === 'following' && e.currentTargetType === 'shape' && e.currentTargetId) {
+        h.lvFh += 16.7 * dtFactor;
+        if (h.lvFh > 1500) { h.lvFh = 0; this._unreachNote(e, e.currentTargetId, now); }
+      }
+      return true;
+    }
+    if (feelWalk) {
+      if (AI_CONSTANTS.HF_AREAASK !== 0 && FEEL_LIVE) {
+        if (h.arOk) { h.arRest |= 16 << (h.arDX === 1 ? 0 : h.arDX === -1 ? 1 : h.arDY === 1 ? 2 : 3); h.arOk = false; }
+        else h.arRest |= 1;
+      }
+      return true;
+    }
+    h.lvBlk += 16.7 * dtFactor;
+    if (h.lvBlk > 5000) { h.lvUntil = 0; h.lvBlk = 0; return false; }
+    if (now >= h.lvTurnAt) { h.lvTurnAt = now + 900; h.hkX = h.lvX; h.hkY = h.lvY; this._hfHeavyQuit(e, h.lvId, now); e.navGoalRepickAt = 0; e.navGoalDwellUntil = 0; }
+    return true;
+  }
+  private _hfLeaveInto(e: EnemyTank, wx: number, wy: number): boolean {
+    const h = e.hf, ax = wx - h.lvX, ay = wy - h.lvY, a2 = ax * ax + ay * ay;
+    if (a2 < h.lvR * h.lvR) return true;
+    const cx = h.lvX - e.position.x, cy = h.lvY - e.position.y, c2 = cx * cx + cy * cy, lim = h.lvR + 500;
+    return c2 < lim * lim && a2 < c2 && Math.sqrt(c2) - Math.sqrt(a2) > 100;
+  }
+  private _hfLeaveBars(e: EnemyTank, wx: number, wy: number): boolean {
+    const h = e.hf, ax = wx - h.lvX, ay = wy - h.lvY;
+    if (ax * ax + ay * ay < h.lvR * h.lvR) return true;
+    const cx = h.lvX - e.position.x, cy = h.lvY - e.position.y, cd = Math.sqrt(cx * cx + cy * cy);
+    if (cd > h.lvR + 900 || cd < 1) return false;
+    const gx = wx - e.position.x, gy = wy - e.position.y, gd = Math.sqrt(gx * gx + gy * gy);
+    return gd > cd && gx * cx + gy * cy > 0.8 * gd * cd;
+  }
+  private _hfAheadHold(e: EnemyTank, id: string, x: number, y: number, r: number, now: number): void {
+    if (AI_CONSTANTS.HF_AHEADHOLD === 0 || e._btBits === 0) return;
+    const h = e.hf;
+    if (!(now < h.ahUntil)) h.ahN = h.ahId === id && now - h.ahUntil < 2500 ? (h.ahN < 3 ? h.ahN + 1 : 3) : 0;
+    let rr = r;
+    if (!(rr > 0)) { const qx = x - e.position.x, qy = y - e.position.y; rr = Math.sqrt(qx * qx + qy * qy) + 190; }
+    h.ahId = id; h.ahX = x; h.ahY = y; h.ahR2 = (rr + 60) * (rr + 60);
+    h.ahUntil = now + 800 + 1500 + 1500 * hfHash(h.seed, 555, hfIdNum(id));
+  }
+  private _hfAheadHeld(e: EnemyTank, v0x: number, v0y: number): boolean {
+    const h = e.hf, qx = h.ahX - e.position.x, qy = h.ahY - e.position.y;
+    if (qx * qx + qy * qy >= h.ahR2) return false;
+    return (e.velocity.x - v0x) * qx + (e.velocity.y - v0y) * qy > 0;
   }
   private _hfOffWall(e: EnemyTank, v0x: number, v0y: number, dtFactor: number, now: number, stands: boolean): boolean {
     const h = e.hf;
@@ -10184,6 +11525,15 @@ export class GameLogic {
     const h = e.hf;
     if (h.placeKind !== 3 && h.placeKind !== 4) return false;
     const st = e.aiState, gene = 0.5 + h.dnaStill;
+    if (AI_CONSTANTS.HF_HITCOVER !== 0 && now < h.hitUntil) {
+      if (h.tsUntil > now) { h.tsUntil = 0; h.tsNextAt = now + (15000 + 30000 * hfHash(h.seed, 373, now | 0)) / gene; }
+      return false;
+    }
+    if (AI_CONSTANTS.HF_CAMPDANGER !== 0 && FEEL_LIVE && h.plays && this._hfCalmDanger(e, now)) {
+      if (h.tsUntil > now) { h.tsUntil = 0; h.tsNextAt = now + (15000 + 30000 * hfHash(h.seed, 373, now | 0)) / gene; }
+      else if (h.tsNextAt !== 0 && h.tsNextAt < now + 5000) h.tsNextAt = now + 5000;
+      return false;
+    }
     if (e.aiBehavior !== 'FFA' || e.groupId !== 0 || (st !== 'roaming' && st !== 'idle' && st !== 'targeting_shapes' && st !== 'attacking' && st !== 'following') ||
         e.isRegrouping || e.graceActive || h.goId !== '' || e.minAttackDistance === 0 || e.currentHealth < 0.3 * aiHealthMax(e, HEALTH_BASIS.AGGRO)) {
       if (h.tsUntil > now) { h.tsUntil = 0; h.tsNextAt = now + (15000 + 30000 * hfHash(h.seed, 373, now | 0)) / gene; }
@@ -10198,6 +11548,7 @@ export class GameLogic {
         const want = (h.tgR + this._shapeSelfExtent(e) + 20 > 100 ? h.tgR + this._shapeSelfExtent(e) + 20 : 100) * 1.25 + 30;
         if (h.tgD > want) return false;
       }
+      if (AI_CONSTANTS.HF_CAMPOPEN !== 0 && !this._hfCampOpen(e)) { h.tsNextAt = now + 2000; return false; }
       const u = 0.97 * hfHash(h.seed, 372, now | 0);
       let len = 15000 + 25000 * Math.pow(u / (1 - u), 0.8);
       if (len > 120000) len = 120000;
@@ -10218,8 +11569,40 @@ export class GameLogic {
     const c = this.feel.s[FEEL.CALM] * (e.aiBehavior === 'FFA' && e.groupId === 0 ? 1 : 0.35) * (0.6 + 0.8 * hfHash(e.hf.seed, 141, 0));
     return c > 1 ? 1 : c;
   }
+  private _hfCalmDanger(e: EnemyTank, now: number): boolean {
+    const h = e.hf;
+    if (now < h.cdAt) return h.cdOn;
+    h.cdAt = now + 150; h.cdOn = false;
+    const x = e.position.x, y = e.position.y;
+    const n = AI_CONSTANTS.HF_FLEEWIDE !== 0 ? h.frN : (h.hvId !== '' && h.hvR > 0 ? 1 : 0);
+    for (let q = 0; q < n; q++) {
+      const wide = AI_CONSTANTS.HF_FLEEWIDE !== 0, id = wide ? h.frId[q] : h.hvId, cx = wide ? h.frC[3 * q] : h.hvX, cy = wide ? h.frC[3 * q + 1] : h.hvY, R = 1.3 * (wide ? h.frC[3 * q + 2] : h.hvR);
+      const dx = cx - x, dy = cy - y, d = Math.sqrt(dx * dx + dy * dy);
+      let near = d < R;
+      if (!near && d > 1) {
+        const o = id === 'P' ? null : (this._enemyById.get(id) ?? undefined);
+        if (o !== undefined && (o === null || (o.active && !o.isDying))) {
+          const cl = -(((o === null ? this.tankVelocity.x : o.velocity.x) - e.velocity.x) * dx + ((o === null ? this.tankVelocity.y : o.velocity.y) - e.velocity.y) * dy) / d;
+          near = cl > 0 && d - cl * 90 < R;
+        }
+      }
+      if (near && this._hfLosTo(e, cx, cy)) { h.cdOn = true; return true; }
+    }
+    if (h.foeSee && h.foeId !== '' && h.foeD2 < 0.81 * e.fovRadius * e.fovRadius) {
+      const o = h.foeId === 'P' ? null : (this._enemyById.get(h.foeId) ?? undefined);
+      if (o !== undefined && (o === null || (o.active && !o.isDying))) {
+        const ox = o === null ? this.tankPos.x : o.position.x, oy = o === null ? this.tankPos.y : o.position.y, dx = ox - x, dy = oy - y, d = Math.sqrt(dx * dx + dy * dy);
+        if (d > 1) {
+          const cl = -(((o === null ? this.tankVelocity.x : o.velocity.x) - e.velocity.x) * dx + ((o === null ? this.tankVelocity.y : o.velocity.y) - e.velocity.y) * dy) / d;
+          if (cl >= 0.25 * this.getEffectiveEnemyRadius(e) && this._hfOutguns(e, o, o === null) && !this._hfOffScreen(e, ox, oy) && this._hfLosTo(e, ox, oy)) { h.cdOn = true; return true; }
+        }
+      }
+    }
+    return false;
+  }
   private _hfCalmRest(e: EnemyTank, now: number): boolean {
     if (e.threatAimActive === true || !e.hf.plays) return false;
+    if (AI_CONSTANTS.HF_CALMSEES !== 0 && FEEL_LIVE && this._hfCalmDanger(e, now)) return false;
     if (AI_CONSTANTS.HF_SHOTAT !== 0 && e.threatDodgeRef !== null) return false;
     if (AI_CONSTANTS.HF_CALM_ARMED !== 0 && e.hf.placeKind === 0) return false;
     if (AI_CONSTANTS.HF_PACE !== 0 && e.hf.dKind !== 0) return false;
@@ -10270,9 +11653,28 @@ export class GameLogic {
     if (drove && this.feel.s[FEEL.FINGER] > 0 && e.roamTarget) e.roamTarget.set(e.position.x + e.navTravelDirX * 96, e.position.y + e.navTravelDirY * 96);
     return drove;
   }
+  private _hfWayNote(e: EnemyTank, now: number): void {
+    const ms = this._getEnemyNavMapState(e);
+    if (ms === null || !ms.navigation) return;
+    const nav = ms.navigation, gc = nav.gridCells, gcY = nav.gridCellsY, h = e.hf;
+    const ix = Math.floor((e.position.x - this._navOffX + nav.mapHalf) / nav.cellSize), iy = Math.floor((e.position.y - this._navOffY + nav.mapHalfY) / nav.cellSize);
+    if (ix < 0 || ix >= gc || iy < 0 || iy >= gcY) return;
+    const c = ix * gcY + iy, n = gc * gcY, area = e.areaId ?? '', lastK = (h.wmH + 23) % 24, last = h.wmC[lastK];
+    let fresh = h.wmN !== n || h.wmArea !== area;
+    if (!fresh && last === c) { h.wmT[lastK] = now; return; }
+    if (!fresh && last >= 0) { const jx = ((last / gcY) | 0) - ix, jy = last % gcY - iy; if (jx > 2 || jx < -2 || jy > 2 || jy < -2) fresh = true; }
+    if (fresh) { h.wmC.fill(-1); h.wmH = 0; h.wmN = n; h.wmArea = area; }
+    h.wmC[h.wmH] = c; h.wmT[h.wmH] = now; h.wmH = (h.wmH + 1) % 24;
+  }
+  private _hfWayKnows(e: EnemyTank, cell: number, now: number): boolean {
+    const C = e.hf.wmC, T = e.hf.wmT;
+    for (let k = 0; k < 24; k++) if (C[k] === cell && now - T[k] < 90000) return true;
+    return false;
+  }
   private _hfDanger(e: EnemyTank, now: number): void {
     const h = e.hf;
     h.foeNext = now + 180 + 120 * hfHash(h.seed, 251, now | 0);
+    if (AI_CONSTANTS.HF_WAYMEM !== 0 && h.plays) this._hfWayNote(e, now);
     const tb = isTeamBehaviorOf(e), x = e.position.x, y = e.position.y;
     let best = Infinity, bx = 0, by = 0;
     let bo: EnemyTank | null = null;
@@ -10289,6 +11691,58 @@ export class GameLogic {
       if (d2 < best && !((e.groupId !== 0 && e.groupId === this.playerGroupId) || (tb && e.team === this._hfPTeam)) && !this._acrossGap(x, y, this.tankPos.x, this.tankPos.y)) { best = d2; bx = this.tankPos.x; by = this.tankPos.y; bo = null; }
     }
     h.foeD2 = best; h.foeX = bx; h.foeY = by; h.foeId = best < Infinity ? (bo === null ? 'P' : bo.id) : '';
+    if (AI_CONSTANTS.HF_HEAVYSEEN !== 0) {
+      const pId = h.hvId, pX = h.hvX, pY = h.hvY, pK = h.hvK, pR = h.hvR;
+      h.hvId = ''; h.hvR = 0; h.hvMem = false;
+      const frOn = AI_CONSTANTS.HF_FLEEWIDE !== 0 && FEEL_LIVE; h.frN = 0;
+      if (h.plays && this.feel.s[FEEL.RISK] > 0) {
+        const lim = e.fovRadius * (0.5 + 0.35 * e.dnaCaution), W0 = 2 * this.getEffectiveEnemyRadius(e);
+        const hrOn = AI_CONSTANTS.HF_HITRANGE !== 0, hrCap = e.fovRadius, l2 = 1.6384 * (hrOn ? hrCap * hrCap : lim * lim);
+        let hb = 1.6384;
+        for (let i = 0; i < es.length; i++) {
+          const o = es[i];
+          if (o === e || !o.active || o.isDying || o.isSpawning || o.graceActive || !o.hf.plays) continue;
+          const dx = o.position.x - x, dy = o.position.y - y, d2 = dx * dx + dy * dy;
+          if (d2 >= l2 || isTankMate(e, o, tb) || campsClash(e.camp, o.camp) || this._acrossGap(x, y, o.position.x, o.position.y) || this._hfOffScreen(e, o.position.x, o.position.y)) continue;
+          const s = this._hfOneHit(e, o, this._hfNow);
+          let K = 0, R = 0;
+          if (!(hrOn ? this._hfHitFear(e, o, this._hfNow, 0) : s >= 0.35)) continue;
+          if (s >= 0.35) { K = (W0 + 2 * this.getEffectiveEnemyRadius(o)) * (s >= 0.8 ? 6 : 2.5 + 3.5 * (s - 0.2) / 0.6); if (K > lim) K = lim; }
+          if (hrOn) { R = this._hfHitRange(e, o, this._hfNow); if (R > hrCap) R = hrCap; if (R > K) K = R; }
+          if (frOn && R > 0 && h.frN < 4) { const q = 3 * h.frN; h.frC[q] = o.position.x; h.frC[q + 1] = o.position.y; h.frC[q + 2] = R; h.frId[h.frN++] = o.id; }
+          if (!(K > 0)) continue;
+          const r = d2 / (K * K);
+          if (r < hb) { hb = r; h.hvId = o.id; h.hvX = o.position.x; h.hvY = o.position.y; h.hvK = K; h.hvR = R; }
+        }
+        if (this._playerTargetable() && !this.state.gracePeriodActive && !this.tankDying && !this.state.playerDead) {
+          const dx = this.tankPos.x - x, dy = this.tankPos.y - y, d2 = dx * dx + dy * dy;
+          if (d2 < l2 && !((e.groupId !== 0 && e.groupId === this.playerGroupId) || (tb && e.team === this._hfPTeam)) && !this._acrossGap(x, y, this.tankPos.x, this.tankPos.y) && !this._hfOffScreen(e, this.tankPos.x, this.tankPos.y)) {
+            const s = this._hfOneHit(e, null, this._hfNow);
+            let K = 0, R = 0;
+            const fearP = hrOn ? this._hfHitFear(e, null, this._hfNow, 0) : s >= 0.35;
+            if (fearP && s >= 0.35) { K = (W0 + 2 * this.getEffectivePlayerRadius()) * (s >= 0.8 ? 6 : 2.5 + 3.5 * (s - 0.2) / 0.6); if (K > lim) K = lim; }
+            if (hrOn && fearP) { R = this._hfHitRange(e, null, this._hfNow); if (R > hrCap) R = hrCap; if (R > K) K = R; }
+            if (frOn && R > 0 && h.frN < 4) { const q = 3 * h.frN; h.frC[q] = this.tankPos.x; h.frC[q + 1] = this.tankPos.y; h.frC[q + 2] = R; h.frId[h.frN++] = 'P'; }
+            if (K > 0 && d2 / (K * K) < hb) { h.hvId = 'P'; h.hvX = this.tankPos.x; h.hvY = this.tankPos.y; h.hvK = K; h.hvR = R; }
+          }
+        }
+      }
+      if (AI_CONSTANTS.HF_HITRANGE !== 0) {
+        if (h.hvId !== '') { if (h.hvR > 0) h.hmUntil = now + 4000; }
+        else if (pR > 0 && pId !== '' && now < h.hmUntil) {
+          const po = pId === 'P' ? null : (this._enemyById.get(pId) ?? null);
+          if (pId === 'P' ? (this._playerTargetable() && !this.tankDying && !this.state.playerDead) : (po !== null && po.active && !po.isDying)) { h.hvId = pId; h.hvX = pX; h.hvY = pY; h.hvK = pK; h.hvR = pR; h.hvMem = true; }
+        }
+      }
+      if (frOn) {
+        if (h.hvMem && h.hvR > 0 && h.frN < 4) { const q = 3 * h.frN; h.frC[q] = h.hvX; h.frC[q + 1] = h.hvY; h.frC[q + 2] = h.hvR; h.frId[h.frN++] = h.hvId; }
+        if (AI_CONSTANTS.HF_LEAVEAREA !== 0 && now < h.lvUntil && h.frN < 4) {
+          let has = false; for (let q = 0; q < h.frN; q++) if (h.frId[q] === h.lvId) has = true;
+          if (!has) { const q = 3 * h.frN; h.frC[q] = h.lvX; h.frC[q + 1] = h.lvY; h.frC[q + 2] = h.lvR - 300 > 200 ? h.lvR - 300 : 200; h.frId[h.frN++] = h.lvId; }
+        }
+      }
+    }
+    if (AI_CONSTANTS.HF_WAGMORE !== 0 && now >= h.wgNext) this._hfWagFear(e, now);
     if (AI_CONSTANTS.HF_BOOSTNEAR !== 0) {
       let okB = false;
       const jx = e.fgIntentX, jy = e.fgIntentY, jm = Math.sqrt(jx * jx + jy * jy);
@@ -10355,10 +11809,27 @@ export class GameLogic {
       defB = defenseOnBody(t.resistBase) || (t._mevF & MF_STAGE) !== 0; rgB = enemyRegenCurve(t); gkB = (grB === undefined ? 1 : growthFactor(grB, 'shieldRegen', t.level)) * (t._statK ? t._statK.shieldRegen : 1); srB = this._enemyHumpK(t);
     }
     if (hpK < 1) { if (hpB > hpK * mxB) hpB = hpK * mxB; shB = 0; }
-    if (!(hitBA > 1e-6)) return mxA > 0 && hpA > 0 ? (hpA / mxA > 1e-6 ? hpA / mxA : 1e-6) : 1;
+    let gun = 0;
+    if (AI_CONSTANTS.HF_RAMGUNS > 0) {
+      gun = AI_CONSTANTS.HF_RAMGUNS * this._hfGunFire(t, this._hfNow) / (1 + 0.19 * (a.upgrades ? (a.upgrades.bodyDamage || 0) : 0));
+      if (gun > 0) {
+        const tx = t === null ? this.tankPos.x : t.position.x, ty = t === null ? this.tankPos.y : t.position.y;
+        const gap = Math.sqrt((tx - a.position.x) * (tx - a.position.x) + (ty - a.position.y) * (ty - a.position.y)) - this.getEffectiveEnemyRadius(a) - (t === null ? this.getEffectivePlayerRadius() : this.getEffectiveEnemyRadius(t));
+        const vMe = 0.9 * (getEnemyMoveSpeed(a) / this.movementZoom) * this._enemyTermFactor(a) * 60;
+        let tIn = gap > 0 && vMe > 1 ? gap / vMe : 0; if (tIn > 3) tIn = 3;
+        let pre = gun * tIn;
+        if (pre > 0) {
+          if (shA > 0 && capA > 0) { const s = Math.min(pre * Math.min(1, shA / capA), shA); shA -= s; pre -= s; }
+          hpA -= pre;
+          if (hpA <= 1e-9 * mxA) return mxB > 0 && hpB / mxB > 1e-6 ? -hpB / mxB : -1e-6;
+        }
+      }
+    }
+    if (!(hitBA > 1e-6) && !(gun > 0)) return mxA > 0 && hpA > 0 ? (hpA / mxA > 1e-6 ? hpA / mxA : 1e-6) : 1;
+    const gunTick = gun / 30;
     const DT = 1 / 30, DEATH = BODY_HIT.TANK_DEATH !== 0;
     for (let k = 0; k < 900; k++) {
-      let dA = hitAB, dB = hitBA;
+      let dA = hitAB, dB = hitBA + gunTick;
       if (DEATH) { const kA = bodyHitDeathK(dB, hpA, shA, capA), kB = bodyHitDeathK(dA, hpB, shB, capB); dA *= kA; dB *= kB; }
       if (shB > 0 && capB > 0) { const s = Math.min(dA * Math.min(1, shB / capB), shB); shB -= s; hpB -= dA - s; } else hpB -= dA;
       if (shA > 0 && capA > 0) { const s = Math.min(dB * Math.min(1, shA / capA), shA); shA -= s; hpA -= dB - s; } else hpA -= dB;
@@ -10393,6 +11864,7 @@ export class GameLogic {
       else if (AI_CONSTANTS.HF_RAMREACH !== 0 && !this._hfRamReach(a, t)) v = stalk && !comes ? 2 : 3;
       else v = 1;
     } else v = stalk && !comes && this._hfRamSim(a, t, 0.6) >= need ? 2 : 3;
+    if (v === 2 && !this._hfStalkRoom(a, t, now)) v = 3;
     V[s] = v; U[s] = now + 600 + 300 * hfHash(h.seed, 474, now | 0);
     return v;
   }
@@ -10468,6 +11940,7 @@ export class GameLogic {
       const W = rE + this.getEffectiveEnemyRadius(o), d = Math.sqrt(d2), v = Math.sqrt(v2), al = pv / (d * v), miss2 = d2 * (1 - al * al);
       if (miss2 > 1.5625 * W * W || d - W > v * 180) continue;
       if (isTankMate(e, o, tb) || campsClash(e.camp, o.camp) || this._acrossGap(x, y, o.position.x, o.position.y)) continue;
+      if (SMALL_FIX.G802 !== 0 && (this._hfOffScreen(e, o.position.x, o.position.y) || !this._hfLosTo(e, o.position.x, o.position.y))) continue;
       best = d2; bx = o.position.x; by = o.position.y; bn = o.hf.idn === 0 ? 1 : o.hf.idn; bid = o.id; bNear = d - W <= v * 60;
     }
     if (isSmasherStatNames(this.state.statNamesType) && this._playerTargetable() && !this.state.gracePeriodActive && !this.tankDying && !this.state.playerDead && this._hfSeesPlayer(e) &&
@@ -10477,7 +11950,8 @@ export class GameLogic {
       const top = (this.state.tankMovementSpeed / this.movementZoom) * this._playerDriveMult() * this._playerTermFactor() / this._playerSizeSpeedReduce();
       if (d2 < best && d2 >= 1 && v2 >= 0.25 * top * top && pv > 0) {
         const W = rE + this.getEffectivePlayerRadius(), d = Math.sqrt(d2), v = Math.sqrt(v2), al = pv / (d * v);
-        if (d2 * (1 - al * al) <= 1.5625 * W * W && d - W <= v * 180 && !this._acrossGap(x, y, this.tankPos.x, this.tankPos.y)) { best = d2; bx = this.tankPos.x; by = this.tankPos.y; bn = 7; bid = 'P'; bNear = d - W <= v * 60; }
+        if (d2 * (1 - al * al) <= 1.5625 * W * W && d - W <= v * 180 && !this._acrossGap(x, y, this.tankPos.x, this.tankPos.y)
+            && !(SMALL_FIX.G802 !== 0 && (this._hfOffScreen(e, this.tankPos.x, this.tankPos.y) || !this._hfLosTo(e, this.tankPos.x, this.tankPos.y)))) { best = d2; bx = this.tankPos.x; by = this.tankPos.y; bn = 7; bid = 'P'; bNear = d - W <= v * 60; }
       }
     }
     if (best === Infinity || this._hfOffScreen(e, bx, by) || !this._hfLosTo(e, bx, by)) { h.rcLooks = 0; return; }
@@ -10587,6 +12061,11 @@ export class GameLogic {
     }
     if (now >= h.rmUntil || now - h.rmSeenAt > 1500) h.rmMode = 0;
   }
+  private _hfStalkRoom(a: EnemyTank, t: EnemyTank | null, now: number): boolean {
+    if (AI_CONSTANTS.HF_STALKFAR === 0 || AI_CONSTANTS.HF_HITRANGE === 0) return true;
+    const R = this._hfHitRange(a, t, now);
+    return R === Infinity || !(R > 0.88 * a.fovRadius);
+  }
   private _hfRamWalk(e: EnemyTank, navMs: MapState | null, ox: number, oy: number, bodyR: number, now: number, dtFactor: number): boolean {
     const h = e.hf;
     if (!h.rmOn || h.rmMode < 2) return false;
@@ -10606,8 +12085,27 @@ export class GameLogic {
     const ux = dx / d, uy = dy / d, ax = ux < 0 ? -ux : ux, ay = uy < 0 ? -uy : uy;
     const ex = ax > 1e-6 ? e.fovRadius / ax : 1e9, ey = ay > 1e-6 ? e.fovRadius * 0.5625 / ay : 1e9, edge = ex < ey ? ex : ey;
     const _sh = AI_CONSTANTS.HF_RAMSHIFT !== 0;
-    if (d < (_sh ? 0.76 : 0.8) * edge) return this._hfAhead(e, this._intDrive(e, e.position.x + ux * 300, e.position.y + uy * 300, navMs, ox, oy, bodyR, now, dtFactor, null));
-    if (d > (_sh ? 0.95 : 0.9) * edge || !this._hfLosTo(e, tx, ty)) return this._hfAhead(e, this._intDrive(e, tx + ux * 0.85 * edge, ty + uy * 0.85 * edge, navMs, ox, oy, bodyR, now, dtFactor, null));
+    let lo = (_sh ? 0.76 : 0.8) * edge, hi = (_sh ? 0.95 : 0.9) * edge, mid = 0.85 * edge;
+    if (AI_CONSTANTS.HF_STALKFAR !== 0 && AI_CONSTANTS.HF_HITRANGE !== 0) {
+      const R = this._hfHitRange(e, t, now);
+      if (R > 0 && R < Infinity && R + 30 > lo) {
+        if (R + 30 > 0.9 * edge) {
+          const D = R + 60 < 0.9 * e.fovRadius ? R + 60 : 0.9 * e.fovRadius;
+          if (AI_CONSTANTS.HF_STALKWAY !== 0 && FEEL_LIVE) {
+            if (d < R + 30) return this._hfAhead(e, this._intDrive(e, e.position.x + ux * 300, e.position.y + uy * 300, navMs, ox, oy, bodyR, now, dtFactor, null));
+            const a0 = Math.atan2(dy, dx);
+            let da = normalizeAngle(Math.atan2(dy >= 0 ? 0.2 : -0.2, dx >= 0 ? 1 : -1) - a0);
+            if (da > 0.35) da = 0.35; else if (da < -0.35) da = -0.35;
+            const top = 0.9 * e.fovRadius; let rr = (d < D || d > 1.12 * D ? D : d) / Math.cos(da); if (rr > top) rr = top;
+            return this._hfAhead(e, this._intDrive(e, tx + Math.cos(a0 + da) * rr, ty + Math.sin(a0 + da) * rr, navMs, ox, oy, bodyR, now, dtFactor, null));
+          }
+          return this._hfAhead(e, this._intDrive(e, tx + (dx >= 0 ? D : -D), ty + (dy >= 0 ? 0.2 : -0.2) * D, navMs, ox, oy, bodyR, now, dtFactor, null));
+        }
+        lo = R + 30; if (hi < lo + 40) hi = lo + 40; mid = 0.5 * (lo + hi);
+      }
+    }
+    if (d < lo) return this._hfAhead(e, this._intDrive(e, e.position.x + ux * 300, e.position.y + uy * 300, navMs, ox, oy, bodyR, now, dtFactor, null));
+    if (d > hi || !this._hfLosTo(e, tx, ty)) return this._hfAhead(e, this._intDrive(e, tx + ux * mid, ty + uy * mid, navMs, ox, oy, bodyR, now, dtFactor, null));
     if (AI_CONSTANTS.HF_RAMSHIFT !== 0) {
       const per = 3000 + 3000 * hfHash(h.seed, 498, 0), at = now + 6000 * hfHash(h.seed, 499, 0), ep = (at / per) | 0;
       const u = hfHash(h.seed, 500, ep);
@@ -10835,7 +12333,7 @@ export class GameLogic {
     const h = e.hf;
     h.frNext = now + 110 + 60 * hfHash(h.seed, 301, now | 0);
     const st = e.aiState, tp = e.targetPosition;
-    let hold = false;
+    let hold = false, aside = false;
     if (tp && (st === 'attacking' || st === 'targeting_shapes') && e.threatAimActive !== true) {
       let defends = false;
       if (st === 'attacking') {
@@ -10844,7 +12342,7 @@ export class GameLogic {
         if (e.lastTankDamageById === tid && now - e.lastTankDamageAt < 2500) defends = true;
         else if (!isP) { const t = this._enemyById.get(tid); if (t !== undefined && t.aiState === 'attacking' && t.currentTargetType === 'enemy' && t.currentTargetId === e.id) defends = true; }
       }
-      if (!defends) {
+      if (!defends || AI_CONSTANTS.HF_MINDSELF !== 0) {
         const px = e.position.x, py = e.position.y, lx = tp.x - px, ly = tp.y - py, L = Math.sqrt(lx * lx + ly * ly);
         if (L > 1) {
           const ux = lx / L, uy = ly / L, own = e.size * 0.5, pad = own * 0.5 + 22;
@@ -10862,7 +12360,7 @@ export class GameLogic {
               if (now < h.frFree) continue;
               if (h.frSince !== 0 && now - h.frSince > 2000) { h.frFree = now + 1500; continue; }
             }
-            hold = true;
+            if (defends) aside = true; else hold = true;
             if (left > 4 || left < -4 || h.frSide === 0) h.frSide = left > 4 ? -1 : left < -4 ? 1 : (hfHash(h.seed, 302, 0) < 0.5 ? -1 : 1);
             h.frSX = -uy * h.frSide; h.frSY = ux * h.frSide;
             break;
@@ -10870,8 +12368,9 @@ export class GameLogic {
         }
       }
     }
-    if (hold) { if (h.frSince === 0) h.frSince = now; } else { h.frSince = 0; h.frSide = 0; }
-    h.frHold = hold;
+    if (aside) h.frAsideAt = now; else if (!hold && h.frAside && h.frSide !== 0 && now - h.frAsideAt < 500 && AI_CONSTANTS.HF_MINDSELF !== 0 && (st === 'attacking' || st === 'targeting_shapes')) aside = true;
+    if (hold) { if (h.frSince === 0) h.frSince = now; } else { h.frSince = 0; if (!aside) h.frSide = 0; }
+    h.frHold = hold; h.frAside = aside;
   }
   private _hfFireHold(e: EnemyTank, now: number): void {
     const h = e.hf;
@@ -10916,6 +12415,26 @@ export class GameLogic {
       }
     }
     h.afHold = hold;
+  }
+  private _hfLeanAside(e: EnemyTank, v0x: number, v0y: number, dtFactor: number): void {
+    const h = e.hf;
+    if (h.leanAt === this.frameCounter || h.tanAt === this.frameCounter || h.frSide === 0) return;
+    if (SMALL_FIX.MS1127 !== 0 && AI_CONSTANTS.BT_BODYSTAND !== 0 && e.aiState === 'attacking' && e.currentTargetId) {
+      const t = this._enemyById.get(e.currentTargetId);
+      if (t !== undefined && t.active && !t.isDying && (t._mevF & MF_STANDS) !== 0 && this._bsStands(e, this.gameNow(), t)) return;
+    }
+    const sx = h.frSX, sy = h.frSY;
+    const ms = this._getEnemyNavMapState(e), ox = this._navOffX, oy = this._navOffY;
+    if (ms) { const lx = e.position.x - ox, ly = e.position.y - oy; if (!(isWalkable(ms, lx + sx * 120, ly + sy * 120) && checkLineOfSight(ms, lx, ly, lx + sx * 120, ly + sy * 120, ox, oy))) return; }
+    const dx = e.velocity.x - v0x, dy = e.velocity.y - v0y, m = Math.sqrt(dx * dx + dy * dy);
+    if (m < 1e-9) {
+      const half = 0.5 * (getEnemyMoveSpeed(e) / this.movementZoom) * TANK_ACCEL * this._enemyThrustMult(e) * dtFactor;
+      e.velocity.x = v0x + sx * half; e.velocity.y = v0y + sy * half;
+      return;
+    }
+    const nx = dx / m + 0.9 * sx, ny = dy / m + 0.9 * sy, nm = Math.sqrt(nx * nx + ny * ny);
+    if (nm < 1e-6) return;
+    e.velocity.x = v0x + (nx / nm) * m; e.velocity.y = v0y + (ny / nm) * m;
   }
   private _hfStepAside(e: EnemyTank, v0x: number, v0y: number, dtFactor: number): void {
     const h = e.hf;
@@ -11101,6 +12620,35 @@ export class GameLogic {
     if (asked) { const p = (0.05 + 0.45 * wk) * (0.55 + 0.9 * h.dnaGesture); return p > 0.5 ? 0.5 : p; }
     return (wk <= 0.44 ? 0.2 + 1.25 * wk : 0.75 + (wk - 0.44) * 0.4464) * (0.4 + 0.7 * h.dnaTrust);
   }
+  private _hfWagFear(e: EnemyTank, now: number): void {
+    const h = e.hf, S = this.feel.s;
+    h.wgNext = now + 600;
+    if (!(S[FEEL.WAG] > 0) || !h.plays || e.aiBehavior !== 'FFA' || e.groupId !== 0 || e.isBossTier === true || e.facingType === 'faceMotion' || now < h.wagUntil || e.graceActive || now - e.lastTankDamageAt < 2000) return;
+    let id = '';
+    if (h.hvId !== '' && !h.hvMem) id = h.hvId;
+    else if (e.fear.isFleeing && e.fear.fleeSourceId) id = e.fear.fleeSourceId;
+    else if (now < h.lvUntil && h.lvId !== '') id = h.lvId;
+    if (id === '') return;
+    if (id === this.state.playerId) id = 'P';
+    const t = id === 'P' ? null : (this._enemyById.get(id) ?? undefined);
+    if (t === undefined || (t !== null && (!t.active || t.isDying || !t.hf.plays || t.isBossTier === true))) return;
+    if (t === null && (!this._playerTargetable() || this.state.playerDead || this.tankDying)) return;
+    if ((e.aiState === 'attacking' || e.aiState === 'following') && (e.currentTargetType === 'player' || e.currentTargetType === 'enemy')) return;
+    const tx = t === null ? this.tankPos.x : t.position.x, ty = t === null ? this.tankPos.y : t.position.y, dx = tx - e.position.x, dy = ty - e.position.y;
+    if (dx * dx + dy * dy > 810000 || this._hfOffScreen(e, tx, ty) || !this._hfLosTo(e, tx, ty) || this._hfBossInSight(e)) return;
+    h.wgNext = now + 1500;
+    const wg = S[FEEL.WAG] < 1 ? S[FEEL.WAG] : 1;
+    if (!(hfHash(h.seed, 586, now | 0) < (0.45 + 0.4 * h.dnaGesture) * wg)) return;
+    this._hfWagNow(e, t, t === null ? 7 : (t.hf.idn === 0 ? 1 : t.hf.idn), now);
+    if (now - h.wgAt > 60000) h.wgStep = 0;
+    h.wgNext = h.wagUntil + (3000 << h.wgStep); h.wgStep = (h.wgStep + 1) & 3; h.wgAt = now;
+  }
+  private _hfWagEnd(e: EnemyTank, now: number): void {
+    const h = e.hf, was = h.wagUntil, end = now + 200;
+    if (was <= end) return;
+    h.wagUntil = end; if (h.geTurnsUntil > now) h.geTurnsUntil = now;
+    if (h.noFireUntil === was) h.noFireUntil = end;
+  }
   private _hfWagNow(a: EnemyTank, t: EnemyTank | null, idn: number, now: number): void {
     const h = a.hf, tp = t === null ? this.tankPos : t.position;
     h.wagUntil = now + 900 + 1300 * hfHash(h.seed, 172, now | 0);
@@ -11137,10 +12685,10 @@ export class GameLogic {
       h.trSt[s] = hfHash(h.seed, idn, 0) < k * this._hfPeaceChance(a, t, false) ? 1 : 2;
       if (h.trSt[s] === 1 && S[FEEL.WAG] > 0 && a.aiBehavior === 'FFA') {
         const tp = t === null ? this.tankPos : t.position, dx = tp.x - a.position.x, dy = tp.y - a.position.y;
-        if ((AI_CONSTANTS.HF_GESTURE !== 0 ? this._hfConcerns(a, t) : dx * dx + dy * dy <= 490000) && hfHash(h.seed, idn ^ 0x3d77, now | 0) < (0.25 + 0.5 * h.dnaGesture) * S[FEEL.WAG]) this._hfWagNow(a, t, idn, now);
+        if ((AI_CONSTANTS.HF_GESTURE !== 0 ? this._hfConcerns(a, t) : dx * dx + dy * dy <= 490000) && hfHash(h.seed, idn ^ 0x3d77, now | 0) < (AI_CONSTANTS.HF_WAGMORE !== 0 ? 0.92 : 0.25 + 0.5 * h.dnaGesture) * S[FEEL.WAG]) this._hfWagNow(a, t, idn, now);
       }
     } else if (now - h.trAt[s] > 15000) {
-      if (h.trSt[s] === 1 && hfHash(h.seed, idn, now | 0) >= 0.85) h.trSt[s] = 2;
+      if (h.trSt[s] === 1 && hfHash(h.seed, idn, now | 0) >= (AI_CONSTANTS.HF_PEACEKEEP !== 0 ? 0.96 : 0.85)) h.trSt[s] = 2;
       h.trRoll[s] = now;
     }
     h.trAt[s] = now;
@@ -11161,7 +12709,7 @@ export class GameLogic {
       h.trRoll[s] = now;
       if (h.dnaTrust < 0.8 && hpc >= 0.6 && !this._hfBusy(a, t)) {
         const rel = this._hfRel(a, t), wk = rel >= 1.25 ? 1 : rel <= 0.8 ? 0 : (rel - 0.8) / 0.45;
-        if (hfHash(h.seed, idn ^ 0x5bd1, now | 0) < 0.03 + 0.55 * (1 - wk) * a.dnaAggression * (1 - h.dnaTrust)) h.trSt[s] = 2;
+        if (hfHash(h.seed, idn ^ 0x5bd1, now | 0) < (AI_CONSTANTS.HF_PEACEKEEP !== 0 ? 0.006 + 0.11 * (1 - wk) * a.dnaAggression * (1 - h.dnaTrust) : 0.03 + 0.55 * (1 - wk) * a.dnaAggression * (1 - h.dnaTrust))) h.trSt[s] = 2;
       }
     }
     if (h.trSt[s] !== 1) return false;
@@ -11245,11 +12793,30 @@ export class GameLogic {
   }
   private _hfFoodLeft(e: EnemyTank, p: FloatingPolygon, now: number): boolean {
     if (e.hf.rmMode >= 2) return true;
-    if (p.isCrasher) return false;
+    if (p.isCrasher) {
+      const hc = e.hf;
+      if (AI_CONSTANTS.HF_KEEPFOOD !== 0 && FEEL_LIVE && AI_CONSTANTS.HF_LEAVEAREA !== 0 && now < hc.lvUntil) {
+        const cx = p.position.x - e.position.x, cy = p.position.y - e.position.y;
+        if (cx * cx + cy * cy >= 122500) {
+          if (p.id === e.unreachTargetId && now < e.unreachUntil) return true;
+          const tx = hc.lvX - e.position.x, ty = hc.lvY - e.position.y, b2 = (hc.lvR + 300) * (hc.lvR + 300), gx = p.position.x - hc.lvX, gy = p.position.y - hc.lvY;
+          if ((tx * tx + ty * ty < b2 || gx * gx + gy * gy < b2) && cx * tx + cy * ty > 0) return true;
+        }
+      }
+      return false;
+    }
     const h = e.hf, x = p.position.x, y = p.position.y;
     if (h.gzUntil > now && this.feel.s[FEEL.SPAWN] > 0) { const gx = x - h.gzX, gy = y - h.gzY, k = 360 + 300 * e.dnaCaution; if (gx * gx + gy * gy < k * k) return true; }
     if (h.hwUntil > now && AI_CONSTANTS.HF_HURTAWAY !== 0 && this.feel.s[FEEL.HURTAWAY] > 0) { const gx = x - h.hwX, gy = y - h.hwY, k = 520 + 240 * e.dnaCaution; if (gx * gx + gy * gy < k * k) return true; }
     if (h.rnUntil > now) { const gx = x - h.rnX, gy = y - h.rnY, k = h.rnR + 20; if (gx * gx + gy * gy < k * k) return true; }
+    if (AI_CONSTANTS.HF_HITRANGE !== 0 && h.hvR > 0 && h.hvId !== '' && this._hfInHit(e, x, y)) return true;
+    if (AI_CONSTANTS.HF_LEAVEAREA !== 0 && now < h.lvUntil) { const gx = x - h.lvX, gy = y - h.lvY; if (gx * gx + gy * gy < h.lvR * h.lvR) return true; }
+    if (AI_CONSTANTS.HF_KEEPFOOD !== 0 && FEEL_LIVE && AI_CONSTANTS.HF_LEAVEAREA !== 0 && now < h.lvUntil) {
+      const tx = h.lvX - e.position.x, ty = h.lvY - e.position.y, b2 = (h.lvR + 300) * (h.lvR + 300), gx = x - h.lvX, gy = y - h.lvY;
+      if ((tx * tx + ty * ty < b2 || gx * gx + gy * gy < b2) && (x - e.position.x) * tx + (y - e.position.y) * ty > 0) return true;
+    }
+    if (AI_CONSTANTS.TM_HELP !== 0 && e._thId !== '' && now < e._thUntil) return true;
+    if (AI_CONSTANTS.TM_MIDDLE !== 0 && e._tmSt !== 0 && this._tmFoodSet(e)) { const gx = x - this._tmFx, gy = y - this._tmFy; if (gx * gx + gy * gy > this._tmFr2) return true; }
     return false;
   }
   private _hfFoodLeftById(e: EnemyTank, id: string, now: number): boolean {
@@ -11281,12 +12848,26 @@ export class GameLogic {
       ok = d2 > 1 && this._hfOffScreen(e, gx, gy) && !this._acrossGap(e.position.x, e.position.y, gx, gy);
       if (ok) { const k = 320 / Math.sqrt(d2), kk = k < 1 ? k : 1; ok = !this._sgGroundDanger(this._sgSlotOfBot(e), e.position.x + dx * kk, e.position.y + dy * kk, AI_CONSTANTS.SAFEZONE_ACQUIRE_CELLS); }
       if (ok && !h.glOk) { ok = navMs === null || botCanReach(e, navMs, gx, gy, ox, oy); h.glOk = ok; }
+      if (ok && AI_CONSTANTS.HF_SEEKAREA !== 0 && FEEL_LIVE && this._hfSeekOut(e, navMs, ox, oy, gx, gy)) ok = false;
     }
     if (ok) return this._hfAhead(e, this._intDrive(e, gx, gy, navMs, ox, oy, bodyR, now, dtFactor, rid));
     if (rid !== '' && e.currentTargetId === rid && (e.aiState === 'roaming' || e.aiState === 'idle')) e.currentTargetId = null;
     if (h.glId !== '') { h.glLastId = h.glId; h.glLastUntil = now + 60000 + 60000 * hfHash(h.seed, 206, now | 0); }
     h.glUntil = 0; h.glId = ''; e.lastDirectionChange = 0;
     return false;
+  }
+  private _hfSeekOut(e: EnemyTank, navMs: MapState | null, ox: number, oy: number, gx: number, gy: number): boolean {
+    const h = e.hf;
+    if (AI_CONSTANTS.HF_AREA === 0 || !(this.feel.s[FEEL.PLACE] > 0) || h.arRank === 0 || h.arG === 0 || e._btBits > 0 || navMs === null || !navMs.navigation) return false;
+    const nav = navMs.navigation, A = this._hfAreaFacts(navMs, nav);
+    if (!A.ok) return false;
+    const gc = nav.gridCells, gcY = nav.gridCellsY, cs = nav.cellSize, mh = nav.mapHalf, mhY = nav.mapHalfY;
+    const ix = Math.floor((e.position.x - ox + mh) / cs), iy = Math.floor((e.position.y - oy + mhY) / cs);
+    if (ix >= 0 && ix < gc && iy >= 0 && iy < gcY && A.cls[ix * gcY + iy] !== h.arG) return true;
+    const jx = Math.floor((gx - ox + mh) / cs), jy = Math.floor((gy - oy + mhY) / cs);
+    if (jx < 0 || jx >= gc || jy < 0 || jy >= gcY) return false;
+    const c = A.cls[jx * gcY + jy];
+    return c !== 0 && c !== h.arG;
   }
   private _hfKnows(e: EnemyTank, id: string, idn: number, now: number): boolean {
     const h = e.hf;
@@ -11304,12 +12885,14 @@ export class GameLogic {
   private static readonly _hfPull = new Float32Array(EXPLORE_REGION_COUNT);
   private static readonly _hfPlace = new Float32Array(EXPLORE_REGION_COUNT);
   private _hfPlaceNav: object | null = null;
+  private _hfPlaceVer = -1;
   private readonly _hfPlaceWall = new Float32Array(EXPLORE_REGION_COUNT);
   private readonly _hfPlaceRock = new Float32Array(EXPLORE_REGION_COUNT);
   private _hfPlaceMaze = false;
   private _hfPlaceFacts(ms: MapState, nav: NonNullable<MapState['navigation']>, offX: number, offY: number): void {
-    if (this._hfPlaceNav === nav) return;
+    if (this._hfPlaceNav === nav && (SMALL_FIX.G801 === 0 || this._hfPlaceVer === nav.wallVer)) return;
     this._hfPlaceNav = nav;
+    this._hfPlaceVer = nav.wallVer;
     const W = this._hfPlaceWall, K = this._hfPlaceRock, rc = GameLogic._bfRectTmp;
     let wMax = 0, kMax = 0, wMin = Infinity, kMin = Infinity, wAll = 0, aAll = 0;
     for (let r = 0; r < EXPLORE_REGION_COUNT; r++) {
@@ -11356,9 +12939,9 @@ export class GameLogic {
   private static _arRuns = new Int32Array(9);
   private _hfAreaFacts(ms: MapState, nav: NonNullable<MapState['navigation']>): HfAreaFacts {
     let A = this._arMap.get(nav);
-    if (A !== undefined) return A;
+    if (A !== undefined && (SMALL_FIX.G801 === 0 || A.ver === nav.wallVer)) return A;
     const gc = nav.gridCells, gcY = nav.gridCellsY, n = gc * gcY, cs = nav.cellSize;
-    A = { cls: new Uint8Array(n), f1: new Uint16Array(n), f2: new Uint16Array(n), f3: new Uint16Array(n), q: new Int32Array(n), corr: cs, ok: false, hasC: false };
+    A = { cls: new Uint8Array(n), f1: new Uint16Array(n), f2: new Uint16Array(n), f3: new Uint16Array(n), q: new Int32Array(n), corr: cs, ok: false, hasC: false, ver: nav.wallVer };
     this._arMap.set(nav, A);
     if (n === 0 || ms.walls.length === 0) return A;
     const C = A.cls, mask = nav.regionsBuilt && nav.navBlocked.length === n ? nav.navBlocked : null;
@@ -11504,7 +13087,7 @@ export class GameLogic {
     if (now < h.arNext) return;
     h.arNext = now + 380 + 160 * hfHash(h.seed, 422, now | 0);
     const ms = this._getEnemyNavMapState(e), ox = this._navOffX, oy = this._navOffY;
-    if (ms === null || !ms.navigation || this._hfAreaFree(h, now) || (isTeamBehaviorOf(e) && hfHash(h.seed, 423, 0) >= 0.35)) { h.arRank = 0; return; }
+    if (ms === null || !ms.navigation || this._hfAreaFree(h, now) || (isTeamBehaviorOf(e) && hfHash(h.seed, 423, 0) >= 0.35) || (AI_CONSTANTS.TM_MIDDLE !== 0 && e._tmSt !== 0)) { h.arRank = 0; return; }
     const nav = ms.navigation, A = this._hfAreaFacts(ms, nav);
     if (!A.ok) { h.arRank = 0; return; }
     this._hfAreaOrder(e, A);
@@ -11539,10 +13122,18 @@ export class GameLogic {
       const tp = t === null ? this.tankPos : t.position; tx = tp.x; ty = tp.y; hasT = true;
     } else if (st !== 'roaming' && st !== 'idle') return false;
     if (A.cls[ix * gcY + iy] !== h.arG) {
+      if (hasT && AI_CONSTANTS.HF_AREACHASE !== 0 && FEEL_LIVE && hfHash(h.seed, 425, hfIdNum(e.currentTargetId ?? 'P')) >= (h.dKind !== 0 ? 0.97 : 0.85)) return false;
+      if (!fight && AI_CONSTANTS.HF_AREAROUTE !== 0 && FEEL_LIVE && e.navGoalRegion >= 0) { const _si = nav.regionSeedIdx[e.navGoalRegion]; if (_si >= 0 && A.cls[_si] === h.arG) return false; }
       const s = queryDistanceStep(nav, h.arG === 1 ? A.f1 : h.arG === 2 ? A.f2 : A.f3, lx, ly, false, this.getEffectiveEnemyRadius(e));
       if (!s.ok) return false;
       const sx = s.dirX, sy = s.dirY;
       if (hasT) { const ax = tx - e.position.x, ay = ty - e.position.y, al = Math.sqrt(ax * ax + ay * ay); if (al > 1 && (sx * ax + sy * ay) / al > 0.35) return false; }
+      if (AI_CONSTANTS.HF_LEAVEAREA !== 0 && now < h.lvUntil) {
+        const _rs = AI_CONSTANTS.HF_AREAREST !== 0 && FEEL_LIVE;
+        if ((_rs || (AI_CONSTANTS.HF_AREAASK !== 0 && FEEL_LIVE)) && h.arRest !== 0) return false;
+        const qx = h.lvX - e.position.x, qy = h.lvY - e.position.y;
+        if (qx * qx + qy * qy < (h.lvR + 300 + cs) * (h.lvR + 300 + cs) && sx * qx + sy * qy > 0) { if (_rs) h.arRest = 1; return false; }
+      } else if (h.arRest !== 0) h.arRest = 0;
       return this._hfWalkTo(e, v0x, v0y, e.position.x + sx * 0.9 * cs, e.position.y + sy * 0.9 * cs, dtFactor);
     }
     if (fight) {
@@ -11571,14 +13162,20 @@ export class GameLogic {
     }
     if (st !== 'roaming') return false;
     const ddx = h.arTX - e.position.x, ddy = h.arTY - e.position.y;
-    if (!h.arOk || ddx * ddx + ddy * ddy < 0.04 * cs * cs || now >= h.arTUntil) {
+    const _koX = h.lvX - e.position.x, _koY = h.lvY - e.position.y;
+    const _ko = AI_CONSTANTS.HF_AREAKEEPOUT !== 0 && FEEL_LIVE && AI_CONSTANTS.HF_LEAVEAREA !== 0 && now < h.lvUntil && _koX * _koX + _koY * _koY < (h.lvR + 300) * (h.lvR + 300);
+    if (!h.arOk || ddx * ddx + ddy * ddy < 0.04 * cs * cs || now >= h.arTUntil || (_ko && ddx * _koX + ddy * _koY > 0)) {
+      if (h.arOk && ddx * ddx + ddy * ddy < 0.04 * cs * cs && h.arRest > 15) h.arRest &= 15;
       h.arOk = false;
       let bs = -Infinity, bk = -1;
       for (let k = 0; k < 4; k++) {
         const ux = k === 0 ? 1 : k === 1 ? -1 : 0, uy = k === 2 ? 1 : k === 3 ? -1 : 0, nx = ix + ux, ny = iy + uy;
         if (nx < 0 || nx >= gc || ny < 0 || ny >= gcY || A.cls[nx * gcY + ny] !== h.arG) continue;
+        const _kd = _ko ? (-mh + (nx + 0.5) * cs + ox - e.position.x) * _koX + (-mhY + (ny + 0.5) * cs + oy - e.position.y) * _koY : 0;
+        if (_kd > 0) continue;
+        if (h.arRest > 15 && AI_CONSTANTS.HF_AREAASK !== 0 && FEEL_LIVE && (h.arRest & (16 << k)) !== 0) continue;
         const along = ux * h.arDX + uy * h.arDY;
-        const sc = (along > 0.5 ? 3 : along < -0.5 ? 0.4 : 2) + 1.5 * hfHash(h.seed, 426 + k, now | 0);
+        const sc = _ko ? -_kd / (cs * Math.sqrt(_koX * _koX + _koY * _koY) + 1) + (along > 0.5 ? 0.3 : 0) : (along > 0.5 ? 3 : along < -0.5 ? 0.4 : 2) + 1.5 * hfHash(h.seed, 426 + k, now | 0);
         if (sc > bs) { bs = sc; bk = k; }
       }
       if (bk < 0) return false;
@@ -11587,8 +13184,41 @@ export class GameLogic {
     }
     return this._hfWalkTo(e, v0x, v0y, h.arTX, h.arTY, dtFactor);
   }
-  private _fwMap = new WeakMap<object, { own: Uint16Array; par: Int32Array; q: Int32Array; fb: Uint8Array }>();
+  private _fwMap = new WeakMap<object, { own: Uint16Array; par: Int32Array; q: Int32Array; fb: Uint8Array; hc: Uint8Array }>();
   private _fwOut = { ok: true, x: 0, y: 0, dirX: 0, dirY: 0, kind: 1 };
+  private static _fwCX = new Float64Array(4); private static _fwCY = new Float64Array(4); private static _fwCR = new Float64Array(4);
+  private _hfFleeLean(e: EnemyTank, dir: Vector, now: number): void {
+    const h = e.hf;
+    if (now >= h.flAt) {
+      h.flAt = now + 100; h.flX = 0; h.flY = 0;
+      const C = h.frC, src = e.fear.fleeSourceId ?? '';
+      let sx = 0, sy = 0;
+      for (let q = 0; q < h.frN; q++) {
+        if (h.frId[q] === 'P' ? src === this.state.playerId : h.frId[q] === src) continue;
+        const ax = e.position.x - C[3 * q], ay = e.position.y - C[3 * q + 1], a = Math.sqrt(ax * ax + ay * ay), r = a / C[3 * q + 2];
+        if (r >= 1.2 || a < 1 || !this._hfLosTo(e, C[3 * q], C[3 * q + 1])) continue;
+        const k = r < 1 ? 1 : (1.2 - r) * 5;
+        sx += (ax / a) * k; sy += (ay / a) * k;
+      }
+      const sl = Math.sqrt(sx * sx + sy * sy);
+      if (sl > 1) { sx /= sl; sy /= sl; }
+      h.flX = sx; h.flY = sy;
+    }
+    const ox = h.flX, oy = h.flY, o2 = ox * ox + oy * oy;
+    if (o2 < 1e-4) return;
+    const dl = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
+    if (dl < 1e-9) return;
+    const wx = dir.x / dl, wy = dir.y / dl;
+    if (o2 < 0.98 && wx * ox + wy * oy >= 0) return;
+    let bk = -1, bs = -Infinity;
+    for (let k = 0; k < 8; k++) {
+      const kx = HF_KEY_X[k], ky = HF_KEY_Y[k], al = kx * wx + ky * wy;
+      if (al < 0.3) continue;
+      const sc = al + kx * ox + ky * oy;
+      if (sc > bs) { bs = sc; bk = k; }
+    }
+    if (bk >= 0) { dir.x = HF_KEY_X[bk] * dl; dir.y = HF_KEY_Y[bk] * dl; }
+  }
   private _hfFleeWay(e: EnemyTank, nav: NonNullable<MapState['navigation']>, ms: MapState, dist: Uint16Array, lx: number, ly: number, ox: number, oy: number, R: number, dgN: number): boolean {
     const gc = nav.gridCells, gcY = nav.gridCellsY, n = gc * gcY, cs = nav.cellSize, mh = nav.mapHalf, mhY = nav.mapHalfY;
     if (ms.walls.length === 0 || dist.length !== n) return false;
@@ -11597,7 +13227,7 @@ export class GameLogic {
     const i0 = ix0 * gcY + iy0, t0 = dist[i0];
     if (t0 === NAV_UNREACHABLE) return false;
     let W = this._fwMap.get(nav);
-    if (W === undefined || W.own.length !== n) { W = { own: new Uint16Array(n), par: new Int32Array(n), q: new Int32Array(n), fb: new Uint8Array(n) }; this._fwMap.set(nav, W); }
+    if (W === undefined || W.own.length !== n) { W = { own: new Uint16Array(n), par: new Int32Array(n), q: new Int32Array(n), fb: new Uint8Array(n), hc: new Uint8Array(n) }; this._fwMap.set(nav, W); }
     const own = W.own, par = W.par, Q = W.q, h = e.hf;
     own.fill(0xFFFF);
     const fb = W.fb; let fbN = 0;
@@ -11613,8 +13243,14 @@ export class GameLogic {
     const A = AI_CONSTANTS.HF_AREA !== 0 && h.arRank !== 0 && this.feel.s[FEEL.PLACE] > 0 ? this._hfAreaFacts(ms, nav) : null, cls = A !== null && A.ok ? A.cls : null;
     const pv = e.pursuitWpOwner === 1 && (e.pursuitWpDirX !== 0 || e.pursuitWpDirY !== 0);
     const near = t0 > 1 ? t0 - 1 : 0;
+    const hrOn = AI_CONSTANTS.HF_HITRANGE !== 0 && h.hvR > 0 && h.hvId !== '', hrX = h.hvX - ox, hrY = h.hvY - oy, hrR2 = h.hvR * h.hvR, hc = W.hc;
+    const wmOn = AI_CONSTANTS.HF_WAYMEM !== 0 && h.wmN === n;
+    const CX = GameLogic._fwCX, CY = GameLogic._fwCY, CR = GameLogic._fwCR;
+    let cN = 0;
+    if (AI_CONSTANTS.HF_FLEEWIDE !== 0 && AI_CONSTANTS.HF_HITRANGE !== 0 && FEEL_LIVE) { for (; cN < h.frN; cN++) { CX[cN] = h.frC[3 * cN] - ox; CY[cN] = h.frC[3 * cN + 1] - oy; CR[cN] = h.frC[3 * cN + 2]; } }
+    const wide = cN > 0;
     let qh = 0, qt = 0, best = -1, bs = -Infinity;
-    own[i0] = 0; par[i0] = -1; Q[qt++] = i0;
+    own[i0] = 0; par[i0] = -1; Q[qt++] = i0; hc[i0] = 0;
     while (qh < qt) {
       const i = Q[qh++], d = own[i], ix = (i / gcY) | 0, iy = i - ix * gcY;
       let open = false, on = 0;
@@ -11625,15 +13261,39 @@ export class GameLogic {
         if (mask ? mask[j] !== 0 : (ms.tileGrid[j] === TileType.WALL || ms.rockGrid[j] >= 0)) continue;
         const tj = dist[j];
         if (tj === NAV_UNREACHABLE || tj > dist[i]) on++;
+        if (wide && own[j] === d + 1 && par[j] !== i) { const c0 = hc[i], cn = (c0 & 127) + (c0 >> 7); if (cn < (hc[j] & 127)) { hc[j] = (hc[j] & 128) | cn; par[j] = i; } continue; }
         if (own[j] !== 0xFFFF) continue;
         if (tj !== NAV_UNREACHABLE && (tj < d + 2 || tj < near)) continue;
-        if (d < H) { own[j] = d + 1; par[j] = i; Q[qt++] = j; if (fbN > 0 && (fb[i] | fb[j]) !== 0) fb[j] |= 1; } else open = true;
+        if (d < H) {
+          own[j] = d + 1; par[j] = i; Q[qt++] = j; if (fbN > 0 && (fb[i] | fb[j]) !== 0) fb[j] |= 1;
+          if (wide) {
+            const wx = -mh + (jx + 0.5) * cs, wy = -mhY + (jy + 0.5) * cs, c0 = hc[i], cn = (c0 & 127) + (c0 >> 7);
+            let inn = 0;
+            for (let q = 0; q < cN && inn === 0; q++) { const ax = wx - CX[q], ay = wy - CY[q]; if (ax * ax + ay * ay < CR[q] * CR[q] && checkLineOfSight(ms, wx, wy, CX[q], CY[q], ox, oy)) inn = 128; }
+            hc[j] = (cn > 100 ? 100 : cn) | inn;
+          } else if (hrOn) {
+            const wx = -mh + (jx + 0.5) * cs, wy = -mhY + (jy + 0.5) * cs, c0 = hc[i], cn = (c0 & 127) + (c0 >> 7);
+            hc[j] = (cn > 100 ? 100 : cn) | ((wx - hrX) * (wx - hrX) + (wy - hrY) * (wy - hrY) < hrR2 && checkLineOfSight(ms, wx, wy, hrX, hrY, ox, oy) ? 128 : 0);
+          }
+        } else open = true;
       }
       if (d < 2) continue;
       const ti = dist[i] === NAV_UNREACHABLE ? 200 : dist[i], cx = -mh + (ix + 0.5) * cs, cy = -mhY + (iy + 0.5) * cs;
       let sc = ti + 0.5 * (ti - d) + (open ? 5 : 0);
       if (!open) { if (on === 0) sc -= 4; const de = queryDeadEndMap(nav, cx, cy).depth; if (de > 0) sc -= 3 + de; }
       for (let k = 0; k < dgN; k++) { const dx = cx - this._fdgPX[k], dy = cy - this._fdgPY[k]; if (dx * dx + dy * dy < 2.25 * cs * cs) sc -= 2 * this._fdgW[k]; }
+      if (wide) {
+        const c = hc[i], w = c & 127; let deep = 0, soft = 0;
+        for (let q = 0; q < cN; q++) { const ax = cx - CX[q], ay = cy - CY[q], r = Math.sqrt(ax * ax + ay * ay) / CR[q]; if (r < 1) { if (1 - r > deep) deep = 1 - r; } else if (r < 1.5 && 1.5 - r > soft) soft = 1.5 - r; }
+        if (w !== 0) sc -= 1.5 * (w > 6 ? 6 : w);
+        if ((c & 128) !== 0) sc -= 6 + 4 * deep; else if (soft > 0) sc -= 4 * soft;
+      } else
+      if (hrOn) { const c = hc[i]; if (c !== 0) { const w = c & 127; sc -= 1.5 * (w > 6 ? 6 : w); if ((c & 128) !== 0) { const dx = cx - hrX, dy = cy - hrY; sc -= 6 + 4 * (1 - Math.sqrt(dx * dx + dy * dy) / h.hvR); } } }
+      if (wmOn) {
+        let risk = (hrOn || wide) && hc[i] !== 0;
+        if (!risk) for (let k = 0; k < dgN; k++) { if (k >= this._fdgBlk0 && k < this._fdgBlk1) continue; const dx = cx - this._fdgPX[k], dy = cy - this._fdgPY[k]; if (dx * dx + dy * dy < 2.25 * cs * cs) { risk = true; break; } }
+        if (!risk && this._hfWayKnows(e, i, this._hfNow)) sc += 3; else if (open) sc -= 3;
+      }
       if (cls !== null && cls[i] === h.arG) sc += 2;
       if (fbN > 0 && (fb[i] & 1) !== 0) sc -= 3;
       if (pv) { const wx = cx - lx, wy = cy - ly, wl = Math.sqrt(wx * wx + wy * wy); if (wl > 1) sc += 1.5 * (wx * e.pursuitWpDirX + wy * e.pursuitWpDirY) / wl; }
@@ -11644,6 +13304,18 @@ export class GameLogic {
     for (let c = best, guard = 0; c !== i0 && c >= 0 && guard < 64; c = par[c], guard++) {
       const ix = (c / gcY) | 0, iy = c - ix * gcY, cx = -mh + (ix + 0.5) * cs, cy = -mhY + (iy + 0.5) * cs;
       if (!checkShotWallsClear(ms, lx, ly, cx, cy, ox, oy, R) || !isPathClear(ms, lx, ly, cx, cy, ox, oy, R)) continue;
+      if (wide) {
+        let cut = false;
+        for (let q = 0; q < cN && !cut; q++) {
+          const ax = lx - CX[q], ay = ly - CY[q], R2 = CR[q] * CR[q];
+          if (ax * ax + ay * ay < R2) continue;
+          const sx = cx - lx, sy = cy - ly, s2 = sx * sx + sy * sy;
+          let t = s2 > 0 ? -(ax * sx + ay * sy) / s2 : 0; if (t < 0) t = 0; else if (t > 1) t = 1;
+          const px = ax + sx * t, py = ay + sy * t;
+          if (px * px + py * py < R2 && checkLineOfSight(ms, CX[q] + px, CY[q] + py, CX[q], CY[q], ox, oy)) cut = true;
+        }
+        if (cut) continue;
+      }
       const wx = cx - lx, wy = cy - ly, wl = Math.sqrt(wx * wx + wy * wy);
       if (wl < 1) return false;
       out.ok = true; out.x = cx; out.y = cy; out.dirX = wx / wl; out.dirY = wy / wl; out.kind = 1;
@@ -12000,12 +13672,26 @@ export class GameLogic {
       }
     }
   }
+  private _roundDiesInBase(b: Bullet): boolean {
+    if (!this._baseZonesPresent || b.health <= 0 || b.isFading) return false;
+    if (this._bulletGhostExempt(b)) return false;
+    if (this._closerIds.size !== 0 && this._closerIds.has(bulletFamilyIdOf(b))) return false;
+    const ms = this.mapState;
+    const multi = this.areaStates.length > 0 && this.areaBounds.length > 0;
+    if (!multi && !ms) return false;
+    const baseTeam = multi ? this._baseTeamAtWorld(b.position.x, b.position.y) : this._baseTeamInState(ms!, b.position.x, b.position.y);
+    if (baseTeam !== null && baseTeam !== this._resolveTeam(b.team)) { b.health = 0; b.isFading = true; return true; }
+    return false;
+  }
   private _caRound(areas: readonly CustomAreaRect[], ai: number, step: number, b: Bullet): void {
     if (!b.active || b.isFading || b.health <= 0 || b.inExitPhase) return;
     const ca0 = areas[ai];
     if (ca0.kind === AREA_KIND_CONVEYOR) {
       const on = _areaGroupAt(areas, ai, step, b.position.x, b.position.y, 0);
-      if (on >= 0) { const s = this._caDt / 60; b.position.x += (areas[on].beltX ?? 0) * s; b.position.y += (areas[on].beltY ?? 0) * s; }
+      if (on >= 0) {
+        const s = this._caDt / 60; b.position.x += (areas[on].beltX ?? 0) * s; b.position.y += (areas[on].beltY ?? 0) * s;
+        if (SMALL_FIX.G906 !== 0) this._roundDiesInBase(b);
+      }
       return;
     }
     const edge = ca0.centre === true ? 0 : 1;
@@ -12556,7 +14242,7 @@ export class GameLogic {
 
   private _syncEnemyChildren(e: EnemyTank): void {
     this._syncChildrenSkillsOf(e.id, e.turrets, e.upgrades,
-      e.maxPointsPerSkill || 9, this._gunLevel(e.level || 0),
+      e.maxPointsPerSkill || 9, this._gunLevelOf(e),
       getEnemyStatMultiplier(e, 'bulletSpeed'), getEnemyStatMultiplier(e, 'reload'), growthRulesOf(e), e._statK);
   }
 
@@ -13342,7 +15028,9 @@ export class GameLogic {
       const gone = this.state.solidLibrary[sIndex];
       this.state.solidLibrary.splice(sIndex, 1);
       const sid = (gone.fileData.data as SolidDesign).solidId;
-      if (!this.state.solidLibrary.some(l => (l.fileData.data as SolidDesign).solidId === sid)) { unregisterSolid(sid); this._shapesOfSolids([sid]); }
+      const _keep940 = this.state.solidLibrary.find(l => (l.fileData.data as SolidDesign).solidId === sid);
+      if (_keep940 === undefined) { unregisterSolid(sid); this._shapesOfSolids([sid]); }
+      else if (SMALL_FIX.G940 !== 0) { const _d940 = normalizeSolid(_keep940.fileData.data); if (_d940 && registerSolid(_d940)) this._shapesOfSolids([sid]); }
       if (this.onStateChange) this.onStateChange(this.state);
       return;
     }
@@ -13622,8 +15310,8 @@ export class GameLogic {
       const angle = angles[a];
       const cosB = Math.cos(angle);
       const sinB = Math.sin(angle);
-      for (let m = 0; m < (mirrorSet ? 2 : 1); m++)
-      for (let i = 0; i < previewTurrets.length; i++) {
+      for (let _k981 = 0, _M981 = mirrorSet ? 2 : 1, _N981 = previewTurrets.length; _k981 < _M981 * _N981; _k981++) {
+        const m = SMALL_FIX.G981 !== 0 ? _k981 % _M981 : Math.floor(_k981 / _N981), i = SMALL_FIX.G981 !== 0 ? Math.floor(_k981 / _M981) : _k981 % _N981;
         const t = previewTurrets[i];
         const isAutoPiece = t.turretType === 'auto';
         const keepsCircle = isAutoPiece && Array.isArray(t.autoSubTurrets) && t.autoSubTurrets.length > 0;
@@ -14080,10 +15768,16 @@ export class GameLogic {
     if (this.onStateChange) this.onStateChange(this.state);
   }
 
+  private _forgetPartMarks(id: string, t: Turret | null | undefined): void {
+    if (SMALL_FIX.G968 === 0 || (this.partHides.size === 0 && this.partLocks.size === 0)) return;
+    this.partHides.delete(id); this.partLocks.delete(id);
+    if (t && t.autoSubTurrets) for (const s of t.autoSubTurrets) { this.partHides.delete(s.id); this.partLocks.delete(s.id); }
+  }
   public removeTurret(id: string) {
     const idx = this.state.turrets.findIndex(t => t.id === id);
     if (idx !== -1) {
       const removed = this.state.turrets[idx];
+      this._forgetPartMarks(removed.id, removed);
       const wasPicked = removed.id === this.state.selectedTurretId;
       this.state.turrets.splice(idx, 1);
 
@@ -14404,6 +16098,7 @@ export class GameLogic {
           const j = p.autoSubTurrets ? p.autoSubTurrets.findIndex(st => st.id === id) : -1;
           if (j < 0) continue;
           p.autoSubTurrets.splice(j, 1);
+          this._forgetPartMarks(id, null);
           if (p.primarySubTurretId === id) p.primarySubTurretId = p.autoSubTurrets.length > 0 ? p.autoSubTurrets[0].id : null;
           if (this.state.autoSubTurretSelectedId === id) { this.state.autoSubTurretSelectedId = null; this.state.autoSubTurretSelectMode = false; this._restoreSubGhostAfterPick(); }
           break;
@@ -14558,6 +16253,7 @@ export class GameLogic {
     const idx = this.state.bodyLayers.findIndex(l => l.id === layerId);
     if (idx === -1) return;
     const layer = this.state.bodyLayers[idx];
+    if (SMALL_FIX.G968 !== 0) { this._forgetPartMarks(layer.id, null); for (const tid of layer.turretIds) this._forgetPartMarks(tid, this.state.turrets.find(q => q.id === tid)); }
     const wasActive = this.state.activeBodyLayerId === layerId;
     if (wasActive) this.partPicked = false;
     for (let i = layer.turretIds.length - 1; i >= 0; i--) {
@@ -15403,6 +17099,7 @@ export class GameLogic {
     const idx = parent.autoSubTurrets.findIndex(s => s.id === subId);
     if (idx !== -1) {
       parent.autoSubTurrets.splice(idx, 1);
+      this._forgetPartMarks(subId, null);
       if (subId === parent.primarySubTurretId) {
         parent.primarySubTurretId = null;
       }
@@ -15567,6 +17264,7 @@ export class GameLogic {
     for (let i = 0; i < et.length; i++) {
       const e = et[i];
       if (!e.active || e.isDying || e.isSpawning || e._intKind !== 0 || now < e._senseAt) continue;
+      if (SMALL_FIX.G643 !== 0 && e._intThrough >= 0 && e.portalSeekIdx === e._intThrough && now < e.portalSeekUntil) continue;
       if ((e._mevF & (MF_STANDS | MF_STAGE | MF_EDITOR)) !== 0 || e.isBaseProtector) continue;
       e._senseAt = now + SENSE_EVERY_MS + (i % 7) * 37;
       const body = e as unknown as MevBody;
@@ -15621,6 +17319,7 @@ export class GameLogic {
       for (let i = 0; i < et.length; i++) {
         const b = et[i];
         if (b === e || !b.active || b.isDying || b._mev < 0) continue;
+        if (SMALL_FIX.G895 !== 0 && this._acrossGap(x, y, b.position.x, b.position.y)) continue;
         if (sn.thing >= 0 && !vm.testBody(sn.thing, b as unknown as MevBody, b._mev)) continue;
         const dx = b.position.x - x, dy = b.position.y - y, d2 = dx * dx + dy * dy;
         if (d2 >= best || d2 > r * r) continue;
@@ -15632,6 +17331,7 @@ export class GameLogic {
       for (let i = 0; i < fp.length; i++) {
         const s = fp[i];
         if (!s.active || s.fadingOut || s._mev < 0 || (SMALL_FIX.R887 === 0 && vm.p.types[vm.bType[s._mev]]?.def.seenByBots === false)) continue;
+        if (SMALL_FIX.G895 !== 0 && this._acrossGap(x, y, s.position.x, s.position.y)) continue;
         if (sn.thing >= 0 && !vm.testBody(sn.thing, s as unknown as MevBody, s._mev)) continue;
         const dx = s.position.x - x, dy = s.position.y - y, d2 = dx * dx + dy * dy;
         if (d2 >= best || d2 > r * r || !sees(s.position.x, s.position.y)) continue;
@@ -15648,6 +17348,7 @@ export class GameLogic {
     for (let i = 0; i < ms.portals.length; i++) {
       const p = ms.portals[i];
       if (p._dying || (p.timed && !p._timedActive) || !portalLeadsSomewhere(p) || p.areaId !== e.areaId) continue;
+      if (SMALL_FIX.G919 !== 0 && p._particlesDraining) continue;
       if (sn.portal === 1 && p.kind !== PORTAL_KIND_WORMHOLE) continue;
       if (sn.portal === 2 && p.kind === PORTAL_KIND_WORMHOLE) continue;
       const d2 = (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y);
@@ -15857,10 +17558,25 @@ export class GameLogic {
       else if (!e._flLow && e.fear.isFleeing) this._btEndFlee(e, now);
     }
     if ((bits & BT_HEAL) !== 0) this._btTrip(e, share, now);
+    if (AI_CONSTANTS.BT_STAYHOME !== 0 && (bits & BT_HEAL) !== 0 && e.fear.isFleeing) {
+      if (e._hsOn === 2 && e._hsStand) this._btEndFlee(e, now);
+      else if (!(e._hsOn === 1 && e._hsStand) && now >= e._hsHomeAt && !e.isSentryEnemy && e.isBaseProtector !== true && (e._mevF & (MF_STANDS | MF_ORDER)) === 0) {
+        e._hsHomeAt = now + 2000;
+        const _hw = e._hsHome;
+        e._hsHome = true;
+        if (this._btPickHeal(e, now)) {
+          e._hsOn = 1; e._hsBestD = this._btGoalDist(e); e._hsGiveUpAt = now + BT.GIVE_UP_MS;
+          this._btEndFlee(e, now);
+          if (e._tfGoalId !== '') btEndGoal(e, '', 0);
+          if (e._hsBestD <= e._hsNear && this._btHealLineClear(e)) { e._hsOn = 2; e._btWAt = 0; }
+        } else e._hsHome = _hw;
+      }
+    }
   }
   private _btTrip(e: EnemyTank, share: number, now: number): void {
     if (e._hsOn === 0) {
       if (share >= e._hsBelow || now < e._hsCoolUntil) return;
+      if (AI_CONSTANTS.BT_HOMELOW !== 0 && FEEL_LIVE && e.hf.plays && share >= 0.5 * e._hsBelow && this._btFightOn(e, now)) return;
       if (e.isSentryEnemy || e.isBaseProtector === true || (e._mevF & (MF_STANDS | MF_ORDER)) !== 0) return;
       if (!this._btPickHeal(e, now)) { e._hsCoolUntil = now + BT.NONE_COOL_MS; return; }
       e._hsOn = 1; e._hsBestD = this._btGoalDist(e); e._hsGiveUpAt = now + BT.GIVE_UP_MS;
@@ -15876,7 +17592,7 @@ export class GameLogic {
       if (d <= e._hsNear && this._btHealLineClear(e)) { e._hsOn = 2; e._hsKite = false; e._btWAt = 0; }
       else if (d < e._hsBestD - BT.PROGRESS) { e._hsBestD = d; e._hsGiveUpAt = now + BT.GIVE_UP_MS; }
       else if (now >= e._hsGiveUpAt) this._btTripEnd(e, now + BT.GAVE_UP_COOL_MS);
-    } else if (d > e._hsLeash) { e._hsOn = 1; e._hsBestD = d; e._hsGiveUpAt = now + BT.GIVE_UP_MS; }
+    } else if (d > e._hsLeash || (SMALL_FIX.G759 !== 0 && !this._btHealLineClear(e))) { e._hsOn = 1; e._hsBestD = d; e._hsGiveUpAt = now + BT.GIVE_UP_MS; }
   }
   private _btHealLineClear(e: EnemyTank): boolean {
     if (SMALL_FIX.GH533 === 0 || e._hsArea >= 0) return true;
@@ -15885,11 +17601,44 @@ export class GameLogic {
     const ox = this._navOffX, oy = this._navOffY;
     return checkShotWallsClear(ms, e.position.x - ox, e.position.y - oy, e._hsX - ox, e._hsY - oy, ox, oy, 5);
   }
-  private _btTripEnd(e: EnemyTank, coolUntil: number): void { btEndTrip(e, coolUntil); this._btDropRoute(e); }
+  private _btTripEnd(e: EnemyTank, coolUntil: number): void { btEndTrip(e, coolUntil); e._hsHome = false; this._btDropRoute(e); }
   private _btDropRoute(e: EnemyTank): void {
     if (e._btRoute === '') return;
     if (e.currentTargetId === e._btRoute && (e.aiState === 'roaming' || e.aiState === 'idle')) e.currentTargetId = null;
     e._btRoute = ''; e.lastDirectionChange = 0;
+  }
+  private _rfBanMs(e: EnemyTank, now: number): number {
+    const was = e.navRegionBlockedUntil[e.navGoalRegion];
+    return AI_CONSTANTS.ROAM_REFUSEMEM !== 0 && FEEL_LIVE && was > 0 && now - was < 30000 ? AI_CONSTANTS.TRAVEL_GOAL_BLOCKED_MS : AI_CONSTANTS.BASEFEAR_ROUTE_BLOCK_MS;
+  }
+  private _bsStands(e: EnemyTank, now: number, t: EnemyTank): boolean {
+    if (now - e.lastTankDamageAt < 1200) return false;
+    { const ax = e.position.x - t.position.x, ay = e.position.y - t.position.y, al = Math.sqrt(ax * ax + ay * ay);
+      const fa = t.angle + (t.facingType === 'faceTarget' || t.facingType === 'smoothFaceTarget' ? t.aimNoseOff : (t.turrets[t.primaryTurretIndex]?.angle || 0));
+      if (al > 1 && (ax * Math.cos(fa) + ay * Math.sin(fa)) / al > 0.707) return false; }
+    const h = e.hf, per = 2500 + 2000 * hfHash(h.seed, 577, 0), at = now + 4500 * hfHash(h.seed, 578, 0), ep = (at / per) | 0;
+    return !(hfHash(h.seed, 579, ep) < 0.5 && at - ep * per < 300 + 500 * hfHash(h.seed, 580, ep));
+  }
+  private _bpWatch(e: EnemyTank, now: number): boolean {
+    const h = e.hf;
+    if (!h.plays || h.rmOn || e.isBossTier === true || e.graceActive) return false;
+    const px = e.position.x, py = e.position.y;
+    if (now < e._bpUntil) {
+      if (now - e.lastTankDamageAt < 400 || now < h.adUntil || now < h.udUntil || now < h.hitUntil) { e._bpX = px; e._bpY = py; }
+      e._bpSeen = now; e._bpLX = px; e._bpLY = py;
+      return true;
+    }
+    const sx = px - e._bpLX, sy = py - e._bpLY, st = Math.sqrt(sx * sx + sy * sy);
+    e._bpLX = px; e._bpLY = py;
+    if (now - e._bpSeen > 1200 || st > 300) { e._bpAt = now; e._bpPath = 0; e._bpSX = px; e._bpSY = py; if (now - e._bpSeen > 12000) e._bpN = 0; e._bpSeen = now; return false; }
+    e._bpSeen = now; e._bpPath += st;
+    const nx = px - e._bpSX, ny = py - e._bpSY;
+    if (nx * nx + ny * ny > 25600) { e._bpAt = now; e._bpPath = 0; e._bpSX = px; e._bpSY = py; e._bpN = 0; return false; }
+    if (e._bpPath < 350) { if (now - e._bpAt > 20000) { e._bpAt = now; e._bpPath = 0; e._bpSX = px; e._bpSY = py; } return false; }
+    e._bpAt = now; e._bpPath = 0; e._bpSX = px; e._bpSY = py;
+    if (e._bpN < 2) e._bpN++;
+    e._bpUntil = now + (6000 + 4000 * hfHash(h.seed, 575, now | 0)) * e._bpN; e._bpX = px; e._bpY = py;
+    return true;
   }
   private _btDrive(e: EnemyTank, gx: number, gy: number, navMs: MapState | null, ox: number, oy: number, bodyR: number, now: number, dtFactor: number, route: string): boolean {
     e._btRoute = route;
@@ -15908,10 +17657,45 @@ export class GameLogic {
       }
     }
     const wx = e._btWx - e.position.x, wy = e._btWy - e.position.y, qx = e._btWx - cx, qy = e._btWy - cy;
-    if (now >= e._btWAt || wx * wx + wy * wy < BT.WANDER_ARRIVE * BT.WANDER_ARRIVE || qx * qx + qy * qy > rOut * rOut * 1.44 || qx * qx + qy * qy < rIn * rIn * 0.64) {
+    let _calm = false;
+    if (AI_CONSTANTS.BT_WALKCALM !== 0 && FEEL_LIVE && e.hf.plays && !this._btDuty(e)) {
+      const h = e.hf, w2 = wx * wx + wy * wy, q2 = qx * qx + qy * qy;
+      const inRing = e._btWn > 0 && q2 <= rOut * rOut * 1.44 && q2 >= rIn * rIn * 0.64;
+      if (inRing && now < e._btWAt && (e._btWRest > now || (e._btWRest === 0 && w2 < 2025))) {
+        if (e._btWRest === 0) {
+          const u = hfHash(h.seed, 543, e._btWn);
+          e._btWRest = now + (hfHash(h.seed, 544, e._btWn) < 0.3 ? 9000 + 11000 * u : 2500 + 6500 * u) * (0.6 + 0.8 * h.dnaStill);
+          e._btWAt = e._btWRest + 1;
+        }
+        const _sk = AI_CONSTANTS.BT_STANDKEEP !== 0;
+        if (_sk && e._ogHoldGo && (w2 <= 625 || now - e._ogHoldSince > 1500)) e._ogHoldGo = false;
+        if (w2 <= 4900 && !(_sk && e._ogHoldGo)) {
+          if (e._btRoute !== '') this._btDropRoute(e);
+          h.standAt = now; e._btStood = true;
+          if (AI_CONSTANTS.HF_STOPS_STUCK !== 0) this._resetStuckWindow(e, now);
+          return true;
+        }
+        if (_sk && !e._ogHoldGo) { e._ogHoldGo = true; e._ogHoldSince = now; }
+        _calm = true;
+      } else if (!inRing || now >= e._btWAt || (e._btWRest > 0 && now >= e._btWRest)) {
+        e._btWRest = 0;
+        btWanderPick(e, cx, cy, rIn, rOut, now);
+        if (AI_CONSTANTS.HF_WALKCLEAR !== 0 && this.feel.s[FEEL.FINGER] > 0 && navMs && navMs.walls.length > 0) {
+          for (let k = 0; k < 5 && !this._btWayClear(navMs, e.position.x - ox, e.position.y - oy, e._btWx - ox, e._btWy - oy, ox, oy, bodyR); k++) btWanderPick(e, cx, cy, rIn, rOut, now);
+        }
+        const sx = e._btWx - e.position.x, sy = e._btWy - e.position.y, sd = Math.sqrt(sx * sx + sy * sy), want = 60 + 160 * hfHash(h.seed, 545, e._btWn);
+        if (sd > want) {
+          const nx = e.position.x + (sx / sd) * want, ny = e.position.y + (sy / sd) * want, r2 = (nx - cx) * (nx - cx) + (ny - cy) * (ny - cy);
+          if (r2 <= rOut * rOut && r2 >= rIn * rIn) { e._btWx = nx; e._btWy = ny; }
+        }
+        e._btWAt = now + 3500 + 2500 * hfHash(h.seed, 546, e._btWn);
+        _calm = true;
+      } else _calm = true;
+    }
+    if (!_calm && (now >= e._btWAt || wx * wx + wy * wy < BT.WANDER_ARRIVE * BT.WANDER_ARRIVE || qx * qx + qy * qy > rOut * rOut * 1.44 || qx * qx + qy * qy < rIn * rIn * 0.64)) {
       btWanderPick(e, cx, cy, rIn, rOut, now);
       if (AI_CONSTANTS.HF_WALKCLEAR !== 0 && e.hf.plays && this.feel.s[FEEL.FINGER] > 0 && navMs && navMs.walls.length > 0) {
-        for (let k = 0; k < 5 && !isPathClear(navMs, e.position.x - ox, e.position.y - oy, e._btWx - ox, e._btWy - oy, ox, oy, bodyR); k++) btWanderPick(e, cx, cy, rIn, rOut, now);
+        for (let k = 0; k < 5 && !this._btWayClear(navMs, e.position.x - ox, e.position.y - oy, e._btWx - ox, e._btWy - oy, ox, oy, bodyR); k++) btWanderPick(e, cx, cy, rIn, rOut, now);
       }
     }
     if (e._btRoute !== '') this._btDropRoute(e);
@@ -15946,6 +17730,7 @@ export class GameLogic {
         for (let s = 0; s < subs.length; s++) {
           const u = subs[s];
           if (!u || u.turretType === 'decorative' || !(u.healer === true || t.autoCircleHealer === true)) continue;
+          if (SMALL_FIX.G658 !== 0 && !(u.bps > 0)) continue;
           const q = this._gunRoundReach(u, m);
           if (q > r && q < Infinity) r = q;
         }
@@ -15977,7 +17762,8 @@ export class GameLogic {
     let best = Infinity, id = '', area = -1, gx = 0, gy = 0, body: EnemyTank | null = null;
     e._hsPickAt = now + BT.PICK_MS;
     const et = this.state.enemyTanks;
-    if (e._hsHealers && (e._mevF & MF_NO_HEAL) === 0) {
+    const home = e._hsHome && AI_CONSTANTS.BT_STAYHOME !== 0;
+    if (!home && e._hsHealers && (e._mevF & MF_NO_HEAL) === 0) {
       for (let i = 0; i < et.length; i++) {
         const o = et[i];
         if (o === e || o._hasHealGun !== true || !o.active || o.isDying || o.isSpawning || ((o._btBits & BT_HEAL) !== 0 && o._hsOn === 1)) continue;
@@ -16004,16 +17790,18 @@ export class GameLogic {
         if (o === e || !o.active || o.isDying) continue;
         const dx = o.position.x - x, dy = o.position.y - y, d2 = dx * dx + dy * dy;
         if (d2 >= best || !vm.bodyHasTag(o as unknown as MevBody, o._mev, e._hsTag) || this._acrossGap(x, y, o.position.x, o.position.y)) continue;
+        if (home && (o._mevF & MF_STANDS) === 0) continue;
         best = d2; id = o.id; area = -1; gx = o.position.x; gy = o.position.y; body = o;
       }
     }
-    if (vm !== null && e._hsZone >= 0 && e._hsZone < vm.p.zones.length) {
+    if (!home && vm !== null && e._hsZone >= 0 && e._hsZone < vm.p.zones.length) {
       this._btZonePoint(e._hsZone, x, y);
       const dx = this._btQx - x, dy = this._btQy - y, d2 = dx * dx + dy * dy;
       if (d2 < best && !this._acrossGap(x, y, this._btQx, this._btQy)) { best = d2; id = ''; area = e._hsZone; gx = this._btQx; gy = this._btQy; body = null; }
     }
     if (best === Infinity) return false;
     e._hsId = id; e._hsArea = area; e._hsX = gx; e._hsY = gy;
+    e._hsStand = body !== null && (body._mevF & MF_STANDS) !== 0;
     const myR = this.getEffectiveEnemyRadius(e);
     if (area >= 0) { e._hsNear = BT.AREA_NEAR; e._hsLeash = BT.LEASH_PAD; }
     else {
@@ -16073,7 +17861,7 @@ export class GameLogic {
   }
   private _btPost(e: EnemyTank, r: AIStateResult, prevState: AIState, now: number): boolean {
     if (BOT_TACTICS.ON === 0) return false;
-    e._hsKite = false;
+    e._hsKite = false; e._ogKite = 0;
     if (SMALL_FIX.R941 !== 0 && this._ftPost(e, r, now)) return true;
     if (r.state === 'fleeing' || r.state === 'protecting_base') return false;
     const bits = e._btBits;
@@ -16095,12 +17883,52 @@ export class GameLogic {
       }
       return true;
     }
+    let _tpHold = false, _tpOut = false;
+    if ((bits & BT_GUARD) !== 0 && AI_CONSTANTS.BT_TEAMPLAN !== 0 && FEEL_LIVE && e._ogFront && e._ogTag >= 0 && e.hf.plays && this._ogFrontOne(e)) {
+      if (r.state !== 'roaming' && r.state !== 'idle') this._tpInFight(e, now);
+      const _ti = this._tpSide(e);
+      if (_ti >= 0) {
+        _tpOut = AI_CONSTANTS.BT_TEAMTAKE !== 0 && e._ogTake && this._tpTakeOf(e, now) !== null;
+        _tpHold = !_tpOut && this._tpId[_ti] !== '' && this._tpId[_ti] === e._ogId && (this._tpKind[_ti] === 1 || this._tpKind[_ti] === 2);
+      }
+    }
+    if ((bits & BT_GUARD) !== 0 && AI_CONSTANTS.BT_GUARDHOLD !== 0 && (e._ogBlockIs === 1 || _tpHold) && !_tpOut && e._ogId !== '' && e._ogHelpId === '') {
+      const _gp = this._enemyById.get(e._ogId);
+      if (_gp !== undefined && _gp.active && !_gp.isDying) {
+        const bound = this._ogBound(e, _gp), st = r.state;
+        const dx = e.position.x - _gp.position.x, dy = e.position.y - _gp.position.y, d = Math.sqrt(dx * dx + dy * dy);
+        if (st === 'attacking') {
+          if (d > bound - 60 && d > 1) { e._ogKite = d > bound + 60 ? 2 : 1; e._ogKx = dx / d; e._ogKy = dy / d; }
+        } else if (st === 'following' || st === 'targeting_shapes') {
+          const p = r.targetPosition;
+          const qx = (st === 'following' ? e.followTargetX : p !== null ? p.x : e.position.x) - _gp.position.x, qy = (st === 'following' ? e.followTargetY : p !== null ? p.y : e.position.y) - _gp.position.y;
+          if (d > bound - 60 || qx * qx + qy * qy > bound * bound) { this._btRoamFill(r); return true; }
+        } else if ((st === 'roaming' || st === 'idle') && d > bound - 60) return true;
+      }
+    }
+    if ((bits & BT_GUARD) !== 0 && AI_CONSTANTS.BT_INTOAREA !== 0 && FEEL_LIVE && e._ogTag >= 0 && e._ogId !== '' && !_tpOut && e.hf.plays && r.state !== 'roaming' && r.state !== 'idle') {
+      const _ip = this._enemyById.get(e._ogId);
+      if (_ip !== undefined && _ip.active && !_ip.isDying) {
+        const _ims = this._getEnemyNavMapState(e), _iox = this._navOffX, _ioy = this._navOffY;
+        if (this._ogAttacked(e, _ip, _ims, _iox, _ioy, now)) {
+          const dx = e.position.x - _ip.position.x, dy = e.position.y - _ip.position.y, d = Math.sqrt(dx * dx + dy * dy), _inR = e._ogRadius < 650 ? e._ogRadius : 650;
+          e._ogGo = 0; e._ogBlockUntil = 0; e._ogBlockSpotUntil = 0;
+          if (d > this.getEffectiveEnemyRadius(_ip) + this.getEffectiveEnemyRadius(e) + 120 && (d > _inR || (_ims !== null && !checkLineOfSight(_ims, e.position.x - _iox, e.position.y - _ioy, _ip.position.x - _iox, _ip.position.y - _ioy, _iox, _ioy)))) {
+            e._iaGoUntil = now + 600;
+            if (r.state === 'attacking') { e._ogKite = 2; e._ogKx = dx / d; e._ogKy = dy / d; }
+            else if (r.state === 'following' || r.state === 'targeting_shapes') { this._btRoamFill(r); return true; }
+          }
+        }
+      }
+    }
     if ((bits & BT_FIGHT) !== 0 && e._tfHelp) {
       if (r.state === 'attacking' || r.state === 'following') {
         if (e._tfGoalId !== '' && r.targetId === e._tfGoalId) btEndGoal(e, '', 0);
         return false;
       }
       if ((r.state === 'roaming' || r.state === 'targeting_shapes' || r.state === 'idle') && (this._btGoal(e, now) || (e._tfMap && AI_CONSTANTS.BT_BOSSMAP !== 0 && this._btMapGoal(e, now)))) { this._btRoamFill(r); return true; }
+      if (e._tfGate && AI_CONSTANTS.BT_GATEFIRE !== 0 && (r.state === 'roaming' || r.state === 'targeting_shapes' || r.state === 'idle') && this._btGateGoal(e, now)) { this._btRoamFill(r); return true; }
+      if (e._tfGateZ >= 0) { e._tfGateZ = -1; e._tfGateHas = false; }
     }
     return false;
   }
@@ -16140,7 +17968,9 @@ export class GameLogic {
       this._btQx = t.position.x; this._btQy = t.position.y;
     }
     if (this._acrossGap(e.position.x, e.position.y, this._btQx, this._btQy)) return false;
-    return !ground || !this._sgTargetSafe(this._sgSlotOfBot(e), this._btQx, this._btQy, AI_CONSTANTS.SAFEZONE_ACQUIRE_CELLS);
+    if (!ground) return true;
+    if (this._sgTargetSafe(this._sgSlotOfBot(e), this._btQx, this._btQy, AI_CONSTANTS.SAFEZONE_ACQUIRE_CELLS)) return false;
+    return !(AI_CONSTANTS.KILLZONE_KEEPOUT !== 0 && FEEL_LIVE && this._kzLine(e, this._btQx, this._btQy));
   }
   private _btSees(e: EnemyTank, id: string): boolean {
     const f2 = e.fovRadius * e.fovRadius;
@@ -16255,7 +18085,7 @@ export class GameLogic {
       if (!t.active || t.isDying || t.isBossTier !== true || (t._mevF & MF_NO_MM) !== 0) continue;
       const dx = t.position.x - e.position.x, dy = t.position.y - e.position.y, d2 = dx * dx + dy * dy;
       if ((t.id === e._tfBanId && now < e._tfBanUntil) || !this._btGoalOk(e, t.id, false)) continue;
-      if (this._sgTargetSafe(slot, this._btQx, this._btQy, AI_CONSTANTS.SAFEZONE_ACQUIRE_CELLS)) { if (meet && d2 < bestIn) { bestIn = d2; pickIn = t; } }
+      if (this._sgTargetSafe(slot, this._btQx, this._btQy, AI_CONSTANTS.SAFEZONE_ACQUIRE_CELLS) || (AI_CONSTANTS.KILLZONE_KEEPOUT !== 0 && FEEL_LIVE && this._kzLine(e, this._btQx, this._btQy))) { if (meet && d2 < bestIn) { bestIn = d2; pickIn = t; } }
       else if (d2 < best) { best = d2; pick = t; }
     }
     if (e._tfMeetId !== '') {
@@ -16299,6 +18129,8 @@ export class GameLogic {
     e._tfGoalBestD = Infinity; e._tfGoalGiveUpAt = now + BT.GOAL_GIVE_UP_MS; e._tfGoalArriveAt = 0;
   }
   private _btMeetPlace(e: EnemyTank, boss: EnemyTank): boolean {
+    if (AI_CONSTANTS.BT_GATEMOST !== 0 && e._tfGate && hfHash(e.hf.seed, 528, hfIdNum(boss.id)) < e._tfGateShare && this._btMeetGate(e, boss)) return true;
+    if (AI_CONSTANTS.BT_MEETKEEP !== 0 && FEEL_LIVE && e._tfMeetId === boss.id && GameLogic._meetKeys.indexOf(e._tfMeetSid) >= 0) return true;
     const et = this.state.enemyTanks;
     let best = Infinity, s: EnemyTank | null = null;
     for (let i = 0; i < et.length; i++) {
@@ -16312,12 +18144,193 @@ export class GameLogic {
     const r = this.getEffectiveEnemyRadius(s), slot = this._sgSlotOfBot(e), band = AI_CONSTANTS.SAFEZONE_ACQUIRE_CELLS;
     let k = r + 90;
     if (this._sgTargetSafe(slot, s.position.x + ux * k, s.position.y + uy * k, band)) { k = r + 40; if (this._sgTargetSafe(slot, s.position.x + ux * k, s.position.y + uy * k, band)) return false; }
-    e._tfMeetSid = s.id; e._tfMeetX = s.position.x + ux * k; e._tfMeetY = s.position.y + uy * k;
+    e._tfMeetSid = SMALL_FIX.CH052 !== 0 ? GameLogic._sideKeys[(((boss.hf.idn === 0 ? 1 : boss.hf.idn) & 15) << 3) | (this._sgSlotOf(e.team) & 7)] : s.id;
+    e._tfMeetX = s.position.x + ux * k; e._tfMeetY = s.position.y + uy * k;
     return true;
+  }
+  private _btMeetOut(e: EnemyTank, boss: EnemyTank, vm: NonNullable<GameLogic['_mev']>): boolean {
+    const plans = vm.p.plans, zones = vm.p.zones, bx = boss.position.x, by = boss.position.y, et = this.state.enemyTanks;
+    const kz = AI_CONSTANTS.KILLZONE_KEEPOUT !== 0 && FEEL_LIVE, reach = this._kzReach(e) + 40;
+    let zi = -1;
+    for (let i = 0; i < plans.length && zi < 0; i++) { const areas = plans[i].areas; for (let k = 0; k < areas.length; k++) { const a = areas[k]; if (a >= 0 && a < zones.length && vm.pointInZone(a, bx, by)) { zi = a; break; } } }
+    const inside = zi >= 0 || (kz && this._kzDepth(e, bx, by, reach) >= 0);
+    let best = Infinity, s: EnemyTank | null = null;
+    for (let i = 0; i < et.length; i++) {
+      const o = et[i];
+      if (o === e || !o.active || o.isDying || (o._mevF & MF_STANDS) === 0 || !this._btMate(e, o)) continue;
+      const dx = o.position.x - bx, dy = o.position.y - by, d2 = dx * dx + dy * dy;
+      if (d2 < best) { best = d2; s = o; }
+    }
+    if (s === null || this._acrossGap(e.position.x, e.position.y, s.position.x, s.position.y)) return false;
+    const d = Math.sqrt(best);
+    if (d < 700) return false;
+    const ux = (s.position.x - bx) / d, uy = (s.position.y - by) / d;
+    for (let k = 120; k < d - 250; k += 80) {
+      const x = bx + ux * k, y = by + uy * k;
+      if ((zi >= 0 && vm.pointInZone(zi, x, y)) || (kz && this._kzDepth(e, x, y, reach) >= 0)) continue;
+      let bad = false;
+      for (let t = k + 80; !bad && kz && t < d; t += 80) if (this._kzDepth(e, bx + ux * t, by + uy * t, reach) >= 0) bad = true;
+      if (bad) continue;
+      if (!inside && k === 120) return false;
+      const k2 = k + 260 < d - 200 ? k + 260 : k;
+      e._tfMeetSid = GameLogic._meetKeys[(boss.hf.idn === 0 ? 1 : boss.hf.idn) & 15]; e._tfMeetX = bx + ux * k2; e._tfMeetY = by + uy * k2;
+      return true;
+    }
+    return false;
+  }
+  private _btMeetGate(e: EnemyTank, boss: EnemyTank): boolean {
+    const vm = this._mev;
+    if (vm === null) return false;
+    if (AI_CONSTANTS.BT_GATEWHERE !== 0) return this._btMeetOut(e, boss, vm);
+    const plans = vm.p.plans, zones = vm.p.zones, bx = boss.position.x, by = boss.position.y, x = e.position.x, y = e.position.y, et = this.state.enemyTanks;
+    let best = Infinity, zi = -1, gx = 0, gy = 0;
+    for (let i = 0; i < plans.length; i++) {
+      const areas = plans[i].areas;
+      for (let k = 0; k < areas.length; k++) {
+        const a = areas[k];
+        if (a < 0 || a >= zones.length) continue;
+        const z = zones[a], cx = z.poly !== null ? z.pmx : (z.x0 + z.x1) * 0.5, cy = z.poly !== null ? z.pmy : (z.y0 + z.y1) * 0.5;
+        const d2 = (cx - bx) * (cx - bx) + (cy - by) * (cy - by);
+        if (d2 >= best || this._acrossGap(x, y, cx, cy)) continue;
+        let own = false;
+        for (let j = 0; j < et.length && !own; j++) { const o = et[j]; if (o.active && !o.isDying && (o._mevF & MF_STANDS) !== 0 && this._btMate(e, o) && vm.pointInZone(a, o.position.x, o.position.y)) own = true; }
+        if (own) continue;
+        best = d2; zi = a; gx = cx; gy = cy;
+      }
+    }
+    if (zi < 0 || !this._btGateSpot(e, zi, gx, gy)) return false;
+    e._tfMeetSid = GameLogic._gateKey(zi); e._tfMeetX = this._gsX[zi]; e._tfMeetY = this._gsY[zi];
+    return true;
+  }
+  private _btGateGoal(e: EnemyTank, now: number): boolean {
+    if (now < e._tfGateLookAt) return e._tfGateZ >= 0;
+    e._tfGateLookAt = now + 500;
+    const vm = this._mev, h = e.hf, held = e._tfGateZ;
+    e._tfGateZ = -1;
+    if (vm === null || !h.plays || (AI_CONSTANTS.BT_GATEMOST === 0 && (h.dKind !== 0 || !(h.bpsMax > 0)))) { e._tfGateHas = false; return false; }
+    const plans = vm.p.plans, zones = vm.p.zones, x = e.position.x, y = e.position.y, et = this.state.enemyTanks;
+    let best = Infinity, zi = -1, gx = 0, gy = 0;
+    for (let i = 0; i < plans.length; i++) {
+      const ph = vm.pPhase[i];
+      if (ph !== 1 && ph !== 3 && !(ph === 2 && vm.pAllBorn[i] === 0)) continue;
+      if (hfHash(h.seed, 511, (vm.pWave[i] + (ph === 2 ? 0 : 1)) * 31 + i) >= e._tfGateShare) continue;
+      const areas = plans[i].areas;
+      for (let k = 0; k < areas.length; k++) {
+        const a = areas[k];
+        if (a < 0 || a >= zones.length || vm.pointInZone(a, x, y)) continue;
+        const z = zones[a], cx = z.poly !== null ? z.pmx : (z.x0 + z.x1) * 0.5, cy = z.poly !== null ? z.pmy : (z.y0 + z.y1) * 0.5;
+        const d2 = (cx - x) * (cx - x) + (cy - y) * (cy - y);
+        if (d2 >= best || this._acrossGap(x, y, cx, cy)) continue;
+        let own = false;
+        for (let j = 0; j < et.length && !own; j++) { const o = et[j]; if (o.active && !o.isDying && (o._mevF & MF_STANDS) !== 0 && this._btMate(e, o) && vm.pointInZone(a, o.position.x, o.position.y)) own = true; }
+        if (own) continue;
+        best = d2; zi = a; gx = cx; gy = cy;
+      }
+    }
+    if (zi < 0) { e._tfGateHas = false; return false; }
+    if (zi !== held) e._tfGateHas = false;
+    e._tfGateZ = zi; e._tfGateGX = gx; e._tfGateGY = gy;
+    return true;
+  }
+  private _gsVm: MapEventsVM | null = null; private _gsX: number[] = []; private _gsY: number[] = []; private _gsOk: number[] = [];
+  private _gsUx: number[] = []; private _gsUy: number[] = [];
+  private static _sideKeys: string[] = Array.from({ length: 128 }, (_v, i) => 'side#' + (i >> 3) + '#' + (i & 7));
+  private static _meetKeys: string[] = ['meet#0', 'meet#1', 'meet#2', 'meet#3', 'meet#4', 'meet#5', 'meet#6', 'meet#7', 'meet#8', 'meet#9', 'meet#10', 'meet#11', 'meet#12', 'meet#13', 'meet#14', 'meet#15'];
+  private static _gateKeys: string[] = [];
+  private static _gateKey(z: number): string { const K = GameLogic._gateKeys; while (K.length <= z) K.push('gate#' + K.length); return K[z]; }
+  private _btGateSpot(e: EnemyTank, z: number, gx: number, gy: number): boolean {
+    const vm = this._mev;
+    if (vm !== this._gsVm) { this._gsVm = vm; this._gsOk.length = 0; this._gsX.length = 0; this._gsY.length = 0; this._gsUx.length = 0; this._gsUy.length = 0; }
+    while (this._gsOk.length <= z) { this._gsOk.push(0); this._gsX.push(0); this._gsY.push(0); this._gsUx.push(0); this._gsUy.push(0); }
+    if (this._gsOk[z] !== 0) return this._gsOk[z] === 1;
+    this._gsOk[z] = -1;
+    const et = this.state.enemyTanks;
+    let best = Infinity, sx = 0, sy = 0;
+    for (let j = 0; j < et.length; j++) {
+      const o = et[j];
+      if (!o.active || o.isDying || (o._mevF & MF_STANDS) === 0 || !this._btMate(e, o)) continue;
+      const d2 = (o.position.x - gx) * (o.position.x - gx) + (o.position.y - gy) * (o.position.y - gy);
+      if (d2 < best) { best = d2; sx = o.position.x; sy = o.position.y; }
+    }
+    if (best === Infinity) { this._gsOk[z] = 0; return false; }
+    const dx = sx - gx, dy = sy - gy, d = Math.sqrt(dx * dx + dy * dy);
+    if (d < 700) return false;
+    const ux = dx / d, uy = dy / d, reach = this._kzReach(e) + 40, kz = AI_CONSTANTS.KILLZONE_KEEPOUT !== 0 && FEEL_LIVE;
+    for (let n = 0, k = 450; n < 20 && k < d - 200; n++, k += 100) {
+      let bad = kz && this._kzDepth(e, gx + ux * k, gy + uy * k, reach) >= 0;
+      for (let t = k + 80; !bad && kz && t < d; t += 80) if (this._kzDepth(e, gx + ux * t, gy + uy * t, reach) >= 0) bad = true;
+      if (bad) continue;
+      const k2 = AI_CONSTANTS.BT_GATEWHERE !== 0 && k + 260 < d - 200 ? k + 260 : k;
+      this._gsX[z] = gx + ux * k2; this._gsY[z] = gy + uy * k2; this._gsUx[z] = ux; this._gsUy[z] = uy; this._gsOk[z] = 1;
+      return true;
+    }
+    return false;
+  }
+  private _btGateRoam(e: EnemyTank, navMs: MapState | null, ox: number, oy: number, bodyR: number, now: number, dtFactor: number): boolean {
+    const z = e._tfGateZ, gx = e._tfGateGX, gy = e._tfGateGY;
+    if (!this._btGateSpot(e, z, gx, gy)) { e._tfGateHas = false; e._tfGateFireUntil = 0; return false; }
+    if (AI_CONSTANTS.BT_GATEWHERE !== 0) {
+      const h = e.hf, px = this._gsX[z], py = this._gsY[z], ux = this._gsUx[z], uy = this._gsUy[z];
+      const back = hfHash(h.seed, 540, z) < 0.125 ? -140 : 100 + 260 * hfHash(h.seed, 541, z) * (0.5 + 0.5 * e.dnaCaution), side = 600 * (hfHash(h.seed, 542, z) - 0.5);
+      let sx = px + ux * back - uy * side, sy = py + uy * back + ux * side;
+      if ((navMs !== null && !isWalkable(navMs, sx - ox, sy - oy, ox, oy, bodyR)) || (AI_CONSTANTS.KILLZONE_KEEPOUT !== 0 && FEEL_LIVE && this._kzDepth(e, sx, sy, this._kzReach(e) + 40) >= 0)) { sx = px; sy = py; }
+      const qx = sx - e.position.x, qy = sy - e.position.y, cx = px - e.position.x, cy = py - e.position.y;
+      if (qx * qx + qy * qy > 122500 && cx * cx + cy * cy > 90000) { e._tfGateHas = false; e._tfGateFireUntil = 0; return this._btDrive(e, px, py, navMs, ox, oy, bodyR, now, dtFactor, GameLogic._gateKey(z)); }
+      if (qx * qx + qy * qy <= 3600) { e._tfGateX = sx; e._tfGateY = sy; e._tfGateHas = true; }
+      if (AI_CONSTANTS.BT_MEETFIRE !== 0 && FEEL_LIVE) this._btWaitFire(e, navMs, ox, oy, now, -ux, -uy, Infinity);
+      else if (navMs !== null && h.dKind === 0 && h.bpsMax > 0) {
+        const lx = e.position.x - ox, ly = e.position.y - oy;
+        if (checkShotWallsClear(navMs, lx, ly, lx - ux * 500, ly - uy * 500, ox, oy, 6)) { e._tfGateAngle = Math.atan2(-uy, -ux); e._tfGateFireUntil = now + 400; }
+      }
+      return this._ogHoldAt(e, sx, sy, 55, navMs, ox, oy, bodyR, now, dtFactor);
+    }
+    if (!e._tfGateHas) {
+      const px = this._gsX[z], py = this._gsY[z], qx = px - e.position.x, qy = py - e.position.y, arr = 120 + 180 * hfHash(e.hf.seed, 512, z);
+      if (qx * qx + qy * qy > arr * arr) { e._tfGateFireUntil = 0; return this._btDrive(e, px, py, navMs, ox, oy, bodyR, now, dtFactor, GameLogic._gateKey(z)); }
+      e._tfGateX = e.position.x; e._tfGateY = e.position.y; e._tfGateHas = true;
+    }
+    const fx = gx - e.position.x, fy = gy - e.position.y, fd = Math.sqrt(fx * fx + fy * fy);
+    if (fd > 1 && navMs !== null && e.hf.dKind === 0 && e.hf.bpsMax > 0) {
+      const L = fd < 500 ? fd : 500, lx = e.position.x - ox, ly = e.position.y - oy;
+      if (checkShotWallsClear(navMs, lx, ly, lx + (fx / fd) * L, ly + (fy / fd) * L, ox, oy, 6)) { e._tfGateAngle = Math.atan2(fy, fx); e._tfGateFireUntil = now + 400; }
+    }
+    return this._btWalkAbout(e, e._tfGateX, e._tfGateY, 0, 90, navMs, ox, oy, bodyR, now, dtFactor);
+  }
+  private _btFightOn(e: EnemyTank, now: number): boolean {
+    if (e.aiState === 'attacking' && (e.currentTargetType === 'enemy' || e.currentTargetType === 'player')) return true;
+    if (now - e.lastTankDamageAt < 4000) return true;
+    const et = this.state.enemyTanks;
+    for (let i = 0; i < et.length; i++) {
+      const t = et[i];
+      if (!t.active || t.isDying || t.isBossTier !== true || (t._mevF & MF_NO_MM) !== 0 || this._btMateOrSelf(e, t) || campsClash(e.camp, t.camp)) continue;
+      if (!this._acrossGap(e.position.x, e.position.y, t.position.x, t.position.y)) return true;
+    }
+    return false;
+  }
+  private _btWaitFire(e: EnemyTank, navMs: MapState | null, ox: number, oy: number, now: number, ux: number, uy: number, d: number): void {
+    const h = e.hf;
+    if (h.sLed === true) return;
+    if (h.dKind !== 0) { e._tfGateAngle = Math.atan2(uy, ux); e._tfGateFireUntil = now + 400; return; }
+    if (!(h.bpsMax > 0) || navMs === null) return;
+    const L = d < 500 ? d : 500, lx = e.position.x - ox, ly = e.position.y - oy;
+    if (!checkShotWallsClear(navMs, lx, ly, lx + ux * L, ly + uy * L, ox, oy, 6)) return;
+    e._tfGateDist = 0;
+    if (h.placeKind === 3 || h.placeKind === 4) {
+      const gun = e.turrets[e.primaryTurretIndex];
+      const f = gun ? this._hfFlightOf(gun, getEnemyStatMultiplier(e, 'bulletSpeed')) : 0;
+      if (f > 0) { const land = 1.6 * this.getEffectiveEnemyRadius(e) + f; if (this._kzDepth(e, e.position.x + ux * land, e.position.y + uy * land, 30) >= 0) return; }
+      else if (f < 0) {
+        let gd = 0;
+        for (let t = 120; t <= 500; t += 60) if (this._kzDepth(e, e.position.x + ux * t, e.position.y + uy * t, 30) >= 0) { gd = t - 90; break; }
+        if (gd !== 0) { if (gd < 120) return; e._tfGateDist = gd; }
+      }
+    }
+    e._tfGateAngle = Math.atan2(uy, ux); e._tfGateFireUntil = now + 400;
   }
   private _btRoam(e: EnemyTank, navMs: MapState | null, ox: number, oy: number, bodyR: number, now: number, dtFactor: number): boolean {
     if (BOT_TACTICS.ON === 0) return false;
     if (this._carried.length !== 0 && this._carryHome(e, navMs, ox, oy, bodyR, now, dtFactor)) return true;
+    if (SMALL_FIX.R941 !== 0 && SMALL_FIX.G737 !== 0 && e._ftGo && e._ftId !== '') return this._btDrive(e, e._ftX, e._ftY, navMs, ox, oy, bodyR, now, dtFactor, e._ftId);
     if (SMALL_FIX.R941 !== 0 && e._esId !== '' && this._esRoam(e, navMs, ox, oy, bodyR, now, dtFactor)) return true;
     if (SMALL_FIX.R941 !== 0 && e._ftGo && e._ftId !== '') return this._btDrive(e, e._ftX, e._ftY, navMs, ox, oy, bodyR, now, dtFactor, e._ftId);
     const bits = e._btBits;
@@ -16345,9 +18358,14 @@ export class GameLogic {
     }
     if (e._tfMeetId !== '' && AI_CONSTANTS.BT_BOSSMEET !== 0) {
       const mdx = e.position.x - e._tfMeetX, mdy = e.position.y - e._tfMeetY;
+      if (AI_CONSTANTS.BT_MEETFIRE !== 0 && FEEL_LIVE && e.hf.plays && mdx * mdx + mdy * mdy <= 160000) {
+        const _mb = this._enemyById.get(e._tfMeetId);
+        if (_mb !== undefined && _mb.active && !_mb.isDying) { const _bx = _mb.position.x - e.position.x, _by = _mb.position.y - e.position.y, _bd = Math.sqrt(_bx * _bx + _by * _by); if (_bd > 1 && _bd <= 2200) this._btWaitFire(e, navMs, ox, oy, now, _bx / _bd, _by / _bd, _bd); }
+      }
       if (mdx * mdx + mdy * mdy > 32400) return this._btDrive(e, e._tfMeetX, e._tfMeetY, navMs, ox, oy, bodyR, now, dtFactor, e._tfMeetSid);
       return this._btWalkAbout(e, e._tfMeetX, e._tfMeetY, 0, 150, navMs, ox, oy, bodyR, now, dtFactor);
     }
+    if (e._tfGateZ >= 0 && AI_CONSTANTS.BT_GATEFIRE !== 0 && this._btGateRoam(e, navMs, ox, oy, bodyR, now, dtFactor)) return true;
     if (this._btDuty(e)) return this._btSideWalk(e, navMs, ox, oy, bodyR, now, dtFactor);
     if (e._btRoute !== '') this._btDropRoute(e);
     return false;
@@ -16377,6 +18395,10 @@ export class GameLogic {
         o = this._ogFrontPick(e, vm, tag, _ogHeld, o, now);
         if (e._ogPendId !== '' && e._ogPendAt < e._ogLookAt) e._ogLookAt = e._ogPendAt;
       }
+      if (!guard && AI_CONSTANTS.BT_TEAMATTACK !== 0 && FEEL_LIVE && e._oaTeam && e.hf.plays && o !== undefined) {
+        o = this._tpAttackPick(e, vm, tag, _ogHeld, o, now);
+        if (e._ogPendId !== '' && e._ogPendAt < e._ogLookAt) e._ogLookAt = e._ogPendAt;
+      }
       e._ogId = o !== undefined ? o.id : '';
     }
     if (o === undefined) { if (e._btRoute !== '') this._btDropRoute(e); return false; }
@@ -16384,26 +18406,377 @@ export class GameLogic {
     const dx = o.position.x - e.position.x, dy = o.position.y - e.position.y, d = Math.sqrt(dx * dx + dy * dy);
     const objR = this.getEffectiveEnemyRadius(o);
     if (guard) {
-      if (d > e._ogRadius) { e._ogBlockUntil = 0; e._ogBlockSpotUntil = 0; e._ogUnitT = ''; return this._btDrive(e, o.position.x, o.position.y, navMs, ox, oy, bodyR, now, dtFactor, o.id); }
+      if (AI_CONSTANTS.BT_TEAMTAKE !== 0 && AI_CONSTANTS.BT_TEAMPLAN !== 0 && FEEL_LIVE && e._ogFront && e._ogTake && e.hf.plays && this._ogFrontOne(e)) {
+        const tk = this._tpTakeOf(e, now);
+        if (tk !== null) {
+          e._ogBlockUntil = 0; e._ogBlockSpotUntil = 0; e._ogGo = 0; e._ogUnitT = ''; e._ogHelpId = '';
+          const tdx = tk.position.x - e.position.x, tdy = tk.position.y - e.position.y;
+          const tnear = Math.max(this.getEffectiveEnemyRadius(tk) + bodyR + 120, e.fovRadius * 0.55);
+          if (tdx * tdx + tdy * tdy > tnear * tnear) return this._btDrive(e, tk.position.x, tk.position.y, navMs, ox, oy, bodyR, now, dtFactor, tk.id);
+          if (e._btRoute !== '') this._btDropRoute(e);
+          return false;
+        }
+      }
+      if (AI_CONSTANTS.BT_INTOAREA !== 0 && FEEL_LIVE && e.hf.plays && this._ogAttacked(e, o, navMs, ox, oy, now)) {
+        const _inR = e._ogRadius < 650 ? e._ogRadius : 650;
+        e._ogBlockUntil = 0; e._ogBlockSpotUntil = 0; e._ogGo = 0; e._ogHelpId = ''; e._ogSideId = '';
+        if (d > objR + bodyR + 120 && (d > _inR || (navMs !== null && !checkLineOfSight(navMs, e.position.x - ox, e.position.y - oy, o.position.x - ox, o.position.y - oy, ox, oy)))) {
+          e._ogUnitT = ''; e._ofUntil = 0; e._iaGoUntil = now + 600;
+          return this._btDrive(e, o.position.x, o.position.y, navMs, ox, oy, bodyR, now, dtFactor, o.id);
+        }
+        this._ogUnitLook(e, now);
+        if (AI_CONSTANTS.BT_FIRESPOT !== 0 && this._ogFireSpot(e, o, navMs, ox, oy, bodyR, now, dtFactor)) return true;
+        return this._btWalkAbout(e, o.position.x, o.position.y, objR + bodyR + 80, _inR < 420 ? _inR : 420, navMs, ox, oy, bodyR, now, dtFactor);
+      }
+      if (AI_CONSTANTS.BT_PACEHOLD !== 0 && FEEL_LIVE && this._bpWatch(e, now)) {
+        if (d <= e._ogRadius) {
+          if (e._ogBlockSpotUntil > 0 && AI_CONSTANTS.BT_BLOCKSTAND !== 0) return this._ogHoldAt(e, e._ogBlockX, e._ogBlockY, 50, navMs, ox, oy, bodyR, now, dtFactor);
+          if (AI_CONSTANTS.BT_FIRESPOT !== 0 && this._ogFireSpot(e, o, navMs, ox, oy, bodyR, now, dtFactor)) { e._bpX = e.position.x; e._bpY = e.position.y; return true; }
+        }
+        return this._ogHoldAt(e, e._bpX, e._bpY, 110, navMs, ox, oy, bodyR, now, dtFactor);
+      }
+      if (AI_CONSTANTS.BT_ALLGUNS !== 0 && FEEL_LIVE && e.hf.plays && d <= e._ogRadius) {
+        const _am = this._agMate(e, now);
+        if (_am !== null) {
+          const _tid = this._btFightOf(_am), _tk = _tid === this.state.playerId ? null : (this._enemyById.get(_tid) ?? undefined);
+          if (_tk !== undefined) {
+            const _tx = (_tk === null ? this.tankPos.x : _tk.position.x) - o.position.x, _ty = (_tk === null ? this.tankPos.y : _tk.position.y) - o.position.y;
+            if (_tx * _tx + _ty * _ty <= e._ogRadius * e._ogRadius) {
+              e._ogHelpId = _am.id; e._ogBlockUntil = 0; e._ogBlockSpotUntil = 0; e._ogGo = 0;
+              if (this._ogGroupGo(e, _am, navMs, ox, oy, bodyR, now, dtFactor)) return true;
+            }
+          }
+        }
+      }
+      let _atPlan = false;
+      if (AI_CONSTANTS.BT_GROUPCALM !== 0 && AI_CONSTANTS.BT_TEAMPLAN !== 0 && FEEL_LIVE && d <= e._ogRadius) { const _ti = this._tpSide(e); if (_ti >= 0 && this._tpId[_ti] === o.id) { _atPlan = true; e._ogHelpId = ''; e._ogSideId = ''; } }
+      if (!_atPlan && AI_CONSTANTS.BT_QUIETHELP !== 0 && e._ogFront && this._ogFrontOne(e) && this._ogHelpGo(e, o, navMs, ox, oy, now)) {
+        const m = this._enemyById.get(e._ogHelpId);
+        if (m !== undefined) {
+          e._ogBlockUntil = 0; e._ogBlockSpotUntil = 0; e._ogGo = 0; e._ogUnitT = '';
+          if (AI_CONSTANTS.BT_GROUPGO !== 0 && FEEL_LIVE && this._ogGroupGo(e, m, navMs, ox, oy, bodyR, now, dtFactor)) return true;
+          const hx = m.position.x - e.position.x, hy = m.position.y - e.position.y, near = 280 + 170 * hfHash(e.hf.seed, 534, 0);
+          if (hx * hx + hy * hy > near * near) return this._btDrive(e, m.position.x, m.position.y, navMs, ox, oy, bodyR, now, dtFactor, m.id);
+          if (AI_CONSTANTS.BT_BLOCKSTAND !== 0) return this._ogHoldAt(e, e.position.x, e.position.y, 60, navMs, ox, oy, bodyR, now, dtFactor);
+          if (e._btRoute !== '') this._btDropRoute(e);
+          return this._btWalkAbout(e, m.position.x, m.position.y, bodyR * 2 + 60, near + 80, navMs, ox, oy, bodyR, now, dtFactor);
+        }
+      }
+      if (d > e._ogRadius) { e._ogBlockUntil = 0; e._ogBlockSpotUntil = 0; e._ogGo = 0; e._ogUnitT = ''; return this._btDrive(e, o.position.x, o.position.y, navMs, ox, oy, bodyR, now, dtFactor, o.id); }
       this._ogBlockLook(e, navMs, ox, oy, now);
       this._ogUnitLook(e, now);
+      if (e._ogBlockSpotUntil > 0 && AI_CONSTANTS.BT_BLOCKSTAND !== 0) return this._ogHoldAt(e, e._ogBlockX, e._ogBlockY, 50, navMs, ox, oy, bodyR, now, dtFactor);
       if (e._ogBlockSpotUntil > 0) return this._btWalkAbout(e, e._ogBlockX, e._ogBlockY, 0, 90, navMs, ox, oy, bodyR, now, dtFactor);
+      if (AI_CONSTANTS.BT_FIRESPOT !== 0 && FEEL_LIVE && this._ogFireSpot(e, o, navMs, ox, oy, bodyR, now, dtFactor)) return true;
+      if (e._ogGo === 1 && AI_CONSTANTS.BT_BLOCKPLACE !== 0) {
+        const gdx = e._ogGoCX - e.position.x, gdy = e._ogGoCY - e.position.y;
+        let spx = e._ogGoX, spy = e._ogGoY;
+        if (AI_CONSTANTS.BT_STANDKEEP !== 0 && FEEL_LIVE) {
+          const _wk = (now / (7000 + 6000 * hfHash(e.hf.seed, 533, 0))) | 0, _kx = spx - e._ogKeepX, _ky = spy - e._ogKeepY;
+          if (e._ogKeepWk !== _wk || _kx * _kx + _ky * _ky > 67600) { e._ogKeepWk = _wk; e._ogKeepX = spx; e._ogKeepY = spy; }
+          else { spx = e._ogKeepX; spy = e._ogKeepY; }
+        }
+        if (AI_CONSTANTS.BT_BLOCKREACH !== 0) {
+          const sdx = spx - e.position.x, sdy = spy - e.position.y;
+          if (sdx * sdx + sdy * sdy > 90000 && gdx * gdx + gdy * gdy > 90000 && !(navMs !== null && checkLineOfSight(navMs, e.position.x - ox, e.position.y - oy, spx - ox, spy - oy, ox, oy)))
+            return this._btDrive(e, e._ogGoCX, e._ogGoCY, navMs, ox, oy, bodyR, now, dtFactor, e._ogGoKey);
+        } else if (gdx * gdx + gdy * gdy > 90000) return this._btDrive(e, e._ogGoCX, e._ogGoCY, navMs, ox, oy, bodyR, now, dtFactor, e._ogGoKey);
+        if (AI_CONSTANTS.BT_BLOCKSTAND !== 0) return this._ogHoldAt(e, spx, spy, 60, navMs, ox, oy, bodyR, now, dtFactor);
+        return this._btWalkAbout(e, spx, spy, 0, 110, navMs, ox, oy, bodyR, now, dtFactor);
+      }
       return this._btWalkAbout(e, o.position.x, o.position.y, objR + bodyR + 80, e._ogRadius, navMs, ox, oy, bodyR, now, dtFactor);
     }
+    if (AI_CONSTANTS.BT_PACEHOLD !== 0 && FEEL_LIVE && this._bpWatch(e, now)) return this._ogHoldAt(e, e._bpX, e._bpY, 110, navMs, ox, oy, bodyR, now, dtFactor);
+    if (AI_CONSTANTS.BT_ALLGUNS !== 0 && FEEL_LIVE && e.hf.plays) {
+      const _am = this._agMate(e, now);
+      if (_am !== null) { e._ogHelpId = _am.id; if (this._ogGroupGo(e, _am, navMs, ox, oy, bodyR, now, dtFactor)) return true; }
+      else if (e._ogHelpId !== '') e._ogHelpId = '';
+    }
+    if (AI_CONSTANTS.BT_UNITFRONT !== 0 && FEEL_LIVE && e.hf.plays && e.hf.dKind !== 0 && !e.hf.rmOn) {
+      const _um = this._ufFar(e, now);
+      if (_um !== null) { e._ogHelpId = _um.id; if (this._ogGroupGo(e, _um, navMs, ox, oy, bodyR, now, dtFactor)) { if (e._ofUntil !== 0) e._ofUntil = 0; return true; } }
+    }
+    if (AI_CONSTANTS.BT_UNITHIDE !== 0 && FEEL_LIVE && e.hf.plays && e.hf.dKind !== 0 && !e.hf.rmOn && this._ouHide(e, o, d, navMs, ox, oy, bodyR, now, dtFactor)) return true;
     if (d > Math.max(objR + bodyR + 120, e.fovRadius * 0.55)) return this._btDrive(e, o.position.x, o.position.y, navMs, ox, oy, bodyR, now, dtFactor, o.id);
     if (e._btRoute !== '') this._btDropRoute(e);
     return false;
   }
+  private _ufFar(e: EnemyTank, now: number): EnemyTank | null {
+    if (now < e._ufAt) {
+      if (e._ufM === '') return null;
+      const k = this._enemyById.get(e._ufM);
+      return k !== undefined && k.active && !k.isDying && this._btFightOf(k) !== '' ? k : null;
+    }
+    e._ufAt = now + 500 + 300 * hfHash(e.hf.seed, 587, (now / 1000) | 0);
+    const et = this.state.enemyTanks, x = e.position.x, y = e.position.y;
+    let best: EnemyTank | null = null, bd = 2250000;
+    for (let i = 0; i < et.length; i++) {
+      const q = et[i];
+      if (q === e || !q.active || q.isDying || q.isSpawning || !q.hf.plays || q.spawnedByEntityId || (q._mevF & MF_STANDS) !== 0) continue;
+      const dx = q.position.x - x, dy = q.position.y - y, d2 = dx * dx + dy * dy;
+      if (d2 >= bd || !this._btMateOrSelf(e, q) || this._btFightOf(q) === '' || this._acrossGap(x, y, q.position.x, q.position.y)) continue;
+      bd = d2; best = q;
+    }
+    e._ufM = best !== null ? best.id : '';
+    {
+      const tb = isTeamBehaviorOf(e), slot = this._sgSlotOfBot(e);
+      let nd = 3240000, nid = '';
+      for (let i = 0; i < et.length; i++) {
+        const q = et[i];
+        if (!this._ogHostile(e, q, x, y) || !mayAttackTank(e, q, tb)) continue;
+        const dx = q.position.x - x, dy = q.position.y - y, d2 = dx * dx + dy * dy;
+        if (d2 >= nd || this._sgTargetSafeFor(slot, q.position.x, q.position.y, false)) continue;
+        nd = d2; nid = q.id;
+      }
+      if (mayAttackPlayer(e, this.state.playerId, this.getPlayerTeam(), this.playerGroupId) && this._playerTargetable() && !this.state.playerDead && !this._acrossGap(x, y, this.tankPos.x, this.tankPos.y)) {
+        const dx = this.tankPos.x - x, dy = this.tankPos.y - y;
+        if (dx * dx + dy * dy < nd && !this._sgTargetSafeFor(slot, this.tankPos.x, this.tankPos.y, false)) nid = 'P';
+      }
+      e._ufN = nid;
+    }
+    return best;
+  }
+  private _ufLook(e: EnemyTank, now: number): void {
+    const h = e.hf;
+    if (!h.plays || h.dKind === 0 || h.rmOn || e.graceActive || e.isSpawning) { e._ufT = ''; return; }
+    let id = '';
+    if (e._tmSt !== 0 && e._thId !== '' && now < e._thUntil) id = e._thId;
+    else {
+      const m = this._ufFar(e, now);
+      if (m !== null) { const tid = this._btFightOf(m); if (tid !== '' && this._btGoalOk(e, tid)) id = tid === this.state.playerId ? 'P' : tid; }
+    }
+    if (id === '' && e._ufN !== '') {
+      if (e._ufN === 'P') { if (this._playerTargetable() && !this.state.playerDead) id = 'P'; }
+      else { const q = this._enemyById.get(e._ufN); if (q !== undefined && q.active && !q.isDying) id = e._ufN; }
+    }
+    if (id === '' && (e._btBits & BT_ATTACK) !== 0 && e._ogId !== '') {
+      const o = this._enemyById.get(e._ogId);
+      if (o !== undefined && o.active && !o.isDying && (o._mevF & MF_GOD) === 0 && !this._enemyUnseeable(o) && !this._btMateOrSelf(e, o)) {
+        const dx = o.position.x - e.position.x, dy = o.position.y - e.position.y;
+        if (dx * dx + dy * dy <= 4840000) id = o.id;
+      }
+    }
+    if (id !== '') { e._ufT = id; e._ufUntil = now + 1500; }
+    else if (!(now < e._ufUntil)) e._ufT = '';
+  }
+  private _ufHoldAhead(e: EnemyTank, ms: MapState, nav: NonNullable<MapState['navigation']>, ox: number, oy: number, n: number, dr: number, tid: string, tlx: number, tly: number, now: number): void {
+    const h = e.hf, lx = e.position.x - ox, ly = e.position.y - oy;
+    let ux = tlx - lx, uy = tly - ly;
+    ensureRegionFields(nav, ms, ox, oy);
+    const dist = ensureAuxDistField(nav, ms, tid, tlx, tly, now, dr);
+    if (dist !== null) { const s = queryDistanceStep(nav, dist, lx, ly, false, dr); if (s.ok) { ux = s.dirX; uy = s.dirY; } }
+    const ul = Math.sqrt(ux * ux + uy * uy);
+    const circ = dr * (1.25 * Math.sqrt(n > 0 ? n : 1) + 1) + 12, off = this.getEffectiveEnemyRadius(e) + circ;
+    let px = lx, py = ly;
+    if (ul > 1e-6) {
+      ux /= ul; uy /= ul;
+      for (let k = 3; k >= 0; k--) {
+        const L = k === 0 ? off : off + 50 + 100 * k, qx = lx + ux * L, qy = ly + uy * L;
+        if (checkShotWallsClear(ms, lx, ly, qx, qy, ox, oy, circ)) { px = qx; py = qy; break; }
+      }
+    }
+    h.dwMode = 1; h.dwPress = true; h.dwHold = false; h.dwGX = px + ox; h.dwGY = py + oy;
+  }
+  private _ouHide(e: EnemyTank, o: EnemyTank, d: number, navMs: MapState | null, ox: number, oy: number, bodyR: number, now: number, dtFactor: number): boolean {
+    const h = e.hf, far = e.fovRadius, bx = o.position.x - e.position.x, by = o.position.y - e.position.y;
+    let fr = this._hfHitRange(e, o, now); if (!(fr < 1600)) fr = 1600;
+    const near = far * 1.3 > fr + 250 ? far * 1.3 : fr + 250;
+    if (!(far > 200) || d > near) { if (e._ofUntil !== 0) e._ofUntil = 0; if (e._ogUnitT !== '') e._ogUnitT = ''; return false; }
+    const onScr = h.sightBox ? ((bx < 0 ? -bx : bx) <= far && (by < 0 ? -by : by) <= far * 0.5625) : d <= far;
+    if (now >= e._ogUnitLookAt) {
+      e._ogUnitLookAt = now + 700 + 600 * hfHash(h.seed, 572, (now / 1000) | 0);
+      const et = this.state.enemyTanks, px = e.position.x, py = e.position.y, r = e.fovRadius, ry = h.sightBox ? r * 0.5625 : r, slot = this._sgSlotOfBot(e), tb = isTeamBehaviorOf(e);
+      let best = '', bd = Infinity;
+      for (let i = 0; i <= et.length; i++) {
+        let qx: number, qy: number, id: string;
+        if (i < et.length) { const q = et[i]; if (!this._ogHostile(e, q, px, py) || !mayAttackTank(e, q, tb)) continue; qx = q.position.x; qy = q.position.y; id = q.id; }
+        else {
+          if (!(mayAttackPlayer(e, this.state.playerId, this.getPlayerTeam(), this.playerGroupId) && this._playerTargetable() && !this.state.playerDead && !this._acrossGap(px, py, this.tankPos.x, this.tankPos.y))) continue;
+          qx = this.tankPos.x; qy = this.tankPos.y; id = 'P';
+        }
+        const dx = qx - px, dy = qy - py;
+        if (h.sightBox ? ((dx < 0 ? -dx : dx) > r || (dy < 0 ? -dy : dy) > ry) : dx * dx + dy * dy > r * r) continue;
+        if (this._sgTargetSafeFor(slot, qx, qy, id === e._ogUnitT)) continue;
+        const d2 = (dx * dx + dy * dy) * (id === e._ogUnitT ? 0.49 : 1);
+        if (d2 < bd) { bd = d2; best = id; }
+      }
+      if (best === '' && onScr && (o._mevF & MF_GOD) === 0 &&!this._enemyUnseeable(o) && !this._sgTargetSafeFor(slot, o.position.x, o.position.y, e._ogUnitT === o.id)) best = o.id;
+      e._ogUnitT = best;
+    }
+    if (navMs === null || !navMs.navigation || navMs.walls.length === 0) return false;
+    if (now >= e._ofLookAt) { e._ofLookAt = now + 450 + 250 * hfHash(h.seed, 573, now | 0); this._ouPlaceLook(e, o, navMs, ox, oy, bodyR, now, far, fr); }
+    if (!(now < e._ofUntil)) return false;
+    const sx = e._ofX - e.position.x, sy = e._ofY - e.position.y;
+    if (sx * sx + sy * sy > 2500) { if (e._btRoute !== '') this._btDropRoute(e); return this._intDrive(e, e._ofWX, e._ofWY, navMs, ox, oy, bodyR, now, dtFactor, null); }
+    return this._ogHoldAt(e, e._ofX, e._ofY, 55, navMs, ox, oy, bodyR, now, dtFactor);
+  }
+  private _ouPlaceLook(e: EnemyTank, o: EnemyTank, navMs: MapState, ox: number, oy: number, bodyR: number, now: number, far: number, fr: number): void {
+    const h = e.hf, nav = navMs.navigation!;
+    const H = GameLogic._ofH, px = e.position.x, py = e.position.y, lx = px - ox, ly = py - oy, et = this.state.enemyTanks;
+    const hold = now < e._ofUntil;
+    if (hold) { const sx = e._ofX - px, sy = e._ofY - py; if (sx * sx + sy * sy <= 2500) return; }
+    let n = 0;
+    for (let i = 0; i <= et.length; i++) {
+      let qx: number, qy: number;
+      if (i < et.length) { const q = et[i]; if (!this._ogHostile(e, q, px, py)) continue; qx = q.position.x; qy = q.position.y; }
+      else {
+        if (!(mayAttackPlayer(e, this.state.playerId, this.getPlayerTeam(), this.playerGroupId) && this._playerTargetable() && !this.state.playerDead && !this._acrossGap(px, py, this.tankPos.x, this.tankPos.y))) continue;
+        qx = this.tankPos.x; qy = this.tankPos.y;
+      }
+      const d2 = (qx - px) * (qx - px) + (qy - py) * (qy - py);
+      if (d2 > 5760000) continue;
+      if (n < 6) { H[2 * n] = qx; H[2 * n + 1] = qy; n++; continue; }
+      let fi = -1, fd = d2;
+      for (let k = 0; k < 6; k++) { const k2 = (H[2 * k] - px) * (H[2 * k] - px) + (H[2 * k + 1] - py) * (H[2 * k + 1] - py); if (k2 > fd) { fd = k2; fi = k; } }
+      if (fi >= 0) { H[2 * fi] = qx; H[2 * fi + 1] = qy; }
+    }
+    const gc = nav.gridCells, gcY = nav.gridCellsY, N = gc * gcY, cs = nav.cellSize, mh = nav.mapHalf, mhY = nav.mapHalfY;
+    const cx0 = Math.floor((lx + mh) / cs), cy0 = Math.floor((ly + mhY) / cs);
+    if (cx0 < 0 || cx0 >= gc || cy0 < 0 || cy0 >= gcY) { e._ofUntil = 0; return; }
+    let W = this._ofMap.get(nav);
+    if (W === undefined || W.own.length !== N) { W = { own: new Uint16Array(N), par: new Int32Array(N), q: new Int32Array(N) }; this._ofMap.set(nav, W); }
+    const own = W.own, par = W.par, Q = W.q, i0 = cx0 * gcY + cy0;
+    const mask = nav.regionsBuilt && nav.navBlocked.length === N ? nav.navBlocked : null;
+    const tgt = hold ? Math.floor((e._ofX - ox + mh) / cs) * gcY + Math.floor((e._ofY - oy + mhY) / cs) : -1, D = hold ? 18 : 12;
+    const olx = o.position.x - ox, oly = o.position.y - oy, slot = this._sgSlotOfBot(e), band = AI_CONSTANTS.SAFEZONE_ACQUIRE_CELLS;
+    const fx2 = 0.81 * far * far, fy2 = h.sightBox ? 0.25 * far * far : fx2, near2 = 0.09 * far * far, fr2 = fr * fr, look2 = fr2 > fx2 + fy2 ? fr2 : fx2 + fy2;
+    own.fill(0xFFFF); own[i0] = 0; par[i0] = -1; Q[0] = i0;
+    let qh = 0, qt = 1, found = -1, alt = -1, fS = Infinity, aS = Infinity;
+    while (qh < qt) {
+      const i = Q[qh++], dd = own[i], ix = (i / gcY) | 0, iy = i - ix * gcY;
+      const wx = -mh + (ix + 0.5) * cs, wy = -mhY + (iy + 0.5) * cs, pdx = wx - olx, pdy = wy - oly, p2 = pdx * pdx + pdy * pdy;
+      const seenB = p2 <= look2 && checkLineOfSight(navMs, wx, wy, olx, oly, ox, oy);
+      if (hold) { if (i === tgt) { found = i; break; } }
+      else if (!seenB && p2 >= near2 && pdx * pdx <= fx2 && pdy * pdy <= fy2 && !this._sgGroundDanger(slot, wx + ox, wy + oy, band)) {
+        let seen = false;
+        for (let k = 0; k < n && !seen; k++) { const hx = H[2 * k] - ox, hy = H[2 * k + 1] - oy, ddx = hx - wx, ddy = hy - wy; if (ddx * ddx + ddy * ddy <= 1.44 * fx2 && checkLineOfSight(navMs, wx, wy, hx, hy, ox, oy)) seen = true; }
+        const sc = dd * cs + Math.sqrt(p2);
+        if (!seen) { if (sc < fS) { fS = sc; found = i; } } else if (sc < aS) { aS = sc; alt = i; }
+      }
+      if (dd >= D || (i !== i0 && seenB && p2 <= fr2)) continue;
+      for (let k = 0; k < 4; k++) {
+        const jx = ix + (k === 0 ? 1 : k === 1 ? -1 : 0), jy = iy + (k === 2 ? 1 : k === 3 ? -1 : 0);
+        if (jx < 0 || jx >= gc || jy < 0 || jy >= gcY) continue;
+        const j = jx * gcY + jy;
+        if (own[j] !== 0xFFFF) continue;
+        if (mask ? mask[j] !== 0 : (navMs.tileGrid[j] === TileType.WALL || navMs.rockGrid[j] >= 0)) continue;
+        { const cl = nav.clearance[j]; if (cl < bodyR && cl < nav.clearanceMax) continue; }
+        own[j] = dd + 1; par[j] = i; Q[qt++] = j;
+      }
+    }
+    if (found < 0) found = alt;
+    if (found < 0) { if (hold) e._ofUntil = 0; else e._ofLookAt = now + 2500; return; }
+    if (!hold) { const fx = (found / gcY) | 0, fy = found - fx * gcY; e._ofX = -mh + (fx + 0.5) * cs + ox; e._ofY = -mhY + (fy + 0.5) * cs + oy; e._ofUntil = now + 7000 + 6000 * hfHash(h.seed, 574, now | 0); }
+    let wpx = e._ofX, wpy = e._ofY;
+    for (let c = found, g = 0; c !== i0 && c >= 0 && g < 40; c = par[c], g++) {
+      const ix = (c / gcY) | 0, iy = c - ix * gcY, cx = -mh + (ix + 0.5) * cs, cy = -mhY + (iy + 0.5) * cs;
+      if (checkShotWallsClear(navMs, lx, ly, cx, cy, ox, oy, bodyR * 0.9) && isPathClear(navMs, lx, ly, cx, cy, ox, oy, bodyR * 0.9)) { wpx = cx + ox; wpy = cy + oy; break; }
+    }
+    e._ofWX = wpx; e._ofWY = wpy;
+  }
+  private _fwLook(e: EnemyTank, now: number): void {
+    if (now < e._fwAt) return;
+    const h = e.hf;
+    e._fwAt = now + 250 + 200 * hfHash(h.seed, 582, (now / 500) | 0);
+    if (!h.plays || h.dKind !== 0 || !(h.bpsMax > 0) || e.minAttackDistance === 0 || (e._btBits === 0 && e._tmSt === 0) || e.graceActive || e.isSpawning) return;
+    const ms = this._getEnemyNavMapState(e), ox = this._navOffX, oy = this._navOffY;
+    const px = e.position.x, py = e.position.y, r0 = this._standoffReach(e), reach = 1.3 * (r0 > 0 ? r0 : 0.8 * e.fovRadius);
+    if (AI_CONSTANTS.TM_ALLIN !== 0 && e._thId !== '' && now < e._thUntil) {
+      const _hp = e._thId === 'P', _ht = _hp ? undefined : this._enemyById.get(e._thId);
+      if (_hp ? (!this.state.playerDead && this._playerTargetable()) : (_ht !== undefined && _ht.active && !_ht.isDying)) {
+        const _hx = _hp ? this.tankPos.x : _ht!.position.x, _hy = _hp ? this.tankPos.y : _ht!.position.y, dx = _hx - px, dy = _hy - py, d2 = dx * dx + dy * dy;
+        if (d2 > 1 && d2 <= reach * reach && !this._sgTargetSafeFor(this._sgSlotOfBot(e), _hx, _hy, false) && (ms === null || checkShotWallsClear(ms, px - ox, py - oy, _hx - ox, _hy - oy, ox, oy, 6))) { e._fwAngle = Math.atan2(dy, dx); e._fwUntil = now + 600; return; }
+      }
+    }
+    const m = this._agMate(e, now);
+    if (m !== null) {
+      const tid = this._btFightOf(m);
+      if (tid !== '' && this._btGoalOk(e, tid)) {
+        const dx = this._btQx - px, dy = this._btQy - py, d2 = dx * dx + dy * dy;
+        if (d2 > 1 && d2 <= reach * reach && (ms === null || checkShotWallsClear(ms, px - ox, py - oy, this._btQx - ox, this._btQy - oy, ox, oy, 6))) { e._fwAngle = Math.atan2(dy, dx); e._fwUntil = now + 600; return; }
+      }
+    }
+    if (ms === null || ms.walls.length === 0) return;
+    const et = this.state.enemyTanks, S = _ogLineW, slot = this._sgSlotOfBot(e);
+    let need = 0, any = false;
+    for (let i = 0; i <= et.length; i++) {
+      let qx: number, qy: number;
+      if (i < et.length) { const q = et[i]; if (!this._ogHostile(e, q, px, py)) continue; qx = q.position.x; qy = q.position.y; }
+      else {
+        if (!(mayAttackPlayer(e, this.state.playerId, this.getPlayerTeam(), this.playerGroupId) && this._playerTargetable() && !this.state.playerDead && !this._acrossGap(px, py, this.tankPos.x, this.tankPos.y))) continue;
+        qx = this.tankPos.x; qy = this.tankPos.y;
+      }
+      const dx = qx - px, dy = qy - py, d2 = dx * dx + dy * dy;
+      if (d2 > 3240000 || d2 < 1 || this._sgTargetSafeFor(slot, qx, qy, false)) continue;
+      const k = ((Math.atan2(dy, dx) / 0.39269908169872414 + 16.5) | 0) & 15;
+      need |= (1 << k) | (1 << ((k + 1) & 15)) | (1 << ((k + 15) & 15)); any = true;
+    }
+    if (!any) return;
+    const lx = px - ox, ly = py - oy, top = reach > 1500 ? 1500 : reach < 600 ? 600 : reach;
+    let best = 0, bestK = -1;
+    for (let k = 0; k < 16; k++) {
+      S[k] = 0;
+      if ((need & (1 << k)) === 0) continue;
+      const cx = _OG_LINE_X[k], cy = _OG_LINE_Y[k];
+      let L = 0;
+      for (let d = 300; d <= top + 299; d += 300) { if (!checkShotWallsClear(ms, lx + cx * (d - 300), ly + cy * (d - 300), lx + cx * d, ly + cy * d, ox, oy, 6)) break; L = d; }
+      if (L < 300) continue;
+      let sc = 0;
+      for (let i = 0; i <= et.length; i++) {
+        let qx: number, qy: number;
+        if (i < et.length) { const q = et[i]; if (!this._ogHostile(e, q, px, py)) continue; qx = q.position.x; qy = q.position.y; }
+        else {
+          if (!(mayAttackPlayer(e, this.state.playerId, this.getPlayerTeam(), this.playerGroupId) && this._playerTargetable() && !this.state.playerDead && !this._acrossGap(px, py, this.tankPos.x, this.tankPos.y))) continue;
+          qx = this.tankPos.x; qy = this.tankPos.y;
+        }
+        const dx = qx - px, dy = qy - py, al = dx * cx + dy * cy;
+        if (al < 150 || al > L + 250) continue;
+        const lat = dx * cy - dy * cx;
+        if (lat > 300 || lat < -300 || this._sgTargetSafeFor(slot, qx, qy, false)) continue;
+        sc += 1 / (1 + al / 1500);
+      }
+      S[k] = sc;
+      if (sc > 0 && e._fwUntil > now - 700 && (((e._fwAngle / 0.39269908169872414 + 16.5) | 0) & 15) === k) sc *= 1.5;
+      if (sc > best) { best = sc; bestK = k; }
+    }
+    if (bestK >= 0) { e._fwAngle = bestK * 0.39269908169872414; e._fwUntil = now + 600; }
+  }
+  private _agMate(e: EnemyTank, now: number): EnemyTank | null {
+    if (now < e._agAt) {
+      if (e._agId === '') return null;
+      const k = this._enemyById.get(e._agId);
+      return k !== undefined && k.active && !k.isDying && this._btFightOf(k) !== '' ? k : null;
+    }
+    e._agAt = now + 400 + 300 * hfHash(e.hf.seed, 565, (now / 1000) | 0);
+    const et = this.state.enemyTanks, x = e.position.x, y = e.position.y;
+    let best: EnemyTank | null = null, bd = 490000;
+    for (let i = 0; i < et.length; i++) {
+      const q = et[i];
+      if (q === e || !q.active || q.isDying || q.isSpawning || !q.hf.plays || q.spawnedByEntityId || (q._mevF & MF_STANDS) !== 0) continue;
+      const dx = q.position.x - x, dy = q.position.y - y, d2 = dx * dx + dy * dy;
+      if (d2 >= bd || !this._btMateOrSelf(e, q) || this._btFightOf(q) === '') continue;
+      bd = d2; best = q;
+    }
+    e._agId = best !== null ? best.id : '';
+    return best;
+  }
   private _ogBlockLook(e: EnemyTank, navMs: MapState | null, ox: number, oy: number, now: number): void {
-    if (AI_CONSTANTS.BT_BLOCKFIRE === 0 || e._ogBlockShare <= 0 || navMs === null) { e._ogBlockUntil = 0; e._ogBlockSpotUntil = 0; return; }
+    if (AI_CONSTANTS.BT_BLOCKFIRE === 0 || e._ogBlockShare <= 0 || navMs === null) { e._ogBlockUntil = 0; e._ogBlockSpotUntil = 0; e._ogGo = 0; return; }
     if (now < e._ogBlockLookAt) return;
     const h = e.hf;
     if (e._ogBlockIs < 0) e._ogBlockIs = hfHash(h.seed, 493, 0) < e._ogBlockShare ? 1 : 0;
-    if (e._ogBlockIs !== 1 || !h.plays || h.dKind !== 0 || !(h.bpsMax > 0)) { e._ogBlockUntil = 0; e._ogBlockSpotUntil = 0; e._ogBlockLookAt = now + 2000; return; }
+    if (e._ogBlockIs !== 1 || !h.plays) { e._ogBlockUntil = 0; e._ogBlockSpotUntil = 0; e._ogGo = 0; e._ogBlockLookAt = now + 2000; return; }
+    let flow: OgFlow | null = null;
+    if (AI_CONSTANTS.BT_BLOCKWAY !== 0 && e._ogId !== '') { const _fo = this._enemyById.get(e._ogId); if (_fo !== undefined) { flow = this._ogFlowOf(e, _fo, navMs, ox, oy, now); if (flow !== null) this._ogGather(e, _fo, flow, navMs, ox, oy, now); } }
+    if (flow === null) e._ogGo = 0;
+    if (h.dKind !== 0 || !(h.bpsMax > 0)) { e._ogBlockUntil = 0; e._ogBlockSpotUntil = 0; e._ogBlockLookAt = now + (e._ogGo === 1 ? 1000 : 2000); return; }
     const et = this.state.enemyTanks, S = _ogLineW, px = e.position.x, py = e.position.y;
     let all = 0;
     for (let k = 0; k < 16; k++) S[k] = 0;
-    for (let i = 0; i <= et.length; i++) {
+    let _lr = 1500;
+    if (flow !== null && AI_CONSTANTS.BT_BLOCKREACH !== 0) { const _rr = this._standoffReach(e) + 100; if (_rr > 100 && _rr < 1500) _lr = _rr < 600 ? 600 : _rr; }
+    if (flow !== null) { all = flow.all; if (all > 0) for (let k = 0; k < 16; k++) S[k] = this._ogLineFlow(flow, navMs, px - ox, py - oy, k, _lr); }
+    else for (let i = 0; i <= et.length; i++) {
       let qx: number, qy: number;
       if (i < et.length) { const q = et[i]; if (!this._ogHostile(e, q, px, py)) continue; qx = q.position.x - px; qy = q.position.y - py; }
       else {
@@ -16417,23 +18790,432 @@ export class GameLogic {
     }
     if (all <= 0) { e._ogBlockUntil = 0; e._ogBlockSpotUntil = 0; e._ogBlockLookAt = now + 2000; return; }
     const lx = px - ox, ly = py - oy, t = (now / 1000) | 0;
+    let barIn = all / 6, barHold = all / 12;
+    if (flow !== null) {
+      if (AI_CONSTANTS.BT_BLOCKNOW !== 0) { barIn = 1.2; barHold = 0.6; } else { barIn = 0.5 * all; barHold = 0.25 * all; }
+      if (e._ogGo === 1 && flow.pOk && AI_CONSTANTS.BT_BLOCKREACH === 0) { if (0.6 * flow.pS > barIn) barIn = 0.6 * flow.pS; if (0.4 * flow.pS > barHold) barHold = 0.4 * flow.pS; }
+    }
     if (e._ogBlockUntil > now) {
       const k0 = ((e._ogBlockAngle / 0.39269908169872414 + 0.5) | 0) & 15;
-      if (S[k0] >= all / 12 && checkShotWallsClear(navMs, lx, ly, lx + _OG_LINE_X[k0] * 600, ly + _OG_LINE_Y[k0] * 600, ox, oy, 6)) { e._ogBlockLookAt = now + 200; return; }
+      if (S[k0] >= barHold && checkShotWallsClear(navMs, lx, ly, lx + _OG_LINE_X[k0] * 600, ly + _OG_LINE_Y[k0] * 600, ox, oy, 6)) { e._ogBlockLookAt = now + 200; return; }
     } else if (e._ogBlockUntil > 0) { e._ogBlockUntil = 0; e._ogBlockLookAt = now + 300 + 900 * hfHash(h.seed, 495, t); return; }
     if (e._ogBlockSpotUntil > 0 && now >= e._ogBlockSpotUntil) { e._ogBlockSpotUntil = 0; e._ogBlockUntil = 0; e._ogBlockLookAt = now + 2500 + 2500 * hfHash(h.seed, 497, t); return; }
     let best = -1, bestK = 0;
     for (let k = 0; k < 16; k++) {
-      if (S[k] < all / 6) continue;
+      if (S[k] < barIn) continue;
       const cx = _OG_LINE_X[k], cy = _OG_LINE_Y[k];
       let L = 0;
       for (let d = 300; d <= 1500; d += 300) { if (!checkShotWallsClear(navMs, lx + cx * (d - 300), ly + cy * (d - 300), lx + cx * d, ly + cy * d, ox, oy, 24)) break; L = d; }
-      if (L >= 600 && L * S[k] > best) { best = L * S[k]; bestK = k; }
+      const sc = flow !== null ? S[k] : L * S[k];
+      if (L >= 600 && sc > best) { best = sc; bestK = k; }
     }
     if (best < 0) { e._ogBlockUntil = 0; e._ogBlockSpotUntil = 0; e._ogBlockLookAt = now + 600; return; }
     e._ogBlockAngle = bestK * 0.39269908169872414; if (!(e._ogBlockUntil > now)) e._ogBlockUntil = now + 2500 + 3500 * hfHash(h.seed, 494, t);
     if (e._ogBlockSpotUntil === 0) { e._ogBlockX = px; e._ogBlockY = py; e._ogBlockSpotUntil = now + 8000 + 12000 * hfHash(h.seed, 496, t); }
     e._ogBlockLookAt = now + 200;
+  }
+  private _ogFlowOf(e: EnemyTank, o: EnemyTank, navMs: MapState, ox: number, oy: number, now: number): OgFlow | null {
+    const nav = navMs.navigation;
+    if (nav === null || nav.isExactView || navMs.walls.length === 0 || nav.gridCells !== navMs.gridCells || nav.gridCellsY !== navMs.gridCellsY) return null;
+    const gc = nav.gridCells, gcY = nav.gridCellsY, N = gc * gcY;
+    let f: OgFlow | null = null, old = -1;
+    for (let i = 0; i < _ogFlows.length; i++) {
+      const q = _ogFlows[i];
+      if (q.oid === o.id && q.team === e.team && q.beh === e.aiBehavior && q.nav === nav) { f = q; break; }
+      if (old < 0 || q.use < _ogFlows[old].use) old = i;
+    }
+    if (f === null) {
+      if (_ogFlows.length < _OG_FLOW_KEYS.length) { f = { oid: '', team: '', beh: '', nav: null, at: 0, use: 0, all: 0, n: 0, fx: new Float32Array(N), fy: new Float32Array(N), st: new Uint16Array(N), pAt: 0, pOk: false, pX: 0, pY: 0, pK: 0, pS: 0, near: 0, minWay: 0, pWay: 0 }; _ogFlows.push(f); }
+      else { f = _ogFlows[old]; if (f.nav === nav && now >= f.use && now - f.use < 3000) return null; }
+      if (f.fx.length !== N) { f.fx = new Float32Array(N); f.fy = new Float32Array(N); f.st = new Uint16Array(N); }
+      f.oid = o.id; f.team = e.team; f.beh = e.aiBehavior; f.nav = nav; f.at = -1e12; f.pAt = -1e12; f.pOk = false;
+    }
+    f.use = now;
+    if (now >= f.at && now - f.at < 600) return f;
+    f.at = now; f.all = 0; f.n = 0; f.near = 0; f.minWay = Infinity;
+    f.fx.fill(0); f.fy.fill(0); f.st.fill(0);
+    ensureRegionFields(nav, navMs, ox, oy);
+    const dist = ensureAuxDistField(nav, navMs, o.id, o.position.x - ox, o.position.y - oy, now, 0);
+    if (dist === null) return f;
+    const cs = nav.cellSize, mh = nav.mapHalf, mhY = nav.mapHalfY, P = _ogPath, fx = f.fx, fy = f.fy, st = f.st;
+    const et = this.state.enemyTanks, px = o.position.x, py = o.position.y;
+    const ogx = Math.floor((px - ox + mh) / cs), ogy = Math.floor((py - oy + mhY) / cs);
+    let stamp = 0;
+    for (let i = 0; i <= et.length; i++) {
+      let qx: number, qy: number;
+      if (i < et.length) { const q = et[i]; if (!this._ogHostile(e, q, px, py)) continue; qx = q.position.x; qy = q.position.y; }
+      else {
+        if (!(mayAttackPlayer(e, this.state.playerId, this.getPlayerTeam(), this.playerGroupId) && this._playerTargetable() && !this.state.playerDead && !this._acrossGap(px, py, this.tankPos.x, this.tankPos.y))) continue;
+        qx = this.tankPos.x; qy = this.tankPos.y;
+      }
+      let gx = Math.floor((qx - ox + mh) / cs), gy = Math.floor((qy - oy + mhY) / cs);
+      if (gx < 0 || gy < 0 || gx >= gc || gy >= gcY) continue;
+      let c = gx * gcY + gy, dv = dist[c];
+      if (dv === 0xFFFF || dv === 0) continue;
+      const w = 1 / (1 + (dv * cs) / 3000);
+      f.all += w; f.n++; stamp++;
+      if (dv * cs <= 2000) f.near++;
+      if (dv * cs < f.minWay) f.minWay = dv * cs;
+      let len = 0;
+      while (len < 512) {
+        P[len++] = c;
+        if (dv === 0) break;
+        const tx = ogx - gx, ty = ogy - gy;
+        let nx = -1, bs = -Infinity, ngx = gx, ngy = gy;
+        if (gy > 0 && dist[c - 1] === dv - 1 && -ty > bs) { bs = -ty; nx = c - 1; ngx = gx; ngy = gy - 1; }
+        if (gx < gc - 1 && dist[c + gcY] === dv - 1 && tx > bs) { bs = tx; nx = c + gcY; ngx = gx + 1; ngy = gy; }
+        if (gy < gcY - 1 && dist[c + 1] === dv - 1 && ty > bs) { bs = ty; nx = c + 1; ngx = gx; ngy = gy + 1; }
+        if (gx > 0 && dist[c - gcY] === dv - 1 && -tx > bs) { bs = -tx; nx = c - gcY; ngx = gx - 1; ngy = gy; }
+        if (nx < 0) break;
+        c = nx; gx = ngx; gy = ngy; dv--;
+      }
+      const kMax = AI_CONSTANTS.BT_BLOCKNOW !== 0 && ((1000 / cs) | 0) + 2 < len ? ((1000 / cs) | 0) + 2 : len;
+      for (let k = 0; k < kMax; k++) {
+        const a = P[k], b = P[k + 3 < len ? k + 3 : len - 1];
+        if (a === b) continue;
+        const agx = (a / gcY) | 0, agy = a - agx * gcY, bgx = (b / gcY) | 0, bgy = b - bgx * gcY;
+        let ux = bgx - agx, uy = bgy - agy;
+        const ul = Math.sqrt(ux * ux + uy * uy); ux = (ux / ul) * w; uy = (uy / ul) * w;
+        if (st[a] !== stamp) { st[a] = stamp; fx[a] += ux; fy[a] += uy; }
+        if (agy > 0 && st[a - 1] !== stamp && dist[a - 1] !== 0xFFFF) { st[a - 1] = stamp; fx[a - 1] += ux; fy[a - 1] += uy; }
+        if (agy < gcY - 1 && st[a + 1] !== stamp && dist[a + 1] !== 0xFFFF) { st[a + 1] = stamp; fx[a + 1] += ux; fy[a + 1] += uy; }
+        if (agx > 0 && st[a - gcY] !== stamp && dist[a - gcY] !== 0xFFFF) { st[a - gcY] = stamp; fx[a - gcY] += ux; fy[a - gcY] += uy; }
+        if (agx < gc - 1 && st[a + gcY] !== stamp && dist[a + gcY] !== 0xFFFF) { st[a + gcY] = stamp; fx[a + gcY] += ux; fy[a + gcY] += uy; }
+      }
+    }
+    return f;
+  }
+  private _ogLineLen = 0;
+  private _ogLineFlow(f: OgFlow, navMs: MapState, lx: number, ly: number, k: number, maxLen: number): number {
+    const gc = navMs.gridCells, gcY = navMs.gridCellsY, cs = navMs.cellSize, mh = navMs.mapHalf, mhY = navMs.mapHalfY, tg = navMs.tileGrid;
+    const cx = _OG_LINE_X[k], cy = _OG_LINE_Y[k], step = cs * 0.5, fx = f.fx, fy = f.fy;
+    let s = 0, last = -1, len = 0;
+    for (let t = cs * 0.75; t <= maxLen; t += step) {
+      const gx = Math.floor((lx + cx * t + mh) / cs), gy = Math.floor((ly + cy * t + mhY) / cs);
+      if (gx < 0 || gy < 0 || gx >= gc || gy >= gcY) break;
+      const c = gx * gcY + gy;
+      if (c !== last) {
+        if (tg[c] === TileType.WALL) break;
+        last = c;
+        const v = -(fx[c] * cx + fy[c] * cy);
+        if (v > 0) s += v;
+      }
+      len = t;
+    }
+    this._ogLineLen = len;
+    return s;
+  }
+  private _ogBlockPlace(e: EnemyTank, o: EnemyTank, f: OgFlow, navMs: MapState, ox: number, oy: number, now: number): boolean {
+    if (now >= f.pAt && now - f.pAt < 1500) return f.pOk;
+    f.pAt = now;
+    const nav = f.nav;
+    if (nav === null || !(f.all > 0)) { f.pOk = false; return false; }
+    const dist = ensureAuxDistField(nav, navMs, o.id, o.position.x - ox, o.position.y - oy, now, 0);
+    if (dist === null) { f.pOk = false; return false; }
+    const gc = nav.gridCells, gcY = nav.gridCellsY, cs = nav.cellSize, mh = nav.mapHalf, mhY = nav.mapHalfY, tg = navMs.tileGrid;
+    const R = 0.72 * e._ogRadius, far = 1.3 * e._ogRadius, olx = o.position.x - ox, oly = o.position.y - oy;
+    const ogx = Math.floor((olx + mh) / cs), ogy = Math.floor((oly + mhY) / cs), rc = Math.ceil(R / cs);
+    const slot = this._sgSlotOfBot(e), band = AI_CONSTANTS.SAFEZONE_ACQUIRE_CELLS;
+    let heldS = -1, heldK = 0;
+    if (f.pOk) { const hx = f.pX - ox, hy = f.pY - oy; for (let k = 0; k < 16; k++) { const v = this._ogLineFlow(f, navMs, hx, hy, k, 1500); if (this._ogLineLen >= 600 && v > heldS) { heldS = v; heldK = k; } } }
+    let best = -1, bx = 0, by = 0, bk = 0, bs = 0, bw = 0;
+    for (let gx = ogx - rc; gx <= ogx + rc; gx++) {
+      if (gx < 0 || gx >= gc) continue;
+      for (let gy = ogy - rc; gy <= ogy + rc; gy++) {
+        if (gy < 0 || gy >= gcY) continue;
+        const c = gx * gcY + gy, dv = dist[c];
+        if (dv === 0xFFFF || tg[c] === TileType.WALL || dv * cs > far) continue;
+        const wx = -mh + (gx + 0.5) * cs, wy = -mhY + (gy + 0.5) * cs, dx = wx - olx, dy = wy - oly;
+        if (dx * dx + dy * dy > R * R) continue;
+        let s = -1, sk = 0;
+        for (let k = 0; k < 16; k++) { const v = this._ogLineFlow(f, navMs, wx, wy, k, 1500); if (this._ogLineLen >= 600 && v > s) { s = v; sk = k; } }
+        if (s <= 0) continue;
+        const score = s * (1.15 - (0.15 * dv * cs) / far);
+        if (score > best && !this._sgGroundDanger(slot, wx + ox, wy + oy, band)) { best = score; bx = wx + ox; by = wy + oy; bk = sk; bs = s; bw = dv * cs; }
+      }
+    }
+    const bar = AI_CONSTANTS.BT_BLOCKNOW !== 0 ? 1.2 : 0.5 * f.all;
+    if (heldS >= bar && bs < 1.3 * heldS) { f.pK = heldK; f.pS = heldS; return true; }
+    if (best < 0 || bs < bar) { f.pOk = false; return false; }
+    f.pOk = true; f.pX = bx; f.pY = by; f.pK = bk; f.pS = bs; f.pWay = bw;
+    return true;
+  }
+  private _ofMap = new WeakMap<object, { own: Uint16Array; par: Int32Array; q: Int32Array }>();
+  private static _ofH = new Float64Array(12);
+  private _ogFireSpot(e: EnemyTank, o: EnemyTank, navMs: MapState | null, ox: number, oy: number, bodyR: number, now: number, dtFactor: number): boolean {
+    if (navMs === null || !navMs.navigation || navMs.walls.length === 0) return false;
+    const h = e.hf;
+    if (!h.plays || h.rmOn) return false;
+    if (now >= e._ofLookAt) { e._ofLookAt = now + 450 + 250 * hfHash(h.seed, 561, now | 0); this._ogFireLook(e, o, navMs, ox, oy, bodyR, now); }
+    if (!(now < e._ofUntil)) return false;
+    const dx = e._ofX - e.position.x, dy = e._ofY - e.position.y;
+    if (dx * dx + dy * dy > 2500) { if (e._btRoute !== '') this._btDropRoute(e); return this._intDrive(e, e._ofWX, e._ofWY, navMs, ox, oy, bodyR, now, dtFactor, null); }
+    if (AI_CONSTANTS.BT_LINESTAND !== 0 && FEEL_LIVE && now - e._ofUseAt < 1100 && h.dKind === 0 && h.bpsMax > 0) { e._ogBlockAngle = e._ofUseA; e._ogBlockUntil = now + 400; }
+    return this._ogHoldAt(e, e._ofX, e._ofY, 55, navMs, ox, oy, bodyR, now, dtFactor);
+  }
+  private _ogFireLook(e: EnemyTank, o: EnemyTank, navMs: MapState, ox: number, oy: number, bodyR: number, now: number): void {
+    const h = e.hf, nav = navMs.navigation!;
+    const unit = h.dKind !== 0, reach = unit ? 0 : this._standoffReach(e);
+    const far = unit ? 0.78 * e.fovRadius : (reach > 0 ? (reach < 1000 ? 0.9 * reach : 900) : 0);
+    if (!(far > 200) || (!unit && !(h.bpsMax > 0))) { e._ofUntil = 0; e._ofNoSince = 0; return; }
+    const H = GameLogic._ofH, px = e.position.x, py = e.position.y, lx = px - ox, ly = py - oy, et = this.state.enemyTanks;
+    let n = 0;
+    for (let i = 0; i <= et.length; i++) {
+      let qx: number, qy: number;
+      if (i < et.length) { const q = et[i]; if (!this._ogHostile(e, q, px, py)) continue; qx = q.position.x; qy = q.position.y; }
+      else {
+        if (!(mayAttackPlayer(e, this.state.playerId, this.getPlayerTeam(), this.playerGroupId) && this._playerTargetable() && !this.state.playerDead && !this._acrossGap(px, py, this.tankPos.x, this.tankPos.y))) continue;
+        qx = this.tankPos.x; qy = this.tankPos.y;
+      }
+      const d2 = (qx - px) * (qx - px) + (qy - py) * (qy - py);
+      if (d2 > 5760000) continue;
+      if (n < 6) { H[2 * n] = qx; H[2 * n + 1] = qy; n++; continue; }
+      let fi = -1, fd = d2;
+      for (let k = 0; k < 6; k++) { const k2 = (H[2 * k] - px) * (H[2 * k] - px) + (H[2 * k + 1] - py) * (H[2 * k + 1] - py); if (k2 > fd) { fd = k2; fi = k; } }
+      if (fi >= 0) { H[2 * fi] = qx; H[2 * fi + 1] = qy; }
+    }
+    if (n === 0) { e._ofUntil = 0; e._ofNoSince = 0; return; }
+    const far2 = far * far;
+    let use = false;
+    const _sp = AI_CONSTANTS.BT_INTOAREA !== 0, _in = _sp && now - e._iaSeen < 3000;
+    let _ux = 0, _uy = 0;
+    for (let k = 0; k < n && !use; k++) { const dx = H[2 * k] - px, dy = H[2 * k + 1] - py; if (dx * dx + dy * dy <= far2 && (unit || (checkLineOfSight(navMs, lx, ly, H[2 * k] - ox, H[2 * k + 1] - oy, ox, oy) && (!_sp || checkShotWallsClear(navMs, lx, ly, H[2 * k] - ox, H[2 * k + 1] - oy, ox, oy, 10))))) { use = true; _ux = dx; _uy = dy; } }
+    const hold = now < e._ofUntil;
+    if (use) {
+      e._ofNoSince = 0; if (hold) { const sx = e._ofX - px, sy = e._ofY - py; if (sx * sx + sy * sy > 14400) e._ofUntil = 0; }
+      if (FEEL_LIVE && !unit && !this._sgTargetSafeFor(this._sgSlotOfBot(e), px + _ux, py + _uy, false)) {
+        e._ofUseAt = now; e._ofUseA = Math.atan2(_uy, _ux);
+        if (AI_CONSTANTS.BT_LINESTAND !== 0 && !(now < e._ofUntil)) { e._ofX = px; e._ofY = py; e._ofWX = px; e._ofWY = py; e._ofUntil = now + 7000 + 6000 * hfHash(h.seed, 581, now | 0); }
+      }
+      return;
+    }
+    if (e._ofNoSince === 0) e._ofNoSince = now;
+    if (!hold && now - e._ofNoSince < 1200 + 1800 * hfHash(h.seed, 562, hfIdNum(o.id))) return;
+    const gc = nav.gridCells, gcY = nav.gridCellsY, N = gc * gcY, cs = nav.cellSize, mh = nav.mapHalf, mhY = nav.mapHalfY;
+    const cx0 = Math.floor((lx + mh) / cs), cy0 = Math.floor((ly + mhY) / cs);
+    if (cx0 < 0 || cx0 >= gc || cy0 < 0 || cy0 >= gcY) { e._ofUntil = 0; return; }
+    if (hold) { const sx = e._ofX - px, sy = e._ofY - py; if (sx * sx + sy * sy <= 2500) return; }
+    let W = this._ofMap.get(nav);
+    if (W === undefined || W.own.length !== N) { W = { own: new Uint16Array(N), par: new Int32Array(N), q: new Int32Array(N) }; this._ofMap.set(nav, W); }
+    const own = W.own, par = W.par, Q = W.q, i0 = cx0 * gcY + cy0;
+    const mask = nav.regionsBuilt && nav.navBlocked.length === N ? nav.navBlocked : null;
+    const tgt = hold ? Math.floor((e._ofX - ox + mh) / cs) * gcY + Math.floor((e._ofY - oy + mhY) / cs) : -1, D = hold ? 16 : 10;
+    const lim = _in && e._ogRadius - 60 > 590 ? 590 : e._ogRadius - 60, olx = o.position.x - ox, oly = o.position.y - oy, slot = this._sgSlotOfBot(e), band = AI_CONSTANTS.SAFEZONE_ACQUIRE_CELLS;
+    own.fill(0xFFFF); own[i0] = 0; par[i0] = -1; Q[0] = i0;
+    let qh = 0, qt = 1, found = -1, alt = -1;
+    while (qh < qt) {
+      const i = Q[qh++], d = own[i], ix = (i / gcY) | 0, iy = i - ix * gcY;
+      if (hold) { if (i === tgt) { found = i; break; } }
+      else if (d >= 1) {
+        const wx = -mh + (ix + 0.5) * cs, wy = -mhY + (iy + 0.5) * cs, pdx = wx - olx, pdy = wy - oly;
+        if (pdx * pdx + pdy * pdy <= lim * lim && !this._sgGroundDanger(slot, wx + ox, wy + oy, band) && (!_in || checkLineOfSight(navMs, wx, wy, olx, oly, ox, oy))) {
+          let ok = false, seen = false;
+          for (let k = 0; k < n; k++) {
+            const hx = H[2 * k] - ox, hy = H[2 * k + 1] - oy, ddx = hx - wx, ddy = hy - wy, d2 = ddx * ddx + ddy * ddy;
+            if (d2 > 1.44 * far2) continue;
+            const los = checkLineOfSight(navMs, wx, wy, hx, hy, ox, oy);
+            if (unit) { if (los) seen = true; if (d2 <= far2 && d2 >= 0.16 * far2) ok = true; }
+            else if (los && d2 <= far2 && d2 >= 0.09 * far2 && (!_sp || checkShotWallsClear(navMs, wx, wy, hx, hy, ox, oy, 10))) ok = true;
+          }
+          if (ok) { if (!unit || !seen) { found = i; break; } else if (alt < 0) alt = i; }
+        }
+      }
+      if (d >= D) continue;
+      for (let k = 0; k < 4; k++) {
+        const jx = ix + (k === 0 ? 1 : k === 1 ? -1 : 0), jy = iy + (k === 2 ? 1 : k === 3 ? -1 : 0);
+        if (jx < 0 || jx >= gc || jy < 0 || jy >= gcY) continue;
+        const j = jx * gcY + jy;
+        if (own[j] !== 0xFFFF) continue;
+        if (mask ? mask[j] !== 0 : (navMs.tileGrid[j] === TileType.WALL || navMs.rockGrid[j] >= 0)) continue;
+        { const cl = nav.clearance[j]; if (cl < bodyR && cl < nav.clearanceMax) continue; }
+        own[j] = d + 1; par[j] = i; Q[qt++] = j;
+      }
+    }
+    if (found < 0) found = alt;
+    if (found < 0) { if (hold) e._ofUntil = 0; else e._ofLookAt = now + 2500; return; }
+    if (!hold) { const fx = (found / gcY) | 0, fy = found - fx * gcY; e._ofX = -mh + (fx + 0.5) * cs + ox; e._ofY = -mhY + (fy + 0.5) * cs + oy; e._ofUntil = now + 7000 + 6000 * hfHash(h.seed, 563, now | 0); }
+    let wpx = e._ofX, wpy = e._ofY;
+    for (let c = found, g = 0; c !== i0 && c >= 0 && g < 40; c = par[c], g++) {
+      const ix = (c / gcY) | 0, iy = c - ix * gcY, cx = -mh + (ix + 0.5) * cs, cy = -mhY + (iy + 0.5) * cs;
+      if (checkShotWallsClear(navMs, lx, ly, cx, cy, ox, oy, bodyR * 0.9) && isPathClear(navMs, lx, ly, cx, cy, ox, oy, bodyR * 0.9)) { wpx = cx + ox; wpy = cy + oy; break; }
+    }
+    e._ofWX = wpx; e._ofWY = wpy;
+  }
+  private _ogHoldAt(e: EnemyTank, x: number, y: number, r: number, navMs: MapState | null, ox: number, oy: number, bodyR: number, now: number, dtFactor: number): boolean {
+    const dx = x - e.position.x, dy = y - e.position.y;
+    if (e._btRoute !== '') this._btDropRoute(e);
+    const d2 = dx * dx + dy * dy;
+    if (AI_CONSTANTS.BT_STANDKEEP !== 0 && FEEL_LIVE && e._ogHoldGo && now - e._ogHoldSince > 1500 && d2 <= (r + 35) * (r + 35)) e._ogHoldGo = false;
+    if (e._ogHoldGo ? d2 > 0.11 * r * r : d2 > (r + 35) * (r + 35)) { if (!e._ogHoldGo) { e._ogHoldGo = true; e._ogHoldSince = now; } return this._intDrive(e, x, y, navMs, ox, oy, bodyR, now, dtFactor, null); }
+    e._ogHoldGo = false;
+    e.hf.standAt = now; e._btStood = true;
+    if (AI_CONSTANTS.HF_STOPS_STUCK !== 0) this._resetStuckWindow(e, now);
+    return true;
+  }
+  private _ogFights(m: EnemyTank): boolean {
+    return m.active && !m.isDying && !m.isSpawning && m.hf.plays && m.aiState === 'attacking' && (m.currentTargetType === 'enemy' || m.currentTargetType === 'player');
+  }
+  private _ogHelpGo(e: EnemyTank, o: EnemyTank, navMs: MapState | null, ox: number, oy: number, now: number): boolean {
+    if (now < e._ogHelpAt) return e._ogHelpId !== '';
+    e._ogHelpAt = now + 700 + 600 * hfHash(e.hf.seed, 535, (now / 1000) | 0);
+    let _tpOn = false, _tpX = 0, _tpY = 0;
+    if (AI_CONSTANTS.BT_TEAMPLAN !== 0 && FEEL_LIVE) { const _ti = this._tpSide(e), _tp = _ti >= 0 && this._tpId[_ti] !== '' ? this._enemyById.get(this._tpId[_ti]) : undefined; if (_tp !== undefined) { _tpOn = true; _tpX = _tp.position.x; _tpY = _tp.position.y; } }
+    if (AI_CONSTANTS.BT_GROUPKEEP !== 0 && AI_CONSTANTS.BT_GROUPGO !== 0 && FEEL_LIVE && e._ogHelpId !== '' && e.hf.plays) {
+      const k = this._enemyById.get(e._ogHelpId);
+      if (k !== undefined && k.active && !k.isDying && !k.isSpawning && this._btMate(e, k)) {
+        const kx = k.position.x - e.position.x, ky = k.position.y - e.position.y;
+        if (kx * kx + ky * ky <= 20250000 && !this._acrossGap(e.position.x, e.position.y, k.position.x, k.position.y) &&
+            (!_tpOn || (k.position.x - _tpX) * (k.position.x - _tpX) + (k.position.y - _tpY) * (k.position.y - _tpY) <= 4665600)) {
+          if (this._btFightOf(k) !== '') { e._ogHelpKeepAt = now; return true; }
+          if (now - e._ogHelpKeepAt < 2500) return true;
+        }
+      }
+    }
+    const et = this.state.enemyTanks, px = o.position.x, py = o.position.y;
+    let quiet = true;
+    const f = navMs !== null && AI_CONSTANTS.BT_BLOCKWAY !== 0 ? this._ogFlowOf(e, o, navMs, ox, oy, now) : null;
+    if (f !== null) quiet = f.near === 0;
+    else {
+      for (let i = 0; i < et.length && quiet; i++) { const q = et[i]; const dx = q.position.x - px, dy = q.position.y - py; if (dx * dx + dy * dy <= 3240000 && this._ogHostile(e, q, px, py)) quiet = false; }
+      if (quiet && mayAttackPlayer(e, this.state.playerId, this.getPlayerTeam(), this.playerGroupId) && this._playerTargetable() && !this.state.playerDead) { const dx = this.tankPos.x - px, dy = this.tankPos.y - py; if (dx * dx + dy * dy <= 3240000) quiet = false; }
+    }
+    const _gg = AI_CONSTANTS.BT_GROUPGO !== 0 && FEEL_LIVE;
+    if ((!quiet && !_gg) || !e.hf.plays) { e._ogQuietAt = 0; e._ogHelpId = ''; return false; }
+    if (e._ogQuietAt === 0) e._ogQuietAt = now + 600 + 2400 * hfHash(e.hf.seed, 536, (now / 8000) | 0);
+    if (now < e._ogQuietAt) { e._ogHelpId = ''; return false; }
+    const x = e.position.x, y = e.position.y;
+    let best: EnemyTank | null = null, bn = 0, bd = Infinity;
+    for (let i = 0; i < et.length; i++) {
+      const m = et[i];
+      if (m === e || !this._ogFights(m) || !this._btMate(e, m)) continue;
+      if (_tpOn && (m.position.x - _tpX) * (m.position.x - _tpX) + (m.position.y - _tpY) * (m.position.y - _tpY) > 3240000) continue;
+      const dx = m.position.x - x, dy = m.position.y - y, d2 = dx * dx + dy * dy;
+      if (d2 > (quiet ? 20250000 : 9000000) || this._acrossGap(x, y, m.position.x, m.position.y)) continue;
+      let n = 1;
+      for (let j = 0; j < et.length; j++) { const q = et[j]; if (q === m || q === e || !this._ogFights(q) || !this._btMate(e, q)) continue; const qx = q.position.x - m.position.x, qy = q.position.y - m.position.y; if (qx * qx + qy * qy <= 360000) n++; }
+      if (n > bn || (n === bn && d2 < bd)) { best = m; bn = n; bd = d2; }
+    }
+    e._ogHelpId = best !== null ? best.id : '';
+    return best !== null;
+  }
+  private _ogGroupGo(e: EnemyTank, m: EnemyTank, navMs: MapState | null, ox: number, oy: number, bodyR: number, now: number, dtFactor: number): boolean {
+    const h = e.hf;
+    const _calm = AI_CONSTANTS.BT_GROUPCALM !== 0;
+    if (e._ogSideId !== '' && (!_calm || e._ogSideId !== m.id)) e._ogSideId = '';
+    if (e.forceAutospin === true || (h.autos === 0 && h.cover >= 6)) {
+      const mx = m.position.x - e.position.x, my = m.position.y - e.position.y, near = 130 + 110 * hfHash(h.seed, 549, 0);
+      if (e._ogSideId === m.id) {
+        const px = m.position.x - e._ogSideX, py = m.position.y - e._ogSideY;
+        if (px * px + py * py <= (near + 250) * (near + 250)) return this._ogHoldAt(e, e._ogSideX, e._ogSideY, 50, navMs, ox, oy, bodyR, now, dtFactor);
+        e._ogSideId = '';
+      }
+      if (mx * mx + my * my > near * near) return this._btDrive(e, m.position.x, m.position.y, navMs, ox, oy, bodyR, now, dtFactor, m.id);
+      if (_calm) { e._ogSideId = m.id; e._ogSideX = e.position.x; e._ogSideY = e.position.y; }
+      return this._ogHoldAt(e, e.position.x, e.position.y, 60, navMs, ox, oy, bodyR, now, dtFactor);
+    }
+    const tid = this._btFightOf(m);
+    if (tid === '' || !this._btGoalOk(e, tid)) return false;
+    const tx = this._btQx, ty = this._btQy, t = tid === this.state.playerId ? null : (this._enemyById.get(tid) ?? null);
+    const dx = tx - e.position.x, dy = ty - e.position.y, d2 = dx * dx + dy * dy;
+    const units = h.dKind !== 0, reach = units ? 0 : this._standoffReach(e), stop = reach > 0 ? 0.85 * reach : 0.8 * e.fovRadius;
+    if (units ? !this._hfOffScreen(e, tx, ty) : (d2 <= stop * stop && this._hfGroupSees(e, tx, ty, t))) {
+      if (units) { e._ogUnitT = t === null ? 'P' : tid; e._ogUnitLookAt = now; }
+      else if (h.bpsMax > 0) { e._ogBlockAngle = Math.atan2(dy, dx); e._ogBlockUntil = now + 400; }
+      return this._ogHoldAt(e, e.position.x, e.position.y, 60, navMs, ox, oy, bodyR, now, dtFactor);
+    }
+    if (AI_CONSTANTS.BT_GROUPSIDE !== 0) {
+      if (e._ogSideId === m.id) {
+        const px = m.position.x - e._ogSideX, py = m.position.y - e._ogSideY;
+        if (px * px + py * py <= 202500) return this._ogHoldAt(e, e._ogSideX, e._ogSideY, 50, navMs, ox, oy, bodyR, now, dtFactor);
+        e._ogSideId = '';
+      }
+      const mx = m.position.x - e.position.x, my = m.position.y - e.position.y;
+      if (mx * mx + my * my > 57600) return this._btDrive(e, m.position.x, m.position.y, navMs, ox, oy, bodyR, now, dtFactor, m.id);
+      const ax = tx - m.position.x, ay = ty - m.position.y, al = Math.sqrt(ax * ax + ay * ay);
+      let sx = m.position.x, sy = m.position.y;
+      if (al > 1) {
+        const back = 70 + 70 * hfHash(h.seed, 550, 0), lat = 60 * (hfHash(h.seed, 551, 0) - 0.5), ux = ax / al, uy = ay / al;
+        const px = sx - ux * back - uy * lat, py = sy - uy * back + ux * lat;
+        if (navMs === null || isWalkable(navMs, px - ox, py - oy, ox, oy, bodyR)) { sx = px; sy = py; }
+      }
+      if (navMs !== null && navMs.walls.length > 0 && !this._btWayClear(navMs, e.position.x - ox, e.position.y - oy, sx - ox, sy - oy, ox, oy, bodyR)) return this._btDrive(e, m.position.x, m.position.y, navMs, ox, oy, bodyR, now, dtFactor, m.id);
+      if (_calm) { e._ogSideId = m.id; e._ogSideX = sx; e._ogSideY = sy; }
+      return this._ogHoldAt(e, sx, sy, 50, navMs, ox, oy, bodyR, now, dtFactor);
+    }
+    return this._btDrive(e, tx, ty, navMs, ox, oy, bodyR, now, dtFactor, tid);
+  }
+  private _btWayClear(ms: MapState, lx: number, ly: number, gx: number, gy: number, ox: number, oy: number, bodyR: number): boolean {
+    const _end = isPathClear(ms, lx, ly, gx, gy, ox, oy, bodyR);
+    if (_end === false) return false;
+    return AI_CONSTANTS.BT_WAYKEEP === 0 || !FEEL_LIVE || ms.walls.length === 0 || checkShotWallsClear(ms, lx, ly, gx, gy, ox, oy, bodyR);
+  }
+  private _btWayKeep(e: EnemyTank, now: number): void {
+    if (AI_CONSTANTS.BT_WAYKEEP === 0 || !FEEL_LIVE) return;
+    const d = this._ftDir;
+    if (now - e._wkAt < 700 && e._wkX * d.x + e._wkY * d.y < -0.3) { d.x = e._wkX; d.y = e._wkY; return; }
+    e._wkX = d.x; e._wkY = d.y; e._wkAt = now;
+  }
+  private _ogAttacked(e: EnemyTank, o: EnemyTank, navMs: MapState | null, ox: number, oy: number, now: number): boolean {
+    if (now < e._iaAt) return now - e._iaSeen < 3000;
+    e._iaAt = now + 400 + 200 * hfHash(e.hf.seed, 564, (now / 1000) | 0);
+    const px = o.position.x, py = o.position.y, et = this.state.enemyTanks;
+    const walls = navMs !== null && navMs.walls.length > 0;
+    let found = false;
+    for (let i = 0; i < et.length && !found; i++) {
+      const q = et[i];
+      const dx = q.position.x - px, dy = q.position.y - py;
+      if (dx * dx + dy * dy > 810000 || !q.hf.plays || !this._ogHostile(e, q, px, py)) continue;
+      if (!walls || checkLineOfSight(navMs!, q.position.x - ox, q.position.y - oy, px - ox, py - oy, ox, oy)) found = true;
+    }
+    if (!found && !this.state.playerDead && !(SMALL_FIX.CH051 !== 0 && !this._playerTargetable()) && mayAttackPlayer(e, this.state.playerId, this.getPlayerTeam(), this.playerGroupId)) {
+      const dx = this.tankPos.x - px, dy = this.tankPos.y - py;
+      if (dx * dx + dy * dy <= 810000 && !this._acrossGap(px, py, this.tankPos.x, this.tankPos.y) && (!walls || checkLineOfSight(navMs!, this.tankPos.x - ox, this.tankPos.y - oy, px - ox, py - oy, ox, oy))) found = true;
+    }
+    if (found) e._iaSeen = now;
+    return now - e._iaSeen < 3000;
+  }
+  private _ogBound(e: EnemyTank, o: EnemyTank): number {
+    let b = 0.6 * e._ogRadius;
+    if (e._ogGo === 1) { const _br = AI_CONSTANTS.BT_BLOCKREACH !== 0, px = (_br ? e._ogGoX : e._ogGoCX) - o.position.x, py = (_br ? e._ogGoY : e._ogGoCY) - o.position.y; b = Math.sqrt(px * px + py * py) + 240 + 160 * hfHash(e.hf.seed, 520, 0); }
+    return b < e._ogRadius ? b : e._ogRadius;
+  }
+  private _ogKiteStep(e: EnemyTank, ms: MapState | null, ox: number, oy: number, now: number): boolean {
+    const o = this._enemyById.get(e._ogId);
+    if (o === undefined) return false;
+    const go = e._ogGo === 1, gx = (go ? e._ogGoCX : o.position.x) - ox, gy = (go ? e._ogGoCY : o.position.y) - oy;
+    const lx = e.position.x - ox, ly = e.position.y - oy, dx = gx - lx, dy = gy - ly, d = Math.sqrt(dx * dx + dy * dy);
+    if (d < 1) return false;
+    const bodyR = this._routeR(e);
+    if (ms !== null && ms.navigation && ms.walls.length > 0 && !this._btWayClear(ms, lx, ly, gx, gy, ox, oy, bodyR)) {
+      ensureRegionFields(ms.navigation, ms, ox, oy);
+      const dist = ensureAuxDistField(ms.navigation, ms, go ? e._ogGoKey : o.id, gx, gy, now, bodyR);
+      if (dist !== null) { const st = queryDistanceStep(ms.navigation, dist, lx, ly, false, bodyR); if (st.ok) { this._ftDir.x = st.dirX; this._ftDir.y = st.dirY; this._btWayKeep(e, now); return true; } }
+      if (AI_CONSTANTS.BT_WAYKEEP !== 0 && FEEL_LIVE) return false;
+    }
+    this._ftDir.x = dx / d; this._ftDir.y = dy / d;
+    return true;
+  }
+  private _ogGather(e: EnemyTank, o: EnemyTank, f: OgFlow, navMs: MapState, ox: number, oy: number, now: number): void {
+    if (AI_CONSTANTS.BT_BLOCKPLACE === 0 || !this._ogBlockPlace(e, o, f, navMs, ox, oy, now)) { e._ogGo = 0; return; }
+    const h = e.hf, cs = navMs.cellSize, ux = _OG_LINE_X[f.pK], uy = _OG_LINE_Y[f.pK];
+    const wk = AI_CONSTANTS.BT_BLOCKSTAND !== 0 ? (now / (7000 + 6000 * hfHash(h.seed, 533, 0))) | 0 : 0;
+    const back = 0.6 * cs * hfHash(h.seed, 518, wk), side = 0.6 * cs * (hfHash(h.seed, 519, wk) - 0.5);
+    let fwd = -back;
+    if (AI_CONSTANTS.BT_BLOCKREACH !== 0 && h.dKind === 0 && h.bpsMax > 0 && f.minWay !== Infinity) {
+      const reach = this._standoffReach(e), want = f.minWay - f.pWay - 0.8 * reach;
+      if (reach > 0 && want > fwd) {
+        this._ogLineFlow(f, navMs, f.pX - ox, f.pY - oy, f.pK, 1500);
+        const qx = f.pX - o.position.x, qy = f.pY - o.position.y, room = this._ogLineLen - 150, lim = e._ogRadius - 120 - Math.sqrt(qx * qx + qy * qy);
+        fwd = want < room ? want : room;
+        if (fwd > lim) fwd = lim;
+        if (fwd < -back) fwd = -back;
+      }
+    }
+    let sx = f.pX + ux * fwd - uy * side, sy = f.pY + uy * fwd + ux * side;
+    if (!isWalkable(navMs, sx - ox, sy - oy, ox, oy, this.getEffectiveEnemyRadius(e)) || !checkLineOfSight(navMs, f.pX - ox, f.pY - oy, sx - ox, sy - oy, ox, oy)) { sx = f.pX; sy = f.pY; }
+    let ki = 0;
+    for (let i = 0; i < _ogFlows.length; i++) if (_ogFlows[i] === f) { ki = i; break; }
+    e._ogGo = 1; e._ogGoX = sx; e._ogGoY = sy; e._ogGoCX = f.pX; e._ogGoCY = f.pY; e._ogGoKey = _OG_FLOW_KEYS[ki];
   }
   private _ogUnitLook(e: EnemyTank, now: number): void {
     if (AI_CONSTANTS.BT_SENDUNITS === 0 || e._ogUnitShare <= 0) { e._ogUnitT = ''; return; }
@@ -16447,9 +19229,10 @@ export class GameLogic {
     let best = '', bd = Infinity;
     for (let i = 0; i <= et.length; i++) {
       let qx: number, qy: number, id: string;
-      if (i < et.length) { const q = et[i]; if (!this._ogHostile(e, q, px, py) || !mayAttackTank(e, q, tb)) continue; qx = q.position.x; qy = q.position.y; id = q.id; }
+      if (i < et.length) { const q = et[i]; if (!this._ogHostile(e, q, px, py) || !mayAttackTank(e, q, tb) || (SMALL_FIX.G803 !== 0 && this._tankHidFrom(e, q, q.id === e._ogUnitT))) continue; qx = q.position.x; qy = q.position.y; id = q.id; }
       else {
         if (!(mayAttackPlayer(e, this.state.playerId, this.getPlayerTeam(), this.playerGroupId) && this._playerTargetable() && !this.state.playerDead && !this._acrossGap(px, py, this.tankPos.x, this.tankPos.y))) continue;
+        if (SMALL_FIX.G803 !== 0 && this._playerHidFrom(e, e._ogUnitT === 'P')) continue;
         qx = this.tankPos.x; qy = this.tankPos.y; id = 'P';
       }
       const dx = qx - px, dy = qy - py;
@@ -16459,6 +19242,515 @@ export class GameLogic {
       if (d2 < bd) { bd = d2; best = id; }
     }
     e._ogUnitT = best;
+  }
+  private readonly _tmLead: string[] = ['', '', '', ''];
+  private readonly _tmLeadAt: number[] = [0, 0, 0, 0];
+  private readonly _tmState: number[] = [0, 0, 0, 0];
+  private readonly _tmSince: number[] = [0, 0, 0, 0];
+  private readonly _tmNext: number[] = [0, 0, 0, 0];
+  private readonly _tmLow: number[] = [0, 0, 0, 0];
+  private readonly _tmGX: number[] = [0, 0, 0, 0];
+  private readonly _tmGY: number[] = [0, 0, 0, 0];
+  private readonly _tmGL: string[] = ['', '', '', ''];
+  private readonly _tmKey: string[] = ['tm-g0', 'tm-g1', 'tm-g2', 'tm-g3'];
+  private _tmZx = 0; private _tmZy = 0; private _tmZr = 0; private _tmZNav: object | null = null;
+  private _tmFx = 0; private _tmFy = 0; private _tmFr2 = 0;
+  private readonly _tmHN: number[] = [0, 0, 0, 0, 0];
+  private readonly _tmHR: number[] = [0, 0, 0, 0, 0];
+  private readonly _tmHP: number[] = [0, 0, 0, 0, 0];
+  private _tmClear(): void {
+    for (let i = 0; i < 4; i++) { this._tmLead[i] = ''; this._tmLeadAt[i] = 0; this._tmState[i] = 0; this._tmSince[i] = 0; this._tmNext[i] = 0; this._tmLow[i] = 0; this._tmGL[i] = ''; }
+    this._tmZr = 0; this._tmZNav = null;
+  }
+  private _ldOf(e: EnemyTank, ti: number, now: number): EnemyTank | null {
+    const keep = AI_CONSTANTS.TM_LEADER !== 0;
+    if (keep && now < this._tmLeadAt[ti]) {
+      const L = this._tmLead[ti] !== '' ? this._enemyById.get(this._tmLead[ti]) : undefined;
+      if (L !== undefined && L.active && !L.isDying && L.team === e.team && L.hf.plays) return L;
+    }
+    const first = keep && this._tmLeadAt[ti] === 0;
+    const et = this.state.enemyTanks;
+    let best: EnemyTank | null = null, bs = -1;
+    for (let i = 0; i < et.length; i++) {
+      const q = et[i];
+      if (!q.active || q.isDying || q.isSpawning || q.spawnedByEntityId || !q.hf.plays || q.team !== e.team || q.isBossTier === true || (q._mevF & MF_STANDS) !== 0) continue;
+      const s = first ? hfHash(q.hf.seed, 567, 0) : this._hfScore(q);
+      if (s > bs) { bs = s; best = q; }
+    }
+    this._tmLead[ti] = best !== null ? best.id : '';
+    this._tmLeadAt[ti] = best !== null ? now + 30000 : 0;
+    return best;
+  }
+  private _tmZone(e: EnemyTank): boolean {
+    const navMs = this._getEnemyNavMapState(e), ox = this._navOffX, oy = this._navOffY;
+    if (navMs === null || !navMs.navigation || this.areaBounds.length > 1) return false;
+    const nav = navMs.navigation;
+    if (this._tmZNav === nav) return this._tmZr > 0;
+    this._tmClear(); this._tmZNav = nav;
+    const cs = nav.cellSize, gc = nav.gridCells, gcY = nav.gridCellsY, mh = nav.mapHalf, mhY = nav.mapHalfY, c0x = gc >> 1, c0y = gcY >> 1;
+    const mask = nav.regionsBuilt && nav.navBlocked.length === gc * gcY ? nav.navBlocked : null;
+    let bd = Infinity, bx = 0, by = 0;
+    for (let ix = c0x - 6; ix <= c0x + 6; ix++) for (let iy = c0y - 6; iy <= c0y + 6; iy++) {
+      if (ix < 0 || ix >= gc || iy < 0 || iy >= gcY) continue;
+      const j = ix * gcY + iy;
+      if (mask ? mask[j] !== 0 : (navMs.tileGrid[j] === TileType.WALL || navMs.rockGrid[j] >= 0)) continue;
+      const wx = -mh + (ix + 0.5) * cs, wy = -mhY + (iy + 0.5) * cs, d = wx * wx + wy * wy;
+      if (d < bd) { bd = d; bx = wx; by = wy; }
+    }
+    if (bd === Infinity) return false;
+    this._tmZx = bx + ox; this._tmZy = by + oy;
+    const r = 0.26 * (mh < mhY ? mh : mhY);
+    this._tmZr = r < 700 ? 700 : r > 1500 ? 1500 : r;
+    return true;
+  }
+  private _tmOut(e: EnemyTank, L: EnemyTank, ti: number, dist: number, half: boolean): void {
+    const navMs = this._getEnemyNavMapState(e), ox = this._navOffX, oy = this._navOffY, zx = this._tmZx, zy = this._tmZy;
+    let ux = L.position.x - zx, uy = L.position.y - zy, far = 0;
+    if (navMs !== null) { const bz = navMs.baseZones; for (let i = 0; i < bz.length; i++) { if (bz[i].team !== e.team) continue; ux = (bz[i].minX + bz[i].maxX) / 2 + ox - zx; uy = (bz[i].minY + bz[i].maxY) / 2 + oy - zy; far = Math.sqrt(ux * ux + uy * uy); break; } }
+    const ul = Math.sqrt(ux * ux + uy * uy);
+    if (ul < 1) { ux = 1; uy = 0; } else { ux /= ul; uy /= ul; }
+    let d = dist;
+    if (half && far > 0) { d = 0.5 * far; const lo = this._tmZr + 900, hi = this._tmZr + 1800; d = d < lo ? lo : d > hi ? hi : d; }
+    this._tmGX[ti] = zx + ux * d; this._tmGY[ti] = zy + uy * d;
+  }
+  private _tmLook(e: EnemyTank, ti: number, now: number): void {
+    this._tmNext[ti] = now + 500;
+    const _gm = this.state.gameModeConfig, md = _gm.mode;
+    if ((md !== 'tdm' && md !== 'open-tdm') || !!_gm.preset || !!_gm.overlay || !this._tmZone(e)) { this._tmState[ti] = 0; return; }
+    const L = this._ldOf(e, ti, now);
+    if (L === null) { this._tmState[ti] = 0; return; }
+    const et = this.state.enemyTanks, zx = this._tmZx, zy = this._tmZy, zr = this._tmZr, in2 = zr * zr, near2 = (zr + 350) * (zr + 350), raid2 = (zr + 850) * (zr + 850);
+    const HN = this._tmHN, HR = this._tmHR, HP = this._tmHP;
+    for (let k = 0; k < 5; k++) { HN[k] = 0; HR[k] = 0; HP[k] = 0; }
+    let n = 0, nIn = 0, nL = 0, pOwn = 0, hk = 4;
+    for (let i = 0; i <= et.length; i++) {
+      let qx: number, qy: number, qvx: number, qvy: number, pool: number, mine = false;
+      if (i < et.length) {
+        const q = et[i];
+        if (!q.active || q.isDying || q.isSpawning || q.spawnedByEntityId || !q.hf.plays || q.isBossTier === true) continue;
+        mine = q.team === e.team; hk = this._tpSide(q); if (hk < 0) hk = 4;
+        if (!mine && !this._ogHostile(e, q, zx, zy)) continue;
+        qx = q.position.x; qy = q.position.y; qvx = q.velocity.x; qvy = q.velocity.y; pool = q.currentHealth + q.currentShield;
+        if (mine) { n++; const lx = qx - L.position.x, ly = qy - L.position.y; if (lx * lx + ly * ly <= 360000) nL++; }
+      } else {
+        if (!(mayAttackPlayer(e, this.state.playerId, this.getPlayerTeam(), this.playerGroupId) && this._playerTargetable() && !this.state.playerDead)) continue;
+        qx = this.tankPos.x; qy = this.tankPos.y; qvx = this.tankVelocity.x; qvy = this.tankVelocity.y; pool = this.state.tankCurrentHealth + this.state.tankCurrentShield;
+        { const pt = this.getPlayerTeam() as string; hk = pt === 'team1' ? 0 : pt === 'team2' ? 1 : pt === 'team3' ? 2 : pt === 'team4' ? 3 : 4; }
+      }
+      const dx = qx - zx, dy = qy - zy, d2 = dx * dx + dy * dy;
+      if (mine) { if (d2 <= in2) nIn++; if (d2 <= near2) pOwn += pool; }
+      else if (d2 <= near2) { HN[hk]++; HP[hk] += pool; }
+      else if (d2 <= raid2) { const v2 = qvx * qvx + qvy * qvy, to = -(qvx * dx + qvy * dy); if (v2 > 0.25 && to > 0 && to * to > 0.25 * v2 * d2) HR[hk]++; }
+    }
+    let hIn = 0, hAll = 0, pHost = 0;
+    for (let k = 0; k < 5; k++) { if (HN[k] > hIn) hIn = HN[k]; if (HN[k] + HR[k] > hAll) hAll = HN[k] + HR[k]; if (HN[k] >= 2 && HP[k] > pHost) pHost = HP[k]; }
+    const st0 = this._tmState[ti], held = now - this._tmSince[ti];
+    if (n < 2) { this._tmState[ti] = 0; return; }
+    if (pHost > 0 && pOwn * 2 < pHost && (st0 === 3 || st0 === 4 || (st0 === 2 && nIn >= 2))) { if (this._tmLow[ti] === 0) this._tmLow[ti] = now; } else this._tmLow[ti] = 0;
+    let st = st0;
+    if (st0 === 5) { if (held >= 9000) st = 1; }
+    else if (this._tmLow[ti] !== 0 && now - this._tmLow[ti] >= 1500) st = 5;
+    else if ((st0 === 3 || st0 === 4) && (hIn >= 3 || (hIn >= 2 && hIn * 2 >= (nIn > 1 ? nIn : 1)))) st = 4;
+    else if (nIn >= 2 && nIn * 2 >= n) st = 3;
+    else if ((st0 === 3 || st0 === 4) && nIn >= 1 && nIn * 3 >= n) st = 3;
+    else if (st0 === 2 || (nL >= 2 && nL * 10 >= n * 6) || (st0 === 1 && held >= 12000)) st = 2;
+    else st = 1;
+    if (st === st0 && (st !== 1 && st !== 4 || this._tmGL[ti] === L.id)) return;
+    if (st !== st0) { this._tmState[ti] = st; this._tmSince[ti] = now; this._tmLow[ti] = 0; }
+    this._tmGL[ti] = L.id;
+    if (st === 5) this._tmOut(e, L, ti, zr + 1300, true);
+    else if (st === 1) {
+      const lx = L.position.x - zx, ly = L.position.y - zy;
+      if (lx * lx + ly * ly < (zr + 400) * (zr + 400)) this._tmOut(e, L, ti, zr + 700, false); else { this._tmGX[ti] = L.position.x; this._tmGY[ti] = L.position.y; }
+    } else if (st === 4) { this._tmGX[ti] = L.position.x; this._tmGY[ti] = L.position.y; }
+  }
+  private _tmMine(e: EnemyTank, ti: number, now: number): number {
+    const s = this._tmState[ti];
+    if (e._tmSt === s) { e._tmPendSt = -1; return s; }
+    if (e._tmPendSt !== s) { const u = hfHash(e.hf.seed, 568, s + ((now / 8000) | 0)); e._tmPendSt = s; e._tmPendAt = now + (s === 4 || s === 5 ? 150 + 700 * u : 300 + 2200 * u); return e._tmSt; }
+    if (now < e._tmPendAt) return e._tmSt;
+    e._tmSt = s; e._tmPendSt = -1;
+    if (e._btRoute !== '') this._btDropRoute(e);
+    return s;
+  }
+  private _tmRoam(e: EnemyTank, navMs: MapState | null, ox: number, oy: number, bodyR: number, now: number, dtFactor: number): boolean {
+    if (e.graceActive || e.isBossTier === true) return false;
+    const ti = this._tpSide(e);
+    if (ti < 0) return false;
+    if (now >= this._tmNext[ti] || this._tmNext[ti] - now > 5000) this._tmLook(e, ti, now);
+    if (AI_CONSTANTS.TM_FREE !== 0 && this._tmLead[ti] !== e.id) {
+      const _hs = e.hf.seed, _per = 90000 + 60000 * hfHash(_hs, 583, 0);
+      if (hfHash(_hs, 584, ((now + 150000 * hfHash(_hs, 585, 0)) / _per) | 0) < 0.125) {
+        if (e._tmSt !== 0) { e._tmSt = 0; e._tmPendSt = -1; if (e._btRoute !== '') this._btDropRoute(e); }
+        return false;
+      }
+    }
+    const st = this._tmMine(e, ti, now);
+    if (AI_CONSTANTS.TM_NOLEAVE !== 0 && st !== 0 && e.hf.lvUntil !== 0) { e.hf.lvUntil = 0; e.hf.lvBlk = 0; }
+    const L = st !== 0 && this._tmLead[ti] !== '' ? this._enemyById.get(this._tmLead[ti]) : undefined;
+    if (L === undefined || !L.active || L.isDying) { if (e._btRoute !== '') this._btDropRoute(e); return false; }
+    const zx = this._tmZx, zy = this._tmZy, zr = this._tmZr;
+    const dzx = zx - e.position.x, dzy = zy - e.position.y, dz2 = dzx * dzx + dzy * dzy;
+    if (st === 5) {
+      const bx = this._tmGX[ti], by = this._tmGY[ti], qx = bx - e.position.x, qy = by - e.position.y;
+      if (qx * qx + qy * qy > 90000) return this._btDrive(e, bx, by, navMs, ox, oy, bodyR, now, dtFactor, this._tmKey[ti]);
+      return this._btWalkAbout(e, bx, by, 0, 260, navMs, ox, oy, bodyR, now, dtFactor);
+    }
+    if (st === 3) {
+      if (dz2 > (zr - 80) * (zr - 80)) return this._btDrive(e, zx, zy, navMs, ox, oy, bodyR, now, dtFactor, 'tm-mid');
+      return this._btWalkAbout(e, zx, zy, 0, zr * 0.8, navMs, ox, oy, bodyR, now, dtFactor);
+    }
+    if (L === e) {
+      if (st === 2) { if (dz2 > 40000) return this._btDrive(e, zx, zy, navMs, ox, oy, bodyR, now, dtFactor, 'tm-mid'); return this._btWalkAbout(e, zx, zy, 0, 200, navMs, ox, oy, bodyR, now, dtFactor); }
+      const gx = this._tmGX[ti], gy = this._tmGY[ti], qx = gx - e.position.x, qy = gy - e.position.y;
+      if (qx * qx + qy * qy > 62500) return this._btDrive(e, gx, gy, navMs, ox, oy, bodyR, now, dtFactor, this._tmKey[ti]);
+      return this._btWalkAbout(e, gx, gy, 0, 160, navMs, ox, oy, bodyR, now, dtFactor);
+    }
+    const dlx = L.position.x - e.position.x, dly = L.position.y - e.position.y, nearL = st === 4 ? 260 : 380;
+    if (dlx * dlx + dly * dly > nearL * nearL) return this._btDrive(e, L.position.x, L.position.y, navMs, ox, oy, bodyR, now, dtFactor, L.id);
+    if (st === 2 && dz2 > 40000) return this._btDrive(e, zx, zy, navMs, ox, oy, bodyR, now, dtFactor, 'tm-mid');
+    return this._btWalkAbout(e, L.position.x, L.position.y, bodyR * 2 + 50, nearL, navMs, ox, oy, bodyR, now, dtFactor);
+  }
+  private _tmBackStep(e: EnemyTank, ms: MapState | null, ox: number, oy: number, now: number): boolean {
+    const h = e.hf, ct = e.currentTargetType, ti = this._tpSide(e);
+    if (ti < 0 || !h.plays || h.rmOn || h.gKite !== 0 || e.isBossTier === true || (ct !== 'enemy' && ct !== 'player') || !(this.feel.s[FEEL.MATES] > 0) || this._isHealEngagement(e)) { e._tmBk = 0; return false; }
+    if (AI_CONSTANTS.TM_HELP !== 0 && e._thId !== '' && now < e._thUntil) { e._tmBk = 0; return false; }
+    const st = this._tmState[ti];
+    let ax = 0, ay = 0, bound = 0, key = '';
+    if (st === 5) { ax = this._tmGX[ti]; ay = this._tmGY[ti]; bound = 300; key = this._tmKey[ti]; }
+    else if (st === 3 || st === 4) { ax = this._tmZx; ay = this._tmZy; bound = this._tmZr + 200; key = 'tm-mid'; if (!(this._tmZr > 0)) { e._tmBk = 0; return false; } }
+    else if (st === 1 || st === 2) {
+      const L = this._tmLead[ti] !== '' ? this._enemyById.get(this._tmLead[ti]) : undefined;
+      if (L === undefined || L === e || !L.active || L.isDying) { e._tmBk = 0; return false; }
+      ax = L.position.x; ay = L.position.y; bound = 700; key = L.id;
+    } else { e._tmBk = 0; return false; }
+    const dx = ax - e.position.x, dy = ay - e.position.y, d = Math.sqrt(dx * dx + dy * dy);
+    if (e._tmBk === 0) { if (d <= bound) return false; e._tmBk = 1; }
+    else if (d < bound - 200) { e._tmBk = 0; return false; }
+    const t = ct === 'player' ? null : (this._enemyById.get(e.currentTargetId ?? '') ?? null);
+    if (ct === 'enemy' && (t === null || t.isDying)) return false;
+    if ((t === null ? this._mevHealthShare(null) : t.currentHealth / Math.max(1, aiHealthMax(t, HEALTH_BASIS.AGGRO))) < 0.25) return false;
+    const lx = e.position.x - ox, ly = e.position.y - oy, gx = ax - ox, gy = ay - oy, bodyR = this._routeR(e);
+    let sx = dx / d, sy = dy / d;
+    if (ms !== null && ms.navigation && ms.walls.length > 0 && !this._btWayClear(ms, lx, ly, gx, gy, ox, oy, bodyR)) {
+      ensureRegionFields(ms.navigation, ms, ox, oy);
+      const dist = ensureAuxDistField(ms.navigation, ms, key, gx, gy, now, bodyR);
+      if (dist === null) return false;
+      const q = queryDistanceStep(ms.navigation, dist, lx, ly, false, bodyR);
+      if (!q.ok) return false;
+      sx = q.dirX; sy = q.dirY; this._btWayKeep(e, now);
+    }
+    const tp = t === null ? this.tankPos : t.position, qx = tp.x - e.position.x, qy = tp.y - e.position.y, ql = Math.sqrt(qx * qx + qy * qy);
+    if (ql > 1 && (sx * qx + sy * qy) / ql > 0.35) return false;
+    this._ftDir.x = sx; this._ftDir.y = sy;
+    return true;
+  }
+  private _thLook(e: EnemyTank, now: number): boolean {
+    const h = e.hf;
+    if (e._btBits !== 0 || !h.plays || h.rmOn || e.isBossTier === true || e.graceActive || !(this.feel.s[FEEL.MATES] > 0)) { if (e._thId !== '') e._thId = ''; return false; }
+    if (e._thId !== '') {
+      if (now < e._thUntil) {
+        if (e._thId === 'P') { if (!this.state.playerDead && this._playerTargetable()) return true; }
+        else { const t = this._enemyById.get(e._thId); if (t !== undefined && t.active && !t.isDying) return true; }
+      }
+      e._thId = ''; e._thNo = now + (AI_CONSTANTS.TM_ALLIN !== 0 && e._tmSt !== 0 ? 600 : 3000);
+      return false;
+    }
+    if (now < e._thLookAt || now < e._thNo) return false;
+    e._thLookAt = now + 500 + 400 * hfHash(h.seed, 570, (now / 1000) | 0);
+    const _gm = this.state.gameModeConfig, md = _gm.mode, st = e.aiState;
+    if ((md !== 'tdm' && md !== 'open-tdm') || !!_gm.preset || !!_gm.overlay || (st !== 'roaming' && st !== 'targeting_shapes' && st !== 'idle')) return false;
+    if (AI_CONSTANTS.TM_MIDDLE !== 0 && e._tmSt === 5) return false;
+    const et = this.state.enemyTanks, px = e.position.x, py = e.position.y, r = e.fovRadius, ry = h.sightBox ? r * 0.5625 : r, tb = isTeamBehaviorOf(e), slot = this._sgSlotOfBot(e);
+    let best = '', bd = Infinity, sd = Infinity;
+    const _all = AI_CONSTANTS.TM_ALLIN !== 0 && e._tmSt !== 0;
+    const _lti = AI_CONSTANTS.TM_WITHLEAD !== 0 && e._tmSt !== 0 ? this._tpSide(e) : -1, _ld = _lti >= 0 ? this._tmLead[_lti] : '';
+    for (let i = 0; i < et.length; i++) {
+      const q = et[i];
+      if (q === e || !q.active || q.isDying || q.isSpawning || q.spawnedByEntityId || !q.hf.plays || q.team !== e.team) continue;
+      const dx = q.position.x - px, dy = q.position.y - py, d2 = dx * dx + dy * dy;
+      const _lead = _ld !== '' && q.id === _ld && d2 <= 2250000;
+      const _side = !_lead && _all && d2 <= 1440000;
+      if (!_lead && !_side && d2 >= bd) continue;
+      if (!_lead && !_side && (h.sightBox ? ((dx < 0 ? -dx : dx) > r || (dy < 0 ? -dy : dy) > ry) : d2 > r * r)) continue;
+      const need = now - q.lastTankDamageAt < 2000 && q.lastTankDamageById !== '';
+      const tid = need ? q.lastTankDamageById : this._btFightOf(q);
+      if (tid === '' || tid === e.id) continue;
+      const pl = tid === this.state.playerId;
+      let tx: number, ty: number;
+      if (pl) {
+        if (!(mayAttackPlayer(e, this.state.playerId, this.getPlayerTeam(), this.playerGroupId) && this._playerTargetable() && !this.state.playerDead)) continue;
+        tx = this.tankPos.x; ty = this.tankPos.y;
+      } else {
+        const t = this._enemyById.get(tid);
+        if (t === undefined || !this._ogHostile(e, t, px, py) || !mayAttackTank(e, t, tb)) continue;
+        tx = t.position.x; ty = t.position.y;
+      }
+      if (this._sgTargetSafeFor(slot, tx, ty, false)) continue;
+      if (!_lead && !_side && !(hfHash(h.seed, 569, hfIdNum(q.id) + ((now / 20000) | 0)) < (need ? 0.7 + 0.2 * e.dnaAggression : 0.4 + 0.1 * e.dnaAggression))) continue;
+      if (!_lead && !_side && !this._hfLosTo(e, q.position.x, q.position.y)) continue;
+      if (_side) { if (bd === -1) continue; const _t2 = (tx - px) * (tx - px) + (ty - py) * (ty - py); if (_t2 >= sd) continue; sd = _t2; best = pl ? 'P' : tid; continue; }
+      if (!_lead && sd < Infinity) continue;
+      bd = _lead ? -1 : d2; best = pl ? 'P' : tid;
+    }
+    if (best === '') return false;
+    e._thId = best; e._thUntil = now + 9000 + 5000 * hfHash(h.seed, 571, now | 0); e._thSeen = 0;
+    return true;
+  }
+  private _thRoam(e: EnemyTank, navMs: MapState | null, ox: number, oy: number, bodyR: number, now: number, dtFactor: number): boolean {
+    const pl = e._thId === 'P', t = pl ? undefined : this._enemyById.get(e._thId);
+    if (!(now < e._thUntil) || e._btBits !== 0 || (AI_CONSTANTS.TM_MIDDLE !== 0 && e._tmSt === 5) || (pl ? (this.state.playerDead || !this._playerTargetable()) : (t === undefined || !t.active || t.isDying))) {
+      e._thId = ''; e._thNo = now + (AI_CONSTANTS.TM_ALLIN !== 0 && e._tmSt !== 0 ? 600 : 3000); if (e._btRoute !== '') this._btDropRoute(e);
+      return false;
+    }
+    if (now < e.hf.adUntil || now < e.hf.udUntil) { e._thId = ''; e._thNo = now + 6000; if (e._btRoute !== '') this._btDropRoute(e); return false; }
+    const tx = pl ? this.tankPos.x : t!.position.x, ty = pl ? this.tankPos.y : t!.position.y, dx = tx - e.position.x, dy = ty - e.position.y;
+    const reach = e.hf.dKind !== 0 ? 0 : this._standoffReach(e), stop = reach > 0 ? 0.8 * reach : 0.7 * e.fovRadius;
+    if (dx * dx + dy * dy <= stop * stop && this._hfLosTo(e, tx, ty)) {
+      if (e._thSeen === 0) e._thSeen = now;
+      if (now - e._thSeen > 1500 && !(AI_CONSTANTS.TM_ALLIN !== 0 && e._tmSt !== 0)) { e._thId = ''; e._thNo = now + 8000; return false; }
+      return this._ogHoldAt(e, e.position.x, e.position.y, 60, navMs, ox, oy, bodyR, now, dtFactor);
+    }
+    e._thSeen = 0;
+    return this._btDrive(e, tx, ty, navMs, ox, oy, bodyR, now, dtFactor, pl ? this.state.playerId : e._thId);
+  }
+  private _tmSparesOut(a: EnemyTank, t: EnemyTank | null): boolean {
+    const st = a._tmSt;
+    if (st === 5) return true;
+    if ((st !== 3 && st !== 4) || !(this._tmZr > 0)) return false;
+    const x = (t === null ? this.tankPos.x : t.position.x) - this._tmZx, y = (t === null ? this.tankPos.y : t.position.y) - this._tmZy, r = this._tmZr + 300;
+    return x * x + y * y > r * r;
+  }
+  private _tmFoodSet(e: EnemyTank): boolean {
+    const st = e._tmSt;
+    if (st === 0 || e._btBits !== 0 || !(this._tmZr > 0)) return false;
+    if (st === 3 || st === 4) { this._tmFx = this._tmZx; this._tmFy = this._tmZy; const r = this._tmZr + 250; this._tmFr2 = r * r; return true; }
+    const ti = this._tpSide(e), L = ti >= 0 && this._tmLead[ti] !== '' ? this._enemyById.get(this._tmLead[ti]) : undefined;
+    if (L === undefined) return false;
+    const dx = e.position.x - L.position.x, dy = e.position.y - L.position.y;
+    this._tmFx = L.position.x; this._tmFy = L.position.y; this._tmFr2 = (st === 1 || st === 2) && dx * dx + dy * dy <= 490000 ? 422500 : -1;
+    return true;
+  }
+  private readonly _tpNext: number[] = [0, 0, 0, 0];
+  private readonly _tpId: string[] = ['', '', '', ''];
+  private readonly _tpKind: number[] = [0, 0, 0, 0];
+  private readonly _tpSince: number[] = [0, 0, 0, 0];
+  private readonly _tpCalm: number[] = [0, 0, 0, 0];
+  private readonly _tpTake: string[] = ['', '', '', ''];
+  private readonly _tpTakeAt: number[] = [0, 0, 0, 0];
+  private readonly _tpTakeEnd: number[] = [0, 0, 0, 0];
+  private readonly _tpAtkNext: number[] = [0, 0, 0, 0];
+  private readonly _tpAtkId: string[] = ['', '', '', ''];
+  private readonly _tpAtkSince: number[] = [0, 0, 0, 0];
+  private readonly _tpPts: EnemyTank[] = [];
+  private readonly _tpCnt: number[] = [];
+  private readonly _tpHd: number[] = [];
+  private _tpClear(): void {
+    for (let i = 0; i < 4; i++) { this._tpNext[i] = 0; this._tpId[i] = ''; this._tpKind[i] = 0; this._tpSince[i] = 0; this._tpCalm[i] = 0; this._tpTake[i] = ''; this._tpTakeAt[i] = 0; this._tpTakeEnd[i] = 0; this._tpAtkNext[i] = 0; this._tpAtkId[i] = ''; this._tpAtkSince[i] = 0; }
+  }
+  private _tpSide(e: EnemyTank): number { const t = e.team as string; return t === 'team1' ? 0 : t === 'team2' ? 1 : t === 'team3' ? 2 : t === 'team4' ? 3 : -1; }
+  private _tpLost(e: EnemyTank, q: EnemyTank): boolean {
+    if (!q.active || q.isDying || q.isSpawning || (q._mevF & MF_STANDS) === 0 || (q._mevF & MF_GOD) !== 0 || q.isBaseProtector === true || q.spawnedByEntityId) return false;
+    if (q.graceActive || this._enemyUnseeable(q) || this._btMateOrSelf(e, q) || campsClash(e.camp, q.camp)) return false;
+    return !this._sgTargetSafe(this._sgSlotOfBot(e), q.position.x, q.position.y, AI_CONSTANTS.SAFEZONE_ACQUIRE_CELLS);
+  }
+  private _tpLook(e: EnemyTank, vm: NonNullable<GameLogic['_mev']>, tag: number, ti: number, now: number): void {
+    this._tpNext[ti] = now + 500;
+    const et = this.state.enemyTanks, R2 = 2250000;
+    const pOk = mayAttackPlayer(e, this.state.playerId, this.getPlayerTeam(), this.playerGroupId) && this._playerTargetable() && !this.state.playerDead;
+    let hn = 0, hx = 0, hy = 0, mn = 0, mx = 0, my = 0;
+    for (let i = 0; i < et.length; i++) {
+      const q = et[i];
+      if (this._ogHostile(e, q, e.position.x, e.position.y)) { hn++; hx += q.position.x; hy += q.position.y; }
+      else if (q.active && !q.isDying && !q.isSpawning && (q._mevF & MF_STANDS) === 0 && !q.spawnedByEntityId && q.hf.plays && this._btMateOrSelf(e, q)) { mn++; mx += q.position.x; my += q.position.y; }
+    }
+    if (pOk && !this._acrossGap(e.position.x, e.position.y, this.tankPos.x, this.tankPos.y)) { hn++; hx += this.tankPos.x; hy += this.tankPos.y; }
+    if (hn > 0) { hx /= hn; hy /= hn; }
+    if (mn > 0) { mx /= mn; my /= mn; } else { mx = e.position.x; my = e.position.y; }
+    const curId = this._tpId[ti];
+    const P = this._tpPts, N = this._tpCnt, HD = this._tpHd; P.length = 0; N.length = 0; HD.length = 0;
+    for (let i = 0; i < et.length; i++) { const p = et[i]; if (p.active && !p.isDying && p._mev >= 0 && vm.bodyHasTag(p as unknown as MevBody, p._mev, tag) && this._btMateOrSelf(e, p)) { P.push(p); N.push(0); HD.push(0); } }
+    for (let j = 0; j <= et.length; j++) {
+      let qx: number, qy: number, qvx: number, qvy: number;
+      if (j < et.length) { const q = et[j]; if (!this._ogHostile(e, q, e.position.x, e.position.y)) continue; qx = q.position.x; qy = q.position.y; qvx = q.velocity.x; qvy = q.velocity.y; }
+      else { if (!pOk) continue; qx = this.tankPos.x; qy = this.tankPos.y; qvx = this.tankVelocity.x; qvy = this.tankVelocity.y; }
+      let hx2 = qvx * 300, hy2 = qvy * 300; { const hl = hx2 * hx2 + hy2 * hy2; if (hl > 810000) { const k = 900 / Math.sqrt(hl); hx2 *= k; hy2 *= k; } }
+      let bi = -1, bd = R2;
+      if (AI_CONSTANTS.BT_TEAMHEADED !== 0 && FEEL_LIVE && j < et.length) {
+        const q = et[j];
+        if (q._oaTag >= 0 && q._ogId !== '' && !((q._btBits & BT_GUARD) !== 0 && q._ogTag >= 0)) {
+          let at = false, gi = -1;
+          for (let i = 0; i < P.length; i++) { const p = P[i]; if ((p._mevF & MF_GOD) !== 0) continue; const dx = qx - p.position.x, dy = qy - p.position.y, d2 = dx * dx + dy * dy; if (d2 <= 810000) at = true; if (p.id === q._ogId && d2 <= 20250000 && !this._acrossGap(p.position.x, p.position.y, qx, qy)) gi = i; }
+          if (!at && gi >= 0) { HD[gi]++; continue; }
+        }
+      }
+      for (let i = 0; i < P.length; i++) { const p = P[i]; if ((p._mevF & MF_GOD) !== 0) continue; const dx = qx + hx2 - p.position.x, dy = qy + hy2 - p.position.y, d2 = dx * dx + dy * dy; if (d2 <= bd && !this._acrossGap(p.position.x, p.position.y, qx, qy)) { bd = d2; bi = i; } }
+      if (bi < 0) { bd = R2; for (let i = 0; i < P.length; i++) { const p = P[i]; if ((p._mevF & MF_GOD) !== 0) continue; const dx = qx - p.position.x, dy = qy - p.position.y, d2 = dx * dx + dy * dy; if (d2 <= bd && !this._acrossGap(p.position.x, p.position.y, qx, qy)) { bd = d2; bi = i; } } }
+      if (bi >= 0) N[bi]++;
+    }
+    let best: EnemyTank | null = null, bK = 0, bS = -1, bD = Infinity, cur: EnemyTank | null = null, cK = 0, cS = -1, cD = Infinity, tot = 0, baseHot = false;
+    for (let i = 0; i < P.length; i++) {
+      const p = P[i], n = N[i], n2 = n + HD[i];
+      const px = p.position.x, py = p.position.y;
+      const base = n > 0 && this._btGunsHealReach(p.turrets, 1) > 0;
+      let k = 3, s = 0;
+      if (base && (n >= 2 || p.currentHealth < 0.7 * aiHealthMax(p, HEALTH_BASIS.AGGRO))) { k = 1; s = 1000 + n; }
+      else if (n2 >= 2 || (n2 > 0 && (base || p.id === curId))) { k = 2; s = base ? 2 * n2 : n2; }
+      tot += n; if (base) baseHot = true;
+      const d = k === 3 && hn > 0 ? (px - hx) * (px - hx) + (py - hy) * (py - hy) : (px - mx) * (px - mx) + (py - my) * (py - my);
+      if (p.id === curId) { cur = p; cK = k; cS = s; cD = d; }
+      if (s > bS || (s === bS && d < bD)) { best = p; bK = k; bS = s; bD = d; }
+    }
+    if (best === null) { this._tpId[ti] = ''; this._tpKind[ti] = 0; this._tpCalm[ti] = 0; this._tpTake[ti] = ''; return; }
+    let take = cur === null;
+    if (!take && best !== cur) {
+      const held = now - this._tpSince[ti];
+      if (bK === 1) take = cK !== 1 || bS >= cS + 2;
+      else if (bK === 2) take = cK === 3 ? held >= 2500 : cK === 2 && held >= 6000 && (bS >= cS + 2 || bS >= 2 * cS);
+      else take = cK === 3 && held >= 8000 && Math.sqrt(cD) - Math.sqrt(bD) >= 600;
+    }
+    if (take) { this._tpId[ti] = best.id; this._tpKind[ti] = bK; this._tpSince[ti] = now; }
+    else this._tpKind[ti] = cK;
+    const _out = this._tpTake[ti] !== '';
+    const _calm = !baseHot && (_out ? (now - this._tpTakeAt[ti] < 12000 || tot * 2 <= mn) : tot * 3 <= mn);
+    if (!_calm || AI_CONSTANTS.BT_TEAMTAKE === 0) { if (_out) this._tpTakeEnd[ti] = now; this._tpCalm[ti] = 0; this._tpTake[ti] = ''; return; }
+    if (this._tpCalm[ti] === 0) this._tpCalm[ti] = now;
+    let tk = this._tpTake[ti] !== '' ? this._enemyById.get(this._tpTake[ti]) : undefined;
+    if (tk !== undefined && !this._tpLost(e, tk)) tk = undefined;
+    if (tk === undefined && now - this._tpCalm[ti] >= 5000 && (this._tpTakeEnd[ti] === 0 || now - this._tpTakeEnd[ti] >= 15000)) {
+      let td = Infinity;
+      for (let i = 0; i < et.length; i++) { const q = et[i]; if ((q._mevF & MF_STANDS) === 0 || !this._tpLost(e, q)) continue; const d = (q.position.x - mx) * (q.position.x - mx) + (q.position.y - my) * (q.position.y - my); if (d < td) { td = d; tk = q; } }
+      if (tk !== undefined) this._tpTakeAt[ti] = now;
+    }
+    this._tpTake[ti] = tk !== undefined ? tk.id : '';
+  }
+  private _tpPick(e: EnemyTank, vm: NonNullable<GameLogic['_mev']>, tag: number, held: EnemyTank | undefined, now: number): EnemyTank | null {
+    const ti = this._tpSide(e);
+    if (ti < 0) return null;
+    { const c0 = this._tpId[ti] !== '' ? this._enemyById.get(this._tpId[ti]) : undefined;
+      if (now >= this._tpNext[ti] || this._tpNext[ti] - now > 5000 || (this._tpId[ti] !== '' && (c0 === undefined || !c0.active || c0.isDying || !this._btMateOrSelf(e, c0)))) this._tpLook(e, vm, tag, ti, now); }
+    const id = this._tpId[ti];
+    const want = id !== '' ? this._enemyById.get(id) : undefined;
+    if (want === undefined) return null;
+    if (held === undefined || held === want) { e._ogPendId = ''; return want; }
+    if (e._ogPendId !== id) {
+      const u = hfHash(e.hf.seed, 552, hfIdNum(id) + ((now / 8000) | 0));
+      e._ogPendId = id; e._ogPendAt = now + (this._tpKind[ti] === 1 ? 200 + 1000 * u : 300 + 2200 * u);
+      return held;
+    }
+    if (now < e._ogPendAt) return held;
+    e._ogPendId = '';
+    if (e._btRoute !== '') this._btDropRoute(e);
+    return want;
+  }
+  private _tpInFight(e: EnemyTank, now: number): void {
+    const vm = this._mev;
+    if (vm === null) return;
+    const held = e._ogId !== '' ? this._enemyById.get(e._ogId) : undefined;
+    const p = this._tpPick(e, vm, e._ogTag, held, now);
+    if (p !== null && p !== held) { e._ogId = p.id; e._ogX = p.position.x; e._ogY = p.position.y; e._ogGo = 0; e._ogBlockUntil = 0; e._ogBlockSpotUntil = 0; e._ogHelpId = ''; }
+  }
+  private _tpTakeOf(e: EnemyTank, now: number): EnemyTank | null {
+    const ti = this._tpSide(e);
+    if (ti < 0 || this._tpTake[ti] === '') return null;
+    const tk = this._enemyById.get(this._tpTake[ti]);
+    if (tk === undefined || !tk.active || tk.isDying) return null;
+    if (now - this._tpTakeAt[ti] < 300 + 2700 * hfHash(e.hf.seed, 553, hfIdNum(tk.id))) return null;
+    return tk;
+  }
+  private _tpAttackPick(e: EnemyTank, vm: NonNullable<GameLogic['_mev']>, tag: number, held: EnemyTank | undefined, closest: EnemyTank, now: number): EnemyTank {
+    const ti = this._tpSide(e);
+    if (ti < 0) return closest;
+    const a0 = this._tpAtkId[ti] !== '' ? this._enemyById.get(this._tpAtkId[ti]) : undefined;
+    if (now >= this._tpAtkNext[ti] || this._tpAtkNext[ti] - now > 5000 || (this._tpAtkId[ti] !== '' && (a0 === undefined || !a0.active || a0.isDying || this._btMateOrSelf(e, a0)))) {
+      this._tpAtkNext[ti] = now + 1000;
+      const et = this.state.enemyTanks;
+      let mn = 0, mx = 0, my = 0;
+      for (let i = 0; i < et.length; i++) { const q = et[i]; if (q.active && !q.isDying && !q.isSpawning && (q._mevF & MF_STANDS) === 0 && !q.spawnedByEntityId && q.hf.plays && q._oaTag === tag && q._oaTeam && this._btMateOrSelf(e, q)) { mn++; mx += q.position.x; my += q.position.y; } }
+      if (mn > 0) { mx /= mn; my /= mn; } else { mx = e.position.x; my = e.position.y; }
+      const _an = AI_CONSTANTS.BT_ATTACKNEAR !== 0 && FEEL_LIVE;
+      let _fl = false;
+      if (_an && mn > 0) {
+        let gb: EnemyTank | null = null, gn = 0;
+        if (AI_CONSTANTS.TM_LEADER !== 0) { const _ld = this._ldOf(e, ti, now); if (_ld !== null && !_ld.isSpawning && _ld._oaTag === tag && _ld._oaTeam) gb = _ld; }
+        const _ldHas = gb !== null;
+        for (let i = 0; !_ldHas && i < et.length; i++) {
+          const q = et[i];
+          if (!(q.active && !q.isDying && !q.isSpawning && (q._mevF & MF_STANDS) === 0 && !q.spawnedByEntityId && q.hf.plays && q._oaTag === tag && q._oaTeam && this._btMateOrSelf(e, q))) continue;
+          let n = 0;
+          for (let j = 0; j < et.length; j++) { const r = et[j]; if (r.active && !r.isDying && !r.isSpawning && (r._mevF & MF_STANDS) === 0 && !r.spawnedByEntityId && r.hf.plays && r._oaTag === tag && r._oaTeam && this._btMateOrSelf(e, r)) { const dx = r.position.x - q.position.x, dy = r.position.y - q.position.y; if (dx * dx + dy * dy <= 490000) n++; } }
+          if (n > gn) { gn = n; gb = q; }
+        }
+        if (gb !== null) { mx = gb.position.x; my = gb.position.y; _fl = this._tpFlood(gb, mx, my); }
+      }
+      const curId = this._tpAtkId[ti];
+      let cur: EnemyTank | null = null, cD = Infinity, best: EnemyTank | null = null, bD = Infinity;
+      for (let pass = _an ? 0 : 1; pass < 2 && best === null; pass++) {
+        for (let i = 0; i < et.length; i++) {
+          const p = et[i];
+          if (!p.active || p.isDying || p._mev < 0 || !vm.bodyHasTag(p as unknown as MevBody, p._mev, tag) || this._btMateOrSelf(e, p) || (SMALL_FIX.R941 !== 0 && this._enemyUnseeable(p)) || this._acrossGap(mx, my, p.position.x, p.position.y)) continue;
+          if (pass === 0 && (p._mevF & MF_GOD) !== 0) continue;
+          let d = (p.position.x - mx) * (p.position.x - mx) + (p.position.y - my) * (p.position.y - my);
+          if (_fl) { const w = this._tpFloodTo(p.position.x, p.position.y); if (w < Infinity && w * w > d) d = w * w; }
+          if (p.id === curId) { cur = p; cD = d; }
+          if (d < bD) { best = p; bD = d; }
+        }
+      }
+      if (best === null) this._tpAtkId[ti] = '';
+      else if (cur === null || (best !== cur && !(_an && AI_CONSTANTS.BT_ATTACKKEEP !== 0) && (_an ? now - this._tpAtkSince[ti] >= 10000 && Math.sqrt(cD) - Math.sqrt(bD) >= 600 : now - this._tpAtkSince[ti] >= 30000 && Math.sqrt(cD) - Math.sqrt(bD) >= 1200))) { this._tpAtkId[ti] = best.id; this._tpAtkSince[ti] = now; }
+    }
+    const id = this._tpAtkId[ti];
+    const want = id !== '' ? this._enemyById.get(id) : undefined;
+    if (want === undefined) return closest;
+    if (held === undefined || held === want) { e._ogPendId = ''; return want; }
+    if (e._ogPendId !== id) { e._ogPendId = id; e._ogPendAt = now + 300 + 2700 * hfHash(e.hf.seed, 554, hfIdNum(id)); return held; }
+    if (now < e._ogPendAt) return held;
+    e._ogPendId = '';
+    if (e._btRoute !== '') this._btDropRoute(e);
+    return want;
+  }
+  private _tpFOwn: Uint16Array | null = null; private _tpFGc = 0; private _tpFGcY = 0; private _tpFCs = 0; private _tpFMh = 0; private _tpFMhY = 0; private _tpFOx = 0; private _tpFOy = 0;
+  private _tpFlood(e: EnemyTank, x: number, y: number): boolean {
+    this._tpFOwn = null;
+    const navMs = this._getEnemyNavMapState(e);
+    if (navMs === null || navMs.walls.length === 0 || !navMs.navigation) return false;
+    const nav = navMs.navigation, ox = this._navOffX, oy = this._navOffY;
+    const gc = nav.gridCells, gcY = nav.gridCellsY, N = gc * gcY, cs = nav.cellSize, mh = nav.mapHalf, mhY = nav.mapHalfY;
+    const cx0 = Math.floor((x - ox + mh) / cs), cy0 = Math.floor((y - oy + mhY) / cs);
+    if (cx0 < 0 || cx0 >= gc || cy0 < 0 || cy0 >= gcY || N >= 0xFFFF) return false;
+    let W = this._ofMap.get(nav);
+    if (W === undefined || W.own.length !== N) { W = { own: new Uint16Array(N), par: new Int32Array(N), q: new Int32Array(N) }; this._ofMap.set(nav, W); }
+    const own = W.own, Q = W.q, mask = nav.regionsBuilt && nav.navBlocked.length === N ? nav.navBlocked : null;
+    own.fill(0xFFFF);
+    const i0 = cx0 * gcY + cy0; own[i0] = 0; Q[0] = i0;
+    let qh = 0, qt = 1;
+    while (qh < qt) {
+      const i = Q[qh++], d = own[i], ix = (i / gcY) | 0, iy = i - ix * gcY;
+      for (let k = 0; k < 4; k++) {
+        const jx = ix + (k === 0 ? 1 : k === 1 ? -1 : 0), jy = iy + (k === 2 ? 1 : k === 3 ? -1 : 0);
+        if (jx < 0 || jx >= gc || jy < 0 || jy >= gcY) continue;
+        const j = jx * gcY + jy;
+        if (own[j] !== 0xFFFF) continue;
+        if (mask ? mask[j] !== 0 : (navMs.tileGrid[j] === TileType.WALL || navMs.rockGrid[j] >= 0)) continue;
+        own[j] = d + 1; Q[qt++] = j;
+      }
+    }
+    this._tpFOwn = own; this._tpFGc = gc; this._tpFGcY = gcY; this._tpFCs = cs; this._tpFMh = mh; this._tpFMhY = mhY; this._tpFOx = ox; this._tpFOy = oy;
+    return true;
+  }
+  private _tpFloodTo(x: number, y: number): number {
+    const own = this._tpFOwn;
+    if (own === null) return Infinity;
+    const gc = this._tpFGc, gcY = this._tpFGcY, cs = this._tpFCs;
+    const cx = Math.floor((x - this._tpFOx + this._tpFMh) / cs), cy = Math.floor((y - this._tpFOy + this._tpFMhY) / cs);
+    let best = 0xFFFF;
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+      const jx = cx + a, jy = cy + b;
+      if (jx < 0 || jx >= gc || jy < 0 || jy >= gcY) continue;
+      const v = own[jx * gcY + jy];
+      if (v !== 0xFFFF && v + (a !== 0 || b !== 0 ? 1 : 0) < best) best = v + (a !== 0 || b !== 0 ? 1 : 0);
+    }
+    return best >= 0xFFFF ? Infinity : best * cs;
   }
   private _ogFrontOne(e: EnemyTank): boolean {
     if (e._ogFrontIs < 0) e._ogFrontIs = hfHash(e.hf.seed, 491, 0) < e._ogFrontShare ? 1 : 0;
@@ -16470,6 +19762,7 @@ export class GameLogic {
     return !this._acrossGap(px, py, q.position.x, q.position.y);
   }
   private _ogFrontPick(e: EnemyTank, vm: NonNullable<GameLogic['_mev']>, tag: number, held: EnemyTank | undefined, closest: EnemyTank, now: number): EnemyTank {
+    if (AI_CONSTANTS.BT_TEAMPLAN !== 0 && FEEL_LIVE && e.hf.plays) { const tp = this._tpPick(e, vm, tag, held, now); if (tp !== null) return tp; }
     if (held === undefined) return closest;
     const et = this.state.enemyTanks, R2 = 2250000;
     const pOk = mayAttackPlayer(e, this.state.playerId, this.getPlayerTeam(), this.playerGroupId) && this._playerTargetable() && !this.state.playerDead;
@@ -16764,7 +20057,7 @@ export class GameLogic {
     const dx = gx - lx, dy = gy - ly, d = Math.sqrt(dx * dx + dy * dy);
     if (d < 1) return false;
     const bodyR = this._routeR(e);
-    if (ms.navigation && ms.walls.length > 0 && !isPathClear(ms, lx, ly, gx, gy, ox, oy, bodyR)) {
+    if (ms.navigation && ms.walls.length > 0 && !this._btWayClear(ms, lx, ly, gx, gy, ox, oy, bodyR)) {
       ensureRegionFields(ms.navigation, ms, ox, oy);
       const dist = ensureAuxDistField(ms.navigation, ms, this._ftHomeKey(ms, gx, gy), gx, gy, now, bodyR);
       if (dist !== null) {
@@ -16926,17 +20219,21 @@ export class GameLogic {
       e._hdLookAt = now + BT.SIDE_LOOK_MS;
       const et = this.state.enemyTanks, fk = e.fovRadius * BT.SIDE_FRONT_K;
       let bestF = fk * fk, bestN = Infinity, mf: EnemyTank | undefined, mn: EnemyTank | undefined;
+      const _HW = AI_CONSTANTS.BT_HEALWAIT !== 0 && FEEL_LIVE;
+      let bestW = Infinity, mw: EnemyTank | undefined;
       for (let i = 0; i < et.length; i++) {
         const o = et[i];
         if (o === e || !o.active || o.isDying || o.isSpawning || (o._mevF & MF_NO_HEAL) !== 0 || btStandsStill(o) || this._btDuty(o)) continue;
         const dx = o.position.x - e.position.x, dy = o.position.y - e.position.y, d2 = dx * dx + dy * dy;
         const front = d2 < bestF && this._btGoalOf(o) !== '';
-        if (!front && d2 >= bestN) continue;
+        const _hw = _HW && !front && d2 < bestW && o.aiState === 'roaming' && (o._tfMeetId !== '' || o._tfGateZ >= 0);
+        if (!front && !_hw && d2 >= bestN) continue;
         if (!this._btMate(e, o) || this._acrossGap(e.position.x, e.position.y, o.position.x, o.position.y)) continue;
         if (front) { bestF = d2; mf = o; }
+        if (_hw) { bestW = d2; mw = o; }
         if (d2 < bestN) { bestN = d2; mn = o; }
       }
-      m = mf ?? mn;
+      m = mf ?? mw ?? mn;
       e._hdMateId = m !== undefined ? m.id : '';
     }
     if (m === undefined) { if (e._btRoute !== '') this._btDropRoute(e); return false; }
@@ -17132,16 +20429,20 @@ export class GameLogic {
   private _mevBotSight(e: EnemyTank, k: number): void {
     if (k === e._mevSightK && (k === 1 || e.fovRadius === e._mevSightSet)) return;
     const base = e.fovRadius === e._mevSightSet && e._mevSightK !== 1 ? e.fovRadius / e._mevSightK : e.fovRadius;
+    const was807 = e.fovRadius;
     e._mevSightK = k;
     e.fovRadius = base * k;
     e._mevSightSet = e.fovRadius;
+    if (SMALL_FIX.G807 !== 0 && e._wtView !== 1 && e._wtViewSet === was807) e._wtViewSet = e.fovRadius;
   }
   private _wtBotView(e: EnemyTank, k: number): void {
     if (k === e._wtView && (SMALL_FIX.GH545 === 0 || k === 1 || e.fovRadius === e._wtViewSet)) return;
     const base = e.fovRadius === e._wtViewSet && e._wtView !== 1 ? e.fovRadius / e._wtView : e.fovRadius;
+    const was807 = e.fovRadius;
     e._wtView = k;
     e.fovRadius = base * k;
     e._wtViewSet = e.fovRadius;
+    if (SMALL_FIX.G807 !== 0 && e._mevSightK !== 1 && e._mevSightSet === was807) e._mevSightSet = e.fovRadius;
   }
 
   private _doors: { beh: number; ms: MapState; walls: number[]; cells: number[]; shut: boolean; built: boolean; crush: number; shutAt: number }[] = [];
@@ -17165,7 +20466,8 @@ export class GameLogic {
       }
       if (walls.length === 0) continue;
       const shut = ms.walls[walls[0]].active;
-      const c = typeof b.a.crush === 'number' && Number.isFinite(b.a.crush) ? Math.max(0, Math.min(10000, b.a.crush)) : 300;
+      const c = SMALL_FIX.R1008 !== 0 ? Math.max(0, Math.min(10000, this._behNum(b.a.crush, 300, b.idx, 30, 1)))
+        : typeof b.a.crush === 'number' && Number.isFinite(b.a.crush) ? Math.max(0, Math.min(10000, b.a.crush)) : 300;
       this._doors.push({ beh: b.idx, ms, walls, cells, shut, built: shut, crush: c, shutAt: -1e9 });
     }
   }
@@ -17228,7 +20530,7 @@ export class GameLogic {
         const et = this.state.enemyTanks;
         for (let k = 0; k < et.length; k++) {
           const e = et[k];
-          if (!e.active || e.isDying || e.isSpawning || (e._mevF & MF_GOD) !== 0) continue;
+          if (!e.active || e.isDying || e.isSpawning || (e._mevF & MF_GOD) !== 0 || (SMALL_FIX.G935 !== 0 && this._enemyGhosted(e))) continue;
           if ((SMALL_FIX.GH455 && e.graceActive) || (SMALL_FIX.R872 && e.isBaseProtector === true)) continue;
           const r = e.size * 0.5;
           if (Math.abs(e.position.x - w.x) >= w.halfW + r * 0.5 || Math.abs(e.position.y - w.y) >= w.halfH + r * 0.5) continue;
@@ -17271,7 +20573,7 @@ export class GameLogic {
       }
       for (let k = 0; k < et.length; k++) {
         const e = et[k];
-        if (!e.active || e.isDying || e.isSpawning || (e._mevF & MF_GOD) !== 0) continue;
+        if (!e.active || e.isDying || e.isSpawning || (e._mevF & MF_GOD) !== 0 || (SMALL_FIX.G935 !== 0 && this._enemyGhosted(e))) continue;
         if (SMALL_FIX.GH455 && e.graceActive) continue;
         if (SMALL_FIX.R872 && e.isBaseProtector === true) continue;
         const r = e.size * 0.5, m = r * 0.5 + 1, x = e.position.x, y = e.position.y;
@@ -17372,6 +20674,7 @@ export class GameLogic {
   }
   private _mmFlush(): void {
     const dirty = this._mmDirty;
+    if (SMALL_FIX.G922 !== 0 && dirty.length > 0) this._glowSoon();
     for (let s = 0; s < dirty.length; s++) {
       const ms = dirty[s];
       if (ms.navigation) rebuildNavigation(ms.navigation, ms);
@@ -17567,7 +20870,8 @@ export class GameLogic {
       this._foodZones.push({
         beh: b.idx, on: b.on, areaIdx: z.areaIdx,
         cfg: foodZoneConfig(base, b.a.shapes),
-        rate: typeof b.a.rate === 'number' && Number.isFinite(b.a.rate) ? Math.max(0, Math.min(100, b.a.rate)) : 50,
+        rate: SMALL_FIX.R1008 !== 0 ? Math.max(0, Math.min(100, this._behNum(b.a.rate, 50, b.idx, 31, 1)))
+          : typeof b.a.rate === 'number' && Number.isFinite(b.a.rate) ? Math.max(0, Math.min(100, b.a.rate)) : 50,
         keepOut: b.a.keepOut !== false,
         x0: z.x0, y0: z.y0, x1: z.x1, y1: z.y1,
         rects: Float64Array.from(z.rects), poly: z.poly !== null ? Float64Array.from(z.poly) : null,
@@ -17619,6 +20923,8 @@ export class GameLogic {
   public mevLog: string[] = [];
   private _mevGodTimers: { e: EnemyTank; id: string; until: number }[] = [];
   private _mevPlayerGodUntil = 0;
+  private _mevGodStatusN = new Map<EnemyTank, number>();
+  private _mevPlayerGodStatus = 0;
   private _mevPlayerGodWas = false;
 
   private _mevInput(): CompileDoc[] {
@@ -17659,6 +20965,7 @@ export class GameLogic {
     this.mevLog.length = 0;
     this._mevGodTimers.length = 0;
     this._mevPlayerGodUntil = 0;
+    this._mevGodStatusN.clear(); this._mevPlayerGodStatus = 0;
     if (MAP_EVENTS.ON === 0) return;
     const modeRoom = this.state.gameModeConfig.maxTanksAlive;
     if (modeRoom !== undefined) this._mevSetRoom(modeRoom);
@@ -17689,6 +20996,7 @@ export class GameLogic {
     this._mevFoodUid = p.match.foodIn ? p.match.foodIn.id : -1;
     this._mevFoodArea = p.match.foodIn && p.foodInDoc >= 0 ? p.docIds[p.foodInDoc] : null;
     if (!p.hasContent) {
+      this._mevRuleOnly = SMALL_FIX.G880 !== 0;
       if (SMALL_FIX.G652 !== 0 && p.match.shrink) this._mevStartedAt = this.gameNow();
       if (SMALL_FIX.GH590 !== 0) {
         this._mevPeace = MISSING_MODES.ON !== 0 && p.match.peaceful === true;
@@ -17729,6 +21037,17 @@ export class GameLogic {
     try { this._chatTimeSkip(['skip', String(SMALL_FIX.GH591 !== 0 ? Math.max(1, Math.round(m)) : Math.round(m))]); } catch { }
     const h = GameLogic.travelHooks as { spread?: (g: GameLogic) => void } | null;
     if (h && h.spread) h.spread(this);
+    this._foundThere();
+  }
+  private _foundThere(): void {
+    if (AI_CONSTANTS.NEXUS_JOIN === 0) return;
+    const now = this.gameNow(), et = this.state.enemyTanks;
+    for (let i = 0; i < et.length; i++) {
+      const e = et[i];
+      if (!e.active || e.isDying || !this._skipOrdinary(e)) continue;
+      e.isSpawning = false; e.spawnStartTime = 0;
+      if (e.graceActive) { e.graceActive = false; e.graceEndTime = now; }
+    }
   }
   private _mevLb: { title: string; goal: number; unit: string; unitOne: string; vars: number[] } | null = null;
   public _mevLbTeams(on: boolean, title: string, goal: number, unit: string, unitOne: string, vars: number[] | null): void {
@@ -17785,11 +21104,16 @@ export class GameLogic {
     const b = m.host.playerBody();
     if (b !== null) m.notePlayerSpawned(b);
   }
+  private _mevRuleOnly = false;
+  private _mevRulesOn(): boolean { return this._mevOn || this._mevRuleOnly; }
   private _mevStop(): void {
     this._mevOff = 0;
+    this._mevRuleOnly = false;
     if (SMALL_FIX.G709 !== 0) this._spawnAreaIdx = 0;
     if (SMALL_FIX.G724 !== 0) this._specDied = null;
     this._mevPeace = false; this._ageAtStart = 0;
+    this._tpClear();
+    this._tmClear();
     if (this._ctlBody !== null) { this.state.ghostMode = this._ctlGhostWas; this._ctlBody = null; }
     this._specOff();
     this._specShownFrom = this._specShownTo = this._specShownLast = 1; this._specShownAt = 0;
@@ -17998,8 +21322,15 @@ export class GameLogic {
       const e = rid !== this.state.playerId ? this._enemyById.get(rid) : undefined;
       if (e && e.active) k = e;
     }
-    const kb = k as unknown as MevBody | null;
-    this._mev!.noteDeath(host.player, kb, k ? k.id : '', kb ? host.sideOf(kb) : '', this._selfDestructDeath ? CAUSE_SELF : this._lastDmgKind === 'area' ? CAUSE_AREA : CAUSE_HIT, this.tankPos.x, this.tankPos.y, true);
+    let kb = k as unknown as MevBody | null;
+    let kid = k ? k.id : '';
+    if (SMALL_FIX.G885 !== 0 && !kb && this._lastDmgKind === 'shape' && this._lastDmgShapeRef !== null && this.frameCounter - this._lastDmgShapeFrame <= 1) {
+      const sb = this._lastDmgShapeRef as unknown as MevBody;
+      if ((sb._mev ?? -1) >= 0 && host.isLive(sb, this._lastDmgShapeRefId)) { kb = sb; kid = this._lastDmgShapeRefId; }
+    }
+    const rule886 = SMALL_FIX.G886 !== 0 && this._mevRuleKill;
+    this._mevRuleKill = false;
+    this._mev!.noteDeath(host.player, kb, kid, kb ? host.sideOf(kb) : '', this._selfDestructDeath ? CAUSE_SELF : rule886 ? CAUSE_RULE : this._lastDmgKind === 'area' ? CAUSE_AREA : CAUSE_HIT, this.tankPos.x, this.tankPos.y, true);
   }
 
   private _mevEdRef: unknown = null;
@@ -18558,7 +21889,7 @@ export class GameLogic {
   }
 
   private _fixedBodyStamp(e: EnemyTank, cfg: EnemyConfig | null | undefined): void {
-    const thing = e.isBaseProtector === true || isFixedMapThing(e._toughWord);
+    const thing = e.isBaseProtector === true || (SMALL_FIX.G896 !== 0 && cfg?.isBaseProtector === true) || isFixedMapThing(e._toughWord);
     if (cfg?.fixedBody ?? thing) e.pushability = 0;
     e.bodySolid = cfg?.solidBody ?? thing;
   }
@@ -18582,11 +21913,12 @@ export class GameLogic {
   }
   private _plSightWord = '';
   private _plSightLibN = -1;
+  private _plSightEpoch = -1;
   private _plSightRef = 0;
   private _playerFileSizePx(): number {
     const w = this.state.currentTankFileName ?? '', lib = this.state.tankLibrary, n = lib ? lib.length : 0;
-    if (w !== this._plSightWord || n !== this._plSightLibN) {
-      this._plSightWord = w; this._plSightLibN = n;
+    if (w !== this._plSightWord || n !== this._plSightLibN || (SMALL_FIX.G804 !== 0 && this._plSightEpoch !== this.projectEpoch)) {
+      this._plSightWord = w; this._plSightLibN = n; this._plSightEpoch = this.projectEpoch;
       const it = w !== '' ? findByShownNameOrFileKey(lib, w, false) : null;
       const ts = it ? (it.fileData as { data?: { tankSize?: number } }).data?.tankSize : undefined;
       this._plSightRef = tankSizeFromSlider(typeof ts === 'number' && ts > 0 ? ts : INITIAL_GAME_STATE.tankSize);
@@ -18609,8 +21941,9 @@ export class GameLogic {
     this._selfDestructDeath = false;
   }
   private _selfDestructDeath = false;
-  public _mevPlayerDies(): void {
+  public _mevPlayerDies(byRule = false): void {
     if (this.tankDying) return;
+    this._mevRuleKill = byRule && SMALL_FIX.G886 !== 0;
     this._lastDmgKind = 'area';
     this.state.tankCurrentHealth = 0;
     this.state.tankCurrentShield = 0;
@@ -18636,6 +21969,7 @@ export class GameLogic {
     }
     if ((e._mevF & MF_GOD) !== 0 || e.isBaseProtector || e.isDying) return;
     if (SMALL_FIX.GH509 && e.graceActive) return;
+    if (SMALL_FIX.G936 !== 0 && this._enemyGhosted(e)) return;
     const m = e.maxHealth * getEnemyStatMultiplier(e, 'maxHealth');
     this._mevHurtBot(e, isShare ? m * amount / 100 : amount);
     if (e.currentHealth <= 0) { this._mevCause = CAUSE_RULE; e.currentHealth = 0; e.currentShield = 0; this.killEnemy(e); }
@@ -18644,26 +21978,26 @@ export class GameLogic {
     const until = this.gameNow() + seconds * 1000;
     if (e === null) {
       if (this._mevPlayerGodUntil === 0) this._mevPlayerGodWas = SMALL_FIX.GH377 && this.state.gracePeriodActive ? this.state._preGraceGodMode : this.state.godMode;
-      this._mevPlayerGodUntil = until;
+      this._mevPlayerGodUntil = SMALL_FIX.G874 !== 0 ? Math.max(this._mevPlayerGodUntil, until) : until;
       this.state.godMode = true;
       return;
     }
     if ((e._mevF & MF_GOD) !== 0 && !this._mevGodTimers.some(t => t.e === e)) return;
     e._mevF |= MF_GOD;
     const had = this._mevGodTimers.find(t => t.e === e);
-    if (had) had.until = until; else this._mevGodTimers.push({ e, id: e.id, until });
+    if (had) had.until = SMALL_FIX.G874 !== 0 ? Math.max(had.until, until) : until; else this._mevGodTimers.push({ e, id: e.id, until });
   }
   public _mevGodHeld(e: EnemyTank): boolean { return this._mevGodTimers.some(t => t.e === e); }
   private _mevGodTick(now: number): void {
-    if (this._mevPlayerGodUntil !== 0 && now >= this._mevPlayerGodUntil) {
+    if (this._mevPlayerGodUntil !== 0 && now >= this._mevPlayerGodUntil && !(SMALL_FIX.G874 !== 0 && this._mevPlayerGodStatus > 0)) {
       this._mevPlayerGodUntil = 0;
       if (!(SMALL_FIX.GH377 && this.state.gracePeriodActive)) this.state.godMode = this._mevPlayerGodWas;
     }
     const list = this._mevGodTimers;
     for (let i = list.length - 1; i >= 0; i--) {
       const t = list[i];
-      if (t.e.id !== t.id || !t.e.active) { list.splice(i, 1); continue; }
-      if (now >= t.until) { t.e._mevF &= ~MF_GOD; list.splice(i, 1); }
+      if (t.e.id !== t.id || !t.e.active) { list.splice(i, 1); if (SMALL_FIX.G874 !== 0) this._mevGodStatusN.delete(t.e); continue; }
+      if (now >= t.until && !(SMALL_FIX.G874 !== 0 && (this._mevGodStatusN.get(t.e) ?? 0) > 0)) { t.e._mevF &= ~MF_GOD; list.splice(i, 1); if (SMALL_FIX.G874 !== 0) this._mevGodStatusN.delete(t.e); }
     }
   }
   public _mevInvisible(e: EnemyTank | null, on: boolean, style: number): void {
@@ -18723,7 +22057,11 @@ export class GameLogic {
         if (on && (kind === 'seekHeal' || kind === 'healerDuty')) this._btShieldHeal = true;
         break;
       case 'invulnerable':
-        if (on) this._mevGodFor(e, 1e9);
+        if (SMALL_FIX.G874 !== 0) {
+          if (e === null) this._mevPlayerGodStatus = on ? 1 : 0;
+          else if (on) this._mevGodStatusN.set(e, 1); else this._mevGodStatusN.delete(e);
+          if (on) this._mevGodFor(e, 0);
+        } else if (on) this._mevGodFor(e, 1e9);
         else if (e === null) { if (this._mevPlayerGodUntil !== 0) this._mevPlayerGodUntil = 1; }
         else { const t = this._mevGodTimers.find(x => x.e === e); if (t) t.until = 0; }
         break;
@@ -19106,6 +22444,7 @@ export class GameLogic {
     if (!rows || rows.length === 0) return;
     const next = rows[0].spare.filter(w => !remove.includes(w));
     for (const w of add) if (!next.includes(w)) next.push(w);
+    if (SMALL_FIX.G926 !== 0) { const cur = rows[0].spare; if (cur.length === next.length && next.every(w => cur.includes(w))) return; }
     this._mevAreaEditSpare.set(behaviorRow, next);
     for (const r of rows) r.spare = next;
     this._mevSpareResolve(behaviorRow, rows, next);
@@ -19137,7 +22476,7 @@ export class GameLogic {
   }
   public matchClosedForGood(): boolean { return this._closeHold && this._closeState !== 0; }
   public matchEndTitle(): string { return this.matchClosedForGood() && this._closeSays ? this._closeSays.screen : ''; }
-  private _shareRoom(): boolean { return this._mevOn && this.mevMatch.shareRoom === true; }
+  private _shareRoom(): boolean { return this._mevRulesOn() && this.mevMatch.shareRoom === true; }
   private _livingPlayerBot(e: EnemyTank): boolean {
     return e.active && !e.isDying && (e._mevF & MF_STAGE) === 0 && !e.isBaseProtector && !e.isBossTier && !e.isSentryEnemy && !e.spawnedByEntityId && !this.isArenaCloser(e);
   }
@@ -19256,6 +22595,7 @@ export class GameLogic {
     if (this.state.gracePeriodActive || this.tankDying || this.state.tankSpawning) return;
     this._sceneGraceOwn = true;
     this.startGracePeriod(now);
+    if (SMALL_FIX.G903 !== 0) this._sceneGraceOwn = true;
   }
   public mevOfHud(): MapEventsVM | null { return this._mev; }
   public mevWaveReached(): number { return this._mev ? this._mev.waveReached() : 0; }
@@ -19304,6 +22644,18 @@ export class GameLogic {
       r => this.state.enemyConfigs.some(c => c.id === r.configId));
   }
 
+  private readonly _portalGuardTestFn = (p: PortalEntity): boolean => {
+    _portalOne.length = 0; _portalOne.push(p);
+    const list = this.state.enemyTanks;
+    for (let i = 0; i < list.length; i++) {
+      const e = list[i];
+      if (!e.active || e.isDying || !e.isBaseProtector) continue;
+      const pad = Math.max(SPAWN_HAZARD_PAD, this.getEffectiveEnemyRadius(e) + GRID_SPACING);
+      if (spawnHazardAt(_portalOne, undefined, e.position.x, e.position.y, pad, true, true)) { _portalOne.length = 0; return true; }
+    }
+    _portalOne.length = 0;
+    return false;
+  };
   private _guardOnPortal(ms: MapState, x: number, y: number, pad: number = SPAWN_HAZARD_PAD): boolean {
     return ms.portals.length > 0 && spawnHazardAt(ms.portals, undefined, x, y, pad, true, true);
   }
@@ -19481,6 +22833,11 @@ export class GameLogic {
           if ((enemyConfig.maxSpawnCount ?? 0) < need) enemyConfig.maxSpawnCount = need;
           _bpPlaced[teamIndex] = need;
         }
+        if (SMALL_FIX.G914 !== 0) {
+          let live = 0;
+          for (const e of this.state.enemyTanks) if (e.active && !e.isDying && e.configId === configId) live++;
+          if ((enemyConfig.maxSpawnCount ?? 0) < live + n) enemyConfig.maxSpawnCount = live + n;
+        }
         for (let pi = 0; pi < n; pi++) {
           const spawned = this.spawnEnemy(enemyConfig, false, true , true );
           if (!spawned) break;
@@ -19567,7 +22924,17 @@ export class GameLogic {
       const gType = (curDoc?.types ?? []).find(ty => ty.brain === 'guard' && ty.side?.team === `team${t + 1}` && ty.forms?.[0]?.tank === tank);
       const range = gType?.guard?.range ?? baseProtectorRange(cfg);
       const key = JSON.stringify([on, count, arrange, tank, tiles, range, zis.map(zi => { const q = parts[zi]; return [q.minX, q.minY, q.maxX, q.maxY]; }), ms.gridCells, gcY, cs, portalsKey]);
-      if (a.guardsFor === key) continue;
+      if (a.guardsFor === key) {
+        if (SMALL_FIX.G932 === 0 || !on || ms.portals.length === 0) continue;
+        const pad932 = this._guardPortalPad(this._resolveBaseProtectorTank(tank));
+        const saved932 = (doc ?? cfg.events)?.placed ?? [];
+        let onPortal932 = false;
+        for (const ge of saved932) {
+          if (ge.guardOf !== zid) continue;
+          if (this._guardOnPortal(ms, ge.cx * cs - mh + offX, ge.cy * cs - mhY + offY, pad932)) { onPortal932 = true; break; }
+        }
+        if (!onPortal932) continue;
+      }
       const pts: { x: number; y: number }[] = [];
       if (on && count > 0) {
         const tc = this._resolveBaseProtectorTank(tank);
@@ -19807,7 +23174,9 @@ export class GameLogic {
   }
 
   private _sgSlotOfBot(e: EnemyTank): number {
-    return this._sgAreasLive && e.camp === CAMP_BOSS ? BASE_DANGER_SLOT_BOSS : this._sgSlotOf(e.team);
+    if (this._sgAreasLive && e.camp === CAMP_BOSS) return BASE_DANGER_SLOT_BOSS;
+    const s = this._sgSlotOf(e.team);
+    return SMALL_FIX.G927 !== 0 && this._sgAreasLive && s === BASE_DANGER_SLOT_NONE && e.aiBehavior !== 'Neutral' && e.aiBehavior !== 'FFA' ? BASE_DANGER_SLOT_UNNAMED : s;
   }
   private _sgSlotOf(t: TeamId | string): number {
     if (t === 'player') return this._sgPlayerSlot;
@@ -20199,6 +23568,7 @@ export class GameLogic {
   }
 
   private startGracePeriod(at?: number): void {
+    if (SMALL_FIX.G903 !== 0) this._sceneGraceOwn = false;
     if (this.state.gracePeriodActive) this.endGracePeriod();
     this.state._preGraceGodMode = SMALL_FIX.GH377 && this._mevPlayerGodUntil !== 0 ? this._mevPlayerGodWas : this.state.godMode;
     this.state.gracePeriodActive = true;
@@ -20253,6 +23623,21 @@ export class GameLogic {
 
   public getPlayerTeam(): TeamId {
     return this._playerTeamOnTank(this.state.currentTankFileName);
+  }
+  public mmTeamRule(): boolean {
+    const gm = this.state.gameModeConfig;
+    return this.state.isTestMode && (teamColourMode(gm.mode) || (SMALL_FIX.G836 !== 0 && sandboxTeamsOn(gm)));
+  }
+  public mmEveryoneSees(e: EnemyTank): boolean {
+    if (AI_CONSTANTS.MINIMAP_DREADS === 0) return false;
+    if (e.camp === CAMP_ROGUE) return true;
+    const r = getTreeRoot((SMALL_FIX.G967 !== 0 ? this._areaTankKeyOf(e) : e.currentTankName) || 'basic');
+    return r === V2_DREAD || r === 'dreadOfficialV1';
+  }
+  public mmPlayerIsDread(): boolean {
+    if (AI_CONSTANTS.MINIMAP_DREADS === 0) return false;
+    const r = getTreeRoot(this.state.currentTankFileName ?? 'basic');
+    return r === V2_DREAD || r === 'dreadOfficialV1';
   }
 
   private _playerTeamOnTank(tankFileName: string | null | undefined,
@@ -20422,7 +23807,14 @@ export class GameLogic {
   public applyGameMode(config: GameModeConfig, forceFullApply = false) {
     if (ALL_MODES.ON !== 0 && config.world && !config.preset && this.state.gameModeConfig.world === config.world && this.state.gameModeConfig.teams !== config.teams) {
       const _twin = isWorldId(config.world) ? MODE_WORLDS[config.world].teamTwins?.[config.teams as 2 | 3 | 4] : undefined;
-      if (_twin) config = { ...config, world: _twin };
+      if (_twin) {
+        const _oldWorld = config.world as Parameters<typeof worldPool>[0];
+        config = { ...config, world: _twin };
+        if (SMALL_FIX.G816 !== 0 && JSON.stringify(config.mapPool ?? null) === JSON.stringify(worldPool(_oldWorld) ?? null)) {
+          const _pool = worldPool(_twin);
+          if (_pool) config.mapPool = _pool; else delete config.mapPool;
+        }
+      }
     }
     const prev = this.state.gameModeConfig;
     const modeChanged = forceFullApply || prev.mode !== config.mode || prev.preset !== config.preset || (ALL_MODES.ON !== 0 && (prev.world ?? '') !== (config.world ?? ''))
@@ -20629,7 +24021,8 @@ export class GameLogic {
         break;
     }
     const _modeSize = modeMapDefaults(config.mode, config.growth, config.world, config.teams);
-    if (_modeSize) {
+    const _rocksOnly = SMALL_FIX.G815 !== 0 && !modeChanged && !modeFieldsChanged && !growthSizeChanged && growthRocksChanged;
+    if (_modeSize && !_rocksOnly) {
       const _waiting = mapConfig.customMap;
       if (SMALL_FIX.R810 && _waiting && mapConfig.mapScale > 0) {
         const k = _modeSize.mapScale / mapConfig.mapScale;
@@ -20661,7 +24054,7 @@ export class GameLogic {
         if (modeChanged) writeWorldMap(mapConfig, _wid, config.growth, config.teams);
         else {
           writeWorldBases(mapConfig, _wid, config.teams);
-          if (growthRocksChanged) writeWorldMap(mapConfig, _wid, config.growth, config.teams);
+          if (growthRocksChanged) { if (SMALL_FIX.G815 !== 0) writeWorldRocks(mapConfig, _wid, config.growth); else writeWorldMap(mapConfig, _wid, config.growth, config.teams); }
         }
       }
       if (config.overlay && modeChanged && !this._keepEventsThroughMode) {
@@ -20748,7 +24141,8 @@ export class GameLogic {
   }
 
   private _sandboxMapMemory: { mapConfig: MapConfig; multiAreaConfig: MultiAreaMapConfig } | null = null;
-  public dropLeakedLabyrinthLook(live: boolean): boolean {
+  private static readonly _labyLookFilesSafeSince = Date.UTC(2026, 10, 9, 6, 18, 27);
+  public dropLeakedLabyrinthLook(live: boolean, savedAt?: number): boolean {
     if (SMALL_FIX.R927 === 0) return false;
     const leaked = (mc: MapConfig | undefined | null): boolean => {
       const p = mc ? mc.wallPaint : undefined;
@@ -20764,7 +24158,8 @@ export class GameLogic {
       if (mc !== m.mapConfig || mac !== m.multiAreaConfig) { this._sandboxMapMemory = { mapConfig: mc, multiAreaConfig: mac }; dropped = true; }
     }
     const g = this.state.gameModeConfig;
-    if (live && g.overlay !== 'labyrinth' && g.world !== 'labyrinth') {
+    const freshFile684 = SMALL_FIX.G684 !== 0 && typeof savedAt === 'number' && Number.isFinite(savedAt) && savedAt >= GameLogic._labyLookFilesSafeSince;
+    if (live && !freshFile684 && g.overlay !== 'labyrinth' && g.world !== 'labyrinth') {
       if (leaked(this.state.mapConfig)) { this.state.mapConfig = clean(this.state.mapConfig); dropped = true; }
       const mac = cleanAreas(this.state.multiAreaConfig);
       if (mac !== this.state.multiAreaConfig) { this.state.multiAreaConfig = mac; dropped = true; }
@@ -21003,11 +24398,14 @@ export class GameLogic {
   }
   private _cmdBossIds = new Set<string>();
   private _spawnPastRoom = false;
+  private _chatRolledStats: StatShares | undefined | null = null;
   private _chatRandomBoss(cfg: MapConfig): string {
     const lib = this.state.tankLibrary;
     const groups = bossGroupsOf(cfg);
     const gi = rollBossGroup(groups, Math.random);
+    this._chatRolledStats = null;
     if (gi >= 0) {
+      if (SMALL_FIX.G882 !== 0) this._chatRolledStats = groups[gi].stats;
       const tanks = SMALL_FIX.G693 !== 0 ? this._bossBuildable(lib, bossTanksInLibrary(lib, groups[gi].tanks)) : bossTanksInLibrary(lib, groups[gi].tanks);
       const n = pickBossTank(tanks === groups[gi].tanks ? groups[gi] : { ...groups[gi], tanks }, Math.random);
       if (n !== null && this._bossDesignOf(lib, n)) return n;
@@ -21019,12 +24417,23 @@ export class GameLogic {
     }
     return '';
   }
+  private _bossStatsByTank(cfg: MapConfig | undefined, name: string): StatShares | undefined {
+    const s = bossStatsOf(cfg, name);
+    if (s !== undefined || SMALL_FIX.G907 === 0) return s;
+    const lib = this.state.tankLibrary;
+    const it = findByShownNameOrFileKey(lib, name, false);
+    if (!it) return undefined;
+    const groups = bossStrengthGroupsOf(cfg);
+    for (let i = 0; i < groups.length; i++) if (Array.isArray(groups[i].tanks) && groups[i].tanks.some(t => findByShownNameOrFileKey(lib, t, false) === it)) return groups[i].stats;
+    return undefined;
+  }
   private _chatBossTick(now: number): void {
     const q = this.chatCmd.pendingBosses;
     for (let i = 0; i < q.length; i++) {
       const p = q[i];
       if (now < p.at) continue;
       const cfg = this.areaBounds.length > 0 ? this._mapConfigForAreaIdFast(this.playerAreaId) : this.state.mapConfig;
+      if (SMALL_FIX.G882 !== 0) this._chatRolledStats = null;
       const name = p.name || this._chatRandomBoss(cfg);
       if (!name || !this._bossDesignOf(this.state.tankLibrary, name)) {
         this.pushMessage(name ? `${shownNameOfWord(this.state.tankLibrary, name, false)} could not be summoned.` : 'No boss could be summoned.', now);
@@ -21035,7 +24444,8 @@ export class GameLogic {
       for (const c of this.state.enemyConfigs) if (c.id === cid && c.maxSpawnCount < CMD_BOSS_MAX) c.maxSpawnCount = CMD_BOSS_MAX;
       if (SMALL_FIX.R765 !== 0) this._spawnPastRoom = true;
       let b: EnemyTank | null;
-      try { b = this._spawnBoss(name, cfg, bossStatsOf(cfg, name)); } finally { this._spawnPastRoom = false; }
+      const stats882 = SMALL_FIX.G882 !== 0 && !p.name && this._chatRolledStats !== null ? this._chatRolledStats : this._bossStatsByTank(cfg, name);
+      try { b = this._spawnBoss(name, cfg, stats882); } finally { this._spawnPastRoom = false; }
       if (!b) { p.at = now + SPAWN_PLACE_RETRY_MS; continue; }
       for (const c of this.state.enemyConfigs) if (c.id === cid && c.maxSpawnCount < CMD_BOSS_MAX) c.maxSpawnCount = CMD_BOSS_MAX;
       this._cmdBossIds.add(b.id);
@@ -21258,6 +24668,7 @@ export class GameLogic {
   }
   public spawnerPumpkinOn = false;
   public spawnerProps: FloatingPolygon[] = [];
+  private _spawnerShapes: { p: FloatingPolygon; id: string }[] = [];
   private _tankSpawnerSeq = 0;
 
   public static _botSkillStart(tc: TankConfig, baseLv: number, gm: GameModeConfig, o: { maxSkillPoints: number; maxPointsPerSkill: number; bonusSkillPoints: number;
@@ -21473,6 +24884,7 @@ export class GameLogic {
     }
     if (!b) return null;
     const p = b as unknown as FloatingPolygon;
+    if (SMALL_FIX.G796 !== 0 && kind !== 'prop') this._spawnerShapes.push({ p, id: p.id });
     if (kind === 'prop') {
       const i = this.floatingPolygons.lastIndexOf(p);
       if (i >= 0) this.floatingPolygons.splice(i, 1);
@@ -21671,6 +25083,13 @@ export class GameLogic {
   }
   public spawnerDebugCount(): number {
     let n = this.spawnerProps.length + this.admin.spawnedCount();
+    if (SMALL_FIX.G796 !== 0 && this._spawnerShapes.length > 0) {
+      const L = this._spawnerShapes;
+      let w = 0;
+      for (let i = 0; i < L.length; i++) { const q = L[i]; if (q.p.active && q.p.id === q.id) L[w++] = q; }
+      L.length = w;
+      n += w;
+    }
     const et = this.state.enemyTanks, cs = this.state.enemyConfigs;
     for (let i = 0; i < et.length; i++) {
       const e = et[i];
@@ -21703,6 +25122,7 @@ export class GameLogic {
     this.spawnerPumpkinOn = false;
     for (const p of this.spawnerProps) this.recyclePolygon(p);
     this.spawnerProps.length = 0;
+    this._spawnerShapes.length = 0;
   }
 
   private _chatSpotNear(px: number, py: number, r: number, e: EnemyTank, area: number, pr: number): boolean {
@@ -23270,6 +26690,10 @@ export class GameLogic {
     if (designsBack.length > 0) this.addProjectileDesignBatch(designsBack);
     const presetsBack = this._builtInPresetList.filter(p => !s.turretPresets.includes(p));
     if (presetsBack.length > 0) this.addTurretPresetBatch(presetsBack);
+    if (SMALL_FIX.G853 !== 0) {
+      this._builtInShapeFiles.clear();
+      for (const l of s.tankLibrary) if (l.fileData.type === 'FoodShape') this._keepBuiltInShapeFile(l.fileData.data as FoodShapeDesign);
+    }
     this.libraryRev++;
     this._tankCPDCache.clear();
     this._tankLibraryMap = null;
@@ -23282,6 +26706,7 @@ export class GameLogic {
     this._mdGlide = null;
     this.partPicked = false;
     this.partHides.clear();
+    if (SMALL_FIX.G941 !== 0 && this.previewMotion) this.setPreviewMotion(false);
     this.endMapEditStroke();
     cancelMapEditInteraction(this.mapEditor);
     clearMapEditSelection(this.mapEditor);
@@ -23867,7 +27292,7 @@ export class GameLogic {
             powerCap: this._editPowerCap(s.currentTankFileName) }
         : { changesTank: false, freshStart: false, level: this._editLevelOf(e!), skillPoints: e!.skillPoints, upgrades, skillCaps,
             maxSkillPoints: e!.maxSkillPoints, bonusSkillPoints: e!.bonusSkillPoints, canEarnSkillPoints: e!.canEarnSkillPoints,
-            powerCap: this._editPowerCap(e!.currentTankName) };
+            powerCap: this._editPowerCap(SMALL_FIX.G878 !== 0 ? this._areaTankKeyOf(e!) : e!.currentTankName) };
     }
     const cfg = item.fileData.data as TankConfig;
     const fresh = this._debugTankChangeIsFreshStart(
@@ -23947,7 +27372,7 @@ export class GameLogic {
       upgrades[k] = Math.max(0, Math.min(e.skillCaps[k] ?? e.maxPointsPerSkill, Math.floor(edit.upgrades[k] ?? 0)));
     }
     if (SMALL_FIX.R994 !== 0) {
-      if (level !== this.shownLevelOf(e)) { e.currentXp = level === 0 ? 0 : xpThresholdForLevel(level - 1); e.level = Math.min(level, this._powerCapFor(e.currentTankName)); }
+      if (level !== this.shownLevelOf(e)) { e.currentXp = level === 0 ? 0 : xpThresholdForLevel(level - 1); e.level = Math.min(level, this._powerCapFor(SMALL_FIX.G878 !== 0 ? this._areaTankKeyOf(e) : e.currentTankName)); }
     } else {
       if (level !== e.level) e.currentXp = level === 0 ? 0 : xpThresholdForLevel(level - 1);
       e.level = level;
@@ -24300,6 +27725,7 @@ export class GameLogic {
   private _gunLevel(level: number): number {
     return SMALL_FIX.CC025 !== 0 && !this.state.gameModeConfig.growth ? 0 : level;
   }
+  private _gunLevelOf(e: EnemyTank): number { return SMALL_FIX.G904 !== 0 && (e._mevF & MF_NO_GROW) !== 0 ? 0 : this._gunLevel(e.level || 0); }
 
   private _oldGunNames = new Map<string, string>();
   private _keptRoundWord = new Map<Bullet, string>();
@@ -24379,6 +27805,7 @@ export class GameLogic {
   private _botsForgetPlayer(): void {
     const _pid = this.state.playerId;
     ksClear(this._plKillShares);
+    if (SMALL_FIX.G881 !== 0) { const fp = this.floatingPolygons; for (let i = 0; i < fp.length; i++) { const p = fp[i]; if (p.active && p.damageContributions.size !== 0) p.damageContributions.delete(_pid); } }
     for (let i = 0; i < this.state.enemyTanks.length; i++) {
       const e = this.state.enemyTanks[i];
       if (!e.active) continue;
@@ -24467,7 +27894,7 @@ export class GameLogic {
     const _tgtKey = target.currentTankName || this.enemyTankKey(target);
     const canBotEvolve = this._computeEvolutions(_tgtKey, Number.POSITIVE_INFINITY).upgrades.length > 0;
 
-    const isTeamMode = teamColourMode(gm.mode);
+    const isTeamMode = teamColourMode(gm.mode) || (SMALL_FIX.G836 !== 0 && sandboxTeamsOn(gm));
     const _tgtTeamNo = this._teamNumberOf(target.team);
     const _adoptSide = (n: number) => n >= 1 && n <= 4 && !(ALL_MODES.ON === 0 && gm.mode === 'old-dreadnoughts' && n === 3);
     const _teamAfter = this._playerTeamOnTank(_tgtKey || null,
@@ -24884,7 +28311,7 @@ export class GameLogic {
       }
     }
 
-    this.pushMessage("Press ESC for Menu");
+    if (SMALL_FIX.R1024 === 0 || !mobileActive()) this.pushMessage("Press ESC for Menu");
     this.pushMessage('You have spawned! Welcome to the game.', now);
     this.pushMessage('You will be invulnerable until you move or shoot.', now);
 
@@ -25094,6 +28521,16 @@ export class GameLogic {
       }
     }
     this._smartFitDiameter = _sgcCell > 0 ? _sgcCell * SMART_FIT_RATIO : 0;
+    this._smartFitByArea.length = 0;
+    if (SMALL_FIX.R1031 !== 0 && _sgcGm.growth && _sgcGm.smartGrowthCap && _sgcGm.mode === 'old-dreadnoughts' && this.areaStates.length > 0) {
+      const _sgcAreas = this.state.multiAreaConfig.areas;
+      for (let i = 0; i < Math.min(this.areaStates.length, _sgcAreas.length); i++) this._smartFitByArea.push(_sgcAreas[i].mapConfig.enableMaze ? this.areaStates[i].cellSize * SMART_FIT_RATIO : 0);
+    }
+  }
+  private _smartFitAt(areaId: string | null | undefined): number {
+    if (this._smartFitByArea.length === 0) return this._smartFitDiameter;
+    const i = this._areaIndexOfId(areaId ?? '');
+    return i >= 0 && i < this._smartFitByArea.length ? this._smartFitByArea[i] : 0;
   }
 
   private _placePlayerAtSpawn(): void {
@@ -25346,8 +28783,9 @@ export class GameLogic {
       const _gm = this.state.gameModeConfig;
       const _startLevel = _gm.growthStartLevel ?? 1;
       const _perLevel = _gm.growthPerLevel ?? 0.05;
-      const _maxMult = this._smartFitDiameter > 0
-        ? Math.max(1, this._smartFitDiameter / tankSizeFromSlider(this.state.tankSize))
+      const _fit497 = this._smartFitAt(this.playerAreaId);
+      const _maxMult = _fit497 > 0
+        ? Math.max(1, _fit497 / tankSizeFromSlider(this.state.tankSize))
         : (_gm.growthMaxMultiplier ?? 5);
       this.state.playerGrowthScale = SMALL_FIX.GH497 ? this._playerGrowthTargetAt(respawnLevel) : Math.min(_maxMult, 1 + Math.max(0, respawnLevel - _startLevel) * _perLevel);
     } else {
@@ -25457,6 +28895,7 @@ export class GameLogic {
     this._pauseStartMs = 0;
     this._resetFiringClock();
     this._smartFitDiameter = 0;
+    this._smartFitByArea.length = 0;
     this._wornName = null;
     this.admin.resetMatch();
     this._spawnerMatchEnd();
@@ -25892,13 +29331,14 @@ export class GameLogic {
     const _gm = this.state.gameModeConfig;
     const _startLevel = _gm.growthStartLevel ?? 1;
     const _perLevel = _gm.growthPerLevel ?? 0.05;
-    const _maxMult = this._smartFitDiameter > 0
-      ? Math.max(1, this._smartFitDiameter / tankSizeFromSlider(this.state.tankSize))
+    const _fitP = this._smartFitAt(this.playerAreaId);
+    const _maxMult = _fitP > 0
+      ? Math.max(1, _fitP / tankSizeFromSlider(this.state.tankSize))
       : (_gm.growthMaxMultiplier ?? 5);
     const _growthLevels = Math.max(0, level - _startLevel);
     const _plGr = ACTIVE_GROWTH.rules;
     return _plGr === undefined ? Math.min(_maxMult, 1 + _growthLevels * _perLevel)
-      : (this._smartFitDiameter > 0 ? Math.min(_maxMult, growthFactor(_plGr, 'size', level)) : growthFactor(_plGr, 'size', level));
+      : (_fitP > 0 ? Math.min(_maxMult, growthFactor(_plGr, 'size', level)) : growthFactor(_plGr, 'size', level));
   }
   private _enemyGrowthTarget(enemy: EnemyTank): number {
     const f = enemy._mevF;
@@ -25914,12 +29354,13 @@ export class GameLogic {
     const _gmE = this.state.gameModeConfig;
     const _eStartLevel = _gmE.growthStartLevel ?? 1;
     const _ePerLevel = _gmE.growthPerLevel ?? 0.05;
-    const _eMaxMult = this._smartFitDiameter > 0
-      ? Math.max(1, this._smartFitDiameter / baseSize)
+    const _fitE = this._smartFitAt(areaId);
+    const _eMaxMult = _fitE > 0
+      ? Math.max(1, _fitE / baseSize)
       : (_gmE.growthMaxMultiplier ?? 5);
     const _eGrowthLevels = Math.max(0, level - _eStartLevel);
     const _eGr = ACTIVE_GROWTH.rules;
-    if (_eGr !== undefined) { const _k = growthFactor(_eGr, 'size', level); return this._smartFitDiameter > 0 ? Math.min(_eMaxMult, _k) : _k; }
+    if (_eGr !== undefined) { const _k = growthFactor(_eGr, 'size', level); return _fitE > 0 ? Math.min(_eMaxMult, _k) : _k; }
     return Math.min(_eMaxMult, 1 + _eGrowthLevels * _ePerLevel);
   }
 
@@ -26279,7 +29720,9 @@ export class GameLogic {
 
     const bulletRadius = b.size / 2;
     if (b.exitProgress >= b.exitBarrelLen + bulletRadius - b.exitReleaseBack) {
-      const _fsOver = this._fsActive ? b.exitProgress - (b.exitBarrelLen + bulletRadius - b.exitReleaseBack) : 0;
+      let _relPt = b.exitBarrelLen + bulletRadius - b.exitReleaseBack;
+      if (SMALL_FIX.G912 !== 0 && b.exitReleaseBack > 0 && _relPt < b.exitStartProgress) _relPt = b.exitStartProgress;
+      const _fsOver = this._fsActive ? b.exitProgress - _relPt : 0;
       this.releaseFromExit(b);
       if (_fsOver > 0 && b.exitStoredSpeed > 0 && !b.isFading) {
         const _fsTc = Math.max(0, _fsOver / b.exitStoredSpeed - FS_LAG_200FPS_MS * 0.06);
@@ -26945,6 +30388,7 @@ export class GameLogic {
   private _cc022Rebuild = false;
   private recycleEnemy(e: EnemyTank) {
     if (SMALL_FIX.CC022 !== 0 && e.isBaseProtector) this._cc022Rebuild = true;
+    if (SMALL_FIX.G795 !== 0) e.spawnHeld = false;
     const recycledId = e.id;
     if (SMALL_FIX.GH326 !== 0 && this._cmdBossIds.size !== 0) this._cmdBossIds.delete(recycledId);
     if (this._takeoverDesigns.size !== 0 && typeof e.configId === 'string') this._takeoverDesigns.delete(e.configId);
@@ -27963,10 +31407,14 @@ export class GameLogic {
     }
 
     if (!config.isAutoBot) {
+      const _sf834 = SMALL_FIX.G834 !== 0 && (config.isBaseProtector === true || this._spawnOwnerPending !== '');
+      const _bp834 = enemy.isBaseProtector, _sb834 = enemy.spawnedByEntityId;
+      if (_sf834) { if (config.isBaseProtector === true) enemy.isBaseProtector = true; if (this._spawnOwnerPending !== '') enemy.spawnedByEntityId = this._spawnOwnerPending; }
       let _skillIter = 200;
       while (enemy.skillPoints > 0 && --_skillIter > 0) {
         if (!applyUpgrade(enemy)) break;
       }
+      if (_sf834) { enemy.isBaseProtector = _bp834; enemy.spawnedByEntityId = _sb834; }
     }
     enemy.penetrationBase = tankConfig.tankPenetrationBase ?? ARRAS_TANK_BASE_PENETRATION;
     enemy.touchScale = tankConfig.tankTouchScale ?? 1;
@@ -28298,6 +31746,7 @@ export class GameLogic {
     if (_aiCategoryForSpawn) {
       enemy.categoryPreferredDistance = mapDistanceSlider(_aiCategoryForSpawn.settings.distanceFromTarget);
       enemy.orbitDistance = enemy.categoryPreferredDistance;
+      if (SMALL_FIX.G930 !== 0 && config.isStageBody && config.isBaseProtector !== true && _aiCategoryForSpawn.settings.distanceFromTarget <= 5) enemy.minAttackDistance = 0;
     }
 
     enemy.navLastX = enemy.position.x;
@@ -28640,7 +32089,9 @@ export class GameLogic {
 
     const _tapPast = this._mevOn && !this._spawnPastRoom;
     if (_tapPast) this._spawnPastRoom = true;
-    const spawned = this.spawnEnemy(ephemeralConfig, false, true, true );
+    if (SMALL_FIX.G834 !== 0) this._spawnOwnerPending = ownerEntityId;
+    let spawned: EnemyTank | null;
+    try { spawned = this.spawnEnemy(ephemeralConfig, false, true, true ); } finally { this._spawnOwnerPending = ''; }
     if (_tapPast) this._spawnPastRoom = false;
     if (!spawned) return false;
 
@@ -29156,6 +32607,12 @@ export class GameLogic {
           if (_hfBack !== null && config.spawnerStats) this._spawnerAfterSpawn(_hfBack, config);
           if (revival.hfName !== undefined && _hfBack !== null) this._hfSamePlayer(_hfBack, revival);
           if (this.spawnPlacementSkips !== _skips0) this._spawnPlaceRetryAt.set(config.id, now + SPAWN_PLACE_RETRY_MS);
+          if (SMALL_FIX.G797 !== 0 && _hfBack === null && config.isCmdBot === true) {
+            revival.revivalTime = now + SPAWN_PLACE_RETRY_MS;
+            if (writeIdx !== i) this.revivalQueue[writeIdx] = revival;
+            writeIdx++;
+            continue;
+          }
         }
       } else {
         if (writeIdx !== i) {
@@ -29319,7 +32776,12 @@ export class GameLogic {
     if (!lib || lib.length === 0) return;
 
     const groups = bossGroupsOf(cfg);
-    const gi = rollBossGroup(groups, Math.random);
+    let rollOf884: readonly BossGroupConfig[] = groups;
+    if (SMALL_FIX.G884 !== 0) {
+      const can = groups.map(gr => Array.isArray(gr.tanks) && this._bossBuildable(lib, bossTanksInLibrary(lib, gr.tanks)).length > 0);
+      if (can.some(c => !c)) rollOf884 = groups.map((gr, k) => (can[k] ? gr : { ...gr, weight: 0 }));
+    }
+    const gi = rollBossGroup(rollOf884, Math.random);
     if (gi < 0) {
       this._nextBossSpawnTime = now + bossSpawnCooldown(cfg);
       this._bossAnnounced = false;
@@ -29466,9 +32928,12 @@ export class GameLogic {
         attempts = 0;
       }
     }
+    const side933 = SMALL_FIX.G933 !== 0 && this._mevOn ? this._mevSideOfBeh(boss.aiBehavior) : '';
+    const places933 = side933 !== '' && this._mev!.spawnPlaceState(side933, this._mevAliasOf(side933)) === 1;
     for (let attempt = 0; attempt < attempts; attempt++) {
-      const rx = cx + (Math.random() * 2 - 1) * limX;
-      const ry = cy + (Math.random() * 2 - 1) * limY;
+      let rx = 0, ry = 0;
+      if (places933) { if (!this._mevDrawPlace(side933, size, this._resolveTeam(boss.team))) continue; rx = this._mev!.px; ry = this._mev!.py; }
+      else { rx = cx + (Math.random() * 2 - 1) * limX; ry = cy + (Math.random() * 2 - 1) * limY; }
       const ddx = rx - px, ddy = ry - py;
       const dsq = ddx * ddx + ddy * ddy;
       if (dsq <= bestSq) continue;
@@ -29753,6 +33218,10 @@ export class GameLogic {
     const horizonF = AI_CONSTANTS.THREAT_HORIZON_MS / (1000 / 60);
     const chaseEvadeF = AI_CONSTANTS.THREAT_CHASE_EVADE_MS / (1000 / 60);
     const myR = this.getEffectiveEnemyRadius(enemy);
+    const _hardPool = AI_CONSTANTS.HF_DODGEHARD !== 0 && AI_CONSTANTS.DODGE_WEAKHIT !== 0 && FEEL_LIVE && enemy.hf.plays && this.feel.s[FEEL.DODGE] > 0 ? 0.25 * (enemy.currentHealth + enemy.currentShield) : 0;
+    const _hwOn = AI_CONSTANTS.HF_HEAVYWATCH !== 0 && _hardPool > 0;
+    let _hwV = -1, bestHv = false, heldHv = false;
+    const _srOn = AI_CONSTANTS.HF_SLOWROUND !== 0 && _hwOn;
     const sevFloor = aiHealthMax(enemy, HEALTH_BASIS.THREAT) * AI_CONSTANTS.THREAT_SEVERITY_FLOOR_FRAC;
     const idx = this._threatIdx;
     const n = this._threatCount;
@@ -29774,30 +33243,37 @@ export class GameLogic {
       if (!b.active || b.health <= 0 || b.isFading || b.inExitPhase) continue;
 
       const sev = this._thSev[i];
+      const sevD = AI_CONSTANTS.DODGE_WEAKHIT !== 0 && FEEL_LIVE ? this._thHit[i] : sev;
       const worthDodging = sev >= sevFloor;
       if (!this._projHostileTo(b, enemy)) continue;
 
       const isChase = this._thChase[i] === 1;
       const reach = myR + this._thRad[i];
-      const t = this._threatEtaF(dpx, dpy, dSq, reach,
+      let t = this._threatEtaF(dpx, dpy, dSq, reach,
         this._thVx[i], this._thVy[i], bvx, bvy, isChase, this._thTopSpd[i]);
+      let _hv = _hwOn && !isChase && this._thHit[i] >= _hardPool;
+      const _srAsk = !_hv && _srOn && !isChase && b.topSpeedRatio > 0 && this._thHit[i] >= 0.16 * _hardPool;
+      if (_hwV < 0 && (_srAsk || (t < 0 && _hv))) _hwV = (getEnemyMoveSpeed(enemy) / this.movementZoom) * this._enemyTermFactor(enemy);
+      if (_srAsk) { const _s2 = this._thVx[i] * this._thVx[i] + this._thVy[i] * this._thVy[i]; if (_s2 >= 2.25 && _s2 <= 2.25 * _hwV * _hwV) _hv = true; }
+      let _lane = false;
+      if (t < 0 && _hv) { t = this._hwLaneF(dpx, dpy, reach, this._thVx[i], this._thVy[i], _hwV); _lane = t >= 0; }
       if (t < 0) continue;
-      if (t > horizonF) continue;
+      if (t > horizonF && !(_hardPool > 0 && (this._thHit[i] >= _hardPool || _hv) && t <= 1.5 * horizonF)) continue;
       if (this._thLifeMs[i] < t * (1000 / 60)
         && !(SMALL_FIX.GH190 && this._thLifeMs[i] >= this._etaContactF(t, reach, isChase) * (1000 / 60))) continue;
       const dodgeOk = worthDodging && (!isChase || t <= chaseEvadeF);
 
-      if (worthDodging) {
+      if (worthDodging && !_lane) {
         const invD = 1 / Math.max(1, dSq);
-        dangerX += dpx * sev * invD;
-        dangerY += dpy * sev * invD;
+        dangerX += dpx * sevD * invD;
+        dangerY += dpy * sevD * invD;
       }
 
-      if (dodgeOk && (bestRef === null || sev * bestT > bestSev * t)) {
-        bestSev = sev; bestT = t; bestRef = b; bestI = i;
+      if (dodgeOk && (bestRef === null || (_hv && !bestHv) || (_hv === bestHv && sevD * bestT > bestSev * t))) {
+        bestSev = sevD; bestT = t; bestRef = b; bestI = i; bestHv = _hv;
       }
-      if (dodgeOk && enemy.threatDodgeRef === b) { heldSev = sev; heldT = t; heldSeen = true; }
-
+      if (dodgeOk && enemy.threatDodgeRef === b) { heldSev = sevD; heldT = t; heldSeen = true; heldHv = _hv; }
+      if (_lane) continue;
       const kill = sev / (1 + b.health);
       if (shootRef === null || kill * shootT > shootSev * t) {
         shootSev = kill; shootT = t; shootRef = b;
@@ -29824,7 +33300,7 @@ export class GameLogic {
       return;
     }
 
-    if (heldSeen && bestRef !== enemy.threatDodgeRef) {
+    if (heldSeen && bestRef !== enemy.threatDodgeRef && !(bestHv && !heldHv)) {
       if (bestSev * heldT <= heldSev * bestT * AI_CONSTANTS.THREAT_SIDE_SWITCH_MARGIN) return;
     }
 
@@ -29874,6 +33350,7 @@ export class GameLogic {
       const dpy = p.position.y - enemy.position.y;
       const dSq = dpx * dpx + dpy * dpy;
       if (dSq > (p.isCrasher ? rSq : rAllSq)) continue;
+      if (SMALL_FIX.G937 !== 0 && this._acrossGap(enemy.position.x, enemy.position.y, p.position.x, p.position.y)) continue;
       if (!p.active || p.fadingOut || p.hp <= 0) continue;
 
       const t = this._threatEtaF(dpx, dpy, dSq, myR + this._crRad[i],
@@ -29914,7 +33391,7 @@ export class GameLogic {
       return;
     }
     const s = enemy.threatDodgeSide;
-    const reach = this.getEffectiveEnemyRadius(enemy) + b.size * 0.5;
+    const reach = this.getEffectiveEnemyRadius(enemy) + b.size * 0.5 * (SMALL_FIX.G934 !== 0 ? b._touchK : 1);
     const t = this._threatEtaF(dpx, dpy, dSq, reach, b.velocity.x, b.velocity.y,
       enemy.velocity.x, enemy.velocity.y, isChase, this._chaseTopSpd(b));
     if (t < 0) { enemy.threatDodgeWeight = 0; return; }
@@ -29943,11 +33420,16 @@ export class GameLogic {
     enemy.threatDodgeWeight = w;
   }
 
-  private _hfStepKey(e: EnemyTank, b: Bullet, ms: MapState | null, ox: number, oy: number, minDot: number): number {
+  private _hfStepKey(e: EnemyTank, b: Bullet, ms: MapState | null, ox: number, oy: number, minDot: number, far: boolean = false, hard: boolean = false): number {
     let ix = e.fgIntentX, iy = e.fgIntentY, im = Math.sqrt(ix * ix + iy * iy);
-    const dpx = b.position.x - e.position.x, dpy = b.position.y - e.position.y, R = this.getEffectiveEnemyRadius(e), reach = R + b.size * 0.5;
+    const dpx = b.position.x - e.position.x, dpy = b.position.y - e.position.y, R = this.getEffectiveEnemyRadius(e), reach = R + b.size * 0.5 * (SMALL_FIX.G934 !== 0 ? b._touchK : 1);
     const evx = e.velocity.x, evy = e.velocity.y;
-    const t = this._threatEtaF(dpx, dpy, dpx * dpx + dpy * dpy, reach, b.velocity.x, b.velocity.y, evx, evy, false, 0);
+    let t = this._threatEtaF(dpx, dpy, dpx * dpx + dpy * dpy, reach, b.velocity.x, b.velocity.y, evx, evy, false, 0);
+    let _lane = false, _laneHit = false;
+    if (t < 0 && hard && AI_CONSTANTS.HF_HEAVYWATCH !== 0 && im >= 1e-9) {
+      const _lvx = b.velocity.x - evx, _lvy = b.velocity.y - evy, _lv2 = _lvx * _lvx + _lvy * _lvy;
+      if (_lv2 > 0.0001) { const _lt = -(dpx * _lvx + dpy * _lvy) / _lv2; if (_lt > 0) { t = _lt; _lane = true; } }
+    }
     if (t < 0) return -2;
     this._hfStepT = t;
     const n = t - 10;
@@ -29958,33 +33440,77 @@ export class GameLogic {
     const dvx = b.velocity.x - evx, dvy = b.velocity.y - evy, il = 1 / Math.sqrt(dvx * dvx + dvy * dvy);
     const nx = -dvy * il, ny = dvx * il, mu = (dpx + dvx * t) * nx + (dpy + dvy * t) * ny;
     if (stand) { const sg = mu > 0 ? -1 : 1; ix = nx * sg; iy = ny * sg; im = 1; }
+    if (_lane && SMALL_FIX.HW1127 !== 0) {
+      const ux = ix / im, uy = iy / im, wdx = (vInf * ux - evx) * gain, wdy = (vInf * uy - evy) * gain;
+      if (Math.abs(mu - (wdx * nx + wdy * ny)) >= reach + 6) return -2;
+    }
     const x = e.position.x - ox, y = e.position.y - oy;
-    let best = -1, bestDot = minDot;
+    let best = -1, bestDot = minDot, farK = -1, farMiss = Math.abs(mu) + 10;
+    let _deN: Uint8Array | null = null, _de0 = 0, _cs = 1, _mh = 0, _mhY = 0, _gc = 0, _gcY = 0;
+    const _hvOn = hard && AI_CONSTANTS.HF_HITRANGE !== 0 && e.hf.hvR > 0, _hvx = _hvOn ? e.hf.hvX - ox - x : 0, _hvy = _hvOn ? e.hf.hvY - oy - y : 0;
+    const _hvCur = Math.sqrt(_hvx * _hvx + _hvy * _hvy), _hvLim = _hvOn ? (_hvCur < e.hf.hvR ? _hvCur - 10 : e.hf.hvR) : 0;
+    const _frN = hard && AI_CONSTANTS.HF_FLEEWIDE !== 0 && AI_CONSTANTS.HF_HITRANGE !== 0 && FEEL_LIVE ? e.hf.frN : 0, _frC = e.hf.frC;
+    if (hard && ms && AI_CONSTANTS.HF_WAYMEM !== 0 && ms.walls.length > 0 && ms.navigation) {
+      const nv = ms.navigation; _gc = nv.gridCells; _gcY = nv.gridCellsY; _cs = nv.cellSize; _mh = nv.mapHalf; _mhY = nv.mapHalfY;
+      if (nv.deadEndDepth.length === _gc * _gcY) { const cx = Math.floor((x + _mh) / _cs), cy = Math.floor((y + _mhY) / _cs); if (cx >= 0 && cy >= 0 && cx < _gc && cy < _gcY) { _deN = nv.deadEndDepth; _de0 = _deN[cx * _gcY + cy]; } }
+    }
     for (let k = 0; k < 8; k++) {
       const kx = HF_KEY_X[k], ky = HF_KEY_Y[k], dot = (kx * ix + ky * iy) / im;
-      if (dot <= bestDot) continue;
       const ddx = (vInf * kx - evx) * gain, ddy = (vInf * ky - evy) * gain;
-      if (Math.abs(mu - (ddx * nx + ddy * ny)) < reach + 6) continue;
+      const miss = Math.abs(mu - (ddx * nx + ddy * ny)), clear = miss >= reach + 6;
+      if (!clear) _laneHit = true;
+      if (hard && (kx * dvx + ky * dvy) * il < -0.2 && !(e.hf.cnGo && dot >= 0.5)) continue;
+      if (_hvOn) { const qx = evx * t + ddx - _hvx, qy = evy * t + ddy - _hvy; if (qx * qx + qy * qy < _hvLim * _hvLim) continue; }
+      if (_frN > 0) {
+        let into = false;
+        for (let q = 0; q < _frN && !into; q++) { const cxr = _frC[3 * q] - ox - x, cyr = _frC[3 * q + 1] - oy - y, Rr = _frC[3 * q + 2], cur = Math.sqrt(cxr * cxr + cyr * cyr), lim = cur < Rr ? cur - 10 : Rr, qx = evx * t + ddx - cxr, qy = evy * t + ddy - cyr; if (qx * qx + qy * qy < lim * lim) into = true; }
+        if (into) continue;
+      }
+      if (clear ? dot <= bestDot : !(far && best < 0 && miss > farMiss)) continue;
       if (ms) {
         const px = evx * t + ddx, py = evy * t + ddy, pl = Math.sqrt(px * px + py * py);
         if (pl > 1 && !checkLineOfSight(ms, x, y, x + px * (1 + R / pl), y + py * (1 + R / pl), ox, oy)) continue;
+        if (_deN !== null && pl > 1) { const qx = Math.floor((x + px * (1 + R / pl) + _mh) / _cs), qy = Math.floor((y + py * (1 + R / pl) + _mhY) / _cs); if (qx >= 0 && qy >= 0 && qx < _gc && qy < _gcY && _deN[qx * _gcY + qy] > _de0) continue; }
       }
-      best = k; bestDot = dot;
+      if (clear) { best = k; bestDot = dot; } else { farK = k; farMiss = miss; }
     }
-    return best;
+    if (_lane && !_laneHit) return -2;
+    this._hfStepClear = best >= 0;
+    return best >= 0 ? best : farK;
+  }
+  private _hfHeavyRound(e: EnemyTank, b: Bullet): boolean {
+    if (b._hitId !== b.bulletId) return false;
+    const pool = e.currentHealth + e.currentShield;
+    if (b._hit >= 0.25 * pool) return true;
+    if (AI_CONSTANTS.HF_SLOWROUND === 0 || AI_CONSTANTS.HF_HEAVYWATCH === 0 || b._hit < 0.04 * pool || this._isChaseMotion(b) || !(b.topSpeedRatio > 0)) return false;
+    const s2 = b.velocity.x * b.velocity.x + b.velocity.y * b.velocity.y;
+    if (s2 < 2.25) return false;
+    const v = (getEnemyMoveSpeed(e) / this.movementZoom) * this._enemyTermFactor(e);
+    return s2 <= 2.25 * v * v;
   }
   private _hfStepT = 0;
+  private _hfStepClear = true;
   private _hfDodgeStep(e: EnemyTank, b: Bullet, now: number): void {
     const h = e.hf;
-    if (h.dgGo || h.dgId === b.bulletId) return;
+    const _heavy = AI_CONSTANTS.HF_DODGEHARD !== 0 && this._hfHeavyRound(e, b);
+    if (AI_CONSTANTS.HF_HEAVYWATCH !== 0 && _heavy) { if (h.dgId === b.bulletId && now < h.dgAsk) return; h.dgAsk = now + 66; }
+    else if (h.dgGo || h.dgId === b.bulletId) return;
     h.dgId = b.bulletId;
     if (this._isRammer(e) && e.aiState === 'attacking' && e.currentTargetId) return;
+    if (_heavy) {
+      const _aw = now < h.adUntil || now < h.hkUntil || now < h.udUntil;
+      const _cn = AI_CONSTANTS.HF_CORNERED !== 0 && h.cnGo && now < h.cnUntil;
+      const kh = this._hfStepKey(e, b, this._getEnemyNavMapState(e), this._navOffX, this._navOffY, _cn ? -0.2 : _aw ? 0.5 : -1.01, !_aw && !_cn, true);
+      if (kh < 0) return;
+      h.dgGo = true; h.dgHard = true; h.dgX = HF_KEY_X[kh]; h.dgY = HF_KEY_Y[kh]; h.dgUntil = now + (this._hfStepT + 4) * (1000 / 60);
+      return;
+    }
     const hpFloor = 0.6 * aiHealthMax(e, HEALTH_BASIS.THREAT);
     const part = b.damage * (1 + Math.min(4, b.health / Math.max(1, b.damage)) * 0.25) / Math.max(1, e.currentHealth > hpFloor ? e.currentHealth : hpFloor);
     if (hfHash(h.seed, 0x3d0d ^ b.bulletId, 0) >= (part < 0.08 ? 0.05 : part < 0.2 ? 0.35 : 0.9) * (0.7 + 0.6 * e.dnaCaution)) return;
     const k = this._hfStepKey(e, b, this._getEnemyNavMapState(e), this._navOffX, this._navOffY, 0.5);
     if (k < 0) return;
-    h.dgGo = true; h.dgX = HF_KEY_X[k]; h.dgY = HF_KEY_Y[k]; h.dgUntil = now + (this._hfStepT + 4) * (1000 / 60);
+    h.dgGo = true; h.dgHard = false; h.dgX = HF_KEY_X[k]; h.dgY = HF_KEY_Y[k]; h.dgUntil = now + (this._hfStepT + 4) * (1000 / 60);
   }
   private _hfShootIt(e: EnemyTank, b: Bullet, ms: MapState | null, ox: number, oy: number): boolean {
     const h = e.hf;
@@ -30034,6 +33560,16 @@ export class GameLogic {
     const my = dpy + dvy * t;
     if (mx * mx + my * my > reach * reach) return -1;
     this._etaM2 = mx * mx + my * my; this._etaDvSq = dvSq;
+    return t;
+  }
+  private _hwLaneF(dpx: number, dpy: number, reach: number, vx: number, vy: number, vInf: number): number {
+    const v2 = vx * vx + vy * vy;
+    if (v2 < 0.0001) return -1;
+    const t = -(dpx * vx + dpy * vy) / v2;
+    if (t <= 0) return -1;
+    const mx = dpx + vx * t, my = dpy + vy * t, w = 0.8 * vInf * t, lim = reach + (w < 260 ? w : 260);
+    if (mx * mx + my * my > lim * lim) return -1;
+    this._etaM2 = mx * mx + my * my; this._etaDvSq = v2;
     return t;
   }
   private _etaM2 = 0;
@@ -30098,6 +33634,7 @@ export class GameLogic {
     const lf = new Float64Array(n); lf.set(this._thLifeMs); this._thLifeMs = lf;
     const ch = new Uint8Array(n);   ch.set(this._thChase); this._thChase = ch;
     const tp = new Float64Array(n); tp.set(this._thTopSpd); this._thTopSpd = tp;
+    const hh = new Float64Array(n); hh.set(this._thHit); this._thHit = hh;
   }
 
   private _growCrasherArrays(): void {
@@ -31169,7 +34706,7 @@ export class GameLogic {
           if (_cc >= this._chX.length) this._growChaserArrays();
           this._chaserIdx[_cc] = b;
           const _cpx = b.position.x, _cpy = b.position.y;
-          const _cr = b.size * 0.5;
+          const _cr = b.size * 0.5 * (SMALL_FIX.G934 !== 0 ? b._touchK : 1);
           this._chX[_cc] = _cpx;
           this._chY[_cc] = _cpy;
           this._chR[_cc] = _cr;
@@ -31188,7 +34725,7 @@ export class GameLogic {
         this._threatIdx[_hc] = b;
         this._thVx[_hc] = b.velocity.x;
         this._thVy[_hc] = b.velocity.y;
-        this._thRad[_hc] = b.size * 0.5;
+        this._thRad[_hc] = b.size * 0.5 * (SMALL_FIX.G934 !== 0 ? b._touchK : 1);
         this._thSev[_hc] = b.damage * (1 + Math.min(4, b.health / Math.max(1, b.damage)) * 0.25);
         this._thLifeMs[_hc] = b.maxAge > 0 && !b.permanent
           ? Math.max(0, (b.maxAge - b.currentAge) * 1000)
@@ -31196,6 +34733,14 @@ export class GameLogic {
         const _mt = b.motionType;
         const _isCh = (_mt === 'chase' || _mt === 'swarm' || _mt === 'minion' || _mt === 'motor') ? 1 : 0;
         this._thChase[_hc] = _isCh;
+        if (AI_CONSTANTS.DODGE_WEAKHIT !== 0 && FEEL_LIVE) {
+          if (b._hitId !== b.bulletId) {
+            b._hitId = b.bulletId;
+            b._hit = 0.31 * Math.pow(b.damage, 0.64) * Math.pow(b.maxHealth > 0 ? b.maxHealth : 1, 0.37) * Math.pow(b.penetration > 0 ? b.penetration : 1, 1.88) * (_mt === 'chase' ? 2.54 : 1);
+            if (AI_CONSTANTS.HF_TRAPPRICE !== 0 && b.projectileVisual === 'trap' && b._offKindId !== 5 && b.maxHealth > 0) b._hit = HF_REST_K * b.damage * b.maxHealth;
+          }
+          this._thHit[_hc] = b._hit;
+        }
         if (_isCh) {
           const _top = b.initialSpeed * (b.topSpeedRatio > 0 ? b.topSpeedRatio : 1);
           const _cur = Math.sqrt(b.velocity.x * b.velocity.x + b.velocity.y * b.velocity.y);
@@ -31585,6 +35130,11 @@ export class GameLogic {
         const _raShape = this._reachArea(enemy.position.x, enemy.position.y);
         const _hfGz = enemy.hf.gzUntil > now && this.feel.s[FEEL.SPAWN] > 0, _hfGzK = 360 + 300 * enemy.dnaCaution;
         const _hfHw = enemy.hf.hwUntil > now && AI_CONSTANTS.HF_HURTAWAY !== 0 && this.feel.s[FEEL.HURTAWAY] > 0, _hfHwK = 520 + 240 * enemy.dnaCaution;
+        const _hfHr = AI_CONSTANTS.HF_HITRANGE !== 0 && enemy.hf.hvR > 0 && enemy.hf.hvId !== '';
+        const _thOn = AI_CONSTANTS.TM_HELP !== 0 && FEEL_LIVE && this._thLook(enemy, now);
+        const _tmFd = AI_CONSTANTS.TM_MIDDLE !== 0 && enemy._tmSt !== 0 && this._tmFoodSet(enemy), _tmFx = this._tmFx, _tmFy = this._tmFy, _tmFr2 = this._tmFr2;
+        const _hfLv = AI_CONSTANTS.HF_LEAVEAREA !== 0 && now < enemy.hf.lvUntil, _hfLvR2 = enemy.hf.lvR * enemy.hf.lvR;
+        const _lfOn = _hfLv && AI_CONSTANTS.HF_KEEPFOOD !== 0 && FEEL_LIVE, _lfTx = enemy.hf.lvX - enemy.position.x, _lfTy = enemy.hf.lvY - enemy.position.y, _lfB2 = (enemy.hf.lvR + 300) * (enemy.hf.lvR + 300), _lfIn = _lfTx * _lfTx + _lfTy * _lfTy < _lfB2;
         for (let i = 0; i < this.floatingPolygons.length; i++) {
           const p = this.floatingPolygons[i];
           if (!p.active || p.fadingOut) continue;
@@ -31594,6 +35144,14 @@ export class GameLogic {
           if (_raShape >= 0 && this._roundAreaIndex(p.position.x, p.position.y) !== _raShape) continue;
           if (_hfGz && !p.isCrasher) { const _gx = p.position.x - enemy.hf.gzX, _gy = p.position.y - enemy.hf.gzY; if (_gx * _gx + _gy * _gy < _hfGzK * _hfGzK) continue; }
           if (_hfHw && !p.isCrasher) { const _gx = p.position.x - enemy.hf.hwX, _gy = p.position.y - enemy.hf.hwY; if (_gx * _gx + _gy * _gy < _hfHwK * _hfHwK) continue; }
+          if (_hfHr && !p.isCrasher && this._hfInHit(enemy, p.position.x, p.position.y)) continue;
+          if (_hfLv && !p.isCrasher) { const _gx = p.position.x - enemy.hf.lvX, _gy = p.position.y - enemy.hf.lvY, _g2 = _gx * _gx + _gy * _gy; if (_g2 < _hfLvR2) continue; if (_lfOn && (_lfIn || _g2 < _lfB2) && (p.position.x - enemy.position.x) * _lfTx + (p.position.y - enemy.position.y) * _lfTy > 0) continue; }
+          else if (_lfOn && p.isCrasher) {
+            const _cx = p.position.x - enemy.position.x, _cy = p.position.y - enemy.position.y;
+            if (_cx * _cx + _cy * _cy >= 122500) { if (p.id === enemy.unreachTargetId && now < enemy.unreachUntil) continue; const _gx = p.position.x - enemy.hf.lvX, _gy = p.position.y - enemy.hf.lvY; if ((_lfIn || _gx * _gx + _gy * _gy < _lfB2) && _cx * _lfTx + _cy * _lfTy > 0) continue; }
+          }
+          if (_tmFd && !p.isCrasher) { const _gx = p.position.x - _tmFx, _gy = p.position.y - _tmFy; if (_gx * _gx + _gy * _gy > _tmFr2) continue; }
+          if (_thOn && !p.isCrasher) continue;
           if (enemy.hf.rnUntil > now && !p.isCrasher) { const _gx = p.position.x - enemy.hf.rnX, _gy = p.position.y - enemy.hf.rnY, _gr = enemy.hf.rnR + 20; if (_gx * _gx + _gy * _gy < _gr * _gr) continue; }
           if ((p.baseOpacity < 1 || this.dark.live) && this._shapeHidFrom(enemy, p,
               enemy.currentTargetType === 'shape' && p.id === enemy.currentTargetId)) continue;
@@ -31691,9 +35249,10 @@ export class GameLogic {
           if (AI_CONSTANTS.HF_RAM !== 0 || _hf.rmOn) this._hfRamTick(enemy, now);
           if (AI_CONSTANTS.HF_RAMSEEN !== 0 || _hf.rcUntil !== 0) this._hfRamComingTick(enemy, now);
           if (_hf.plays && (this.feel.s[FEEL.ONEFOE] > 0 || (this.feel.s[FEEL.FOCUS] > 0 && AI_CONSTANTS.HF_DEFEND !== 0))) this._hfRivalTick(enemy, now); else if (_hf.rvId !== '') { _hf.rvId = ''; _hf.rvN = 0; _hf.rvHits = 0; }
-          if (_hf.plays && this.feel.s[FEEL.MIND] > 0 && this.feel.s[FEEL.TRUST] > 0) { if (now >= _hf.frNext) this._hfMind(enemy, now); } else if (_hf.frHold) { _hf.frHold = false; _hf.frSince = 0; _hf.frSide = 0; }
+          if (_hf.plays && this.feel.s[FEEL.MIND] > 0 && this.feel.s[FEEL.TRUST] > 0) { if (now >= _hf.frNext) this._hfMind(enemy, now); } else if (_hf.frHold || _hf.frAside) { _hf.frHold = false; _hf.frAside = false; _hf.frSince = 0; _hf.frSide = 0; }
           if (_hf.plays && now >= _hf.ntNext && (this.feel.s[FEEL.GOALS] > 0 || this.feel.s[FEEL.SPAWN] > 0)) this._hfNotice(enemy, now);
           if (this.auraRingCount > 0 && _hf.plays && now >= _hf.rnNext && AI_CONSTANTS.HF_RINGS !== 0 && this.feel.s[FEEL.RINGS] > 0) this._hfRings(enemy, now);
+          if (_hf.plays && AI_CONSTANTS.HF_UNITFEAR !== 0 && this.feel.s[FEEL.READY] > 0 && now >= _hf.udNext) this._hfUnitLook(enemy, now);
           if (_hf.plays && this.feel.s[FEEL.READY] > 0) { if (now >= _hf.foeNext) this._hfDanger(enemy, now); if (enemy.aiState === 'attacking' || enemy.aiState === 'fleeing' || now - enemy.lastDamageTime < 300) _hf.fightAt = now; }
           if (_hf.plays && this.feel.s[FEEL.SPIN] > 0) { if (enemy.forceAutospin && _hf.cover < 2) { enemy.forceAutospin = false; _hf.spinWas = true; } }
           else if (_hf.spinWas) { enemy.forceAutospin = true; _hf.spinWas = false; }
@@ -32086,7 +35645,8 @@ export class GameLogic {
         }
 
         if (SMALL_FIX.GH398 !== 0 && enemy._intKind !== 0 && now >= enemy._intGiveUpAt) this._intEnd(enemy);
-        const _btHold = (enemy._btBits > 0 || (SMALL_FIX.R941 !== 0 && this._carried.length !== 0)) && this._btPost(enemy, stateResult, prevState, now);
+        const _btHold = ((enemy._btBits > 0 || (SMALL_FIX.R941 !== 0 && this._carried.length !== 0)) && this._btPost(enemy, stateResult, prevState, now)) ||
+          ((enemy.hf.gDo !== 0 || enemy.hf.gPend !== 0 || enemy.hf.gKite !== 0) && this._hfGroupPost(enemy, stateResult, now));
         enemy.aiState = stateResult.state;
 
         const _ks = getKnownScan();
@@ -32189,7 +35749,8 @@ export class GameLogic {
             } else if (enemy.aiState === 'roaming' || enemy.aiState === 'idle' || enemy.aiState === 'targeting_shapes') {
               if (now - enemy.followStartTime < enemy.followMaxDuration &&
                   !this._sgHeldTargetSafe(enemy, AI_CONSTANTS.SAFEZONE_BAND_CELLS) &&
-                  !this._heldAcross(enemy) && !_btHold) {
+                  !this._heldAcross(enemy) && !_btHold &&
+                  !(AI_CONSTANTS.HF_KEEPFOOD !== 0 && FEEL_LIVE && enemy.currentTargetType === 'shape' && !!enemy.currentTargetId && (this._unreachAgrees(enemy, enemy.currentTargetId, now) || this._hfFoodLeftById(enemy, enemy.currentTargetId, now)))) {
                 enemy.aiState = 'following';
               }
             }
@@ -32199,7 +35760,8 @@ export class GameLogic {
                 !this._farmShapeRefusedById(enemy, enemy.currentTargetId) &&
                 !this._farmShapeScanRefusedById(enemy, enemy.currentTargetId, _losMs, _losOffX, _losOffY) &&
                 !(SMALL_FIX.R892 !== 0 && this._mevOn && this._mevNotFoodById(enemy, enemy.currentTargetId)) &&
-                !(AI_CONSTANTS.HF_FOODAGREE !== 0 && this._hfFoodLeftById(enemy, enemy.currentTargetId, now))) {
+                !(AI_CONSTANTS.HF_FOODAGREE !== 0 && this._hfFoodLeftById(enemy, enemy.currentTargetId, now)) &&
+                !(AI_CONSTANTS.UNREACH_AGREE !== 0 && FEEL_LIVE && this._unreachAgrees(enemy, enemy.currentTargetId, now))) {
               enemy.aiState = 'following';
               this._resetStuckWindow(enemy, now);
               enemy.followTargetX = enemy.targetPosition ? enemy.targetPosition.x : enemy.position.x;
@@ -32381,7 +35943,7 @@ export class GameLogic {
                   }
                 } else {
                   const _atk = this._enemyById.get(_atkId);
-                  if (_atk && !campsClash(enemy.camp, _atk.camp) && !this._tankHidFrom(enemy, _atk, false) &&
+                  if (_atk && !campsClash(enemy.camp, _atk.camp) && !this._tankHidFrom(enemy, _atk, false) && !bossLeavesBody(enemy, _atk) &&
                       !(SMALL_FIX.CC051 !== 0 && AREA_REACH.CH041 !== 0 && this._enemyProtected(_atk)) &&
                       !(enemy.groupId !== 0 && _atk.groupId === enemy.groupId) &&
                       !(_pIsTeamB && _atk.team === enemy.team)) {
@@ -32697,6 +36259,7 @@ export class GameLogic {
             this._zSwarmRoam(enemy, this._getEnemyNavMapState(enemy), this._navOffX, this._navOffY, this.getEffectiveEnemyRadius(enemy), now, dtFactor)) {
         } else if (enemy.aiState === 'roaming' && enemy._zPack && enemy._mevFollowOf === '' && SMALL_FIX.R976 !== 0 &&
             this._zSwarmGather(enemy, this._getEnemyNavMapState(enemy), this._navOffX, this._navOffY, this.getEffectiveEnemyRadius(enemy), now, dtFactor)) {
+        } else if (enemy.aiState === 'roaming' && enemy._btStood && AI_CONSTANTS.BT_STANDKEEP !== 0 && FEEL_LIVE) {
         } else if (enemy.aiState === 'roaming' && enemy.roamTarget) {
           let tdx = enemy.roamTarget.x - enemy.position.x;
           let tdy = enemy.roamTarget.y - enemy.position.y;
@@ -32835,6 +36398,12 @@ export class GameLogic {
         else if (enemy.hf.dwMode !== 0 || enemy.hf.swFire) { enemy.hf.dwMode = 0; enemy.hf.dwHold = false; enemy.hf.dwPress = false; enemy.hf.swFire = false; }
         if (AI_CONSTANTS.HF_GOALCLAMP !== 0 && enemy.hf.dwMode !== 0) this._hfPointerClamp(enemy);
         let _hfWk = false;
+        const _dgH = AI_CONSTANTS.HF_DODGEHARD !== 0 && enemy.hf.dgGo && enemy.hf.dgHard && now < enemy.hf.dgUntil;
+        if (_dgH) {
+          _hfWk = this._hfWalkTo(enemy, _fgVx0, _fgVy0, enemy.position.x + enemy.hf.dgX * 120, enemy.position.y + enemy.hf.dgY * 120, dtFactor);
+        }
+        const _cnW = AI_CONSTANTS.HF_CORNERED !== 0 && FEEL_LIVE && this._hfCornerStep(enemy, now);
+        if (_cnW && !_hfWk) _hfWk = this._hfWalkTo(enemy, _fgVx0, _fgVy0, this._cnX, this._cnY, dtFactor);
         if (AI_CONSTANTS.HF_MINDALL !== 0 && AI_CONSTANTS.HF_UNITAWAY !== 0 && enemy.hf.dKind !== 0 && now < enemy.hf.dnUntil && now - enemy.lastTankDamageAt < 1500 &&
             enemy.aiState !== 'fleeing' && this.feel.s[FEEL.DRONESAFE] > 0 && enemy.lastTankDamageById !== '' &&
             enemy.lastTankDamageById !== (enemy.currentTargetType === 'player' ? this.state.playerId : (enemy.currentTargetId ?? '')))
@@ -32853,6 +36422,10 @@ export class GameLogic {
         if (!_hfWk && enemy.aiState !== 'fleeing') {
           if (AI_CONSTANTS.HF_UNITAWAY !== 0 && enemy.hf.dKind !== 0 && now < enemy.hf.dnUntil && this.feel.s[FEEL.DRONESAFE] > 0) _hfWk = this._hfAwayStep(enemy, _fgVx0, _fgVy0, dtFactor, now, enemy.hf.dnX, enemy.hf.dnY);
           else if (now < enemy.hf.adUntil) _hfWk = this._hfAwayStep(enemy, _fgVx0, _fgVy0, dtFactor, now, enemy.hf.adX, enemy.hf.adY);
+          else if (AI_CONSTANTS.HF_UNITFEAR !== 0 && now < enemy.hf.udUntil) _hfWk = this._hfAwayStep(enemy, _fgVx0, _fgVy0, dtFactor, now, enemy.hf.udX, enemy.hf.udY);
+          else if (AI_CONSTANTS.HF_HITCOVER !== 0 && now < enemy.hf.hitUntil && !(AI_CONSTANTS.BT_PUSHON !== 0 && FEEL_LIVE && enemy._btBits !== 0 && enemy.hf.tmHas && enemy.hf.tmMates >= 2 && this._btShare(enemy) >= 0.5) &&
+                   !((enemy.aiState === 'attacking' || enemy.aiState === 'following') && (enemy.hf.hitId === 'P' ? enemy.currentTargetType === 'player' : (enemy.currentTargetType === 'enemy' && enemy.currentTargetId === enemy.hf.hitId))))
+            _hfWk = this._hfAwayStep(enemy, _fgVx0, _fgVy0, dtFactor, now, enemy.hf.hitX, enemy.hf.hitY);
         }
         if (!_hfWk && AI_CONSTANTS.HF_PACE !== 0 && enemy.hf.dKind !== 0 && (enemy.hf.dwHold || enemy.hf.ddHoldAt === now) && this.feel.s[FEEL.DRONESAFE] > 0) _hfWk = this._hfPaceStep(enemy, _fgVx0, _fgVy0, dtFactor, now);
         if (AI_CONSTANTS.HF_AREA !== 0 && this.feel.s[FEEL.PLACE] > 0) { this._hfAreaTick(enemy, now); if (!_hfWk && !(enemy.hf.dKind !== 0 && (enemy.hf.dwHold || enemy.hf.ddHoldAt === now))) _hfWk = this._hfAreaDrive(enemy, _fgVx0, _fgVy0, dtFactor, now); }
@@ -32860,19 +36433,26 @@ export class GameLogic {
         if (AI_CONSTANTS.HF_OFFWALL !== 0 && enemy.hf.dKind !== 0 && enemy.aiState !== 'fleeing' && !enemy.graceActive && this.feel.s[FEEL.DRONEKEEP] > 0 &&
             this._hfOffWall(enemy, _fgVx0, _fgVy0, dtFactor, now, (enemy.hf.dwHold || enemy.hf.ddHoldAt === now) && !_hfWk)) _hfWk = true;
         if (_hfWk && AI_CONSTANTS.HF_CHASEWALK !== 0 && enemy.aiState === 'following' && this.feel.s[FEEL.KEYS] > 0) enemy.hf.standAt = now;
+        if (enemy.hf.frAside && !enemy.hf.frHold) this._hfLeanAside(enemy, _fgVx0, _fgVy0, dtFactor);
         if (enemy.hf.frHold) this._hfStepAside(enemy, _fgVx0, _fgVy0, dtFactor);
-        if (AI_CONSTANTS.HF_KEEPSEEN !== 0 && enemy.aiState === 'attacking' && enemy.hf.sightBox) this._hfKeepSeen(enemy, _fgVx0, _fgVy0);
-        if ((this.feel.s[FEEL.STOPS] > 0 && this._hfStop(enemy, now)) || (this.feel.s[FEEL.CALM] > 0 && enemy.aiState === 'fleeing' && this._hfCalmRest(enemy, now)) ||
+        if (AI_CONSTANTS.HF_KEEPSEEN !== 0 && enemy.aiState === 'attacking' && enemy.hf.sightBox && !(enemy.hf.gKite === 2 && AI_CONSTANTS.HF_GROUP !== 0) && !(enemy._ogKite === 2 && AI_CONSTANTS.BT_GUARDHOLD !== 0)) this._hfKeepSeen(enemy, _fgVx0, _fgVy0);
+        if (AI_CONSTANTS.BT_HOLDGROUND !== 0 && FEEL_LIVE && (enemy._btBits & BT_ATTACK) !== 0 && !_cnW) this._hgHold(enemy, _fgVx0, _fgVy0, now);
+        if (!_dgH && !_cnW && ((AI_CONSTANTS.HF_FIGHTSPOT !== 0 && !_hfWk && this.feel.s[FEEL.STOPS] > 0 && this._hfFightSpot(enemy, now)) ||
+            (this.feel.s[FEEL.STOPS] > 0 && this._hfStop(enemy, now)) || (this.feel.s[FEEL.CALM] > 0 && enemy.aiState === 'fleeing' && this._hfCalmRest(enemy, now)) ||
             (AI_CONSTANTS.HF_NEST !== 0 && this.feel.s[FEEL.NEST] > 0 && this._hfTrapStand(enemy, now)) ||
-            ((enemy.hf.dwHold || enemy.hf.ddHoldAt === now) && !_hfWk)) {
+            (AI_CONSTANTS.HF_LEAVEAREA !== 0 && now < enemy.hf.lvUntil && enemy.aiState !== 'fleeing' && !(now < enemy.hf.adUntil) && !(now < enemy.hf.udUntil) && !(now < enemy.hf.hitUntil) && this._hfLeaveHeld(enemy, _fgVx0, _fgVy0, now, dtFactor, _hfWk)) ||
+            (AI_CONSTANTS.HF_AHEADHOLD !== 0 && now < enemy.hf.ahUntil && now >= enemy.hf.adUntil && !_hfWk && enemy._btBits !== 0 && (enemy.aiState === 'roaming' || enemy.aiState === 'targeting_shapes') && this._hfAheadHeld(enemy, _fgVx0, _fgVy0)) ||
+            ((enemy.hf.dwHold || enemy.hf.ddHoldAt === now) && !_hfWk) || (now < enemy.hf.hkUntil && !_hfWk && enemy.aiState !== 'fleeing' && (enemy.velocity.x - _fgVx0) * (enemy.hf.hkX - enemy.position.x) + (enemy.velocity.y - _fgVy0) * (enemy.hf.hkY - enemy.position.y) > 0))) {
           enemy.velocity.x = _fgVx0; enemy.velocity.y = _fgVy0; enemy.hf.keyIdx = -1; enemy.hf.wX = 0; enemy.hf.wY = 0; enemy.hf.wM = 0;
           if (AI_CONSTANTS.HF_STOPS_STUCK !== 0) this._resetStuckWindow(enemy, now);
           enemy.hf.standAt = now;
         }
-        else if (this.feel.s[FEEL.OWNTIME] > 0 && now < enemy.hf.moveHoldUntil && this._hfMoveHold(enemy, _fgVx0, _fgVy0, now)) { }
+        else if (!_dgH && !_cnW && this.feel.s[FEEL.OWNTIME] > 0 && now < enemy.hf.moveHoldUntil && this._hfMoveHold(enemy, _fgVx0, _fgVy0, now)) { }
         else if (this.feel.s[FEEL.KEYS] > 0) this._hfKeysDrive(enemy, _fgVx0, _fgVy0, now);
       }
       else if (enemy.hf.legs && !_mmSt && this.feel.s[FEEL.KEYS] > 0) this._hfKeysDrive(enemy, _fgVx0, _fgVy0, now);
+      if (AI_CONSTANTS.KILLZONE_KEEPOUT !== 0 && FEEL_LIVE && !_mmSt) this._kzHold(enemy, _fgVx0, _fgVy0, dtFactor);
+      if (AI_CONSTANTS.HF_TRAPDEATH !== 0 && FEEL_LIVE && !_mmSt && this._trapCount > 0 && enemy.hf.legs) this._dtHold(enemy, _fgVx0, _fgVy0, now, dtFactor);
       enemy.fgIntentX = enemy.velocity.x - _fgVx0;
       enemy.fgIntentY = enemy.velocity.y - _fgVy0;
       if (enemy._dkFeelAt !== 0 && enemy.currentTargetType !== 'enemy' && enemy.currentTargetType !== 'player') {
@@ -33293,6 +36873,7 @@ export class GameLogic {
     const bots = [];
     for (const e of this.state.enemyTanks) {
       if (!this._skipOrdinary(e)) continue;
+      if (SMALL_FIX.G900 !== 0 && this._tripTravellers.has(e.displayName)) continue;
       let d = this._skipDraws.get(e.id);
       if (!d) { d = new Float64Array(4); for (let k = 0; k < 4; k++) d[k] = 1 - Math.random(); }
       bots.push({ name: e.displayName, tank: e.currentTankName, team: String(e.team), xp: e.currentXp, draws: [d[0], d[1], d[2], d[3]] as [number, number, number, number] });
@@ -33324,6 +36905,7 @@ export class GameLogic {
     this._tripTravellers.clear();
     for (const n of travellers) this._tripTravellers.add(n);
     if (this.travel) this.travel.freeze(key, performance.now());
+    this._foundThere();
     this._tripGracePlayer(this.gameNow());
     this._cameraToPlayer();
     this.pushMessage('You have traveled through a portal!', this.gameNow());
@@ -33632,6 +37214,160 @@ export class GameLogic {
     const d1 = this._koDepth(e, e.position.x + ox, e.position.y + oy, bodyR);
     return d1 >= 0 && d1 > this._koDepth(e, e.position.x, e.position.y, bodyR) + 1e-6;
   }
+  private _kzList: readonly CustomAreaRect[] | null = null;
+  private readonly _kzHeads: number[] = [];
+  private _kzNx = 0; private _kzNy = 0;
+  private static readonly KZ_KEEP = 60;
+  private static readonly KZ_KEEP_K = 0.5;
+  private _kzSync(): readonly CustomAreaRect[] | null {
+    const list = this.mapState ? this.mapState.customAreas : undefined;
+    if (!list || list.length === 0) { if (this._kzList !== null) { this._kzList = null; this._kzHeads.length = 0; } return null; }
+    if (list !== this._kzList) {
+      this._kzList = list; this._kzHeads.length = 0;
+      for (let i = 0; i < list.length;) {
+        const n = list[i].groupN === undefined || list[i].groupN! < 1 ? 1 : list[i].groupN!;
+        if (list[i].kind === AREA_KIND_KILL) this._kzHeads.push(i);
+        i += n;
+      }
+    }
+    return this._kzHeads.length > 0 ? list : null;
+  }
+  private _kzHurts(e: EnemyTank, ca: CustomAreaRect): boolean {
+    if (e.isBaseProtector === true || (e._mevF & MF_GOD) !== 0 || (SMALL_FIX.R833A !== 0 && this.isArenaCloser(e))) return false;
+    return !this._areaSpares(ca, this._resolveTeam(e.team), e.camp ?? CAMP_NONE, this._areaTankKeyOf(e), e.aiBehavior, false, e._mev, e.id);
+  }
+  private _kzDepth(e: EnemyTank, x: number, y: number, reach: number): number {
+    const list = this._kzSync();
+    if (list === null) return -1;
+    let best = -1;
+    for (let k = 0; k < this._kzHeads.length; k++) {
+      const i = this._kzHeads[k], h = list[i];
+      if (h.off === true) continue;
+      const n = h.groupN === undefined || h.groupN < 1 ? 1 : h.groupN;
+      if (n > 1 && h.ux0 !== undefined && (x < h.ux0 - reach || x > h.ux1! + reach || y < h.uy0! - reach || y > h.uy1! + reach)) continue;
+      let hurts = -1;
+      for (let j = i; j < i + n; j++) {
+        const r = list[j];
+        const a = x - (r.x0 - reach), b = (r.x1 + reach) - x, c = y - (r.y0 - reach), dd = (r.y1 + reach) - y;
+        const d = Math.min(a, b, c, dd);
+        if (d < 0 || d <= best) continue;
+        if (r.poly != null && !polyTouches(r.poly, x, y, reach)) continue;
+        if (hurts < 0) hurts = this._kzHurts(e, r) ? 1 : 0;
+        if (hurts === 0) break;
+        best = d;
+        if (d === a) { this._kzNx = -1; this._kzNy = 0; } else if (d === b) { this._kzNx = 1; this._kzNy = 0; } else if (d === c) { this._kzNx = 0; this._kzNy = -1; } else { this._kzNx = 0; this._kzNy = 1; }
+      }
+    }
+    return best;
+  }
+  private _kzReach(e: EnemyTank): number {
+    const R = this.getEffectiveEnemyRadius(e);
+    return R + GameLogic.KZ_KEEP + GameLogic.KZ_KEEP_K * R;
+  }
+  private _kzStepRefused(e: EnemyTank, sx: number, sy: number, reach: number): boolean {
+    const d1 = this._kzDepth(e, e.position.x + sx, e.position.y + sy, reach);
+    if (d1 < 0) return false;
+    const d0 = this._kzDepth(e, e.position.x, e.position.y, reach);
+    if (d1 > d0 + 1e-6) return true;
+    return d0 > 0.5 * (reach - this.getEffectiveEnemyRadius(e)) && d1 > d0 - 1e-6;
+  }
+  private _kzHold(e: EnemyTank, v0x: number, v0y: number, dtFactor: number): void {
+    if (this._kzSync() === null || e.isSentryEnemy || (e._mevF & MF_STANDS) !== 0) return;
+    const R = this.getEffectiveEnemyRadius(e), keep = GameLogic.KZ_KEEP + GameLogic.KZ_KEEP_K * R;
+    const d0 = this._kzDepth(e, e.position.x, e.position.y, R + keep);
+    if (d0 < 0) return;
+    const nx = this._kzNx, ny = this._kzNy;
+    if (d0 > 0.5 * keep) {
+      const spd = (getEnemyMoveSpeed(e) / this.movementZoom) * TANK_ACCEL * this._enemyThrustMult(e) * dtFactor;
+      e.velocity.x = v0x + nx * spd; e.velocity.y = v0y + ny * spd;
+      if (e.hf.legs) { e.hf.keyIdx = -1; e.hf.wX = 0; e.hf.wY = 0; e.hf.wM = 0; }
+      return;
+    }
+    const into = -((e.velocity.x - v0x) * nx + (e.velocity.y - v0y) * ny);
+    if (into > 0) { e.velocity.x += nx * into; e.velocity.y += ny * into; }
+  }
+  private _dtHold(e: EnemyTank, v0x: number, v0y: number, now: number, dtFactor: number): void {
+    if (e.isBossTier === true || e.isSentryEnemy || (e._mevF & MF_STANDS) !== 0 || this._isNoPvpForEnemy(e)) return;
+    const pool = e.currentHealth + e.currentShield;
+    if (!(pool > 0)) return;
+    const need = 0.34 * pool * (1 + 0.19 * (e.upgrades ? (e.upgrades.bodyDamage || 0) : 0)) / HF_REST_K;
+    const R = this.getEffectiveEnemyRadius(e), x = e.position.x, y = e.position.y;
+    const mvx = e.velocity.x + e.knockbackVelocity.x, mvy = e.velocity.y + e.knockbackVelocity.y;
+    const traps = this._trapIdx, n = this._trapCount;
+    let best = 0, bx = 0, by = 0, bcl = 0, bg = 0;
+    for (let i = 0; i < n; i++) {
+      const b = traps[i];
+      const dx = b.position.x - x, dy = b.position.y - y;
+      if (dx > 300 || dx < -300 || dy > 300 || dy < -300) continue;
+      if (!b.active || b.health <= 0 || b.isFading || b.projectileVisual !== 'trap' || b.damage * b.health < need) continue;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < 1) continue;
+      const cl = ((mvx - b.velocity.x) * dx + (mvy - b.velocity.y) * dy) / d;
+      const reach = R + b.size * 0.5 + 14 + 0.3 * R + (cl > 0 ? 14 * cl : 0);
+      if (d >= reach || reach - d <= best) continue;
+      if (!this._trapHostileTo(b, e)) continue;
+      best = reach - d; bx = dx / d; by = dy / d; bcl = cl; bg = d - R - b.size * 0.5;
+    }
+    if (!(best > 0)) return;
+    const drx = e.velocity.x - v0x, dry = e.velocity.y - v0y, m = Math.sqrt(drx * drx + dry * dry);
+    const into = drx * bx + dry * by;
+    if (!(into > 0.05 * m) && !(bcl > 0.3) && !(bg < 6)) return;
+    const h = e.hf;
+    const spd = (getEnemyMoveSpeed(e) / this.movementZoom) * TANK_ACCEL * this._enemyThrustMult(e) * dtFactor;
+    const cr = bx * dry - by * drx;
+    let side = 0;
+    if (m > 1e-9 && (cr > 0.15 * m || cr < -0.15 * m)) side = cr > 0 ? 1 : -1;
+    else if (h.dtSide !== 0 && now - h.dtAt < 800) side = h.dtSide;
+    else {
+      const ms = this._getEnemyNavMapState(e), ox = this._navOffX, oy = this._navOffY, L = 2 * R + 30;
+      const fa = ms === null || ms.walls.length === 0 || checkLineOfSight(ms, x - ox, y - oy, x - by * L - ox, y + bx * L - oy, ox, oy);
+      const fb = ms === null || ms.walls.length === 0 || checkLineOfSight(ms, x - ox, y - oy, x + by * L - ox, y - bx * L - oy, ox, oy);
+      side = fa ? 1 : fb ? -1 : 0;
+    }
+    if (side !== 0 && (side !== h.dtSide || now - h.dtAt >= 800)) { h.dtSide = side; h.dtAt = now; }
+    const w = bg < 6 ? 1 : bcl > 0 ? (bcl >= 1.5 ? 1 : bcl / 1.5) : 0;
+    let nx = -by * side * (1 - 0.6 * w) - bx * w, ny = bx * side * (1 - 0.6 * w) - by * w;
+    const nm = Math.sqrt(nx * nx + ny * ny);
+    if (nm < 1e-6) { e.velocity.x = v0x; e.velocity.y = v0y; return; }
+    const sz = m > 0.6 * spd ? m : (w > 0 || m > 1e-9 ? 0.6 * spd + 0.4 * spd * w : 0);
+    nx /= nm; ny /= nm;
+    e.velocity.x = v0x + nx * sz; e.velocity.y = v0y + ny * sz;
+  }
+  private _kzLine(e: EnemyTank, x: number, y: number): boolean {
+    const list = this._kzSync();
+    if (list === null) return false;
+    const reach = this._kzReach(e), x0 = e.position.x, y0 = e.position.y, dx = x - x0, dy = y - y0;
+    for (let k = 0; k < this._kzHeads.length; k++) {
+      const i = this._kzHeads[k], h = list[i];
+      if (h.off === true) continue;
+      const n = h.groupN === undefined || h.groupN < 1 ? 1 : h.groupN;
+      let hurts = -1;
+      for (let j = i; j < i + n; j++) {
+        const r = list[j];
+        let t0 = 0, t1 = 1;
+        let rr = reach;
+        if (AI_CONSTANTS.BT_GATEWHERE !== 0) {
+          const gx0 = x0 < r.x0 ? r.x0 - x0 : x0 > r.x1 ? x0 - r.x1 : 0, gy0 = y0 < r.y0 ? r.y0 - y0 : y0 > r.y1 ? y0 - r.y1 : 0, gd = Math.sqrt(gx0 * gx0 + gy0 * gy0);
+          if (gd < rr) rr = gd > 1 ? gd - 1 : 0;
+        }
+        const ax = r.x0 - rr, bx = r.x1 + rr, ay = r.y0 - rr, by = r.y1 + rr;
+        if (dx > -1e-9 && dx < 1e-9) { if (x0 < ax || x0 > bx) continue; }
+        else { let ta = (ax - x0) / dx, tb = (bx - x0) / dx; if (ta > tb) { const s = ta; ta = tb; tb = s; } if (ta > t0) t0 = ta; if (tb < t1) t1 = tb; if (t0 > t1) continue; }
+        if (dy > -1e-9 && dy < 1e-9) { if (y0 < ay || y0 > by) continue; }
+        else { let ta = (ay - y0) / dy, tb = (by - y0) / dy; if (ta > tb) { const s = ta; ta = tb; tb = s; } if (ta > t0) t0 = ta; if (tb < t1) t1 = tb; if (t0 > t1) continue; }
+        if (SMALL_FIX.CH054 !== 0 && r.poly != null) {
+          const len = Math.sqrt(dx * dx + dy * dy) * (t1 - t0), stp = rr > 16 ? rr * 0.5 : 8, n = Math.min(64, Math.max(1, Math.ceil(len / stp)));
+          let touch = false;
+          for (let s = 0; s <= n && !touch; s++) { const t = t0 + (t1 - t0) * s / n; if (polyTouches(r.poly, x0 + dx * t, y0 + dy * t, rr)) touch = true; }
+          if (!touch) continue;
+        }
+        if (hurts < 0) hurts = this._kzHurts(e, r) ? 1 : 0;
+        if (hurts === 0) break;
+        return true;
+      }
+    }
+    return false;
+  }
   public botMayStandAt(e: EnemyTank, x: number, y: number): boolean {
     if (this._gateLevelAt(x, y) > e.level) return false;
     return !(this._koLiveNow() && this._koDepth(e, x, y, this.getEffectiveEnemyRadius(e), true) >= 0);
@@ -33890,13 +37626,15 @@ export class GameLogic {
   private _specSeenPts = NaN;
   private _specSeenUp = NaN;
   private _specSeenTank = '';
+  private _specSeenKab = NaN;
   private _specHudChanged(e: EnemyTank): boolean {
     const up = e.upgrades;
     let sum = 0;
     for (let i = 0; i < _UPGRADE_KEYS.length; i++) sum += up[_UPGRADE_KEYS[i]] ?? 0;
     const tank = e.currentTankName || '';
-    if (e.currentXp === this._specSeenXp && e.kills === this._specSeenKills && e.skillPoints === this._specSeenPts && sum === this._specSeenUp && tank === this._specSeenTank) return false;
-    this._specSeenXp = e.currentXp; this._specSeenKills = e.kills; this._specSeenPts = e.skillPoints; this._specSeenUp = sum; this._specSeenTank = tank;
+    const kab = SMALL_FIX.G830 !== 0 ? ((e.tankKills || 0) * 65536 + (e.assists || 0)) * 65536 + (e.bossKills || 0) : 0;
+    if (e.currentXp === this._specSeenXp && e.kills === this._specSeenKills && e.skillPoints === this._specSeenPts && sum === this._specSeenUp && tank === this._specSeenTank && (SMALL_FIX.G830 === 0 || kab === this._specSeenKab)) return false;
+    this._specSeenXp = e.currentXp; this._specSeenKills = e.kills; this._specSeenPts = e.skillPoints; this._specSeenUp = sum; this._specSeenTank = tank; this._specSeenKab = kab;
     return true;
   }
   private _specStep(): void {
@@ -34025,7 +37763,28 @@ export class GameLogic {
       if (_shrOn && (Math.abs(sx) > _shrX || Math.abs(sy) > _shrY)) continue;
       if (_sgRoamF !== null &&
           _sgRoamF.code[nav.regionSeedIdx[r]] < BASE_DANGER_ZERO + AI_CONSTANTS.SAFEZONE_BAND_CELLS) continue;
+      if (_sgRoamF !== null && AI_CONSTANTS.ROAM_REFUSEMEM !== 0 && FEEL_LIVE && AI_CONSTANTS.BASEFEAR_WAYPOINT_AVOID !== 0) {
+        const _bw = computeRegionWaypoint(nav, navMs, r, lx, ly, enemy.position.x - lx, enemy.position.y - ly, 8, _pickBodyR);
+        if (_bw.ok) {
+          const _bcs = nav.cellSize, _bgx = nav.gridCells, _bgy = nav.gridCellsY, _bwx = _bw.x - lx, _bwy = _bw.y - ly, _bn = Math.ceil(Math.sqrt(_bwx * _bwx + _bwy * _bwy) / (0.5 * _bcs));
+          const _hx = Math.floor((lx + nav.mapHalf) / _bcs), _hy = Math.floor((ly + nav.mapHalfY) / _bcs);
+          const _here = _hx >= 0 && _hx < _bgx && _hy >= 0 && _hy < _bgy ? _sgRoamF.code[_hx * _bgy + _hy] : BASE_DANGER_ZERO + AI_CONSTANTS.SAFEZONE_BAND_CELLS;
+          let _bad = false;
+          for (let _k = 1; _k <= _bn && !_bad; _k++) {
+            const _cx = Math.floor((lx + _bwx * _k / _bn + nav.mapHalf) / _bcs), _cy = Math.floor((ly + _bwy * _k / _bn + nav.mapHalfY) / _bcs);
+            if (_cx < 0 || _cx >= _bgx || _cy < 0 || _cy >= _bgy) continue;
+            const _c = _sgRoamF.code[_cx * _bgy + _cy];
+            if (_c < BASE_DANGER_ZERO + AI_CONSTANTS.SAFEZONE_BAND_CELLS && _c <= _here) _bad = true;
+          }
+          if (_bad) continue;
+        }
+      }
       if (this._koLiveNow() && this._koDepth(enemy, sx + (enemy.position.x - lx), sy + (enemy.position.y - ly), 0) >= 0) continue;
+      if (AI_CONSTANTS.HF_LEAVEAREA !== 0 && now < enemy.hf.lvUntil) {
+        if (this._hfLeaveBars(enemy, sx + (enemy.position.x - lx), sy + (enemy.position.y - ly))) continue;
+        const _lw = computeRegionWaypoint(nav, navMs, r, lx, ly, enemy.position.x - lx, enemy.position.y - ly, 4, _pickBodyR);
+        if (_lw.ok && this._hfLeaveInto(enemy, _lw.x + (enemy.position.x - lx), _lw.y + (enemy.position.y - ly))) continue;
+      }
       if (homeZone && regionOverlapsRect(nav, r, homeZone.minX, homeZone.minY, homeZone.maxX, homeZone.maxY)) continue;
       if (!regionIsReachable(nav, r, lx, ly)) continue;
       if (_exHere !== 0) {
@@ -35158,6 +38917,8 @@ export class GameLogic {
       if (_shT !== null && (Math.abs(_shT.x - navOff) + bodyR > navMs.shrinkHX! || Math.abs(_shT.y - navOffY_) + bodyR > (navMs.shrinkHY ?? 0))) _shGate = false;
     }
     if (_shGate) avoid0 = 0;
+    const _kzR = AI_CONSTANTS.KILLZONE_KEEPOUT !== 0 && FEEL_LIVE && this._kzSync() !== null && !enemy.isSentryEnemy ? this._kzReach(enemy) : 0;
+    const _kzGate = _kzR > 0 && this._kzDepth(enemy, enemy.position.x, enemy.position.y, _kzR + pd) >= 0;
     let _sgUx = ux, _sgUy = uy, _sgA = baseAngle;
     if (avoid0 === 0 && SMALL_FIX.R658 !== 0 && this._portalTangent(enemy, ux, uy, _pkBodyR, pd, _sgRest, _sgBan)) {
       _sgUx = this._portalTanOut.x; _sgUy = this._portalTanOut.y; _sgA = Math.atan2(_sgUy, _sgUx);
@@ -35178,6 +38939,7 @@ export class GameLogic {
             if (avoid === 0 && this._restRefuses(enemy, cx * pd, cy * pd, _pkBodyR, pd, _sgRest, _sgBan)) continue;
             if (avoid === 0 && _koGate && this._koStepRefused(enemy, cx * pd, cy * pd, bodyR)) continue;
             if (avoid === 0 && _shGate && this._shrinkStepRefused(navMs, lx, ly, cx * pd, cy * pd, bodyR)) continue;
+            if (_kzGate && this._kzStepRefused(enemy, cx * pd, cy * pd, _kzR)) continue;
             out.dirX = cx; out.dirY = cy;
             out.hardDeviation = tier === 1;
             return true;
@@ -35186,6 +38948,7 @@ export class GameLogic {
       }
     }
     out.dirX = ux; out.dirY = uy;
+    if (_kzGate && this._kzStepRefused(enemy, ux * pd, uy * pd, _kzR) && this._kzDepth(enemy, enemy.position.x + ux * pd, enemy.position.y + uy * pd, _kzR) >= 0) { out.dirX = this._kzNx; out.dirY = this._kzNy; }
     out.trapped = true;
     enemy.navTrappedAt = this.gameNow();
     return true;
@@ -35198,7 +38961,7 @@ export class GameLogic {
 
   private _dodgeAdjust(enemy: EnemyTank, dirX: number, dirY: number): boolean {
     if (enemy.hf.dgGo) {
-      if (enemy.hf.dgX * dirX + enemy.hf.dgY * dirY >= 0.5) { this._dodgeOut.dirX = enemy.hf.dgX; this._dodgeOut.dirY = enemy.hf.dgY; return true; }
+      if ((AI_CONSTANTS.HF_DODGEHARD !== 0 && enemy.hf.dgHard) || enemy.hf.dgX * dirX + enemy.hf.dgY * dirY >= 0.5) { this._dodgeOut.dirX = enemy.hf.dgX; this._dodgeOut.dirY = enemy.hf.dgY; return true; }
       enemy.hf.dgGo = false;
     }
     const w = enemy.threatDodgeWeight;
@@ -35876,7 +39639,7 @@ export class GameLogic {
     if (_sgWpDecided) {
       if (_sgWpRefuse) {
         if (enemy.navGoalRegion < enemy.navRegionBlockedUntil.length) {
-          enemy.navRegionBlockedUntil[enemy.navGoalRegion] = now + AI_CONSTANTS.BASEFEAR_ROUTE_BLOCK_MS;
+          enemy.navRegionBlockedUntil[enemy.navGoalRegion] = now + this._rfBanMs(enemy, now);
         }
         enemy.navGoalRegion = -1;
         enemy.lastDirectionChange = 0;
@@ -35887,7 +39650,7 @@ export class GameLogic {
       const _bwHere = this._threatHostileAt(enemy, enemy.position.x, enemy.position.y, true);
       if (!_bwHere && this._threatHostileAt(enemy, wp.x + navOffX, wp.y + navOffY, true)) {
         if (enemy.navGoalRegion < enemy.navRegionBlockedUntil.length) {
-          enemy.navRegionBlockedUntil[enemy.navGoalRegion] = now + AI_CONSTANTS.BASEFEAR_ROUTE_BLOCK_MS;
+          enemy.navRegionBlockedUntil[enemy.navGoalRegion] = now + this._rfBanMs(enemy, now);
         }
         enemy.navGoalRegion = -1;
         this.baseFearWaypointRefusals++;
@@ -35961,6 +39724,7 @@ export class GameLogic {
 
   private updateEnemyRoaming(enemy: EnemyTank, dtFactor: number, mapLimit: number) {
     const now = this.gameNow();
+    enemy._btStood = false;
     const navMs = this._getEnemyNavMapState(enemy);
     const _roamOffX = this._navOffX;
     const _roamOffY = this._navOffY;
@@ -35969,6 +39733,7 @@ export class GameLogic {
 
     if (enemy._zPack && enemy._hordeLed && enemy.isRegrouping && SMALL_FIX.R976 !== 0 && this._zSwarmRoam(enemy, navMs, _roamOffX, _roamOffY, _roamBodyR, now, dtFactor)) return;
     if (enemy._zPack && enemy._mevFollowOf === '' && SMALL_FIX.R976 !== 0 && this._zSwarmGather(enemy, navMs, _roamOffX, _roamOffY, _roamBodyR, now, dtFactor)) return;
+    if ((enemy.hf.gDo !== 0 || enemy.hf.gPend !== 0 || enemy.hf.gThere) && this._hfGroupRoam(enemy, navMs, _roamOffX, _roamOffY, _roamBodyR, now, dtFactor)) return;
     if ((enemy._btBits > 0 || (SMALL_FIX.R941 !== 0 && this._carried.length !== 0)) && this._btRoam(enemy, navMs, _roamOffX, _roamOffY, _roamBodyR, now, dtFactor)) return;
     if (enemy._intKind !== 0 && this._intRoam(enemy, navMs, _roamOffX, _roamOffY, _roamBodyR, now, dtFactor)) return;
     if (enemy.hf.gzUntil > now && this._hfKeepOff(enemy, navMs, _roamOffX, _roamOffY, _roamBodyR, now, dtFactor)) return;
@@ -35977,6 +39742,9 @@ export class GameLogic {
     if (enemy.hf.rnUntil > now && this._hfRingOut(enemy, navMs, _roamOffX, _roamOffY, _roamBodyR, now, dtFactor)) return;
     if (enemy.hf.rhUntil > now && this._hfRingIn(enemy, navMs, _roamOffX, _roamOffY, _roamBodyR, now, dtFactor)) return;
     if (enemy.hf.letTurnUntil > now && this._hfTurnAway(enemy, navMs, _roamOffX, _roamOffY, _roamBodyR, now, dtFactor)) return;
+    if (AI_CONSTANTS.TM_HELP !== 0 && FEEL_LIVE && enemy._thId !== '' && this._thRoam(enemy, navMs, _roamOffX, _roamOffY, _roamBodyR, now, dtFactor)) return;
+    if (AI_CONSTANTS.TM_MIDDLE !== 0 && FEEL_LIVE && enemy._btBits === 0 && enemy.hf.plays && this.feel.s[FEEL.MATES] > 0) { if (this._tmRoam(enemy, navMs, _roamOffX, _roamOffY, _roamBodyR, now, dtFactor)) return; }
+    else if (enemy._tmSt !== 0) { enemy._tmSt = 0; enemy._tmPendSt = -1; }
     if ((enemy.hf.goId !== '' || (this._hfTeamLive && enemy.hf.plays && enemy.hf.tmHas)) && this._hfRoamMates(enemy, navMs, _roamOffX, _roamOffY, _roamBodyR, now, dtFactor)) return;
     if (enemy.hf.glUntil > now && this._hfSeek(enemy, navMs, _roamOffX, _roamOffY, _roamBodyR, now, dtFactor)) return;
     if (this.feel.s[FEEL.GOALS] > 0 && enemy.hf.plays) this._hfBored(enemy, now);
@@ -36082,6 +39850,7 @@ export class GameLogic {
           if (_skSee) {
             if (Math.random() < _skBestChance) {
               enemy.portalSeekIdx = _skBest;
+              if (SMALL_FIX.G920 !== 0) enemy._intThrough = -1;
               enemy.portalSeekUntil = now + (MISSING_MODES.ON !== 0 && _skBP.botKnown ? TRIP_FORGE_SEEK_MS : AI_CONSTANTS.PORTAL_SEEK_TIMEOUT_MS);
             } else {
               enemy.portalSeekCooldownUntil = now + this._botPortalRethinkMs(enemy);
@@ -36799,9 +40568,10 @@ export class GameLogic {
       enemy.fgSeen = _gMs === null || checkLineOfSight(_gMs, enemy.position.x - this._navOffX, enemy.position.y - this._navOffY,
         tp.x - this._navOffX, tp.y - this._navOffY, this._navOffX, this._navOffY);
     }
-    applyFacingType(enemy, aimWorld);
     const _bpPrimary = enemy.turrets[enemy.primaryTurretIndex];
-    enemy.targetTurretAngle = normalizeAngle(aimWorld - (_bpPrimary?.angle || 0));
+    const _aw809 = SMALL_FIX.G809 !== 0 ? this._aimMountWorldAngle(enemy, _bpPrimary, enemy.position.x + dx, enemy.position.y + dy, aimWorld) : aimWorld;
+    applyFacingType(enemy, _aw809);
+    enemy.targetTurretAngle = normalizeAngle(_aw809 - (_bpPrimary?.angle || 0));
   }
 
   private readonly _guardVel: Vector = new Vector(0, 0);
@@ -36850,6 +40620,7 @@ export class GameLogic {
       if (!targetTank || (AI_CONSTANTS.SEEN_RULE !== 0 ? this._tankHidFrom(enemy, targetTank, true)
             : (targetTank.invisEnabled && targetTank.invisAlpha <= 0.2))
           || (this._enemyUnseeable(targetTank) && targetTank.id !== enemy._intTargetId)
+          || bossLeavesBody(enemy, targetTank)
           || (AREA_REACH.CH041 !== 0 && this._enemyProtected(targetTank))) {
         enemy.aiState = 'roaming';
         enemy.currentTargetId = null;
@@ -37017,7 +40788,8 @@ export class GameLogic {
     this._soReach = 0;
     const _gapK = this.feel.s[FEEL.GAP] > 0 && !_isRamMode && enemy.catNoGapDist !== true && (enemy.currentTargetType === 'enemy' || enemy.currentTargetType === 'player') && !enemy._zMind && !this._isHealEngagement(enemy)
       ? this._hfGapDist(enemy, _arTargetTank, this._hfNow) : 1;
-    const _ddOn = AI_CONSTANTS.HF_DRONEDIST !== 0 && this.feel.s[FEEL.DRONEDIST] > 0 && enemy.hf.plays && (enemy.hf.dKind === 1 || (enemy.hf.dKind === 2 && AI_CONSTANTS.HF_FARBACK !== 0)) && !_isRamMode && (enemy.currentTargetType === 'enemy' || enemy.currentTargetType === 'player') && !enemy._zMind && !this._isHealEngagement(enemy);
+    const _ddOn = AI_CONSTANTS.HF_DRONEDIST !== 0 && this.feel.s[FEEL.DRONEDIST] > 0 && enemy.hf.plays && (enemy.hf.dKind === 1 || (enemy.hf.dKind === 2 && AI_CONSTANTS.HF_FARBACK !== 0)) && !_isRamMode && (enemy.currentTargetType === 'enemy' || enemy.currentTargetType === 'player') && !enemy._zMind && !this._isHealEngagement(enemy)
+      && !this._hfGunOut(enemy, _arTargetTank);
     const _mdMeet = _ddOn ? this._hfDroneDist(enemy, _arTargetTank, personalPreferredDist, targetPos.x, targetPos.y)
       : AI_CONSTANTS.HF_MEETDIST !== 0 && this.feel.s[FEEL.MEET] > 0 && enemy.hf.plays && !_isRamMode && enemy.catNoGapDist !== true && (enemy.currentTargetType === 'enemy' || enemy.currentTargetType === 'player') && !enemy._zMind && !this._isHealEngagement(enemy)
       ? this._hfMeetDist(enemy, _arTargetTank, personalPreferredDist, targetPos.x, targetPos.y) : 0;
@@ -37025,7 +40797,21 @@ export class GameLogic {
       ? personalPreferredDist
       : this._standoffClamp(enemy, _gapK * (enemy.hf.tmHas && enemy.hf.plays && (this.feel.s[FEEL.LINES] > 0 || this.feel.s[FEEL.ODDS] > 0) && !this._isHealEngagement(enemy)
           ? this._hfStandDist(enemy, personalPreferredDist, _arTargetTank) : personalPreferredDist), enemy.navLosResult);
-    let _basePreferredDist = _soPersonal * fearDistMult;
+    const _hvK = AI_CONSTANTS.HF_HEAVY !== 0 && this.feel.s[FEEL.GAP] > 0 && enemy.hf.plays && !_isRamMode && enemy.hf.dKind === 0 && enemy.catNoGapDist !== true &&
+      (enemy.currentTargetType === 'enemy' || enemy.currentTargetType === 'player') && !enemy._zMind && !this._isHealEngagement(enemy) &&
+      (AI_CONSTANTS.HF_HITRANGE === 0 || (_arTargetTank !== null && !_arTargetTank.hf.plays) || this._hfHitOf(enemy, _arTargetTank, this._hfNow) > 0) ? this._hfHeavyK(enemy, _arTargetTank, this._hfNow) : 1;
+    let _basePreferredDist = _soPersonal * fearDistMult * _hvK;
+    let _hrFloor = 0;
+    if (AI_CONSTANTS.HF_HITRANGE !== 0 && this.feel.s[FEEL.GAP] > 0 && enemy.hf.plays && !_isRamMode && enemy.hf.dKind === 0 && enemy.catNoGapDist !== true && !enemy._zMind &&
+        (enemy.currentTargetType === 'enemy' || enemy.currentTargetType === 'player') && !this._isHealEngagement(enemy)) {
+      const _hrR = this._hfHitOf(enemy, _arTargetTank, this._hfNow);
+      if (_hrR > 0) {
+        _hrFloor = _hrR + 100;
+        if (this._soReach > 0 && AI_CONSTANTS.STANDOFF_REACH !== 0) { const _hrHi = this._soReach * AI_CONSTANTS.STANDOFF_MAX_FRAC; if (_hrFloor > _hrHi) _hrFloor = _hrHi; }
+        if (enemy.fovRadius > 0) { const _hrEye = enemy.fovRadius * AI_CONSTANTS.STANDOFF_EYE_KEEP; if (_hrFloor > _hrEye) _hrFloor = _hrEye; }
+        if (_hrFloor > _basePreferredDist) _basePreferredDist = _hrFloor;
+      }
+    }
     if (_mdMeet > personalPreferredDist) {
       let _mdFloor = _gapK < 1 && !(_ddOn && AI_CONSTANTS.HF_FARBACK !== 0) ? _gapK * _mdMeet : _mdMeet;
       if (!_ddOn && this._soReach > 0 && AI_CONSTANTS.STANDOFF_REACH !== 0) { const _mdHi = this._soReach * AI_CONSTANTS.STANDOFF_MAX_FRAC; if (_mdFloor > _mdHi) _mdFloor = _mdHi; }
@@ -37048,6 +40834,7 @@ export class GameLogic {
         if (_basePreferredDist > _sfEye) _basePreferredDist = _sfEye;
       }
     }
+    if (_hrFloor > _basePreferredDist && AI_CONSTANTS.HF_KEEPSEEN !== 0 && enemy.hf.sightBox) _basePreferredDist = _hrFloor;
     const adjustedPreferredDist = _muzzleFloor > _rawHardMin
       ? Math.max(_basePreferredDist, hardMinDist + 100)
       : _basePreferredDist;
@@ -37243,6 +41030,14 @@ export class GameLogic {
         this._combatHoldOut.dirY = Math.cos(enemy.orbitAngle) * enemy.orbitDirection;
         this._combatHoldOut.isOrbit = true;
       }
+      let _bsRad = false;
+      if (!this._combatHoldOut.isOrbit && dist >= hardMinDist && AI_CONSTANTS.BT_BODYSTAND !== 0 && FEEL_LIVE && enemy.hf.plays && this.feel.s[FEEL.STOPS] > 0 &&
+          _arTargetTank !== null && (_arTargetTank._mevF & MF_STANDS) !== 0 && this._bsStands(enemy, now, _arTargetTank)) {
+        const _bsR = this._combatHoldOut.dirX * towardX + this._combatHoldOut.dirY * towardY, _bsIn = dist > maxDist, _bsOut = dist < softMinDist;
+        const _bsK = _bsOut ? (_bsR < 0 ? -_bsR : 0) : _bsIn ? (_bsR > 0 ? _bsR : 0) : 0, _bsS = _bsOut ? -1 : 1;
+        this._combatHoldOut.dirX = towardX * _bsS; this._combatHoldOut.dirY = towardY * _bsS; this._combatHoldOut.speed *= _bsK > 1 ? 1 : _bsK;
+        _bsRad = true;
+      }
       if (navMs) {
         let fleeDirX = 0, fleeDirY = 0;
         let escapeDirX = 0, escapeDirY = 0;
@@ -37258,7 +41053,7 @@ export class GameLogic {
         }
         validateCombatDirectionWalls(this._combatHoldOut, enemy.position.x - navOff, enemy.position.y - navOffY_, navMs, fleeDirX, fleeDirY, escapeDirX, escapeDirY, navOff, navOffY_, _navBodyR);
       }
-      snapDirectionTo8Way(this._combatHoldOut, dist >= hardMinDist);
+      snapDirectionTo8Way(this._combatHoldOut, dist >= hardMinDist && !_bsRad);
       enemy.combatTargetDirX = this._combatHoldOut.dirX;
       enemy.combatTargetDirY = this._combatHoldOut.dirY;
       enemy.combatHeldSpeed = this._combatHoldOut.speed;
@@ -37287,8 +41082,23 @@ export class GameLogic {
     }
 
     if (_isRamMode && !enemy.navUseFlowField) {
-      this._combatHoldOut.dirX = towardX;
-      this._combatHoldOut.dirY = towardY;
+      let _rlX = towardX, _rlY = towardY;
+      if (AI_CONSTANTS.HF_RAMLEAD !== 0 && FEEL_LIVE && enemy.hf.rmOn && enemy.hf.rmMode === 1 && dist > 1 && (enemy.currentTargetType === 'enemy' || enemy.currentTargetType === 'player')) {
+        const _rlVx = targetVelocity.x, _rlVy = targetVelocity.y, _rlV2 = _rlVx * _rlVx + _rlVy * _rlVy;
+        if (_rlV2 > 0.25) {
+          const _rlO = Math.sqrt(enemy.velocity.x * enemy.velocity.x + enemy.velocity.y * enemy.velocity.y), _rlV = Math.sqrt(_rlV2), _rlS = _rlO > 1.15 * _rlV ? _rlO : 1.15 * _rlV;
+          const _rlA = _rlS * _rlS - _rlV2, _rlB = dx * _rlVx + dy * _rlVy, _rlCap = 36 + 24 * hfHash(enemy.hf.seed, 576, 0);
+          let _rlT = (_rlB + Math.sqrt(_rlB * _rlB + _rlA * dist * dist)) / _rlA;
+          if (_rlT > _rlCap) _rlT = _rlCap;
+          for (let _rlK = 0; _rlK < 4; _rlK++) {
+            const _rlLx = dx + _rlVx * _rlT, _rlLy = dy + _rlVy * _rlT, _rlL = Math.sqrt(_rlLx * _rlLx + _rlLy * _rlLy);
+            if (_rlL > 1 && _rlLx * towardX + _rlLy * towardY >= 0.5 * _rlL) { _rlX = _rlLx / _rlL; _rlY = _rlLy / _rlL; break; }
+            _rlT *= 0.5;
+          }
+        }
+      }
+      this._combatHoldOut.dirX = _rlX;
+      this._combatHoldOut.dirY = _rlY;
       if (navMs) {
         let _rwOpen = false;
         if (AI_CONSTANTS.HF_RAMWALL !== 0 && enemy.hf.rmMode === 1) {
@@ -37339,7 +41149,8 @@ export class GameLogic {
       const _heldRad = moveX * towardX + moveY * towardY;
       const _tanX = moveX - towardX * _heldRad;
       const _tanY = moveY - towardY * _heldRad;
-      const _tanK = _rfOn ? 0 : 1 - Math.abs(_pdRadial);
+      let _tanK = _rfOn ? 0 : 1 - Math.abs(_pdRadial);
+      if (_tanK > 0 && AI_CONSTANTS.BT_BODYSTAND !== 0 && FEEL_LIVE && enemy.hf.plays && this.feel.s[FEEL.STOPS] > 0 && _arTargetTank !== null && (_arTargetTank._mevF & MF_STANDS) !== 0 && this._bsStands(enemy, now, _arTargetTank)) _tanK = 0;
       moveX = _tanX * _tanK + towardX * _pdRadial;
       moveY = _tanY * _tanK + towardY * _pdRadial;
     }
@@ -37635,6 +41446,38 @@ export class GameLogic {
       moveX = this._ftDir.x; moveY = this._ftDir.y;
       moveSpeed = (getEnemyMoveSpeed(enemy) / this.movementZoom) * TANK_ACCEL * this._enemyThrustMult(enemy);
     }
+    if (enemy._ogKite !== 0 && AI_CONSTANTS.BT_GUARDHOLD !== 0 && BOT_TACTICS.ON !== 0) {
+      const _okOut = moveX * enemy._ogKx + moveY * enemy._ogKy;
+      if (enemy._ogKite === 2 && this._ogKiteStep(enemy, navMs, navOff, navOffY_, this.gameNow())) {
+        moveX = this._ftDir.x; moveY = this._ftDir.y;
+        moveSpeed = (getEnemyMoveSpeed(enemy) / this.movementZoom) * TANK_ACCEL * this._enemyThrustMult(enemy);
+      } else if (_okOut > 0) {
+        moveX -= _okOut * enemy._ogKx; moveY -= _okOut * enemy._ogKy;
+        if (moveX * moveX + moveY * moveY < 0.04) { const _okS = hfHash(enemy.hf.seed, 521, (this.gameNow() / 2500) | 0) < 0.5 ? 1 : -1; moveX = -enemy._ogKy * _okS * 0.5; moveY = enemy._ogKx * _okS * 0.5; }
+      }
+    }
+    if (AI_CONSTANTS.TM_BACK !== 0 && FEEL_LIVE && enemy._tmSt !== 0 && enemy._btBits === 0 && this._tmBackStep(enemy, navMs, navOff, navOffY_, this.gameNow())) {
+      moveX = this._ftDir.x; moveY = this._ftDir.y;
+      moveSpeed = (getEnemyMoveSpeed(enemy) / this.movementZoom) * TANK_ACCEL * this._enemyThrustMult(enemy);
+    }
+    if (enemy.hf.gKite !== 0 && AI_CONSTANTS.HF_GROUP !== 0) {
+      const _gh = enemy.hf;
+      if (_gh.gKite === 2) {
+        if (this._hfGroupStep(enemy, navMs, navOff, navOffY_, this.gameNow())) {
+          moveX = this._ftDir.x; moveY = this._ftDir.y;
+          moveSpeed = (getEnemyMoveSpeed(enemy) / this.movementZoom) * TANK_ACCEL * this._enemyThrustMult(enemy);
+        }
+      } else {
+        const _gqx = _gh.gQx - enemy.position.x, _gqy = _gh.gQy - enemy.position.y, _gqd = Math.sqrt(_gqx * _gqx + _gqy * _gqy);
+        if (_gqd > 1) {
+          const _gin = (moveX * _gqx + moveY * _gqy) / _gqd;
+          if (_gin > 0) {
+            moveX -= (_gin * _gqx) / _gqd; moveY -= (_gin * _gqy) / _gqd;
+            if (moveX * moveX + moveY * moveY < 0.04) { const _gs = hfHash(_gh.seed, 527, (this.gameNow() / 2500) | 0) < 0.5 ? 1 : -1; moveX = (-_gqy / _gqd) * _gs * 0.5; moveY = (_gqx / _gqd) * _gs * 0.5; }
+          }
+        }
+      }
+    }
     let _atkImpeded = false;
     if (navMs) {
       const _dgMag = Math.sqrt(moveX * moveX + moveY * moveY);
@@ -37834,10 +41677,34 @@ export class GameLogic {
       enemy.healTargetId = ''; enemy.healUntil = 0; enemy.healDecisionAt = now;
     }
   }
+  private _unreachAgrees(e: EnemyTank, id: string, now: number): boolean {
+    if (id === '' || !((id === e.unreachTargetId && now < e.unreachUntil) || (e.unreachMoreLive > now && unreachMoreHas(e, id, now)))) return false;
+    const fp = this.floatingPolygons;
+    for (let i = 0; i < fp.length; i++) { const p = fp[i]; if (p.active && p.id === id) return !p.isCrasher; }
+    return true;
+  }
   private _healGaveUpOn(enemy: EnemyTank, id: string, now: number): boolean {
     return (enemy.unreachTargetId === id && now < enemy.unreachUntil) || this._chaseFutileRefuses(enemy, id, now);
   }
 
+  private _hfFoodChaseOver(e: EnemyTank, id: string, now: number): boolean {
+    const h = e.hf;
+    if (h.fcId !== id || now - h.fcAt > 1500) { h.fcId = id; h.fcSince = now; }
+    h.fcAt = now;
+    let lim = 5000 + 4000 * hfHash(h.seed, 505, hfIdNum(id));
+    if (now - h.fcSince < lim) return false;
+    const polys = this.floatingPolygons;
+    for (let i = 0; i < polys.length; i++) {
+      const p = polys[i];
+      if (p.id !== id) continue;
+      if (p.isCrasher) return false;
+      if (p.rarity !== 'normal') lim *= 3;
+      break;
+    }
+    if (now - h.fcSince < lim) return false;
+    h.fcId = '';
+    return true;
+  }
   private _unreachNote(enemy: EnemyTank, id: string, now: number): void {
     if (AI_CONSTANTS.UNREACH_RING !== 0 && enemy.unreachTargetId !== '' && enemy.unreachTargetId !== id && now < enemy.unreachUntil) {
       const ids = enemy.unreachMoreIds, un = enemy.unreachMoreUntils;
@@ -37878,6 +41745,22 @@ export class GameLogic {
       return;
     }
 
+    if (AI_CONSTANTS.HF_FOODQUIT !== 0 && enemy.currentTargetType === 'shape' && enemy.currentTargetId && enemy.hf.plays && this.feel.s[FEEL.GOALS] > 0 && enemy._intKind === 0 && !enemy.hf.dwHold &&
+        this._hfFoodChaseOver(enemy, enemy.currentTargetId, now)) {
+      this._unreachNote(enemy, enemy.currentTargetId, now);
+      enemy.followVacuousPlans = 0;
+      enemy.aiState = 'roaming';
+      enemy.currentTargetId = null;
+      enemy.currentTargetType = null;
+      enemy.targetPosition = null;
+      const _fqAb = this.areaBounds.length > 0 ? this._getEnemyAreaBounds(enemy.areaId) : null;
+      enemy.roamTarget = calculateRoamTarget(this.getMapLimit(), _fqAb, _fReachMs, this._navOffX, this._navOffY, enemy.position.x, enemy.position.y, enemy.roamTarget, 0, 0, this.getEffectiveEnemyRadius(enemy), this._roamAvoidFor(enemy));
+      enemy.navTravelDirX = 0;
+      enemy.navTravelDirY = 0;
+      enemy.pursuitPathLive = false;
+      enemy.pursuitWpLive = false;
+      return;
+    }
     if (enemy.currentTargetType === 'shape' && !enemy.hf.dwHold &&
         enemy.followVacuousPlans >= AI_CONSTANTS.FOLLOW_VACUOUS_PLAN_LIMIT) {
       if (AI_CONSTANTS.VALVE_REMEMBERS !== 0 && enemy.currentTargetId) this._unreachNote(enemy, enemy.currentTargetId, now);
@@ -38151,7 +42034,8 @@ export class GameLogic {
     if (canSee && enemy.navLosStreak >= 2) {
       if (enemy.currentTargetType === 'shape') {
         if (distToReal <= this._shapeRangeLimit(enemy) &&
-            this._commuteShapeAllowed(enemy, realTargetX, realTargetY, navMs, navOff, navOffY_)) {
+            this._commuteShapeAllowed(enemy, realTargetX, realTargetY, navMs, navOff, navOffY_) &&
+            !(AI_CONSTANTS.UNREACH_AGREE !== 0 && FEEL_LIVE && this._unreachAgrees(enemy, enemy.currentTargetId ?? '', now))) {
           enemy.aiState = 'targeting_shapes';
           enemy.navLastShapeLosTime = now;
           enemy.throttleMoveDirX = 0;
@@ -38975,6 +42859,7 @@ export class GameLogic {
       if (this._tankHidFrom(enemy, o, o.id === enemy.fleeAimId || o.id === _faHeldTank)) continue;
       if (isTankMate(enemy, o, isTeamB)) continue;
       if (!mayAttackTank(enemy, o, isTeamB)) continue;
+      if (bossLeavesBody(enemy, o)) continue;
       if (this._sgTargetSafeFor(_faSlot, o.position.x, o.position.y, o.id === enemy.fleeAimId || o.id === _faHeldTank)) continue;
       if (_faArea >= 0 && this._roundAreaIndex(o.position.x, o.position.y) !== _faArea) continue;
       this._flAimConsider(o, false, dSq);
@@ -39024,7 +42909,7 @@ export class GameLogic {
         const s = this._findEnemyById(srcId, false);
         if (s && !(AREA_REACH.CH043 !== 0 && this._enemyProtected(s)) &&
             !this._tankHidFrom(enemy, s, s.id === enemy.fleeAimId || s.id === _faHeldTank) &&
-            !isTankMate(enemy, s, isTeamB) && mayAttackTank(enemy, s, isTeamB) &&
+            !isTankMate(enemy, s, isTeamB) && mayAttackTank(enemy, s, isTeamB) && !bossLeavesBody(enemy, s) &&
             !this._sgTargetSafeFor(_faSlot, s.position.x, s.position.y, s.id === enemy.fleeAimId || s.id === _faHeldTank) &&
             !(_faArea >= 0 && this._roundAreaIndex(s.position.x, s.position.y) !== _faArea)) {
           const dx = s.position.x - enemy.position.x;
@@ -39138,7 +43023,7 @@ export class GameLogic {
     const _taSlot = this._sgSlotOfBot(enemy);
     if (!hasAtk && enemy.threatAttackerFrame === this.frameCounter && enemy.threatAttackerId) {
       const a = this._findEnemyById(enemy.threatAttackerId, false);
-      if (a && mayAttackTank(enemy, a, isTeamB) &&
+      if (a && mayAttackTank(enemy, a, isTeamB) && !bossLeavesBody(enemy, a) &&
           !this._sgTargetSafeFor(_taSlot, a.position.x, a.position.y,
             enemy.currentTargetType === 'enemy' && enemy.currentTargetId === a.id)) {
         atkX = a.position.x; atkY = a.position.y; hasAtk = true;
@@ -39483,6 +43368,7 @@ export class GameLogic {
     }
 
     if (navMs) {
+      if (AI_CONSTANTS.HF_FLEEWIDE !== 0 && AI_CONSTANTS.HF_HITRANGE !== 0 && FEEL_LIVE && enemy.hf.plays && enemy.hf.frN > 0 && this.feel.s[FEEL.RISK] > 0) this._hfFleeLean(enemy, fleeDir, _fhNow);
       if (this._dodgeAdjust(enemy, fleeDir.x, fleeDir.y)) {
         fleeDir.x = this._dodgeOut.dirX;
         fleeDir.y = this._dodgeOut.dirY;
@@ -39991,9 +43877,8 @@ export class GameLogic {
               ? arrasShotMotion(ARRAS_SPD_AT_REST * getEnemyStatMultiplier(enemy, 'bulletSpeed'), _eTapArrasRecoil)
               : (3 * Math.log(Math.sqrt(Math.max(0, turret.speed)) + _eTapArrasRecoil + 1) + 1) * ARRAS_TICK_RATE;
             turret.physRecoilVel += _eTapImpulse;
-            if (ARRAS_PARITY.RECOIL_SHOT !== 0) recoilNoteShot(turret, _eTapImpulse);
-            turret.physRecoilDirX = -_eTapCosGA;
-            turret.physRecoilDirY = -_eTapSinGA;
+            if (ARRAS_PARITY.RECOIL_SHOT !== 0) recoilNoteShotDir(turret, _eTapImpulse, -_eTapCosGA, -_eTapSinGA);
+            else { turret.physRecoilDirX = -_eTapCosGA; turret.physRecoilDirY = -_eTapSinGA; }
             turret.recoilVelocity -= 0.3;
             turret.animProgress = 1;
             (turret.nextShotTime as number) += interval;
@@ -40259,7 +44144,7 @@ export class GameLogic {
     }
 
     const _emt1 = _deriveMotionType(turret.projectileBehaviors, turret.projectileType?.motionType || 'glide');
-    const _ebs1 = computeBulletTypeStats(turret, _emt1, enemy.upgrades, enemy.maxPointsPerSkill || 9, this._gunLevel(enemy.level || 0), growthRulesOf(enemy), enemy._statK);
+    const _ebs1 = computeBulletTypeStats(turret, _emt1, enemy.upgrades, enemy.maxPointsPerSkill || 9, this._gunLevelOf(enemy), growthRulesOf(enemy), enemy._statK);
     const _egss = typeof turret.gunStatScale === 'number' ? turret.gunStatScale : 1;
     b.damage = _ebs1.damage * _egss;
     b.penetration = _ebs1.penetration * _egss;
@@ -40459,8 +44344,9 @@ export class GameLogic {
             b.controllerData.currentGoalX = enemy.targetPosition.x;
             b.controllerData.currentGoalY = enemy.targetPosition.y;
           } else {
-            b.controllerData.currentGoalX = enemy.position.x + Math.cos(globalTurretAngle) * 500;
-            b.controllerData.currentGoalY = enemy.position.y + Math.sin(globalTurretAngle) * 500;
+            const _gd = AI_CONSTANTS.BT_MEETFIRE !== 0 && enemy._tfGateDist > 0 && enemy._tfGateFireUntil > this._hfNow ? enemy._tfGateDist : 500;
+            b.controllerData.currentGoalX = enemy.position.x + Math.cos(globalTurretAngle) * _gd;
+            b.controllerData.currentGoalY = enemy.position.y + Math.sin(globalTurretAngle) * _gd;
           }
         }
       }
@@ -40585,9 +44471,8 @@ export class GameLogic {
       ? arrasShotMotion(ARRAS_SPD_AT_REST * getEnemyStatMultiplier(enemy, 'bulletSpeed'), _eArrasRecoil)
       : (3 * Math.log(Math.sqrt(Math.max(0, turret.speed)) + _eArrasRecoil + 1) + 1) * ARRAS_TICK_RATE;
     turret.physRecoilVel += eImpulse;
-    if (ARRAS_PARITY.RECOIL_SHOT !== 0) recoilNoteShot(turret, eImpulse);
-    turret.physRecoilDirX = -Math.cos(globalTurretAngle);
-    turret.physRecoilDirY = -Math.sin(globalTurretAngle);
+    if (ARRAS_PARITY.RECOIL_SHOT !== 0) recoilNoteShotDir(turret, eImpulse, -Math.cos(globalTurretAngle), -Math.sin(globalTurretAngle));
+    else { turret.physRecoilDirX = -Math.cos(globalTurretAngle); turret.physRecoilDirY = -Math.sin(globalTurretAngle); }
   }
 
   private _tagBotShot(b: Bullet, enemy: EnemyTank, turret: Turret | null,
@@ -40960,6 +44845,7 @@ export class GameLogic {
     for (const sub of subs) {
       if (skipId && sub.id === skipId) continue;
       if (this.partHides.size > 0 && this.partHides.has(sub.id)) continue;
+      if (SMALL_FIX.G952 !== 0 && this.partLocks.size > 0 && this.partLocks.has(sub.id)) continue;
       const subOffX = sub.xOffset * subSizePx / 2;
       const subOffY = sub.yOffset * subSizePx / 2;
       const subBaseX = circleCX + subOffX * cosC - subOffY * sinC;
@@ -41170,7 +45056,7 @@ export class GameLogic {
   };
   private readonly _ceSnap = new Float64Array(2048);
   private _ceSnapN = 0;
-  private readonly _ceRadii = new Float64Array(64);
+  private readonly _ceRadii = new Float64Array(SMALL_FIX.G957 !== 0 ? 1100 : 64);
   private _ceRadiiN = 0;
   private _ceSnapTurn(a: number, extra: number): number {
     const k = Math.PI / 4, near = (3 * Math.PI) / 180;
@@ -41383,6 +45269,7 @@ export class GameLogic {
       add(x, y);
       if (Math.abs(y) > 1e-6) add(x, -y);
       const d = Math.sqrt(x * x + y * y);
+      if (SMALL_FIX.G957 !== 0 && d > 1e-6) { for (let i = 0; i < nr; i++) if (Math.abs(this._ceRadii[i] - d) < 1e-6) return; }
       if (d > 1e-6 && nr < this._ceRadii.length) this._ceRadii[nr++] = d;
     };
     this._ceRadiiN = 0;
@@ -41495,7 +45382,7 @@ export class GameLogic {
       const dsx = this.mouseX - ce.downSX, dsy = this.mouseY - ce.downSY;
       if (dsx * dsx + dsy * dsy < 16) return;
       ce.phase = 2;
-      if (ce.mode === 'move' && this.ceAlt) this._ceCopyForDrag();
+      if (ce.mode === 'move' && this.ceAlt && !this._ceCopyForDrag() && SMALL_FIX.G969 !== 0) { ce.phase = 0; return; }
     }
     if (ce.phase !== 2) return;
     this._ceLocal(this._cePt);
@@ -41564,7 +45451,7 @@ export class GameLogic {
         if (snapOn) {
           this._ceSnapPoint(nx, ny, slack, false, this._ceS); nx = this._ceS[0]; ny = this._ceS[1];
           for (const o of this.state.bodyLayers) {
-            if (o.id === L.id || !this.editorLayerPlace(o)) continue;
+            if (o.id === L.id || (SMALL_FIX.G956 !== 0 && this.partHidden(o.id)) || !this.editorLayerPlace(o)) continue;
             if (ce.guideX !== ce.guideX && Math.abs(nx - this.edLayerPlace[0]) <= slack) { nx = this.edLayerPlace[0]; ce.guideX = nx; }
             if (ce.guideY !== ce.guideY && Math.abs(ny - this.edLayerPlace[1]) <= slack) { ny = this.edLayerPlace[1]; ce.guideY = ny; }
           }
@@ -41576,16 +45463,17 @@ export class GameLogic {
       } else if (ce.mode === 'size') {
         const d0 = Math.hypot(ce.downX - ce.frameX, ce.downY - ce.frameY), d1 = Math.hypot(px - ce.frameX, py - ce.frameY);
         if (d0 > 1e-6) L.sizeRatio = Math.max(0.05, Math.min(100, ce.o3 * d1 / d0));
-        let same = '';
+        let same = '', sameSize = NaN;
         if (snapOn) {
           let bd = 0.02;
-          if (Math.abs(L.sizeRatio - 1) / 1 <= bd) { bd = Math.abs(L.sizeRatio - 1); same = 'the main body'; }
+          if (Math.abs(L.sizeRatio - 1) / 1 <= bd) { bd = Math.abs(L.sizeRatio - 1); same = 'the main body'; sameSize = 1; }
           for (const o of this.state.bodyLayers) {
-            if (o.id === L.id) continue;
+            if (o.id === L.id || (SMALL_FIX.G956 !== 0 && this.partHidden(o.id))) continue;
             const e = Math.abs(L.sizeRatio - o.sizeRatio) / o.sizeRatio;
-            if (e <= bd) { bd = e; same = o.label; }
+            if (e <= bd) { bd = e; same = o.label; sameSize = o.sizeRatio; }
           }
-          if (same === 'the main body') L.sizeRatio = 1;
+          if (SMALL_FIX.CH050 !== 0) { if (same !== '') L.sizeRatio = sameSize; }
+          else if (same === 'the main body') L.sizeRatio = 1;
           else if (same !== '') { for (const o of this.state.bodyLayers) if (o.label === same && o.id !== L.id) { L.sizeRatio = o.sizeRatio; break; } }
         }
         ce.label = 'Size Ratio ' + L.sizeRatio.toFixed(3) + 'x' + (same !== '' ? ', as ' + same : '');
@@ -41724,19 +45612,20 @@ export class GameLogic {
     const now = performance.now();
     if (now - ce.notifyAt > 90) { ce.notifyAt = now; if (this.onStateChange) this.onStateChange(this.state); }
   }
-  private _ceCopyForDrag(): void {
+  private _ceCopyForDrag(): boolean {
     const ce = this.ce;
     if (ce.kind === 'layer') {
       const c = this.duplicateBodyLayer(ce.id);
-      if (!c) return;
+      if (!c) return false;
       this.partPicked = true;
       ce.id = c.id; ce.copied = true;
     } else if (ce.kind === 'turret') {
       const id = this.duplicatePickedTurret(0);
-      if (!id) return;
+      if (!id) return false;
       ce.id = id; ce.copied = true;
     }
     this._ceTake();
+    return true;
   }
   private _ceUp(): void {
     const ce = this.ce, was = ce.phase;
@@ -41856,6 +45745,18 @@ export class GameLogic {
     if (t.explode) copy.explode = cloneExplode(t.explode);
     const subsSrc = t.autoSubTurrets ?? [];
     if (copy.autoSubTurrets) for (let j = 0; j < copy.autoSubTurrets.length; j++) if (subsSrc[j] && subsSrc[j].explode) copy.autoSubTurrets[j].explode = cloneExplode(subsSrc[j].explode);
+    if (SMALL_FIX.CH048 !== 0 && copy.autoSubTurrets && copy.autoSubTurrets.some(sb => !!sb.groupId)) {
+      const s = this.state, from = 'base:' + t.id, to = 'base:' + copy.id;
+      const groups = [...s.turretGroups], ids = new Map<string, string>();
+      let full = false;
+      for (const g of s.turretGroups) if (g.scope === from) {
+        if (groups.length >= MAX_TURRET_GROUPS) { full = true; continue; }
+        const id = uuidv4(); ids.set(g.id, id); groups.push({ id, name: g.name, scope: to });
+      }
+      for (const sb of copy.autoSubTurrets) if (sb.groupId) { const gid = ids.get(sb.groupId); if (gid) sb.groupId = gid; else delete sb.groupId; }
+      s.turretGroups = groups;
+      if (full) editorNotice(`A tank holds ${MAX_TURRET_GROUPS} groups at most: some of the copy's parts are not in a group.`);
+    }
     const L = this.getLayerForTurret(t.id);
     if (nudge !== 0) {
       copy.xOffset += nudge;
@@ -41974,8 +45875,9 @@ export class GameLogic {
       const u: Partial<BodyLayer> = { x: nx === 0 && ny === 0 ? undefined : this._ceNum(nx), y: nx === 0 && ny === 0 ? undefined : this._ceNum(ny) };
       if (axis) u.initialAngle = this._ceNum(axis === 'y' ? -(L.initialAngle ?? 0) : Math.PI - (L.initialAngle ?? 0));
       const _mp = axis ? this.layerPathOf(L) : null;
-      if (_mp) { const np = copyPath(_mp); flipPath(np, 'y'); this._commitLayerPath(L, np, word + L.label, u); return; }
+      if (_mp) { const np = copyPath(_mp); flipPath(np, 'y'); if (this._commitLayerPath(L, np, word + L.label, u) && SMALL_FIX.CH049 !== 0) this._ceMirrorLayerTurrets(L, f, axis!); return; }
       this.updateBodyLayer(L.id, u);
+      if (axis && SMALL_FIX.CH049 !== 0) this._ceMirrorLayerTurrets(L, f, axis);
       return;
     }
     const t = this.state.turrets.find(x => x.id === p.id);
@@ -41984,8 +45886,28 @@ export class GameLogic {
     this._ceUnbake(t, this.getLayerForTurret(t.id), bx, by, this._ceO);
     const u: Partial<Turret> = { xOffset: this._ceNum(this._ceO[0]), yOffset: this._ceNum(this._ceO[1]) };
     if (axis) (u as Partial<Turret>).angle = axis === 'y' ? -t.angle : Math.PI - t.angle;
+    if (axis && SMALL_FIX.R1012 !== 0 && Array.isArray(t.autoSubTurrets) && t.autoSubTurrets.length > 0) u.autoSubTurrets = this._ceMirrorSubs(t.autoSubTurrets);
     this.historyHint = { label: word + turretShownName(t, this.state.turrets.indexOf(t)), kind: 'edit' };
     this.updateEditingTurret(u);
+  }
+  private _ceMirrorSubs(subs: Turret[]): Turret[] {
+    return subs.map(u => ({ ...u, yOffset: this._ceNum(-(u.yOffset ?? 0)), angle: this._ceNum(-(u.angle ?? 0)) }));
+  }
+  private _ceMirrorLayerTurrets(L: BodyLayer, f: (x: number, y: number) => number[], axis: 'x' | 'y'): void {
+    const s = this.state;
+    let n = 0;
+    for (let i = 0; i < L.turretIds.length; i++) {
+      const T = s.turrets.find(x => x.id === L.turretIds[i]);
+      if (!T) continue;
+      const [bx, by] = f(T.xOffset, T.yOffset);
+      this._ceUnbake(T, L, bx, by, this._ceO);
+      const u: Partial<Turret> = { xOffset: this._ceNum(this._ceO[0]), yOffset: this._ceNum(this._ceO[1]), angle: axis === 'y' ? -T.angle : Math.PI - T.angle };
+      if (SMALL_FIX.R1012 !== 0 && Array.isArray(T.autoSubTurrets) && T.autoSubTurrets.length > 0) u.autoSubTurrets = this._ceMirrorSubs(T.autoSubTurrets);
+      if (s.selectMode && s.selectedTurretId === T.id) s.editingTurret = { ...s.editingTurret, ...u };
+      Object.assign(T, this._rebakeUpdatesForLiveEdit(T, L, u));
+      n++;
+    }
+    if (n > 0 && this.onStateChange) this.onStateChange(s);
   }
   public togglePartLock(id: string): void {
     if (this.partLocks.has(id)) this.partLocks.delete(id); else this.partLocks.add(id);
@@ -42034,6 +45956,7 @@ export class GameLogic {
       const L = this.getLayerForTurret(t.id);
       const lid = L ? L.id : null;
       if (this.state.activeBodyLayerId !== lid) this.setActiveBodyLayer(lid);
+      if (SMALL_FIX.G964 !== 0 && this.state.inheritMode && this.state.inheritTargetTurretId !== null && this.state.inheritTargetTurretId !== t.id) this.cancelInheritMode();
       if (this.state.selectedTurretId !== t.id) this.pickTurretForEditing(t);
     } else if (!this.partPicked || this.state.selectedTurretId || this.state.activeBodyLayerId !== (u.kind === 'layer' ? u.id : null)) {
       this.pickPart(u.kind === 'layer' ? u.id : null);
@@ -42061,9 +45984,25 @@ export class GameLogic {
   }
   private readonly _outlinePaths = new WeakMap<object, PathPoint[]>();
   private _outlineDrawable(o: [number, number][]): boolean {
-    if (outlineFansFromMiddle(o)) return true;
+    const g970 = SMALL_FIX.G970 !== 0;
+    if (outlineFansFromMiddle(o) && (!g970 || !GameLogic._sidesCross(o))) return true;
     const c = cleanOutline(o);
-    return outlineFansFromMiddle(c) || outlineFillTriangles(c) !== null;
+    return (outlineFansFromMiddle(c) && (!g970 || !GameLogic._sidesCross(c))) || outlineFillTriangles(c) !== null;
+  }
+  private static _sidesCross(o: readonly (readonly [number, number])[]): boolean {
+    const n = o.length;
+    const side = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number): number => (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+    for (let i = 0; i < n; i++) {
+      const a = o[i], b = o[(i + 1) % n];
+      for (let j = i + 2; j < n; j++) {
+        if (i === 0 && j === n - 1) continue;
+        const c = o[j], d = o[(j + 1) % n];
+        const d1 = side(a[0], a[1], b[0], b[1], c[0], c[1]), d2 = side(a[0], a[1], b[0], b[1], d[0], d[1]);
+        const d3 = side(c[0], c[1], d[0], d[1], a[0], a[1]), d4 = side(c[0], c[1], d[0], d[1], b[0], b[1]);
+        if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
+      }
+    }
+    return false;
   }
   private _commitLayerPath(L: BodyLayer, path: PathPoint[], label: string, extra?: Partial<BodyLayer>): boolean {
     let p = path, ratio = extra && extra.sizeRatio !== undefined ? extra.sizeRatio : L.sizeRatio;
@@ -42073,6 +46012,7 @@ export class GameLogic {
     for (const q of p) for (let k = 0; k < 6; k++) { const a = Math.abs(q[k]); if (k < 2 ? a > far : a > hmax) { if (k < 2) far = a; else hmax = a; } }
     const k = Math.max(far / 3.9, hmax / 7.9, 1);
     if (k > 1) { p = copyPath(p); stretchPath(p, 1 / k, 1 / k); ratio *= k; }
+    if (SMALL_FIX.G949 !== 0 && k > 1 && ratio > BODY_LAYER_SIZE_MAX) { editorNotice('This layer cannot grow any bigger. Keep its points closer to its middle.'); return false; }
     p = p.map(q => [Math.round(q[0] * 1e4) / 1e4, Math.round(q[1] * 1e4) / 1e4, Math.round(q[2] * 1e4) / 1e4, Math.round(q[3] * 1e4) / 1e4, Math.round(q[4] * 1e4) / 1e4, Math.round(q[5] * 1e4) / 1e4] as PathPoint);
     const o = flattenLayerPath(p);
     const c = cleanLayerOutline(o);
@@ -42204,16 +46144,20 @@ export class GameLogic {
     this._ceLocal(this._cePt);
     const c = Math.cos(f.frameA), s = Math.sin(f.frameA), dx = this._cePt[0] - f.frameX, dy = this._cePt[1] - f.frameY;
     const u = (dx * c + dy * s) / f.frameS, v = (-dx * s + dy * c) / f.frameS, tol = 8 / ((this.zoom || 1) * f.frameS);
-    for (let i = 0; i < p.length; i++) if ((p[i][0] - u) ** 2 + (p[i][1] - v) ** 2 <= tol * tol) {
-      const np = copyPath(p); togglePathPoint(np, i);
-      if (this._commitLayerPath(L, np, 'Changed a point of ' + L.label)) this.pe.pick = i;
-      return true;
+    let pick = -1, bd = tol * tol;
+    for (let i = 0; i < p.length; i++) {
+      const d2 = (p[i][0] - u) ** 2 + (p[i][1] - v) ** 2;
+      if (d2 <= bd) { pick = i; bd = d2; if (SMALL_FIX.G959 === 0) break; }
     }
-    return false;
+    if (pick < 0) return false;
+    const np = copyPath(p); togglePathPoint(np, pick);
+    if (this._commitLayerPath(L, np, 'Changed a point of ' + L.label)) this.pe.pick = pick;
+    return true;
   }
   private _ceSnapBuildShape(L: BodyLayer): void {
     const P = this._ceSnap, cap = P.length - 2;
     let n = 0;
+    if (SMALL_FIX.G958 !== 0) this._ceRadiiN = 0;
     P[n++] = 0; P[n++] = 0;
     const f = this._ceF; this.shapeFrameOf(L, f);
     P[n++] = f.frameX; P[n++] = f.frameY;
@@ -42398,7 +46342,7 @@ export class GameLogic {
       if (!t) return;
       if (h.subId !== '') {
         const sub = t.autoSubTurrets ? t.autoSubTurrets.find(x => x.id === h.subId) : undefined;
-        if (sub) { this._pickAutoSubFromCanvas(t, sub); return; }
+        if (sub && !(SMALL_FIX.G963 !== 0 && skip === 0 && this.ceAlt)) { this._pickAutoSubFromCanvas(t, sub); return; }
       }
       if (this.state.selectedTurretId !== t.id) this.pickTurretForEditing(t);
       return;
@@ -43392,8 +47336,8 @@ export class GameLogic {
 
     let placedPrimaryId: string | null = null;
     const _subsBefore = parent.autoSubTurrets.length;
-    for (let m = 0; m < (mirrorSet ? 2 : 1); m++)
-    for (let i = 0; i < placeList.length; i++) {
+    for (let _k981 = 0, _M981 = mirrorSet ? 2 : 1, _N981 = placeList.length; _k981 < _M981 * _N981; _k981++) {
+      const m = SMALL_FIX.G981 !== 0 ? _k981 % _M981 : Math.floor(_k981 / _N981), i = SMALL_FIX.G981 !== 0 ? Math.floor(_k981 / _M981) : _k981 % _N981;
       const pt = placeList[i];
       if (pt.turretType === 'auto' && pt.autoSubTurrets && pt.autoSubTurrets.length > 0) continue;
 
@@ -43719,6 +47663,7 @@ export class GameLogic {
     const now = this.gameNow();
 
     if (ms.portals.length > 0 && this.state.isTestMode) {
+      if (SMALL_FIX.G931 !== 0) setPortalGuardTest(this._portalGuardTestFn);
       updateTimedPortals(ms.portals, now, ms, this.areaStates, this.state.multiAreaConfig.areas);
       updatePortalVisuals(ms.portals, dtFactor, now);
     } else if (this.isMapDesignerActive && this.isCustomMapActive()) {
@@ -45257,6 +49202,7 @@ export class GameLogic {
         this._ctlNearY = b.position.y;
         _minionDriven = b.motionType === 'minion';
         this._ctlCamp = b.ownerCamp;
+        this._ctlBoss = SMALL_FIX.R1027 !== 0 && b.ownerIsBoss ? (ownerEnemy ?? null) : null;
         this._ctlFamId = bulletFamilyIdOf(b);
         this._dkLook(this._dkOwnerOf(b.ownerId));
 
@@ -45991,6 +49937,7 @@ export class GameLogic {
       if (!t || t.turretType !== 'auto') continue;
       const _self = _selfAny && (t.autoCircleSpin === true || t.autoCircleFixed === true);
       if (!_self && (_farSkip || _othersRested)) continue;
+      let _spent889 = 0;
 
       this._roundTurretFrame(parent, t.id, bodyAngle);
       const tBody = this._rtTurn, tSize = this._rtSize;
@@ -46099,9 +50046,10 @@ export class GameLogic {
             this._atLeadOrigin.x = turretWorldX; this._atLeadOrigin.y = turretWorldY;
             this._atLeadPos.x = target.x; this._atLeadPos.y = target.y;
             this._atLeadVel.x = target.vx; this._atLeadVel.y = target.vy;
+            this._atLeadGlideOf(this._atLeadGun);
             calculateInterceptPositionInto(
               this._atLeadOut, this._atLeadOrigin, this._atLeadPos, this._atLeadVel, _btSpd,
-              parent.ownerAimbot,
+              parent.ownerAimbot, this._atLeadTsr, this._atLeadDamp,
             );
             _btAimX = this._atLeadOut.x; _btAimY = this._atLeadOut.y;
           }
@@ -46112,6 +50060,7 @@ export class GameLogic {
         while (diff > Math.PI) diff -= Math.PI * 2;
         while (diff < -Math.PI) diff += Math.PI * 2;
         if (hasArcLimit && TURRET_CONE.INSIDE !== 0) diff = _coneTurn(t.autoCurrentAngle, targetAngle, baseAngle);
+        const _a889 = t.autoCurrentAngle;
         if (AI_CONSTANTS.AUTO_TURRET_EASE_IN === 0) {
           if (Math.abs(diff) < maxTurn) {
             t.autoCurrentAngle = targetAngle;
@@ -46136,6 +50085,8 @@ export class GameLogic {
           if (Math.abs(step) < maxTurn * 0.50) step = step < 0 ? -maxTurn * 0.50 : maxTurn * 0.50;
           t.autoCurrentAngle += step;
         }
+
+        if (SMALL_FIX.G889 !== 0) { let _d889 = t.autoCurrentAngle - _a889; while (_d889 > Math.PI) _d889 -= Math.PI * 2; while (_d889 < -Math.PI) _d889 += Math.PI * 2; _spent889 += Math.abs(_d889); }
 
         let _rhOnAim = true;
         if (_rhOn) {
@@ -46163,7 +50114,7 @@ export class GameLogic {
         t.autoTargetId = null;
         t.autoShapeLockId = null;
         if (_rhOn) t.autoCurrentAngle += _restCarry;
-        this.returnAutoTurretToBase(t, restNow, dtSec, this._atCeiling(t) * dtSec);
+        _spent889 += this.returnAutoTurretToBase(t, restNow, dtSec, this._atCeiling(t) * dtSec);
         for (let si = 0; si < t.autoSubTurrets.length; si++) {
           t.autoSubTurrets[si].nextShotTime = undefined;
         }
@@ -46176,7 +50127,7 @@ export class GameLogic {
         while (clampDiff < -Math.PI) clampDiff += Math.PI * 2;
         if (clampDiff > fovHalf) {
           const clampTarget = baseAngle + fovHalf;
-          const clampMaxTurn = (ARRAS_PARITY.TURRET_TURN !== 0 ? Math.min(t.maxTurnSpeed || 4.5, AUTO_TURN_TAIL_SPEED) : this._atCeiling(t)) * dtSec;
+          const clampMaxTurn = Math.max(0, (ARRAS_PARITY.TURRET_TURN !== 0 ? Math.min(t.maxTurnSpeed || 4.5, AUTO_TURN_TAIL_SPEED) : this._atCeiling(t)) * dtSec - (SMALL_FIX.G889 !== 0 ? _spent889 : 0));
           let cDiff = clampTarget - t.autoCurrentAngle;
           while (cDiff > Math.PI) cDiff -= Math.PI * 2;
           while (cDiff < -Math.PI) cDiff += Math.PI * 2;
@@ -46187,7 +50138,7 @@ export class GameLogic {
           }
         } else if (clampDiff < -fovHalf) {
           const clampTarget = baseAngle - fovHalf;
-          const clampMaxTurn = (ARRAS_PARITY.TURRET_TURN !== 0 ? Math.min(t.maxTurnSpeed || 4.5, AUTO_TURN_TAIL_SPEED) : this._atCeiling(t)) * dtSec;
+          const clampMaxTurn = Math.max(0, (ARRAS_PARITY.TURRET_TURN !== 0 ? Math.min(t.maxTurnSpeed || 4.5, AUTO_TURN_TAIL_SPEED) : this._atCeiling(t)) * dtSec - (SMALL_FIX.G889 !== 0 ? _spent889 : 0));
           let cDiff = clampTarget - t.autoCurrentAngle;
           while (cDiff > Math.PI) cDiff -= Math.PI * 2;
           while (cDiff < -Math.PI) cDiff += Math.PI * 2;
@@ -46222,7 +50173,7 @@ export class GameLogic {
     b._skSpd = up.bulletSpeed ?? 0;
     b._skCap = e.maxPointsPerSkill || 9;
     b._skRldMult = getEnemyStatMultiplier(e, 'reload');
-    this._snapGrowth(b, this._gunLevel(e.level || 0), growthRulesOf(e));
+    this._snapGrowth(b, this._gunLevelOf(e), growthRulesOf(e));
     const sk = e._statK;
     if (sk) this._snapShare(b, sk);
   }
@@ -46858,6 +50809,7 @@ export class GameLogic {
     const b = this.getBullet();
     b.position.x = bulletPosX;
     b.position.y = bulletPosY;
+    if (SMALL_FIX.G924 !== 0 && this._bornOutsideArena(bulletPosX, bulletPosY)) { b.bornOutsideMap = true; b.bornOutsideStartTime = this.gameNow(); }
     const _stAsSpd = roundCarriedSkill(parentBullet).spd;
     const autoSpeed = sub.speed * ARRAS_RUN_SPEED * _stAsSpd / this.movementZoom;
     let _asLaunch = autoSpeed;
@@ -48267,7 +52219,7 @@ export class GameLogic {
     const allied = ownRound || shouldSkipTeamCollision(w.team, w.behavior, w.group, e.team, e.aiBehavior, e.groupId, w.camp, e.camp);
     if (g.heal !== allied) return 0;
     if (allied) return SMALL_FIX.GH416 && (e._mevF & MF_NO_HEAL) !== 0 ? 0 : 1;
-    if (this.state.multiAreaConfig.enableMultiArea === true && (this._isNoPvpForEnemy(e) || this._isNoPvpAtPosition(g.x, g.y))) return 0;
+    if ((SMALL_FIX.G915 !== 0 || this.state.multiAreaConfig.enableMultiArea === true) && (this._isNoPvpForEnemy(e) || this._isNoPvpAtPosition(g.x, g.y))) return 0;
     return -1;
   }
   private _hfRingsOn(e: EnemyTank): boolean {
@@ -48390,7 +52342,7 @@ export class GameLogic {
       o.id = e.id; o.tapRoot = e._tapRootId; o.family = tapFamilyIdOf(e); o.team = e.team; o.behavior = e.aiBehavior; o.group = e.groupId;
       o.camp = e.camp; o.isPlayer = false; o.enemy = e; o.round = null; o.sentry = e.isSentryEnemy === true; o.boss = e.camp === CAMP_BOSS; o.guard = e.isBaseProtector === true;
       this._auraSkillOfList(list, e.upgrades, e.maxPointsPerSkill);
-      this._auraGrowth(this._gunLevel(e.level || 0), growthRulesOf(e));
+      this._auraGrowth(this._gunLevelOf(e), growthRulesOf(e));
       if (e._statK) _auraOwn.dam *= e._statK.bulletDamage;
       this._auraHits(from, e.position.x, e.position.y, ticks);
     }
@@ -48448,7 +52400,7 @@ export class GameLogic {
     }
     _aceCtx.combinedRadius = 0; _aceCtx.difference = 0; _aceCtx.componentNorm = 0; _aceCtx.depthMe = 0; _aceCtx.depthN = 0; _aceCtx.accelerationFactor = 0.001;
     _fillAuraACE(_aceA, 0, o.resist, o.team, o.id, false);
-    const areas = st.multiAreaConfig.enableMultiArea === true;
+    const areas = SMALL_FIX.G915 !== 0 || st.multiAreaConfig.enableMultiArea === true;
     const enemies = st.enemyTanks, nE = enemies.length;
     if (!this._auraBodiesReady) {
       this._auraBodiesReady = true;
@@ -48994,9 +52946,10 @@ export class GameLogic {
             this._atLeadOrigin.x = turretWorldX; this._atLeadOrigin.y = turretWorldY;
             this._atLeadPos.x = target.x; this._atLeadPos.y = target.y;
             this._atLeadVel.x = target.vx; this._atLeadVel.y = target.vy;
+            this._atLeadGlideOf(this._atLeadGun);
             calculateInterceptPositionInto(
               this._atLeadOut, this._atLeadOrigin, this._atLeadPos, this._atLeadVel, _atLeadSpd,
-              entityType === 'player' ? 100 : enemy!.aimbotStrength,
+              entityType === 'player' ? 100 : enemy!.aimbotStrength, this._atLeadTsr, this._atLeadDamp,
             );
             _atAimX = this._atLeadOut.x; _atAimY = this._atLeadOut.y;
           }
@@ -49247,6 +53200,20 @@ export class GameLogic {
   private _atLeadVel = new Vector(0, 0);
   private _atLeadOrigin = new Vector(0, 0);
 
+  private _atLeadGun: Turret | null = null;
+  private _atLeadTsr = 1;
+  private _atLeadDamp = glideDampPerFrame();
+  private _atLeadGlideOf(gun: Turret | null): void {
+    this._atLeadTsr = 1; this._atLeadDamp = glideDampPerFrame();
+    if (SMALL_FIX.G911 === 0 || gun === null || AI_CONSTANTS.AIM_FLIGHT_DECEL === 0) return;
+    if (_deriveMotionType(gun.projectileBehaviors, gun.projectileType?.motionType || 'glide') !== 'glide') return;
+    const tsr = gun.projectileType?.topSpeedRatio;
+    if (typeof tsr === 'number' && tsr > 0 && tsr < 1) this._atLeadTsr = tsr;
+    if (AI_CONSTANTS.PROJ_FRICTION_LIVE !== 0 && _motionFrictionAuthored(gun.projectileBehaviors)) {
+      const gf = _deriveMotionFriction(gun.projectileBehaviors, gun.projectileType?.friction ?? 0);
+      this._atLeadDamp = gf > 0 ? Math.exp(Math.log(1 / (1 + gf)) * (frictionTickRate() / 60)) : 1;
+    }
+  }
   private _autoTurretLeadSpeed(t: Turret, entityType: 'player' | 'enemy', enemy: EnemyTank | null): number {
     const subs = t.autoSubTurrets;
     if (!subs || subs.length === 0) return 0;
@@ -49263,6 +53230,7 @@ export class GameLogic {
       }
     }
     if (sub === null) return 0;
+    this._atLeadGun = sub;
     const speedMult = entityType === 'player'
       ? this.getStatMultiplier('bulletSpeed')
       : getEnemyStatMultiplier(enemy!, 'bulletSpeed');
@@ -49286,6 +53254,7 @@ export class GameLogic {
         gun = g;
       }
     }
+    this._atLeadGun = gun;
     return gun.speed * ARRAS_RUN_SPEED * roundCarriedSkill(parent).spd / this.movementZoom;
   }
 
@@ -49462,7 +53431,7 @@ export class GameLogic {
     if (AI_CONSTANTS.AUTO_TURRET_ARRIVAL_FILTER !== 1) return true;
     const isChase = this._isChaseMotion(b);
     const t = this._threatEtaF(
-      dpx, dpy, dSq, ownerR + b.size * 0.5,
+      dpx, dpy, dSq, ownerR + b.size * 0.5 * (SMALL_FIX.G934 !== 0 ? b._touchK : 1),
       b.velocity.x, b.velocity.y, ownerVx, ownerVy,
       isChase, isChase ? this._chaseTopSpd(b) : 0,
     );
@@ -49471,7 +53440,7 @@ export class GameLogic {
       ? Math.max(0, (b.maxAge - b.currentAge) * 1000)
       : Infinity;
     if (SMALL_FIX.GH190 && lifeMs < t * (1000 / 60)) {
-      return lifeMs >= this._etaContactF(t, ownerR + b.size * 0.5, isChase) * (1000 / 60);
+      return lifeMs >= this._etaContactF(t, ownerR + b.size * 0.5 * (SMALL_FIX.G934 !== 0 ? b._touchK : 1), isChase) * (1000 / 60);
     }
     return lifeMs >= t * (1000 / 60);
   }
@@ -49605,7 +53574,7 @@ export class GameLogic {
     if (!subs || subs.length === 0) return 5;
     const circleR = _mapVal(t.autoCircleSize ?? 25, 0, 50, 0, sizePx * 0.96) * 0.7;
     let w = 0;
-    for (let i = 0; i < subs.length; i++) { const sw = subs[i].width || 0; if (sw > w) w = sw; }
+    for (let i = 0; i < subs.length; i++) { const pk = SMALL_FIX.G805 !== 0 ? (subs[i].projectileType?.size ?? 1) : 1; const sw = (subs[i].width || 0) * (pk > 0 ? pk : 1); if (sw > w) w = sw; }
     const r = _mapVal(w, 0, 50, 0, circleR * 2 * 0.96) * 0.5;
     return r > 5 ? r : 5;
   }
@@ -49658,6 +53627,30 @@ export class GameLogic {
   }
   public isAskingPeace(e: EnemyTank): boolean {
     return e.hf.plays && this.feel.s[FEEL.WAG] > 0 && this.gameNow() < e.hf.wagUntil;
+  }
+  public botDebugWord(e: EnemyTank): string {
+    const st = e.aiState, h = e.hf;
+    if ((st !== 'roaming' && st !== 'idle') || !h.plays) return '';
+    const now = this.gameNow();
+    if (h.rmOn && h.rmMode === 2) return 'STALKING';
+    if (h.rmOn && h.rmMode === 3) return 'LEAVING A TANK';
+    if (now < h.adUntil || now < h.udUntil) return 'STEPPING AWAY';
+    const gd = this._hfGroupDo(e, now);
+    if (gd === 3) return 'GROUP FALLS BACK';
+    if (gd === 2) return 'WAITING FOR GROUP';
+    if (e._thId !== '' && now < e._thUntil) return 'HELPING A MATE';
+    if (now < h.ahUntil) return 'WAITING AT A DANGER';
+    if (now < e._bpUntil) return 'WAITING TO TRY AGAIN';
+    if (now < h.gzUntil || now < h.hwUntil) return 'KEEPING AWAY';
+    if (e._btBits !== 0) {
+      if (e._btStood === true) return 'HOLDING A PLACE';
+      if (e._ogId !== '') return (e._btBits & BT_GUARD) !== 0 && e._ogTag >= 0 ? 'GUARDING' : 'GOING TO A POINT';
+      return '';
+    }
+    const ts = e._tmSt;
+    if (ts !== 0) return ts === 1 ? 'GATHERING' : ts === 2 ? 'GOING TO THE MIDDLE' : ts === 3 ? 'HOLDING THE MIDDLE' : ts === 4 ? 'CLOSING RANKS' : 'BACKING OFF';
+    if (h.arRank >= 2) return 'GOING TO ITS GROUND';
+    return '';
   }
 
   private _healCandidateOk(
@@ -49994,6 +53987,7 @@ export class GameLogic {
       const _heldId = (AI_CONSTANTS.AUTO_TURRET_TARGET_HOLD !== 0 && hasArcLimit)
         ? turret.autoTargetId : null;
       const _atTanks = this.state.enemyTanks;
+      const _r1027 = SMALL_FIX.R1027 === 0 ? null : enemy !== null ? enemy : (callerIsBoss && callerOwnerId ? (this._enemyById.get(callerOwnerId) ?? null) : null);
       for (let i = 0; i < _atTanks.length; i++) {
         const e = _atTanks[i];
         if (!e.active || e.isDying || e.graceActive || this._enemyUnseeable(e)) continue;
@@ -50028,6 +54022,7 @@ export class GameLogic {
           if (kFound) continue;
           if (e.id === _callerId) continue;
           if (shouldSkipTeamCollision(_callerTeam, _callerBeh, _callerGroup, e.team, e.aiBehavior, e.groupId, _callerCamp, e.camp)) continue;
+          if (_r1027 !== null && bossLeavesBody(_r1027, e)) continue;
           if (tapFamilyIdOf(e) === (_callerTap !== '' ? _callerTap : _callerId)) continue;
           const dx = e.position.x - x;
           const dy = e.position.y - y;
@@ -50241,9 +54236,8 @@ export class GameLogic {
           ? arrasShotMotion(ARRAS_SPD_AT_REST * this.getStatMultiplier('bulletSpeed'), _pstR)
           : (3 * Math.log(Math.sqrt(Math.max(0, sub.speed)) + _pstR + 1) + 1) * ARRAS_TICK_RATE;
         sub.physRecoilVel += _pstImp;
-        if (ARRAS_PARITY.RECOIL_SHOT !== 0) recoilNoteShot(sub, _pstImp);
-        sub.physRecoilDirX = -Math.cos(subWorldAngle);
-        sub.physRecoilDirY = -Math.sin(subWorldAngle);
+        if (ARRAS_PARITY.RECOIL_SHOT !== 0) recoilNoteShotDir(sub, _pstImp, -Math.cos(subWorldAngle), -Math.sin(subWorldAngle));
+        else { sub.physRecoilDirX = -Math.cos(subWorldAngle); sub.physRecoilDirY = -Math.sin(subWorldAngle); }
         sub.recoilVelocity -= 0.3;
       }
       return;
@@ -50548,9 +54542,8 @@ export class GameLogic {
       ? arrasShotMotion(ARRAS_SPD_AT_REST * this.getStatMultiplier('bulletSpeed'), _subArrasR)
       : (3 * Math.log(Math.sqrt(sub.speed) + _subArrasR + 1) + 1) * ARRAS_TICK_RATE;
     sub.physRecoilVel += impulse;
-    if (ARRAS_PARITY.RECOIL_SHOT !== 0) recoilNoteShot(sub, impulse);
-    sub.physRecoilDirX = -Math.cos(subWorldAngle);
-    sub.physRecoilDirY = -Math.sin(subWorldAngle);
+    if (ARRAS_PARITY.RECOIL_SHOT !== 0) recoilNoteShotDir(sub, impulse, -Math.cos(subWorldAngle), -Math.sin(subWorldAngle));
+    else { sub.physRecoilDirX = -Math.cos(subWorldAngle); sub.physRecoilDirY = -Math.sin(subWorldAngle); }
     sub.recoilVelocity -= 0.3;
   }
 
@@ -50642,9 +54635,8 @@ export class GameLogic {
           ? arrasShotMotion(ARRAS_SPD_AT_REST * getEnemyStatMultiplier(enemy, 'bulletSpeed'), _estR)
           : (3 * Math.log(Math.sqrt(Math.max(0, sub.speed)) + _estR + 1) + 1) * ARRAS_TICK_RATE;
         sub.physRecoilVel += _estImp;
-        if (ARRAS_PARITY.RECOIL_SHOT !== 0) recoilNoteShot(sub, _estImp);
-        sub.physRecoilDirX = -Math.cos(subWorldAngle);
-        sub.physRecoilDirY = -Math.sin(subWorldAngle);
+        if (ARRAS_PARITY.RECOIL_SHOT !== 0) recoilNoteShotDir(sub, _estImp, -Math.cos(subWorldAngle), -Math.sin(subWorldAngle));
+        else { sub.physRecoilDirX = -Math.cos(subWorldAngle); sub.physRecoilDirY = -Math.sin(subWorldAngle); }
         sub.recoilVelocity -= 0.3;
       }
       return;
@@ -50704,7 +54696,7 @@ export class GameLogic {
     b.lifespanDistance = b.velocity.mag() * 60 * b.maxAge;
 
     const _emt3 = _deriveMotionType(sub.projectileBehaviors, sub.projectileType?.motionType || 'glide');
-    const _ebs3 = computeBulletTypeStats(sub, _emt3, enemy.upgrades, enemy.maxPointsPerSkill || 9, this._gunLevel(enemy.level || 0), growthRulesOf(enemy), enemy._statK);
+    const _ebs3 = computeBulletTypeStats(sub, _emt3, enemy.upgrades, enemy.maxPointsPerSkill || 9, this._gunLevelOf(enemy), growthRulesOf(enemy), enemy._statK);
     b.damage = _ebs3.damage;
     b.penetration = _ebs3.penetration;
     b.knockback = sub.knockback;
@@ -50971,9 +54963,8 @@ export class GameLogic {
       ? arrasShotMotion(ARRAS_SPD_AT_REST * getEnemyStatMultiplier(enemy, 'bulletSpeed'), _subArrasR2)
       : (3 * Math.log(Math.sqrt(sub.speed) + _subArrasR2 + 1) + 1) * ARRAS_TICK_RATE;
     sub.physRecoilVel += impulse;
-    if (ARRAS_PARITY.RECOIL_SHOT !== 0) recoilNoteShot(sub, impulse);
-    sub.physRecoilDirX = -Math.cos(subWorldAngle);
-    sub.physRecoilDirY = -Math.sin(subWorldAngle);
+    if (ARRAS_PARITY.RECOIL_SHOT !== 0) recoilNoteShotDir(sub, impulse, -Math.cos(subWorldAngle), -Math.sin(subWorldAngle));
+    else { sub.physRecoilDirX = -Math.cos(subWorldAngle); sub.physRecoilDirY = -Math.sin(subWorldAngle); }
     sub.recoilVelocity -= 0.3;
   }
 
@@ -51229,9 +55220,8 @@ export class GameLogic {
                 ? arrasShotMotion(ARRAS_SPD_AT_REST * this.getStatMultiplier('bulletSpeed'), _tapArrasRecoil)
                 : (3 * Math.log(Math.sqrt(Math.max(0, t.speed)) + _tapArrasRecoil + 1) + 1) * ARRAS_TICK_RATE;
               t.physRecoilVel += _tapImpulse;
-              if (ARRAS_PARITY.RECOIL_SHOT !== 0) recoilNoteShot(t, _tapImpulse);
-              t.physRecoilDirX = -_tapCosGA;
-              t.physRecoilDirY = -_tapSinGA;
+              if (ARRAS_PARITY.RECOIL_SHOT !== 0) recoilNoteShotDir(t, _tapImpulse, -_tapCosGA, -_tapSinGA);
+              else { t.physRecoilDirX = -_tapCosGA; t.physRecoilDirY = -_tapSinGA; }
               t.recoilVelocity -= 0.3;
               t.animProgress = 1;
               (t.nextShotTime as number) += interval;
@@ -51329,9 +55319,8 @@ export class GameLogic {
       ? arrasShotMotion(ARRAS_SPD_AT_REST * speedMult, k)
       : (3 * Math.log(Math.sqrt(Math.max(0, t.speed)) + k + 1) + 1) * ARRAS_TICK_RATE;
     t.physRecoilVel += impulse;
-    if (ARRAS_PARITY.RECOIL_SHOT !== 0) recoilNoteShot(t, impulse);
-    t.physRecoilDirX = -Math.cos(angle);
-    t.physRecoilDirY = -Math.sin(angle);
+    if (ARRAS_PARITY.RECOIL_SHOT !== 0) recoilNoteShotDir(t, impulse, -Math.cos(angle), -Math.sin(angle));
+    else { t.physRecoilDirX = -Math.cos(angle); t.physRecoilDirY = -Math.sin(angle); }
     t.recoilVelocity -= 0.3;
     if (SMALL_FIX.CC024 !== 0) t.animProgress = 1;
   }
@@ -51676,9 +55665,8 @@ export class GameLogic {
       ? arrasShotMotion(ARRAS_SPD_AT_REST * this.getStatMultiplier('bulletSpeed'), _pArrasRecoil)
       : (3 * Math.log(Math.sqrt(Math.max(0, t.speed)) + _pArrasRecoil + 1) + 1) * ARRAS_TICK_RATE;
     t.physRecoilVel += impulse;
-    if (ARRAS_PARITY.RECOIL_SHOT !== 0) recoilNoteShot(t, impulse);
-    t.physRecoilDirX = -Math.cos(globalAngle);
-    t.physRecoilDirY = -Math.sin(globalAngle);
+    if (ARRAS_PARITY.RECOIL_SHOT !== 0) recoilNoteShotDir(t, impulse, -Math.cos(globalAngle), -Math.sin(globalAngle));
+    else { t.physRecoilDirX = -Math.cos(globalAngle); t.physRecoilDirY = -Math.sin(globalAngle); }
 
     t.recoilVelocity -= 0.3;
   }
@@ -51775,6 +55763,7 @@ export class GameLogic {
       if (shouldSkipTeamCollision(bulletTeam as TeamId, bBeh, bGroup, e.team, e.aiBehavior, e.groupId, this._ctlCamp, e.camp)) continue;
       if (_neu !== null && !shouldNeutralAttackTarget(_neu, e.id)) continue;
       if (campsClash(this._ctlCamp, e.camp)) continue;
+      if (this._ctlBoss !== null && bossLeavesBody(this._ctlBoss, e)) continue;
       if (this._ctlFamId !== '' && tapFamilyIdOf(e) === this._ctlFamId) continue;
       const dx = e.position.x - x;
       const dy = e.position.y - y;
@@ -51849,6 +55838,8 @@ export class GameLogic {
   private _ctlHealBeh: AIBehavior | null = null;
   private _ctlHealGroup: number = 0;
   private _ctlCamp: number = 0;
+  private _spawnOwnerPending = '';
+  private _ctlBoss: EnemyTank | null = null;
   private _ctlFamId: string = '';
   private _ctlSgSlot: number = -1;
   private _ctlArea: number = -1;
@@ -51907,6 +55898,7 @@ export class GameLogic {
             : e.invisAlpha <= 0.5)) return null;
       if (!this._needsHealing(e, 1)) return null;
       if (this._ctlArea >= 0 && this._roundAreaIndex(e.position.x, e.position.y) !== this._ctlArea) return null;
+      if (SMALL_FIX.G756 !== 0 && campsClash(this._ctlCamp, e.camp)) return null;
       return { x: e.position.x, y: e.position.y, vx: e.velocity.x, vy: e.velocity.y, id };
     }
     return null;
@@ -51936,6 +55928,7 @@ export class GameLogic {
         if (shouldSkipTeamCollision(this._ctlHealTeam, _bh04Beh, this._ctlHealGroup, e.team, e.aiBehavior, e.groupId, this._ctlCamp, e.camp)) return null;
         if (_neu !== null && !shouldNeutralAttackTarget(_neu, e.id)) return null;
         if (campsClash(this._ctlCamp, e.camp)) return null;
+        if (this._ctlBoss !== null && bossLeavesBody(this._ctlBoss, e)) return null;
         if (this._ctlFamId !== '' && tapFamilyIdOf(e) === this._ctlFamId) return null;
         if (this._ctlSgSlot >= 0 && this._sgTargetSafe(this._ctlSgSlot, e.position.x, e.position.y, AI_CONSTANTS.SAFEZONE_BAND_CELLS)) return null;
         if (this._hfPeaceful(this._ctlHfOwner, e.id)) return null;
@@ -52947,7 +56940,11 @@ export class GameLogic {
     let pairs = 0, mates = 0;
     const pBeh: AIBehavior | null = isFfaStyleMode(this.state.gameModeConfig.mode) ? 'FFA' : null;
     const pTeam = this.getPlayerTeam(), pGroup = this.playerGroupId;
+    let camp925 = false;
+    if (SMALL_FIX.G925 !== 0) for (let j = 0; j < _crowdBots.length; j++) if (_crowdBots[j].camp !== CAMP_NONE) { camp925 = true; break; }
     if (SMALL_FIX.GH624 !== 0) {
+      let nNB = 0, nRg = 0, nB1 = 0;
+      if (camp925) { _crowdNB.length = 0; _crowdNBnr.length = 0; _crowdB1.length = 0; }
       _crowdG.clear(); _crowdT.clear(); _crowdGT.clear();
       let allied = 0;
       const n = _crowdBots.length;
@@ -52963,7 +56960,21 @@ export class GameLogic {
           const t0 = _crowdT.get(ti) ?? 0; if (t0 > 0) mate = true; allied += t0; _crowdT.set(ti, t0 + 1);
           if (g !== 0) { const kk = g * 1024 + ti, b0 = _crowdGT.get(kk) ?? 0; allied -= b0; _crowdGT.set(kk, b0 + 1); }
         }
+        if (camp925) {
+          const cm = b.camp;
+          if ((cm & 1) === 0) {
+            if ((cm & 4) !== 0 ? nNB > 0 : nRg > 0) mate = true;
+            _crowdNB.push(b); nNB++;
+            if ((cm & 4) !== 0) nRg++; else _crowdNBnr.push(b);
+          } else if (cm === 1 && SMALL_FIX.R972 !== 0) { if (nB1 > 0) mate = true; _crowdB1.push(b); nB1++; }
+        }
         if (mate) mates++;
+      }
+      if (camp925) {
+        const nr = _crowdNBnr.length;
+        allied += nNB * (nNB - 1) / 2 - nr * (nr - 1) / 2 - (_crowdAlliedOf(_crowdNB) - _crowdAlliedOf(_crowdNBnr));
+        if (nB1 > 1) allied += nB1 * (nB1 - 1) / 2 - _crowdAlliedOf(_crowdB1);
+        _crowdNB.length = 0; _crowdNBnr.length = 0; _crowdB1.length = 0;
       }
       pairs += n * (n - 1) / 2 - allied;
       _crowdBots.length = 0;
@@ -54905,6 +58916,7 @@ export class GameLogic {
             b.position.y += b.velocity.y * dtFactor * toiBE;
             }
             collidedBE = true;
+            if (SMALL_FIX.G923 !== 0 && this._roundDiesInBase(b)) continue;
             if (SMALL_FIX.GH011 !== 0) {
               const _gx = b.position.x - enemy.position.x, _gy = b.position.y - enemy.position.y;
               dBE = Math.sqrt(_gx * _gx + _gy * _gy);
@@ -54941,7 +58953,7 @@ export class GameLogic {
             if (enemyMaxShield > 0 && enemy.currentShield < enemyMaxShield) {
               enemy.currentShield = Math.min(enemy.currentShield + healGive * 0.5, enemyMaxShield);
             }
-            if (this._mevOn && this.mevMatch.healersScoreByHealing === true) this._mevHealScore(b, enemy.currentHealth + enemy.currentShield - _healWas);
+            if (this._mevRulesOn() && this.mevMatch.healersScoreByHealing === true) this._mevHealScore(b, enemy.currentHealth + enemy.currentShield - _healWas);
             b.health -= healAmt * 0.3;
             if (b.health <= 0) { b.health = 0; b.damage = 0; }
             continue;
@@ -55096,7 +59108,7 @@ export class GameLogic {
             remainingDmg -= shieldDmg;
           }
 
-          this._stampPressDamage(b.ownerId, b._tapRootId, enemy.id, now);
+          if (SMALL_FIX.G928 === 0 || bulletToEnemyDmg > 0) this._stampPressDamage(b.ownerId, b._tapRootId, enemy.id, now);
 
           if (AI_CONSTANTS.PROVOKE_SHIELD !== 0 && remainingDmg <= 0
               && bulletToEnemyDmg > 0 && enemy.currentShield < _pvPreShield) {
@@ -55243,6 +59255,7 @@ export class GameLogic {
             b.position.y += b.velocity.y * dtFactor * toiBP;
             }
             collidedBP = true;
+            if (SMALL_FIX.G923 !== 0 && this._roundDiesInBase(b)) continue;
             if (SMALL_FIX.GH011 !== 0) {
               const _gx = b.position.x - this.tankPos.x, _gy = b.position.y - this.tankPos.y;
               dBP = Math.sqrt(_gx * _gx + _gy * _gy);
@@ -55276,16 +59289,17 @@ export class GameLogic {
             if (this.state.tankCurrentHealth > 0 && this.state.tankCurrentHealth < playerMaxHp) {
               this.state.tankCurrentHealth = Math.min(this.state.tankCurrentHealth + healGive, playerMaxHp);
             }
-            if (playerMaxShield > 0 && this.state.tankCurrentShield < playerMaxShield) {
+            if (playerMaxShield > 0 && this.state.tankCurrentShield < playerMaxShield && !(SMALL_FIX.G901 !== 0 && this.state.tankCurrentHealth <= 0)) {
               this.state.tankCurrentShield = Math.min(this.state.tankCurrentShield + healGive * 0.5, playerMaxShield);
             }
-            if (this._mevOn && this.mevMatch.healersScoreByHealing === true) this._mevHealScore(b, this.state.tankCurrentHealth + this.state.tankCurrentShield - _healWas);
+            if (this._mevRulesOn() && this.mevMatch.healersScoreByHealing === true) this._mevHealScore(b, this.state.tankCurrentHealth + this.state.tankCurrentShield - _healWas);
             b.health -= healAmt * 0.3;
             if (b.health <= 0) { b.health = 0; b.damage = 0; }
             continue;
           }
 
-          if (!this.state.godMode) {
+          const _god1030 = SMALL_FIX.R1030 !== 0 && this.admin.godOn && this.state.godMode && !this.state.gracePeriodActive && !_bpIsHealing;
+          if (!this.state.godMode || _god1030) {
             _fillBulletACE(_aceA, b);
             if (OFFENSE_ARRAS.ON !== 0 && OFFENSE_ARRAS.TANK_GUN_RESIST !== 0) _aceA.healthResist = b._rvrResist;
             _aceB.damage = this.state.tankBodyDamage * this._playerAtkVsRounds();
@@ -55373,7 +59387,7 @@ export class GameLogic {
 
             const _bpHp = this.state.tankCurrentHealth + this.state.tankCurrentShield;
             const bpDf = applyDeathFactor(bulletToPlayerDmg, playerToBulletDmg, b.health, SMALL_FIX.CC035 !== 0 && _bpHp < 0 ? 0 : _bpHp);
-            bulletToPlayerDmg = bpDf.damageAB;
+            bulletToPlayerDmg = _god1030 ? 0 : bpDf.damageAB;
             playerToBulletDmg = bpDf.damageBA;
 
             if (ARRAS_PARITY.BULLET_TANK_PUSH !== 0 && !b.ownerIsBaseProtector) {
@@ -55455,13 +59469,13 @@ export class GameLogic {
               remainingDmg -= shieldDmg;
             }
 
-            this._notePlayerAttackerBullet(b);
-            this._stampPressDamage(b.ownerId, b._tapRootId, this.state.playerId, now);
+            if (!_god1030) this._notePlayerAttackerBullet(b);
+            if (SMALL_FIX.G928 === 0 || bulletToPlayerDmg > 0) this._stampPressDamage(b.ownerId, b._tapRootId, this.state.playerId, now);
             if (remainingDmg > 0) {
               this._vampHitPlayer(remainingDmg, b.ownerId, now);
             }
 
-            this.state.lastTankDamageTime = now;
+            if (!_god1030) this.state.lastTankDamageTime = now;
             if (bulletToPlayerDmg > 0) this.tankDamageOverlay = flashOnHit(this.tankDamageOverlay);
 
             b.health -= playerToBulletDmg;
@@ -55968,8 +59982,9 @@ export class GameLogic {
           } else {
           const totalMass = this.tankMass + enemy.mass;
           const _fx965 = SMALL_FIX.R965 !== 0 && (enemy.pushability ?? 1) <= 0;
-          const playerRatio = _fx965 ? 1 : enemy.mass / totalMass;
-          const enemyRatio = _fx965 ? 0 : this.tankMass / totalMass;
+          const _fp883 = SMALL_FIX.G883 !== 0 && SMALL_FIX.R965 !== 0 && !_fx965 && (this.state.tankPushability ?? 1) <= 0;
+          const playerRatio = _fx965 ? 1 : _fp883 ? 0 : enemy.mass / totalMass;
+          const enemyRatio = _fx965 ? 0 : _fp883 ? 1 : this.tankMass / totalMass;
 
           const playerOffset = overlap * playerRatio;
           const enemyOffset = overlap * enemyRatio;
@@ -56090,6 +60105,7 @@ export class GameLogic {
             enemy.playerHurtAt = now;
             enemy.lastTankDamageAt = now;
             enemy.lastTankDamageById = this.state.playerId;
+            if (SMALL_FIX.G800 !== 0) this._hfHitNote(enemy, this.state.playerId, now);
             if (playerRamDmg > aiHealthMax(enemy, HEALTH_BASIS.HOLD) * 0.15) enemy.combatHoldUntil = 0;
 
             if (_bhBoth0) enemy.currentHealth = bothDieKeep(enemy.currentHealth, enemy.maxHealth * getEnemyStatMultiplier(enemy, 'maxHealth'));
@@ -56406,6 +60422,7 @@ export class GameLogic {
           e2.lastTankDamageAt = now;
           e1.lastTankDamageById = e2.id;
           e2.lastTankDamageById = e1.id;
+          if (SMALL_FIX.G800 !== 0) { this._hfHitNote(e1, e2.id, now); this._hfHitNote(e2, e1.id, now); }
           if (e2Dmg > aiHealthMax(e1, HEALTH_BASIS.HOLD) * 0.15) e1.combatHoldUntil = 0;
           if (e1Dmg > aiHealthMax(e2, HEALTH_BASIS.HOLD) * 0.15) e2.combatHoldUntil = 0;
 
@@ -56939,6 +60956,10 @@ export class GameLogic {
               (b.hitsOwnType === 'hardWithBuffer' && gnow - b.spawnTime < 200)) continue;
         }
 
+        if (SMALL_FIX.R977 !== 0 && a.projectileVisual === 'trap' && b.projectileVisual === 'trap'
+            && (a.motionType !== b.motionType || a.shapeSides !== b.shapeSides || a.bouncy !== b.bouncy)
+            && (a.ownerId === b.ownerId || (SMALL_FIX.R977T !== 0 && shouldSkipTeamCollision(
+              a.team, a.ownerBehavior, a.groupId, b.team, b.ownerBehavior, b.groupId, a.ownerCamp, b.ownerCamp)))) continue;
         if (_bfLaw && a._bornFree !== 0 && a.bouncy && b.bouncy && a.projectileVisual === 'trap' && b.projectileVisual === 'trap') {
           const _fx = a.position.x - b.position.x, _fy = a.position.y - b.position.y, _fr = ((a.size * a._touchK) + (b.size * b._touchK)) * 0.5;
           if (_fx * _fx + _fy * _fy < _fr * _fr) _bfHit = true;
@@ -57377,7 +61398,7 @@ export class GameLogic {
   private addEnemyXp(enemy: EnemyTank, amount: number) {
     amount = this._vampHealBot(enemy, amount);
     const maxLevel = isManhuntMode(this.state.gameModeConfig.mode)
-      ? MANHUNT_LEVEL_CAP : this._capOnTank(enemy.currentTankName, this.state.gameModeConfig.levelCap ?? 45);
+      ? MANHUNT_LEVEL_CAP : this._capOnTank(SMALL_FIX.G878 !== 0 ? this._areaTankKeyOf(enemy) : enemy.currentTankName, this.state.gameModeConfig.levelCap ?? 45);
     const _lv0 = enemy.level;
     const _mhCount = SMALL_FIX.GH317 !== 0 && maxLevel === MANHUNT_LEVEL_CAP;
     const _count = _mhCount || levelHeldIn(this.state.gameModeConfig) || SMALL_FIX.R994 !== 0;

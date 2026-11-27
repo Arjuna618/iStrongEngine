@@ -1,9 +1,9 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { TEXT_LIMITS } from '../kit/textLimits';
 import type { Num, Ref, SpawnGroup, WaveCell, WaveOverride, WavePlan, ZoneLike } from '../../game/mapEvents/doc';
 import { rectsOf, SIDE_WORDS, zoneShapeOf } from '../../game/mapEvents/doc';
 import { tracePoly, shapeCellPoints } from '../../game/areaShape';
-import { previewMeans, breakSeconds, rollWave, type WaveRoll } from '../../game/mapEvents/waves';
+import { previewMeans, breakSeconds, rollWave, lineOfMean, type WaveRoll } from '../../game/mapEvents/waves';
 import { priceOfLine, ROUNDS_HEAVY } from '../../game/mapEvents/priceTank';
 import { evalNum } from '../../game/mapEvents/num';
 import { addGroup, copyForPaste, fillDown, pasteLine, ramp, removeAt, sentenceOf, setAt, tagWords, typeCell, withIds, wordOfCards, type Path } from '../../game/mapEvents/docOps';
@@ -14,11 +14,12 @@ import { ScrollArea } from '../ui/ScrollArea';
 import { EvEmpty } from './EvEmpty';
 import { NumberBox } from '../kit/NumberBox';
 import { EvSelect } from './EvSelect';
-import { closeMapEvents, runEngineTest } from './mapEventsStore';
+import { closeMapEvents, runEngineTest, openMapEvents } from './mapEventsStore';
 import { BodyTestField, CardsField, choicesOf, Facts, factsFrom, FieldControl, NumField, OrderField, PlaceRuleField, RefField, TakeOffTags, thingNamer, WaveTestField, wordOfNum, type EvCtx } from './fields';
 import { Plus, Trash2, Copy, ChevronRight, MevEvents, MevProblems, MevWaves } from '../ui/icons';
 import { Split, DetailHead } from './pages';
 import { StatSharesRow } from '../shared/StatShares';
+import { SMALL_FIX } from '../../game/smallFixSwitch';
 
 const num = (s: string): number | undefined => { const v = Number(s); return s.trim() !== '' && Number.isFinite(v) ? v : undefined; };
 type Tab = 'every' | 'grid' | 'special' | 'exact' | 'timing' | 'actions' | 'where' | 'preview';
@@ -98,10 +99,12 @@ const LineDetail: React.FC<{ g: SpawnGroup; path: Path; ctx: EvCtx }> = ({ g, pa
 };
 
 let _copiedLine: SpawnGroup | null = null;
+const _copyHear = new Set<React.Dispatch<React.SetStateAction<number>>>();
 const lineSays = (g: SpawnGroup, q: string): boolean => g.name.toLowerCase().includes(q) || g.cards.some(c => (c.tank ?? c.shape ?? c.type?.n ?? '').toLowerCase().includes(q));
 interface LinePick { path: Path; id: number }
 const LinesTable: React.FC<{ groups: SpawnGroup[]; path: Path; ctx: EvCtx; firstPlace?: Ref[] | 'plan'; search?: string; picked?: number | null; onPick?: (p: LinePick) => void }> = ({ groups, path, ctx, search = '', picked = null, onPick }) => {
   const [, bump] = useState(0);
+  useEffect(() => { if (SMALL_FIX.G806 === 0) return; _copyHear.add(bump); return () => { _copyHear.delete(bump); }; }, []);
   const q = search.trim().toLowerCase();
   const shown: number[] = [];
   groups.forEach((g, i) => { if (q === '' || lineSays(g, q)) shown.push(i); });
@@ -110,7 +113,7 @@ const LinesTable: React.FC<{ groups: SpawnGroup[]; path: Path; ctx: EvCtx; first
       <LongList gap={6} estimate={68} reveal={picked !== null ? String(picked) : null} count={shown.length} rowKey={n => String(groups[shown[n]].id)} renderRow={n => { const i = shown[n], g = groups[i]; return (
           <PickRow title={g.name} facts={factsFrom(lineFacts(g, thingNamer(ctx)))} selected={picked === g.id} onPick={() => onPick?.({ path: [...path, i], id: g.id })}
             actions={<>
-              <IconButton size="sm" label="Copy this line" onClick={() => { _copiedLine = copyForPaste(g, ctx.doc, ctx.zones); bump(n2 => n2 + 1); }}><Copy size={13} /></IconButton>
+              <IconButton size="sm" label="Copy this line" onClick={() => { _copiedLine = copyForPaste(g, ctx.doc, ctx.zones); if (SMALL_FIX.G806 !== 0) { for (const b of _copyHear) b(n2 => n2 + 1); } else bump(n2 => n2 + 1); }}><Copy size={13} /></IconButton>
               <IconButton size="sm" label="Remove this line" onClick={() => ctx.commit(d => removeAt(d, path, i))}><Trash2 size={13} /></IconButton>
             </>} />
         ); }} />
@@ -183,8 +186,7 @@ const Preview: React.FC<{ plan: WavePlan; ctx: EvCtx }> = ({ plan, ctx }) => {
     g.beginPath(); series.forEach((v, i) => { const x = i / (series.length - 1) * W, y = H - v / top * H; if (i === 0) g.moveTo(x, y); else g.lineTo(x, y); }); g.stroke();
   }, [series, room]);
   const over = series.findIndex(v => v > room);
-  const lineOf = (name: string): SpawnGroup | undefined => plan.groups.find(g => g.name === name) ?? (plan.specials ?? []).flatMap(s => s.groups).find(g => g.name === name) ?? (plan.overrides ?? []).flatMap(o => o.groups).find(g => g.name === name);
-  const priced = useMemo(() => means.map(m => { const p = priceOfLine(lineOf(m.name), ctx.doc, ctx.logic.state.tankLibrary); return { ...m, rounds: m.mean * p.rounds, shapes: m.mean * p.shapes }; }), [means, ctx.doc, ctx.logic.state.tankLibrary]);
+  const priced = useMemo(() => means.map(m => { const p = priceOfLine(lineOfMean(plan, m), ctx.doc, ctx.logic.state.tankLibrary); return { ...m, rounds: m.mean * p.rounds, shapes: m.mean * p.shapes }; }), [means, ctx.doc, ctx.logic.state.tankLibrary]);
   const sumOf = priced.reduce((s, m) => ({ bodies: s.bodies + m.mean, shapes: s.shapes + m.shapes, rounds: s.rounds + m.rounds }), { bodies: 0, shapes: 0, rounds: 0 });
   return (
     <div className="k-ev-page">
@@ -198,7 +200,7 @@ const Preview: React.FC<{ plan: WavePlan; ctx: EvCtx }> = ({ plan, ctx }) => {
         </div>
         <Reveal when={ten}>{() => <FieldRow stacked label="Ten Rolls Of This Wave" help="How many bodies each of ten rolls brought."><Facts items={ten!.map((n, k) => ({ key: String(k), text: String(n) }))} /></FieldRow>}</Reveal>
         <table className="k-ev-preview"><thead><tr><th>Line</th><th>About</th><th>Holds</th><th title="About how many rounds these keep in the air, by their tank files">Rounds</th></tr></thead>
-          <tbody>{priced.map(m => <tr key={m.name}><td>{m.name}</td><td>{m.mean.toFixed(1)}</td><td>{m.holds ? 'Yes' : 'No'}</td><td>{Math.round(m.rounds)}</td></tr>)}</tbody></table>
+          <tbody>{priced.map(m => <tr key={m.id ?? m.name}><td>{m.name}</td><td>{m.mean.toFixed(1)}</td><td>{m.holds ? 'Yes' : 'No'}</td><td>{Math.round(m.rounds)}</td></tr>)}</tbody></table>
         <FieldRow stacked label="All Of Them At Once" help="About how much stands at the same time, with nothing else alive and no limit of room."><Facts items={factsFrom([`${Math.round(sumOf.bodies - sumOf.shapes)} Tanks`, `${Math.round(sumOf.shapes)} Shapes`, `${Math.round(sumOf.rounds)} Rounds In The Air`])} /></FieldRow>
         <Reveal when={sumOf.rounds > ROUNDS_HEAVY}><div className="k-note"><MevProblems size={14} />That many rounds may slow the game down on many computers.</div></Reveal>
         <Reveal when={roll}>{() => <FieldRow stacked label="This Roll" help="What one roll of this wave brought."><Facts items={factsFrom([roll!.special ? `Special: ${roll!.special.name}` : '', ...roll!.streams.map(l => `${l.group.name}: ${l.k}`)])} /></FieldRow>}</Reveal>
@@ -217,7 +219,7 @@ const WaveActions: React.FC<{ plan: WavePlan; ctx: EvCtx }> = ({ plan, ctx }) =>
   if (rules.length === 0) return <div className="k-ev-whole"><EvEmpty icon={MevEvents} name="No Map Event starts from this plan" hints={[{ label: 'Make One On The Map Events Page, From A Wave Starts' }]} /></div>;
   return (
     <ScrollArea className="k-ev-scroll"><div className="k-ev-list-box">
-      <LongList gap={6} estimate={68} count={rules.length} rowKey={i => String(rules[i].id)} renderRow={i => <PickRow title={rules[i].name} facts={factsFrom(rules[i].when.map(w => tagWords(sentenceOf('trigger', w, ctx.doc, ctx.zones))))} onPick={() => {}} />} />
+      <LongList gap={6} estimate={68} count={rules.length} rowKey={i => String(rules[i].id)} renderRow={i => <PickRow title={rules[i].name} facts={factsFrom(rules[i].when.map(w => tagWords(sentenceOf('trigger', w, ctx.doc, ctx.zones))))} onPick={() => { if (SMALL_FIX.G774 !== 0) openMapEvents(ctx.areaId, 'events', rules[i].id); }} />} />   { }
     </div></ScrollArea>
   );
 };
@@ -225,7 +227,8 @@ const WaveActions: React.FC<{ plan: WavePlan; ctx: EvCtx }> = ({ plan, ctx }) =>
 const WhereTheySpawn: React.FC<{ plan: WavePlan; ctx: EvCtx }> = ({ plan, ctx }) => {
   const box = useRef<HTMLCanvasElement>(null);
   const zones = ctx.zones;
-  const inPlan = (z: ZoneLike) => z.uid !== undefined && plan.groups.some(g => g.at === 'plan' ? (z.behaviors ?? []).some(b => b.k === 'spawn' && ((b.a.settings ?? b.a) as { mode?: string; plan?: Ref }).mode === 'waves' && (((b.a.settings ?? b.a) as { plan?: Ref }).plan?.id ?? plan.id) === plan.id)
+  const lines780 = SMALL_FIX.G780 !== 0 ? [...plan.groups, ...(plan.specials ?? []).flatMap(s => s.groups), ...(plan.overrides ?? []).flatMap(o => o.groups)] : plan.groups;
+  const inPlan = (z: ZoneLike) => z.uid !== undefined && lines780.some(g => g.at === 'plan' ? (z.behaviors ?? []).some(b => b.k === 'spawn' && ((b.a.settings ?? b.a) as { mode?: string; plan?: Ref }).mode === 'waves' && (((b.a.settings ?? b.a) as { plan?: Ref }).plan?.id ?? plan.id) === plan.id)
     : g.at.some(r => r.id === z.uid || (ctx.doc?.areaGroups ?? []).some(ag => ag.id === r.id && ag.members.some(m => m.id === z.uid))));
   React.useLayoutEffect(() => {
     const c = box.current, st = ctx.logic.selectionStateOf(ctx.areaId);

@@ -1,6 +1,6 @@
 import type { OtherDesign, OtherPart, PlacedLook } from '../types';
 import { otherDrawList, otherRefusal, otherReach, makeOtherId, type OtherDrawList } from './otherDraw';
-
+import { cutName } from '../game/project/hubNaming';
 export const CROSS_LOOK_ID = 'other:healer-hat';
 
 export const LOOK_MIN_ALPHA = 0.05;
@@ -69,7 +69,7 @@ export function normalizeLook(raw: unknown): PlacedLook | null {
   if (r.kind !== 'other' && r.kind !== 'shape') return null;
   if (!r.design || typeof r.design !== 'object' || otherRefusal(r.design) !== null) return null;
   const size = typeof r.size === 'number' && isFinite(r.size) ? Math.min(LOOK_SIZE.max, Math.max(LOOK_SIZE.min, r.size)) : LOOK_SIZE.start;
-  const look: PlacedLook = { kind: r.kind, name: typeof r.name === 'string' ? r.name.slice(0, 80) : String(r.design.name || ''), design: r.design as OtherDesign, size };
+  const look: PlacedLook = { kind: r.kind, name: typeof r.name === 'string' ? cutName(r.name, 80) : String(r.design.name || ''), design: r.design as OtherDesign, size };
   if (r.kind === 'shape' && typeof r.shapeId === 'string') look.shapeId = r.shapeId.slice(0, 80);
   if (typeof r.alpha === 'number' && isFinite(r.alpha) && r.alpha < 1) look.alpha = Math.max(LOOK_MIN_ALPHA, r.alpha);
   if (r.anim === 'rainbow' || r.anim === 'trans') look.anim = r.anim;

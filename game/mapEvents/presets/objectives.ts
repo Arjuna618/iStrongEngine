@@ -1,6 +1,7 @@
 import type { BodyTest, EntityType, Id, MapEventsDoc, Named, PlacedEntity, Ref, Row, Rule, StatusDef, TimerDef, VarDef, ZoneLike } from '../doc';
 import { drawingOf, drawingSites, type DrawnSite } from '../../modeDrawings';
 import { SMALL_FIX } from '../../smallFixSwitch';
+import { AI_CONSTANTS } from '../../../types';
 const SLOT_NEUTRAL = 3, SLOT_BLUE = 10, SLOT_GREEN = 11, SLOT_RED = 12, SLOT_PURPLE = 15;
 export function teamSlot(team: number, teams: number): number {
   return team === 1 ? SLOT_BLUE : team === 2 ? (teams === 2 ? SLOT_GREEN : SLOT_RED) : team === 3 ? SLOT_GREEN : SLOT_PURPLE;
@@ -40,8 +41,8 @@ export interface ObjectiveWorld { events: MapEventsDoc; mapAreas: { nextId: numb
 export const ROLES = { GUARD_RADIUS: 900, GUARD_SHARE_EVEN: 40 } as const;
 export function roleRules(M: { id: () => Id; named: (n: string) => Named; ref: (t: { id: Id; name?: string }) => Ref; row: (k: string, a: Record<string, unknown>) => Row; rule: (f: Named, n: string, w: Row[], c: Row[], t: Row[], m?: Partial<Rule>) => Rule },
   folder: Named, guardTag: Named, attackTag: Named, sides: { guard?: string[]; attack?: string[]; guardShare?: number; front?: number; block?: number; units?: number }): { statuses: StatusDef[]; rules: Rule[] } {
-  const guards: StatusDef = { ...M.named('Guards Its Objectives'), seconds: null, effects: [M.row('guardTag', sides.front ? { tag: M.ref(guardTag), radius: ROLES.GUARD_RADIUS, front: true, frontShare: sides.front, blockShare: sides.block ?? 0, unitShare: sides.units ?? 0 } : { tag: M.ref(guardTag), radius: ROLES.GUARD_RADIUS }), M.row('teamFight', { help: true })] };
-  const attacks: StatusDef = { ...M.named('Attacks Objectives'), seconds: null, effects: [M.row('attackTag', { tag: M.ref(attackTag) }), M.row('teamFight', { help: true })] };
+  const guards: StatusDef = { ...M.named('Guards Its Objectives'), seconds: null, effects: [M.row('guardTag', sides.front ? { tag: M.ref(guardTag), radius: ROLES.GUARD_RADIUS, front: true, frontShare: sides.front, takeBack: true, blockShare: sides.block ?? 0, unitShare: sides.units ?? 0 } : { tag: M.ref(guardTag), radius: ROLES.GUARD_RADIUS }), M.row('teamFight', { help: true })] };
+  const attacks: StatusDef = { ...M.named('Attacks Objectives'), seconds: null, effects: [M.row('attackTag', sides.front ? { tag: M.ref(attackTag), together: true } : { tag: M.ref(attackTag) }), M.row('teamFight', { help: true })] };
   const give = (s: StatusDef) => M.row('status.add', { who: { w: 'subject' }, status: M.ref(s) });
   const rules: Rule[] = [];
   if (sides.guard || sides.attack) {
@@ -221,6 +222,7 @@ export function buildAssaultWorld(drawingKey: string): ObjectiveWorld | null {
   const roles = roleRules(M, folderBots, greenHolds, greenHolds, { guard: ['team2'], attack: ['team1'], front: ASSAULT.FRONT_SHARE, block: ASSAULT.BLOCK_SHARE, units: ASSAULT.UNIT_SHARE });
   rules.push(...roles.rules);
   if (lockedSay) lockedSay.rule.then.push(M.say(lockedSay.text));
+  if (AI_CONSTANTS.BT_LOCKALONE !== 0 && domSites.length > 0) locked.effects.push(M.row('leftAlone', {}));
   const events: MapEventsDoc = {
     v: 1, nextId: 1,
     meta: { title: d.name, seed: 'match', shipped: `assault-${drawingKey}` },

@@ -2,7 +2,8 @@ import type { SolidDesign, LibraryItem } from '../../types';
 import { ARRAS_SOLIDS, type ArrasSolid } from '../../utils/solidArras';
 import { SOLID_LIMITS, SOLID_STARTERS, SOLID_GAME_IDS, SOLID_FILE_TYPE, makeSolidId, normalizeSolid, solidLibraryItem } from '../../utils/solidDesign';
 import { solidReach, type Vec3 } from './solidView';
-
+import { cutName } from '../../game/project/hubNaming';
+import { SMALL_FIX } from '../../game/smallFixSwitch';
 export interface SolidSource {
   readonly key: string;
   readonly design: SolidDesign;
@@ -41,7 +42,7 @@ export function startOf(design: SolidDesign | null, library: readonly LibraryIte
 }
 
 export function nameToSave(name: string): string {
-  return name.trim().slice(0, SOLID_LIMITS.name) || 'Solid';
+  return cutName(name.trim(), SOLID_LIMITS.name) || 'Solid';
 }
 
 export function designToSave(verts: readonly number[], faces: readonly (readonly number[])[], name: string): SolidDesign | null {
@@ -188,7 +189,11 @@ export class SolidEdit {
   }
   private push(s: SolidStep): void {
     this.undos.push(s);
-    if (this.undos.length > SOLID_HISTORY_MAX) this.undos.shift();
+    if (this.undos.length > SOLID_HISTORY_MAX) {
+      let i = 0;
+      if (SMALL_FIX.G947 !== 0) while (i < this.undos.length - 1 && this.undos[i].kind === 'load' && (this.undos[i] as LoadStep).before.dirty) i++;
+      this.undos.splice(i, 1);
+    }
     this.redos.length = 0;
   }
   private orient(): void { orientInPlace(this.verts, this.faces); }

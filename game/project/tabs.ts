@@ -1,4 +1,5 @@
 import { newId } from './hash';
+import { SMALL_FIX } from '../smallFixSwitch';
 
 const LOCK = 'istrong-project-writer';
 const CHANNEL = 'istrong-tabs';
@@ -69,7 +70,13 @@ export function startTabLock(): TabLock {
             writer = true; waiting = null; emit(); resolve();
             const renew = setInterval(() => {
               if (!writer) { clearInterval(renew); return; }
-              try { localStorage.setItem(LEASE_KEY, JSON.stringify({ id, at: Date.now() })); } catch { }
+              try {
+                if (SMALL_FIX.R1019 !== 0) {
+                  const cur = JSON.parse(localStorage.getItem(LEASE_KEY) || 'null');
+                  if (cur && cur.id !== id) { clearInterval(renew); writer = false; emit(); setTimeout(() => { void queue(); }, LEASE_MS); return; }
+                }
+                localStorage.setItem(LEASE_KEY, JSON.stringify({ id, at: Date.now() }));
+              } catch { }
             }, RENEW_MS);
             return;
           }

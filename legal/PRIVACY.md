@@ -1,6 +1,6 @@
 # iStrongEngine Privacy Notice
 
-Version 1.1, 12 November 2026
+Version 1.2, 23 November 2026
 
 This notice says what information iStrongEngine and its official services keep about you, why, for how long, and who can see it. It is written by the creator of iStrongEngine, Arjuna (the creator). To ask anything about it, or to ask for your information, write to the creator on the official Discord.
 
@@ -18,9 +18,9 @@ The beta site lets testers use iStrongEngine before it is public. When you enter
 
 - your IP address, your browser, your system and your kind of device;
 - the date and time, the token you used, and whether it worked;
-- for an early access token: your internet provider, its network number and your country, the first time you use it.
+- your internet provider, its network number and your country, the first time you use a token.
 
-Why: to keep each token to the person it was given to, to lock it to the connection it was first used from, and to stop sharing, attacks and abuse. Cloudflare's own check against bots (Turnstile) may run on the page.
+Why: to keep each token to the person it was given to, to lock it to the internet provider and country it was first used from, and to stop sharing, attacks and abuse. Cloudflare's own check against bots (Turnstile) may run on the page.
 
 How long: the login records are deleted after 90 days. A token and its lock stay while the token exists, and end when it is taken away or when you ask.
 

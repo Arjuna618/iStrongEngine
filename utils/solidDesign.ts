@@ -1,6 +1,6 @@
 import type { SolidDesign, ExportFile, LibraryItem } from '../types';
 import { nameSlug, nameSlugLegacy } from './nameSlug';
-
+import { cutName } from '../game/project/hubNaming';
 export const SOLID_LIMITS = Object.freeze({ verts: 64, faces: 96, faceSides: 12, coord: 4, name: 40 });
 export const SOLID_FILE_TYPE = 'Solid' as const;
 export const SOLID_GAME_IDS: readonly string[] = Object.freeze(['cube', 'dodecahedron', 'icosahedron']);
@@ -62,7 +62,7 @@ export function normalizeSolid(d: unknown): SolidDesign | null {
     }
     faces.push(face);
   }
-  const name = (typeof o.name === 'string' ? o.name.trim() : '').slice(0, SOLID_LIMITS.name).trim() || 'Solid';
+  const name = cutName(typeof o.name === 'string' ? o.name.trim() : '', SOLID_LIMITS.name).trim() || 'Solid';
   const id = typeof o.solidId === 'string' && o.solidId.trim() !== '' ? o.solidId.trim() : makeSolidId(name);
   return { _designVersion: 1, solidId: id, name, verts, faces: orientFaces(verts, faces) };
 }

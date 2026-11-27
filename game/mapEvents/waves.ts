@@ -79,6 +79,14 @@ function pickGroups(plan: WavePlan, n: number, seed: number, ctx: RollCtx | unde
   }
   if (replace) return { special: null, groups: replace.concat(add), breakScaleSpecial: false };
   let special: SpecialWave | null = null;
+  if (SMALL_FIX.G826 !== 0 && plan.specialChance === undefined && Array.isArray(plan.specials) && plan.specials.length > 0) {
+    const forced = ctx?.forceSpecial;
+    if (forced !== undefined && forced >= 0) {
+      seedStream(_rng, seed, plan.id, n, PURPOSE_SPECIAL);
+      special = plan.specials.find(s => s.id === forced) ?? null;
+      if (special) { const base = special.groups ?? []; return { special, groups: base.concat(add), breakScaleSpecial: true }; }
+    }
+  }
   if (plan.specialChance !== undefined && Array.isArray(plan.specials) && plan.specials.length > 0) {
     seedStream(_rng, seed, plan.id, n, PURPOSE_SPECIAL);
     const forced = ctx?.forceSpecial;
@@ -210,16 +218,25 @@ export function breakSeconds(plan: WavePlan, comingWave: number, wasEmpty: boole
   return d;
 }
 
-export function previewMeans(plan: WavePlan, n: number, rolls: number, seed: number, ctx?: RollCtx): { name: string; mean: number; holds: boolean }[] {
-  const sums = new Map<string, { sum: number; holds: boolean }>();
+export function previewMeans(plan: WavePlan, n: number, rolls: number, seed: number, ctx?: RollCtx): { name: string; mean: number; holds: boolean; id?: SpawnGroup['id'] }[] {
+  const byId = SMALL_FIX.G779 !== 0;
+  const sums = new Map<unknown, { sum: number; holds: boolean; name: string; id: SpawnGroup['id'] }>();
   for (let i = 0; i < rolls; i++) {
     const r = rollWave(plan, n, hash32(seed, i), ctx);
     for (const s of r.streams) {
-      const e = sums.get(s.group.name);
-      if (e) e.sum += s.k; else sums.set(s.group.name, { sum: s.k, holds: s.holds });
+      const key = byId ? s.group.id : s.group.name;
+      const e = sums.get(key);
+      if (e) e.sum += s.k; else sums.set(key, { sum: s.k, holds: s.holds, name: s.group.name, id: s.group.id });
     }
   }
-  const out: { name: string; mean: number; holds: boolean }[] = [];
-  sums.forEach((v, name) => out.push({ name, mean: v.sum / rolls, holds: v.holds }));
+  const out: { name: string; mean: number; holds: boolean; id?: SpawnGroup['id'] }[] = [];
+  sums.forEach((v) => out.push(byId ? { name: v.name, mean: v.sum / rolls, holds: v.holds, id: v.id } : { name: v.name, mean: v.sum / rolls, holds: v.holds }));
   return out;
+}
+export function lineOfMean(plan: WavePlan, m: { name: string; id?: SpawnGroup['id'] }): SpawnGroup | undefined {
+  if (SMALL_FIX.G779 !== 0 && m.id !== undefined) {
+    const g = plan.groups.find(q => q.id === m.id) ?? (plan.specials ?? []).flatMap(s => s.groups).find(q => q.id === m.id) ?? (plan.overrides ?? []).flatMap(o => o.groups).find(q => q.id === m.id);
+    if (g) return g;
+  }
+  return plan.groups.find(g => g.name === m.name) ?? (plan.specials ?? []).flatMap(s => s.groups).find(g => g.name === m.name) ?? (plan.overrides ?? []).flatMap(o => o.groups).find(g => g.name === m.name);
 }

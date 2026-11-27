@@ -6,6 +6,7 @@ import { flattenLayerPath, pathOfLayerShape } from '../../utils/layerPath';
 import { layerOutlineOf, layerSolidOf } from '../../utils/layerOutline';
 import { solidStill, solidStillOutline } from '../../utils/solidArras';
 import { tankSizeFromSlider } from '../../game/GameLogic';
+import { SMALL_FIX } from '../../game/smallFixSwitch';
 
 const PAPER_DARK = '#111112';
 const PAPER_LIGHT = '#fffffe';
@@ -246,15 +247,19 @@ function handleCursor(logic: GameLogic, h: number): string {
 }
 
 let _cx = NaN, _cy = NaN, _cz = NaN, _cT: string | null = null, _cS: string | null = null, _cL: string | null = null, _cP = false, _cWas = '';
+let _cbx = NaN, _cby = NaN, _cba = NaN, _cbw = NaN, _cbh = NaN;
 export function canvasGestureCursor(logic: GameLogic): string {
   const sub = logic.ceSubActive();
   if (logic.state.isTestMode || (!sub && (!logic.ceActive() || logic.cePlacing()))) return '';
   if (logic.pen.on) return 'var(--cur-crosshair)';
   if (logic.ce.phase === 2) return logic.ce.mode === 'move' ? 'var(--cur-grabbing)' : _cWas !== '' && _cWas !== 'var(--cur-move)' ? _cWas : 'var(--cur-crosshair)';
   const s = logic.state;
+  const b = SMALL_FIX.G951 !== 0 ? logic.ceBox() : null;
+  const bx = b !== null && b.ok ? b.cx : NaN, by = b !== null && b.ok ? b.cy : NaN, ba = b !== null && b.ok ? b.a : NaN, bw = b !== null && b.ok ? b.hw : NaN, bh = b !== null && b.ok ? b.hh : NaN;
   if (logic.mouseX === _cx && logic.mouseY === _cy && logic.zoom === _cz && s.selectedTurretId === _cT && s.autoSubTurretSelectedId === _cS
-      && s.activeBodyLayerId === _cL && logic.partPicked === _cP) return _cWas;
+      && s.activeBodyLayerId === _cL && logic.partPicked === _cP && Object.is(bx, _cbx) && Object.is(by, _cby) && Object.is(ba, _cba) && Object.is(bw, _cbw) && Object.is(bh, _cbh)) return _cWas;
   _cx = logic.mouseX; _cy = logic.mouseY; _cz = logic.zoom; _cT = s.selectedTurretId; _cS = s.autoSubTurretSelectedId; _cL = s.activeBodyLayerId; _cP = logic.partPicked;
+  _cbx = bx; _cby = by; _cba = ba; _cbw = bw; _cbh = bh;
   const h = logic.ceHandleAt();
   _cWas = h >= 0 ? handleCursor(logic, h) : logic.ceOverPick() ? 'var(--cur-move)' : '';
   return _cWas;

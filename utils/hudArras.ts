@@ -626,6 +626,11 @@ export function hudMsgKillLine(ownName: string, kind: string, boss: boolean): st
   return boss ? `You killed a visiting ${kind}.` : `You killed an unnamed ${kind}.`;
 }
 
+export function hudMsgAssistLine(killLine: string): string {
+  if (killLine === '') return '';
+  return killLine.endsWith('.') ? killLine.slice(0, -1) + ' (with some help).' : killLine + ' (with some help)';
+}
+
 export function hudMsgShapeKillLine(name: string): string {
   return name !== '' ? `You killed ${hudMsgWithArticle(name)}.` : '';
 }

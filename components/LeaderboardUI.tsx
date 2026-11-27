@@ -372,7 +372,7 @@ const TankPreviewMini: React.FC<{
         ctx.save();
         if (!t.autoCircleHidden) {
           ctx.beginPath();
-          ctx.rect(-effSizePx * 10, -effSizePx * 10, effSizePx * 20, effSizePx * 20);
+          { const _k942 = SMALL_FIX.G942 !== 0 ? 1000 : 10; ctx.rect(-effSizePx * _k942, -effSizePx * _k942, effSizePx * 2 * _k942, effSizePx * 2 * _k942); }
           const _cbSides = t.autoCircleBaseSides ?? 0;
           if (_cbSides >= 3) {
             const _cbDepth = autoBaseDepth(_cbSides, t.autoCircleBaseDepth);
@@ -512,7 +512,10 @@ const TankPreviewMini: React.FC<{
         ctx.fill();
 
         if (bLayer.showHealerCross) {
+          const _crossTurn = SMALL_FIX.R1010 !== 0 ? (bLayer.initialAngle || 0) : 0;
+          if (_crossTurn !== 0) ctx.rotate(_crossTurn);
           _lbDrawHealerCross(ctx, layerSizePx, screenStroke);
+          if (_crossTurn !== 0) ctx.rotate(-_crossTurn);
         }
     };
     const drawLayer = (bLayer: BodyLayer, layerSizePx: number, layerHalf: number, layerColor: string) => {

@@ -37,7 +37,7 @@ import { Modal, useModalClose } from '../kit/Modal';
 import { openContextMenu, type MenuEntry } from '../shell/ContextMenu';
 import { mapLoadDoor } from '../shell/doors';
 import type { Tool } from '../shell/engineTools';
-import { useEscapeOwner } from '../shared/escapeStack';
+import { useEscapeOwner, useSearchEscape } from '../shared/escapeStack';
 import { useBackdropClose } from '../shared/useBackdropClose';
 import { TabSlide } from '../kit/TabSlide';
 import { usePortalMenuScale, useFitScale } from '../../utils/useMenuScale';
@@ -404,7 +404,8 @@ const ProjectHubWindow: React.FC<{ logic: GameLogic; setTool: (t: Tool) => void;
     }).finally(() => setProgress(null));
   }, [hub]);
   useEscapeOwner(close);
-  useEscapeOwner(() => setSelectedKey(null), selectedKey !== null && renamingKey === null && detailsId === null);
+  const srch770 = useSearchEscape(query, () => setQuery(''));
+  useEscapeOwner(() => setSelectedKey(null), selectedKey !== null && renamingKey === null && detailsId === null && !srch770.active);
   const onKeyDown = (ev: React.KeyboardEvent) => {
     if (ev.key !== 'Escape') ev.stopPropagation();
     const t = ev.target as HTMLElement;
@@ -469,6 +470,7 @@ const ProjectHubWindow: React.FC<{ logic: GameLogic; setTool: (t: Tool) => void;
               <div className="k-search-host relative flex-1 max-w-[520px] mx-auto">
                 <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--k-search-icon)] pointer-events-none" />
                 <input ref={searchRef} type="text" value={query} maxLength={TEXT_LIMITS.SEARCH} onChange={e => setQuery(e.target.value)} dir="auto"
+                  onFocus={srch770.onFocus} onBlur={srch770.onBlur}
                   onKeyDown={e => { if (e.key === 'Escape' && query) { e.preventDefault(); e.stopPropagation(); setQuery(''); } }}
                   placeholder="Search projects and files"
                   className="k-text-in k-search-bar w-full h-9 pl-9 pr-16 rounded-lg text-[13px] bg-[var(--k-search-bg)] border border-[var(--alpha-card-border)] shadow-[var(--shadow-input)] text-[var(--text-primary)] placeholder:text-[var(--k-placeholder)] outline-none" />

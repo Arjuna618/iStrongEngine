@@ -1525,6 +1525,11 @@ function dragShapeHandle(logic: GameLogic, ps: PickedShape, fx: number, fy: numb
   }
   me.vtxShape = shapeToBox(orig, from, x0, y0, x1, y1);
 }
+function samePts(a: readonly number[], b: readonly number[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
 function shapeWithPts(orig: AreaShape, pts: number[]): AreaShape {
   const s: AreaShape = { k: 'poly', pts };
   if (orig.rot !== undefined) s.rot = orig.rot;
@@ -1559,6 +1564,7 @@ function commitShapeEdit(logic: GameLogic): void {
     return;
   } else {
     if (shape === ps.sh || (code < VTX_BOX && !moved)) return;
+    if (SMALL_FIX.G974 !== 0 && shape.k === 'poly' && ps.sh.k === 'poly' && samePts(shape.pts!, ps.sh.pts!)) return;
     next = shape;
     if (next.k === 'poly') {
       const merged = mergeTwins(next.pts!);
@@ -1590,7 +1596,16 @@ export function nudgePickedPoints(logic: GameLogic, dx: number, dy: number): boo
   const sels = liveSels(me, ps.sh);
   if (sels.length === 0) return false;
   const st = ps.ref.state, id = ps.z.id;
-  const s2 = shapeWithPts(ps.sh, keepOnGrid(movePoints(ps.sh.pts!, sels, dx, dy), st.gridCells, st.gridCellsY));
+  let moved = keepOnGrid(movePoints(ps.sh.pts!, sels, dx, dy), st.gridCells, st.gridCellsY);
+  if (SMALL_FIX.G974 !== 0 && samePts(moved, ps.sh.pts!)) return true;
+  if (SMALL_FIX.G973 !== 0) {
+    const merged = mergeTwins(moved);
+    if (merged.length !== moved.length) {
+      if (nPts(merged) < 3) return true;
+      moved = merged; me.vtxSels = []; me.vtxSel = -1;
+    }
+  }
+  const s2 = shapeWithPts(ps.sh, moved);
   logic.endMapEditStroke();
   logic.applyMapEdit(ps.ref.areaId, cfg => opShapeZone(cfg, id, s2, st.gridCells, st.gridCellsY));
   if (logic.onStateChange) logic.onStateChange(logic.state);

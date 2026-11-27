@@ -12,6 +12,7 @@ import { turretFill, setGameDarkMode, isGameDark, mapBodyColor, bodyFill, healer
 import { cmMapOf } from '../utils/colorMap';
 import { drawOtherList } from '../utils/otherDraw';
 import { layerOutlineOf, strokeFillLayerOutline, layerSolidOf, strokeFillLayerSolid } from '../utils/layerOutline';
+import { SMALL_FIX } from '../game/smallFixSwitch';
 import { layerIsPlaced, layerPlaceInto, layerPlaceReach } from '../utils/canvasParts';
 const _tpLp: number[] = [0, 0];
 const _tpScratch = new PartScratch();
@@ -102,7 +103,7 @@ function mapVal(val: number, inMin: number, inMax: number, outMin: number, outMa
     return (val - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
 }
 
-function computeMaxExtent(
+export function computeMaxExtent(
     turrets: Turret[] | undefined,
     tankSizePx: number,
     tankSides: number,
@@ -119,6 +120,8 @@ function computeMaxExtent(
             const layerHalf = (tankSizePx / 2) * layer.sizeRatio;
             const layerRadius = layer.sides >= 3 ? layerHalf * getRealSizeFactor(layer.sides) : layerHalf;
             maxExtent = Math.max(maxExtent, layerRadius);
+            const _o768 = SMALL_FIX.G768 !== 0 ? layerOutlineOf(layer) : null;
+            if (_o768 !== null) for (let k = 0; k < _o768.length; k++) maxExtent = Math.max(maxExtent, Math.hypot(_o768[k][0], _o768[k][1]) * layerHalf);
         }
     }
 
@@ -232,6 +235,14 @@ export function computeCircumcircle(
                 for (let i = 0; i < intS; i++) {
                     const theta = (Math.PI * 2 * i) / intS + initAngle;
                     _ccPoints.push([Math.cos(theta) * vH + plx, Math.sin(theta) * vH + ply]);
+                }
+            }
+            const _o768c = SMALL_FIX.G768 !== 0 ? layerOutlineOf(layer) : null;
+            if (_o768c !== null) {
+                const nC = layer.copies > 1 ? layer.copies : 1;
+                for (let c = 0; c < nC; c++) {
+                    const a = (layer.initialAngle || 0) + (Math.PI * 2 * c) / nC, ca = Math.cos(a), sa = Math.sin(a);
+                    for (let k = 0; k < _o768c.length; k++) { const ox = _o768c[k][0], oy = _o768c[k][1]; _ccPoints.push([(ox * ca - oy * sa) * layerHalf + plx, (ox * sa + oy * ca) * layerHalf + ply]); }
                 }
             }
         }
@@ -654,7 +665,7 @@ const TankPreview2D: React.FC<Props> = ({ tankConfig, size = 100, animate = true
           ctx.save();
           if (!t.autoCircleHidden) {
             ctx.beginPath();
-            ctx.rect(-effSizePx * 10, -effSizePx * 10, effSizePx * 20, effSizePx * 20);
+            { const _k942 = SMALL_FIX.G942 !== 0 ? 1000 : 10; ctx.rect(-effSizePx * _k942, -effSizePx * _k942, effSizePx * 2 * _k942, effSizePx * 2 * _k942); }
             const _cbSides = t.autoCircleBaseSides ?? 0;
             if (_cbSides >= 3) {
               const _cbDepth = autoBaseDepth(_cbSides, t.autoCircleBaseDepth);
@@ -810,7 +821,10 @@ const TankPreview2D: React.FC<Props> = ({ tankConfig, size = 100, animate = true
           ctx.fill();
 
           if (bLayer.showHealerCross) {
+            const _crossTurn = SMALL_FIX.R1010 !== 0 ? (bLayer.initialAngle || 0) : 0;
+            if (_crossTurn !== 0) ctx.rotate(_crossTurn);
             _tpDrawHealerCross(ctx, layerSizePx, screenStroke);
+            if (_crossTurn !== 0) ctx.rotate(-_crossTurn);
           }
       };
       const drawLayer = (bLayer: BodyLayer, layerSizePx: number, layerHalf: number, layerColor: string) => {

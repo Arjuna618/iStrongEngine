@@ -1,4 +1,5 @@
 import { shortcutKey } from '../../utils/shortcutKey';
+import { SMALL_FIX } from '../../game/smallFixSwitch';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { GameLogic } from '../../game/GameLogic';
 import type { SolidDesign } from '../../types';
@@ -167,7 +168,7 @@ function makeView(ed: SolidEdit) {
       if (ed.live !== vs.liveMark) vs.liveDirty = false;
       else if (time - vs.liveAt >= SOLID_LIVE.MS) { vs.liveDirty = false; vs.liveAt = time; ed.touchLive(); }
     }
-    if (again) schedule();
+    if (again || (SMALL_FIX.G953 !== 0 && vs.liveDirty)) schedule();
   };
   const liveMoved = (): void => {
     if (!vs.liveDirty) { vs.liveDirty = true; vs.liveMark = ed.live; }
@@ -203,7 +204,13 @@ function makeView(ed: SolidEdit) {
   };
   const changed = (): void => {
     const target = Math.max(SOLID_VIEW_MIN_REACH, ed.reach());
-    if (ed.faces !== vs.facesSeen) { vs.facesSeen = ed.faces; vs.reachShown = target; camReset(vs.cam); }
+    if (ed.faces !== vs.facesSeen) {
+      if (SMALL_FIX.G992 !== 0 && vs.drag === 2) {
+        try { vs.cv?.releasePointerCapture(vs.pointerId); } catch { }
+        vs.drag = 0; vs.pointerId = -1; vs.liveDirty = false; setCursor();
+      }
+      vs.facesSeen = ed.faces; vs.reachShown = target; camReset(vs.cam);
+    }
     vs.reachTarget = target;
     schedule();
   };

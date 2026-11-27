@@ -43,7 +43,7 @@ const foldGroup = (id: string) => {
 type Line =
   | { kind: 'group'; g: TurretGroup; members: number[] }
   | { kind: 'turret'; i: number; inGroup: boolean }
-  | { kind: 'sub'; i: number; s: number };
+  | { kind: 'sub'; i: number; s: number; inGroup: boolean };
 
 const H_GROUP = 34, H_TURRET = 48, H_SUB = 28;
 
@@ -104,7 +104,7 @@ export const InstalledTurretsList: React.FC<Props> = ({
       out.push({ kind: 'turret', i, inGroup });
       const t = turrets[i];
       if (t.turretType === 'auto' && t.autoSubTurrets && t.autoSubTurrets.length > 0 && onEditAutoTurret)
-        for (let s = 0; s < t.autoSubTurrets.length; s++) out.push({ kind: 'sub', i, s });
+        for (let s = 0; s < t.autoSubTurrets.length; s++) out.push({ kind: 'sub', i, s, inGroup });
     };
     turrets.forEach((t, i) => {
       const g = !flat && t.groupId ? byId.get(t.groupId) : undefined;
@@ -225,7 +225,8 @@ export const InstalledTurretsList: React.FC<Props> = ({
     if (l.kind === 'sub') {
       const t = turrets[l.i], sub = t.autoSubTurrets[l.s];
       return (
-        <button type="button" onClick={() => onEditAutoTurret?.(t.id)} className={`k-subrow k-subrow-line${l.s === t.autoSubTurrets.length - 1 ? ' k-subrow-last' : ''}`}>
+        <button type="button" onClick={() => onEditAutoTurret?.(t.id)} className={`k-subrow k-subrow-line${l.s === t.autoSubTurrets.length - 1 ? ' k-subrow-last' : ''}${l.inGroup ? ' k-subrow-in' : ''}`}>
+          <span className="k-subrow-grail" />
           <CornerDownRight size={12} className="shrink-0" />
           <span className="k-fade">{sub.name || `Sub #${l.s + 1}`} ({sub.turretType === 'decorative' ? 'Decorative' : 'Standard'})</span>
         </button>

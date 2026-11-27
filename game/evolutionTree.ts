@@ -69,6 +69,7 @@ import { DEFAULT_TURRET_CONFIG } from '../types';
 import { CM, CM_USE, CM_ARRAS_LIGHT, CM_ARRAS_DARK, cmHex } from '../utils/colorMap';
 import type { TankConfig, Turret, ExportFile, LibraryItem } from '../types';
 import { standInBossCopies } from './bossCopies';
+import { SMALL_FIX } from './smallFixSwitch';
 import { TREE_PAGES, BOOK_TREE_ENTRIES, withPageCards, bookTreeRootOf, isBookTreeKey, standInBookTreeFiles, bookTreeFileKey } from './bookTrees';
 
 const COLOR_IDX: Record<string, number> = {
@@ -327,7 +328,8 @@ export function matchTreeVersion(): number { return _mtVersion; }
 export function clearMatchTree(): void { if (_mtGroups !== null) { _mtGroups = null; _mtRoot = null; _mtVersion++; } }
 export function swapMatchTree(from: string, to: string | undefined): void {
   const groups = _mtGroups ?? (_mtGroups = new Map());
-  for (const parent of Object.keys(FULL_EVOLUTION_TREE)) {
+  const parents = SMALL_FIX.G868 !== 0 ? [...new Set([...Object.keys(FULL_EVOLUTION_TREE), ...groups.keys()])] : Object.keys(FULL_EVOLUTION_TREE);
+  for (const parent of parents) {
     const now = groups.get(parent) ?? FULL_EVOLUTION_TREE[parent];
     let changed: EvolutionEntry[] | null = null;
     for (let i = 0; i < now.length; i++) {

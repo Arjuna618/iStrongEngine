@@ -4,6 +4,7 @@ import { drawingOf, drawingSites } from '../../modeDrawings';
 import { teamSlot, teamCaps, roleRules } from './objectives';
 import { BASE_AREAS } from '../../baseAreasSwitch';
 import { SMALL_FIX } from '../../smallFixSwitch';
+import { AI_CONSTANTS } from '../../../types';
 
 export interface MissingWorld {
   events: MapEventsDoc;
@@ -180,7 +181,10 @@ function ctfWorld(drawingKey: string | undefined): MissingWorld {
   }
   for (let t = 1; t <= 2; t++) {
     const cap = t === 1 ? 'BLUE' : 'GREEN';
-    rules.push(M.rule(folderWin, `${cap} Wins`, [M.row('count.crossed', { tag: M.ref(sideTags[2 - t]), n: 0, dir: 'fallsTo' })], [], [M.say(`${cap} HAS WON THE GAME!`), M.row('match.end', { result: 'win', team: `team${t}`, then: 'closeArena' })], { once: true }));
+    const winSteps = [M.say(`${cap} HAS WON THE GAME!`), M.row('match.end', { result: 'win', team: `team${t}`, then: 'closeArena' })];
+    rules.push(SMALL_FIX.G875 !== 0
+      ? M.rule(folderWin, `${cap} Wins`, [M.row('count.crossed', { tag: M.ref(sideTags[2 - t]), n: 0, dir: 'fallsTo' })], [], [M.row('if', { cond: [M.row('cmp', { a: { f: `{${sideTags[2 - t].id}}` }, op: 'eq', b: 0 })], then: winSteps, else: [] })])
+      : M.rule(folderWin, `${cap} Wins`, [M.row('count.crossed', { tag: M.ref(sideTags[2 - t]), n: 0, dir: 'fallsTo' })], [], winSteps, { once: true }));
   }
   const roles = roleRules(M, folderBots, postTag, postTag, { guardShare: 35 });
   rules.push(...roles.rules);
@@ -219,7 +223,7 @@ function nexusWorld(): MissingWorld {
   const laby = M.area('Labyrinth Room Portal', { gx: 3, gy: 14, cw: 1, ch: 2 }, { opacity: 0 }, []);
   const forge = M.area('Forge Room Portal', { gx: 15, gy: 14, cw: 1, ch: 2 }, { opacity: 0 }, []);
   M.area('Labyrinth Gate', { gx: 3, gy: 12, cw: 1, ch: 1 }, { colorMap: 12, opacity: 0.3 }, []);
-  M.area('Building', { gx: 2, gy: 5, cw: 15, ch: 12 }, { opacity: 0 }, [M.row('peace', {}), M.row('spawnPlace', { teams: ['team1', 'team5', 'player'], enabledAtStart: true })]);
+  M.area('Building', { gx: 2, gy: 5, cw: 15, ch: 12 }, { opacity: 0 }, [M.row('peace', {}), M.row('spawnPlace', { teams: AI_CONSTANTS.NEXUS_JOIN !== 0 ? ['team5'] : ['team1', 'team5', 'player'], enabledAtStart: true })]);
   const outside = M.area('Outside', { gx: 0, gy: 0, cw: 23, ch: 4 }, { opacity: 0 }, [M.row('keepOut', { chance: MISSING.NEXUS_CROSS, hold: MISSING.NEXUS_CROSS_HOLD })]);
   (outside as unknown as { more: { gx: number; gy: number; cw: number; ch: number }[] }).more = [
     { gx: 0, gy: 4, cw: 1, ch: 15 }, { gx: 18, gy: 4, cw: 5, ch: 15 }, { gx: 1, gy: 18, cw: 17, ch: 1 }, { gx: 10, gy: 4, cw: 1, ch: 1 }];

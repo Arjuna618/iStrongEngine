@@ -192,10 +192,15 @@ export function editorLabelsDraw(
   const now = performance.now();
   let quads = 0, o = 0;
   for (let i = 0; i < n && quads < 8; i++) {
-    const e = _atlas.get(texts[i], f10, l10, dark, now, _sink);
+    let e = _atlas.get(texts[i], f10, l10, dark, now, _sink);
+    let k991 = 1;
+    if (e === null && SMALL_FIX.G991 !== 0 && _atlas.miss === 3) {
+      const ff10 = Math.floor(f10 * _atlas.fit * 0.97);
+      if (ff10 >= 1) { e = _atlas.get(texts[i], ff10, Math.max(1, Math.round(l10 * ff10 / f10)), dark, now, _sink); if (e !== null) k991 = f10 / ff10; }
+    }
     if (e === null) continue;
     e.lastUse = now;
-    _lblQuads[o] = xs[i]; _lblQuads[o + 1] = ys[i]; _lblQuads[o + 2] = e.bw; _lblQuads[o + 3] = e.bh; _lblQuads[o + 4] = 1;
+    _lblQuads[o] = xs[i]; _lblQuads[o + 1] = ys[i]; _lblQuads[o + 2] = e.bw * k991; _lblQuads[o + 3] = e.bh * k991; _lblQuads[o + 4] = 1;
     _lblQuads[o + 5] = e.u0; _lblQuads[o + 6] = e.v0; _lblQuads[o + 7] = e.uw; _lblQuads[o + 8] = e.vh;
     o += TAG_QUAD_FLOATS; quads++;
   }

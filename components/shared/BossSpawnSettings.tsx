@@ -198,13 +198,21 @@ export const BossSpawnSettings: React.FC<Props> = ({ config, updateConfig, tankL
     if (SMALL_FIX.R811) { toast('success', `Deleted "${before[index].name}". Ctrl Z brings it back.`); if (logic) pushUndoAction(logic, samePlace(() => { keysRef.current = beforeKeys; latestUpdate.current({ bossGroups: before }); })); }
   };
 
+  const strengthRow = (
+    <ToggleItem
+      label="Strength For Every Boss"
+      checked={bossStrengthEveryWay(config)}
+      onChange={v => updateConfig({ bossStrengthEveryWay: v })}
+      desc="A boss from these groups has its group's Strength however it comes: from the Spawn Tool, a command, a Map Events Entity Type with no Strength of its own, or a boss you take over and play. Off: only the bosses this system brings and $spawnboss calls."
+    />
+  );
   return (
     <>
       <ToggleItem
         label="Spawn Bosses"
         checked={enabled}
         onChange={v => {
-          if (v && groups.length === 0) updateConfig({ enableBossSpawns: true, bossGroups: defaultBossGroups() });
+          if (v && groups.length === 0 && (SMALL_FIX.G813 === 0 || !Array.isArray(config.bossGroups))) updateConfig({ enableBossSpawns: true, bossGroups: defaultBossGroups() });
           else updateConfig({ enableBossSpawns: v });
         }}
         desc="One boss roams the map at a time. When it dies, another arrives after a delay."
@@ -278,12 +286,7 @@ export const BossSpawnSettings: React.FC<Props> = ({ config, updateConfig, tankL
           )}
 
 
-          <ToggleItem
-            label="Strength For Every Boss"
-            checked={bossStrengthEveryWay(config)}
-            onChange={v => updateConfig({ bossStrengthEveryWay: v })}
-            desc="A boss from these groups has its group's Strength however it comes: from the Spawn Tool, a command, a Map Events Entity Type with no Strength of its own, or a boss you take over and play. Off: only the bosses this system brings and $spawnboss calls."
-          />
+          {strengthRow}
           <ToggleItem
             label="Bosses Can Grow"
             checked={canGrow}
@@ -297,6 +300,9 @@ export const BossSpawnSettings: React.FC<Props> = ({ config, updateConfig, tankL
             desc="Lets bosses from the boss spawn system travel through portals and wormholes like other bots. Off: they keep away from every portal, are pushed out of it and never travel. A portal with Blacklist Bosses on always keeps them out."
           />
         </div>
+      </Reveal>
+      <Reveal when={SMALL_FIX.G812 !== 0 && !enabled}>
+        <div className="mt-1">{strengthRow}</div>
       </Reveal>
     </>
   );

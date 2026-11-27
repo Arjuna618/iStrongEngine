@@ -438,7 +438,7 @@ export const DOCS_BASICS: DocCategory = {
               ['Room for everything', 'While the tiles and the skill buttons are shown, the sticks get a little smaller and lower, and the minimap and the leaderboard a little smaller, so nothing covers anything. The leaderboard may show only its top rows. Everything grows back smoothly when they go.'],
             ] },
             { t: 'kv', title: 'Leaving and the screen', rows: [
-              ['Back in a match', 'The phone\'s Back button opens the pause menu, the same as **Escape**.'],
+              ['Back in a match', 'The phone\'s Back button opens the pause menu, the same as **Escape**. With a window open over the pause menu, Back closes that window first and the game stays paused.'],
               ['Back in the menus', 'Back asks before the page is left. Where the browser can ask by itself, it shows its own question. Where it cannot, on an iPhone or iPad, or when the game is the first page of its tab, the **Leave the Game?** window opens and the game stays: press Back again to leave, or **Stay** to keep playing.'],
               ['The screen stays on', 'During a match the screen does not dim or lock. Browsers allow this only on a secure address, one that starts with https.'],
               ['The camera hole', 'In a match the game also fills the strip beside the camera hole, and every button stays clear of it.'],

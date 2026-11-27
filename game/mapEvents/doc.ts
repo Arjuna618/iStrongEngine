@@ -425,6 +425,7 @@ export function docHasContent(doc: MapEventsDoc | null | undefined): boolean {
 }
 export function docHasWork(doc: MapEventsDoc | null | undefined): boolean {
   if (docHasContent(doc)) return true;
+  if (doc && SMALL_FIX.G866 !== 0 && (doc.areaGroups?.length || doc.folders?.length)) return true;
   return !!(doc && SMALL_FIX.R897 !== 0 && (doc.statuses?.length || doc.signals?.length || doc.tags?.length));
 }
 
@@ -438,6 +439,20 @@ export function docStockKey(doc: MapEventsDoc | null | undefined): string {
 }
 export function zonesStockKey(zones: readonly ZoneLike[] | null | undefined): string {
   return JSON.stringify((zones ?? []).filter(z => z && (z as { modeBase?: boolean }).modeBase !== true).slice().sort((a, b) => a.id - b.id));
+}
+export function laidBaseKey(z: ZoneLike): string {
+  const o: Record<string, unknown> = { ...(z as unknown as Record<string, unknown>) };
+  for (const k of ['id', 'uid', 'gx', 'gy', 'cw', 'ch', 'modeBase', 'modeName', 'shape', 'more']) delete o[k];
+  const n = z as { name?: string; modeName?: string };
+  if (n.name === undefined || (n.modeName !== undefined ? n.name === n.modeName : /^(Blue|Red|Green|Purple) Base$/.test(n.name))) delete o.name;
+  if (Array.isArray(o.behaviors)) o.behaviors = (o.behaviors as { id: number; a?: Record<string, unknown> }[]).map(b => {
+    const a = b.a && typeof b.a === 'object' ? { ...b.a } : b.a;
+    if (a) delete a.guardsFor;
+    return { ...b, id: 0, a };
+  });
+  const s: Record<string, unknown> = {};
+  for (const k of Object.keys(o).sort()) s[k] = o[k];
+  return JSON.stringify(s);
 }
 
 export function docIsOnlyGuards(doc: MapEventsDoc | null | undefined): boolean {

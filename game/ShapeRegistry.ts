@@ -3,6 +3,7 @@ import { CM, CM_USE, cmHex, cmMapOf } from '@/utils/colorMap';
 import { solidOf } from '@/utils/solidArras';
 import { acTick, acRainbowHex, acTransHex, acFlashIsFirst, AC_FLASH_SLOTS, AC_UI, AC_WORLD } from '@/utils/animColorArras';
 import { SHAPES_ARRAS, SHAPE_SCORES } from './shapesSwitch';
+import { SMALL_FIX } from './smallFixSwitch';
 import { SHAPE_BOOK, SHAPE_BOOK_SCORE, SHAPE_SCORE_RARE_TIMES } from './shapeBook.generated';
 import type { ShapeBookRow } from './shapeBook.generated';
 import { makeShapeLook, type ShapeLook } from '@/utils/shapeLook';
@@ -904,6 +905,26 @@ const USER_SHAPE_SLUG_MAX = 48;
 
 export function makeUserShapeId(name: string): string {
   return USER_SHAPE_ID_PREFIX + (nameSlug(name, USER_SHAPE_SLUG_MAX) || 'shape');
+}
+export function savedShapeNameClash(library: readonly { id: string; fileData: { type: string; data: unknown } }[], file: { type: string; data: unknown }): string | null {
+  if (file.type !== 'FoodShape') return null;
+  const d = file.data as { shapeId?: string; name?: string };
+  const hit = library.find(l => l.id === 'shape-' + d.shapeId && l.fileData.type === 'FoodShape');
+  if (!hit) return null;
+  const was = String((hit.fileData.data as { name?: string }).name ?? '').trim();
+  return was !== String(d.name ?? '').trim() ? was : null;
+}
+export function savedLookNameClash(solids: readonly { id: string; fileData: { type: string; data: unknown } }[], others: readonly { id: string; fileData: { type: string; data: unknown } }[], file: { type: string; data: unknown }): string | null {
+  if (SMALL_FIX.R1016 === 0 || (file.type !== 'Solid' && file.type !== 'Other')) return null;
+  const d = file.data as { solidId?: string; otherId?: string; name?: string };
+  const id = file.type === 'Solid' ? 'user-solid/' + d.solidId : 'other-' + d.otherId;
+  const hit = (file.type === 'Solid' ? solids : others).find(l => l.id === id && l.fileData.type === file.type);
+  if (!hit) return null;
+  const was = String((hit.fileData.data as { name?: string }).name ?? '').trim();
+  return was !== String(d.name ?? '').trim() ? was : null;
+}
+export function lookClashWords(type: string): string {
+  return type === 'Solid' ? 'Another saved 3D solid already uses this name. Pick a different name.' : 'Another saved Others file already uses this name. Pick a different name.';
 }
 export function makeUserShapeIdLegacy(name: string): string {
   return USER_SHAPE_ID_PREFIX + (nameSlugLegacy(name, USER_SHAPE_SLUG_MAX) || 'shape');

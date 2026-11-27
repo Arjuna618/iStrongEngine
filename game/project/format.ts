@@ -2,6 +2,7 @@ import { canonicalBytes, canonicalStringify, safeParse, textOf, bytesOf, Project
 import { sha256Hex } from './hash';
 import { readZip, writeZip, ZipError, ZIP_LIMITS, zipNameOk, type ZipLimits, type ZipEntryIn } from './zip';
 import { SMALL_FIX } from '../smallFixSwitch';
+import { cutName } from './hubNaming';
 
 export const PROJECT_MIME = 'application/x-istrong-project';
 export const BACKUP_MIME = 'application/x-istrong-backup';
@@ -258,7 +259,7 @@ export async function unpackBackup(bytes: Uint8Array, limits: ZipLimits = ZIP_LI
   const items: BackupItem[] = [];
   for (const raw of idx.items as Record<string, unknown>[]) {
     if (!raw || typeof raw !== 'object') continue;
-    const name = typeof raw.name === 'string' ? raw.name.slice(0, 200) : 'Unnamed';
+    const name = typeof raw.name === 'string' ? cutName(raw.name, 200) : 'Unnamed';
     const id = typeof raw.id === 'string' ? raw.id.slice(0, 80) : '';
     const meta = raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta) ? raw.meta as Record<string, unknown> : {};
     if (raw.kind === 'project' && Array.isArray(raw.versions)) {

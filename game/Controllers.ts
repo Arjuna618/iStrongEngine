@@ -1251,7 +1251,7 @@ function controllerDisableOnOverride(
     bullet.opacity = Math.max(30, bullet.opacity - 5 * (_fsK > 0 ? _fsK : 1));
     io.fire = false;
     io.power = 0;
-  } else if (bullet.opacity < 255) {
+  } else if (bullet.opacity < 255 && !(SMALL_FIX.G929 !== 0 && bullet._invisEnabled)) {
     bullet.opacity = Math.min(255, bullet.opacity + 5 * (_fsK > 0 ? _fsK : 1));
   }
 }

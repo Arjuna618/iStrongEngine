@@ -115,7 +115,7 @@ export const MapEventsWindow: React.FC<{ logic: GameLogic; areaId: string; page:
       case 'vars': return <VarsPage ctx={ctx} />;
       case 'timers': return <TimersPage ctx={ctx} />;
       case 'names': return <NamesPage ctx={ctx} />;
-      case 'statuses': return <StatusesPage ctx={ctx} />;
+      case 'statuses': return <StatusesPage ctx={ctx} focus={focus} />;
       case 'sequences': return <SequencesPage ctx={ctx} />;
       case 'groups': return <TankGroupsPage ctx={ctx} focus={focus} />;
       case 'match': return <MatchPage ctx={ctx} />;

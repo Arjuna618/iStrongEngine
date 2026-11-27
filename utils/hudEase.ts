@@ -1,3 +1,4 @@
+import { SMALL_FIX } from '../game/smallFixSwitch';
 export function hudEase(a: number, t: number): number {
   if (a <= 1) { const q = Math.pow(a, 0.2) - t; return q > 0 ? Math.pow(q, 5) : 0; }
   const l = Math.log(a);
@@ -22,7 +23,8 @@ export function hudEaseStep(rec: HudEaseRecord, S: number, clockUs: number): num
   const m = clockUs > 1 ? clockUs : 1;
   const t = (m > rec.stampUs ? m - rec.stampUs : 0) / 1000000 / 0.7;
   const d = rec.x - rec.T;
-  const x2 = rec.T + (signum(d) * hudEase(Math.abs(d), t));
+  let x2 = rec.T + (signum(d) * hudEase(Math.abs(d), t));
+  if (SMALL_FIX.G829 !== 0 && x2 === rec.x && x2 !== S && Math.abs(x2 - S) <= Math.abs(S) * 2e-15) x2 = S;
   rec.stampUs = m;
   rec.x = x2;
   rec.T = S;

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import type { GameLogic } from '../../game/GameLogic';
 import { kindOf, kindsOf, SPARE_WORD_SHOWN, darkStepHides, type Family, type Field, type KindDef, type RefOf } from '../../game/mapEvents/registry';
 import { SIDE_WORDS } from '../../game/mapEvents/doc';
@@ -14,17 +14,18 @@ import { InlineMotion } from '../kit/TagLine';
 import { HelpTooltip } from '../shared/HelpTooltip';
 import { helpOfLabel, helpWithPick, OPTION_HELP, TARGET_HELP } from './fieldHelp';
 import { DropMenu, menuOpen, useDropMenu } from '../kit/DropMenu';
+import { SMALL_FIX } from '../../game/smallFixSwitch';
 import { NumberBox } from '../kit/NumberBox';
 import { EvSelect } from './EvSelect';
 import type { SelectGroup } from '../shared/CustomSelect';
 import { ContentLibrary } from '../library/ContentLibrary';
 import type { LibMode } from '../library/libraryModes';
 import type { LibEntry, LibKind } from '../library/catalog';
-import { OTHER_HEAD, PROJECTILE_HEAD, SHAPE_HEAD, TURRET_HEAD } from '../../game/mapEvents/thingWord';
+import { OTHER_HEAD, PROJECTILE_HEAD, SHAPE_HEAD, TURRET_HEAD, MAP_TANK_HEAD } from '../../game/mapEvents/thingWord';
 import { WALL_RULES } from '../../game/wallTypes';
 import { CM_NAMES } from '../../utils/colorMap';
 import { colourWordShown, hexWordOf } from '../../game/mapEvents/colourWord';
-import { pickWordOf, shownNameOfWord } from '../../game/tankByName';
+import { pickWordOf, shownNameOfWord, fileKeyOf } from '../../game/tankByName';
 import { Plus, Trash2, ChevronDown, ChevronRight, Pencil, SlidersHorizontal, X, Shapes } from '../ui/icons';
 
 export const ZONES_KEY = '@zones';
@@ -57,7 +58,15 @@ const SmallNum: React.FC<{ value: number | undefined; onChange: (v: number | und
     <NumberBox className="k-field k-num-field" value={value ?? ''} step={step} min={min} placeholder={empty} onChange={e => { const n = num(e.target.value); onChange(n ?? undefined); }} />
   </label>
 );
-export const NumField: React.FC<{ value: Num | undefined; onChange: (v: Num) => void; unit?: string; min?: number; max?: number; plain?: boolean }> = ({ value, onChange, unit, min, max, plain }) => {
+const numShown = (v: unknown): Num | undefined => (SMALL_FIX.R1006 !== 0 && v !== undefined && typeof v !== 'number' && (v === null || typeof v !== 'object') ? undefined : v as Num | undefined);
+type EveryRule = { n: number; rem: number; mult: number };
+const everyWithFirst = (now: readonly EveryRule[] | undefined, first: EveryRule | null): EveryRule[] | undefined => {
+  const rest = SMALL_FIX.G775 !== 0 ? (now ?? []).slice(1) : [];
+  const l = first ? [first, ...rest] : rest;
+  return l.length ? l : undefined;
+};
+export const NumField: React.FC<{ value: Num | undefined; onChange: (v: Num) => void; unit?: string; min?: number; max?: number; plain?: boolean }> = ({ value: stored, onChange, unit, min, max, plain }) => {
+  const value = numShown(stored);
   const menu = useDropMenu({ estimatedHeight: 230, estimatedWidth: 320 });
   const mode = modeOfNum(value);
   const setMode = (m: NumMode) => {
@@ -91,10 +100,10 @@ export const NumField: React.FC<{ value: Num | undefined; onChange: (v: Num) => 
             <SmallNum label="Add Each Wave" help="How much it grows from one wave to the next." value={value.ramp.per} step={0.01} onChange={v => onChange({ ramp: { ...value.ramp, per: v } })} />
             <SmallNum label="Never Under" help="It never goes below this." value={value.ramp.min} step={0.1} onChange={v => onChange({ ramp: { ...value.ramp, min: v } })} />
             <SmallNum label="Never Over" help="It never goes above this." value={value.ramp.max} step={0.1} onChange={v => onChange({ ramp: { ...value.ramp, max: v } })} />
-            <SmallNum label="Every N Waves" help="Every this many waves it is multiplied." value={value.ramp.every?.[0]?.n} min={1} onChange={v => onChange({ ramp: { ...value.ramp, every: v ? [{ n: v, rem: value.ramp.every?.[0]?.rem ?? 1, mult: value.ramp.every?.[0]?.mult ?? 2 }] : undefined } })} />
+            <SmallNum label="Every N Waves" help="Every this many waves it is multiplied." value={value.ramp.every?.[0]?.n} min={1} onChange={v => onChange({ ramp: { ...value.ramp, every: everyWithFirst(value.ramp.every, v ? { n: v, rem: value.ramp.every?.[0]?.rem ?? 1, mult: value.ramp.every?.[0]?.mult ?? 2 } : null) } })} />
             {value.ramp.every?.[0] && (<>
-              <SmallNum label="At Wave" help="Which wave of the N it falls on." value={value.ramp.every[0].rem} min={0} onChange={v => onChange({ ramp: { ...value.ramp, every: [{ ...value.ramp.every![0], rem: v ?? 0 }] } })} />
-              <SmallNum label="Times" help="What it is multiplied by on those waves." value={value.ramp.every[0].mult} step={0.1} onChange={v => onChange({ ramp: { ...value.ramp, every: [{ ...value.ramp.every![0], mult: v ?? 1 }] } })} />
+              <SmallNum label="At Wave" help="Which wave of the N it falls on." value={value.ramp.every[0].rem} min={0} onChange={v => onChange({ ramp: { ...value.ramp, every: everyWithFirst(value.ramp.every, { ...value.ramp.every![0], rem: v ?? 0 }) } })} />
+              <SmallNum label="Times" help="What it is multiplied by on those waves." value={value.ramp.every[0].mult} step={0.1} onChange={v => onChange({ ramp: { ...value.ramp, every: everyWithFirst(value.ramp.every, { ...value.ramp.every![0], mult: v ?? 1 }) } })} />
             </>)}
           </>)}
           {mode === 'curve' && value && typeof value === 'object' && 'curve' in value && (
@@ -191,9 +200,15 @@ export const TankField: React.FC<{ value: string | undefined; onChange: (word: s
   );
 };
 
+const _THING_HEADS = [SHAPE_HEAD, OTHER_HEAD, PROJECTILE_HEAD, TURRET_HEAD, MAP_TANK_HEAD] as const;
 export function thingWordOf(e: LibEntry, lib: GameLogic['state']['tankLibrary']): string | null {
   switch (e.kind) {
-    case 'tank': return e.item ? pickWordOf(lib, e.item, false) : null;
+    case 'tank': {
+      if (!e.item) return null;
+      const w = pickWordOf(lib, e.item, false);
+      if (SMALL_FIX.G955 !== 0 && _THING_HEADS.some(h => w.startsWith(h))) { const k = fileKeyOf(e.item); return k !== '' && !_THING_HEADS.some(h => k.startsWith(h)) ? k : null; }
+      return w;
+    }
     case 'sentry': return e.id;
     case 'shape': return SHAPE_HEAD + e.id;
     case 'other': return e.item ? OTHER_HEAD + e.item.id : null;
@@ -257,10 +272,16 @@ const TeamSelect: React.FC<{ value: string | undefined; onChange: (v: string | u
   <EvSelect value={value ?? ''} onChange={v => onChange(v || undefined)} options={[{ value: '', label: none }, ...SIDE_WORDS.map(s => ({ value: s.word, label: s.shown }))]} />
 );
 
+export function headRest(k: string): [string, string | undefined] {
+  if (SMALL_FIX.G954 === 0) { const [h, r] = k.split(':'); return [h, r]; }
+  const i = k.indexOf(':');
+  return i < 0 ? [k, undefined] : [k.slice(0, i), k.slice(i + 1)];
+}
+
 export const WordsField: React.FC<{ value: string[]; onChange: (v: string[]) => void; ctx: EvCtx }> = ({ value, onChange, ctx }) => {
   const nameOfWord = (w: string): string => {
     if (SPARE_WORD_SHOWN[w]) return SPARE_WORD_SHOWN[w];
-    const [head, rest] = w.split(':');
+    const [head, rest] = headRest(w);
     if (head === 'tag') return `Tag: ${ctx.doc?.tags?.find(t => String(t.id) === rest)?.name ?? rest}`;
     if (head === 'type') return `Entity Type: ${ctx.doc?.types?.find(t => String(t.id) === rest)?.name ?? rest}`;
     if (head === 'cat') return `Folder: ${rest}`;
@@ -283,6 +304,13 @@ export const TeamsField: React.FC<{ value: string[]; onChange: (v: string[]) => 
     onAdd={k => onChange([...value, k])} onRemove={k => onChange(value.filter(w => w !== k))} />
 );
 
+export const ListText: React.FC<{ value: string; canon: (s: string) => string; onChange: (s: string) => void; on: boolean; placeholder?: string; maxLength?: number }> = ({ value, canon, onChange, on, placeholder, maxLength }) => {
+  const [raw, setRaw] = useState<string | null>(null);
+  const text = on && raw !== null && canon(raw) === value ? raw : value;
+  return <TextField value={text} placeholder={placeholder} maxLength={maxLength} onChange={s => { setRaw(s); onChange(s); }} />;
+};
+const wavesOf = (s: string): number[] => s.split(/[^0-9]+/).filter(Boolean).map(Number);
+const intsOf = (s: string): number[] => s.split(/[^0-9-]+/).filter(Boolean).map(Number);
 export const WaveTestField: React.FC<{ value: WaveTest | undefined; onChange: (v: WaveTest | undefined) => void }> = ({ value, onChange }) => {
   const v = value ?? {};
   const set = (patch: WaveTest) => { const n = { ...v, ...patch }; for (const k of Object.keys(n) as (keyof WaveTest)[]) if (n[k] === undefined) delete n[k]; onChange(Object.keys(n).length ? n : undefined); };
@@ -292,7 +320,7 @@ export const WaveTestField: React.FC<{ value: WaveTest | undefined; onChange: (v
       <SmallNum label="To Wave" help="The last wave it counts." empty="No End" value={v.to} min={0} onChange={x => set({ to: x })} />
       <SmallNum label="Every" help="3: every third wave." empty="1" value={v.every} min={1} onChange={x => set({ every: x })} />
       <label className="k-num"><span className="k-num-label"><HelpTooltip text="Exactly these waves, whatever the other three say." />Only These</span>
-        <TextField value={v.list?.join(', ') ?? ''} placeholder="5, 10, 15" onChange={s => { const l = s.split(/[^0-9]+/).filter(Boolean).map(Number); set({ list: l.length ? l : undefined }); }} />
+        <ListText on={SMALL_FIX.G782 !== 0} canon={s => wavesOf(s).join(', ')} value={v.list?.join(', ') ?? ''} placeholder="5, 10, 15" onChange={s => { const l = wavesOf(s); set({ list: l.length ? l : undefined }); }} />
       </label>
     </div>
   );
@@ -309,6 +337,8 @@ export const BodyTestField: React.FC<{ value: BodyTest | undefined; onChange: (v
     ...(v.colours ?? []).map(c => ({ key: `colour:${String(c)}`, label: `Colour: ${colourWordShown(c)}` })),
     ...(v.boss !== undefined ? [{ key: 'boss', label: v.boss ? 'Bosses' : 'No Bosses' }] : []),
     ...(v.player !== undefined ? [{ key: 'player', label: v.player ? 'The Player' : 'No Player' }] : []),
+    ...(SMALL_FIX.G864 !== 0 ? (v.forms ?? []).map(r => ({ key: `form:${r.id}`, label: `Form: ${r.n}` })) : []),
+    ...(SMALL_FIX.G864 !== 0 ? (v.groups ?? []).map(r => ({ key: `group:${r.id}`, label: `Wave Line: ${r.n}` })) : []),
   ];
   const offer = [
     { key: 'boss', label: 'Bosses' }, { key: 'player', label: 'The Player' },
@@ -321,7 +351,7 @@ export const BodyTestField: React.FC<{ value: BodyTest | undefined; onChange: (v
     if (k === 'boss') put({ boss: true });
     else if (k === 'player') put({ player: true });
     else {
-      const [h, r] = k.split(':');
+      const [h, r] = headRest(k);
       if (h === 'team') put({ teams: [...(v.teams ?? []), r] });
       else if (h === 'colour') put({ colours: [...(v.colours ?? []), Number(r)] });
       else if (h === 'type') put({ types: [...(v.types ?? []), { id: +r, n: choicesOf('type', ctx).find(x => x.id === +r)?.name ?? '' }] });
@@ -332,12 +362,14 @@ export const BodyTestField: React.FC<{ value: BodyTest | undefined; onChange: (v
     if (k === 'boss') put({ boss: undefined });
     else if (k === 'player') put({ player: undefined });
     else {
-      const [h, r] = k.split(':');
+      const [h, r] = headRest(k);
       if (h === 'team') put({ teams: v.teams?.filter(w => w !== r) });
       else if (h === 'colour') put({ colours: v.colours?.filter(c => String(c) !== r) });
       else if (h === 'type') put({ types: v.types?.filter(x => x.id !== +r) });
       else if (h === 'tag') put({ tags: v.tags?.filter(x => x.id !== +r) });
       else if (h === 'tank') put({ tanks: v.tanks?.filter(w => w !== r) });
+      else if (h === 'form') put({ forms: v.forms?.filter(x => x.id !== +r) });
+      else if (h === 'group') put({ groups: v.groups?.filter(x => x.id !== +r) });
     }
   };
   return (
@@ -483,7 +515,7 @@ export const FieldControl: React.FC<{ field: Field; value: unknown; path: Path; 
     case 'place': return <PlaceField value={value as PlaceV | undefined} ctx={ctx} onChange={onChange} />;
     case 'nums': { const list = (value as Num[] | undefined) ?? [];
       return <div className="k-ev-chips-wrap">{list.map((n, i) => <NumField key={i} value={n} onChange={v => { const a = list.slice(); a[i] = v; onChange(a); }} />)}<IconButton size="sm" label="Add A Number" onClick={() => onChange([...list, 0])}><Plus size={13} /></IconButton></div>; }
-    case 'ints': return <TextField value={((value as number[] | undefined) ?? []).join(', ')} onChange={s => onChange(s.split(/[^0-9-]+/).filter(Boolean).map(Number))} />;
+    case 'ints': return <ListText on={SMALL_FIX.G782 !== 0} canon={s => intsOf(s).join(', ')} value={((value as number[] | undefined) ?? []).join(', ')} onChange={s => onChange(intsOf(s))} />;
     case 'rows': return <OrderField value={value as Row | undefined} path={path} ctx={ctx} />;
     case 'steps': return <RowList family="step" list={(value as Row[] | undefined) ?? []} path={path} ctx={ctx} addLabel="Add A Step" />;
     case 'conds': return <RowList family="cond" list={(value as Row[] | undefined) ?? []} path={path} ctx={ctx} addLabel="Add A Test" />;
@@ -530,7 +562,7 @@ export const SpawnFields: React.FC<{ row: Row; path: Path; ctx: EvCtx }> = ({ ro
   return (
     <div className="k-ev-spawn">
       <Group title="How They Come" foldKey="spawn-how">
-        <Segmented<string> value={mode} onChange={v => put('mode', v)} block options={SPAWN_MODES} />
+        <Segmented<string> value={mode} onChange={v => { if (SMALL_FIX.G893 !== 0 && v === 'maxAlive' && a.maxAlive === 0) ctx.commit(d => setAt(setAt(d, [...base, 'mode'], v), [...base, 'maxAlive'], 1)); else put('mode', v); }} block options={SPAWN_MODES} />
         <SwapBox swapKey={mode}><div>{panel()}</div></SwapBox>
       </Group>
       <Reveal when={mode !== 'waves'}>{() => (<div className="k-ev-spawn">
@@ -582,50 +614,63 @@ export const FoodFields: React.FC<{ row: Row; path: Path; ctx: EvCtx }> = ({ row
 
 const PickOptions: React.FC<{ value: { weight: number; do: Row[] }[]; path: Path; ctx: EvCtx }> = ({ value, path, ctx }) => {
   const total = value.reduce((s, o) => s + (o.weight > 0 ? o.weight : 0), 0);
-  return (
-    <div className="k-ev-list">
-      {value.map((o, i) => (
-        <div key={i} className="k-ev-nest">
+  const sk = useSteadyKeys(value.length);
+  const row = (o: { weight: number; do: Row[] }, i: number) => (
+        <div key={SMALL_FIX.R878 !== 0 ? sk.keys[i] : i} className="k-ev-nest">
           <div className="k-ev-nest-head">
             <SmallNum label="Share" help="How likely this list is beside the others." value={o.weight} step={0.1} min={0} onChange={v => ctx.commit(d => setAt(d, [...path, i, 'weight'], v ?? 0))} />
             <span className="k-count">{total > 0 ? `${Math.round((o.weight > 0 ? o.weight : 0) / total * 100)}%` : '0%'}</span>
-            <IconButton size="sm" label="Remove this list" onClick={() => ctx.commit(d => removeAt(d, path, i))}><Trash2 size={13} /></IconButton>
+            <IconButton size="sm" label="Remove this list" onClick={() => { sk.drop(i); ctx.commit(d => removeAt(d, path, i)); }}><Trash2 size={13} /></IconButton>
           </div>
           <RowList family="step" list={o.do ?? []} path={[...path, i, 'do']} ctx={ctx} addLabel="Add A Step" />
         </div>
-      ))}
-      <Button size="sm" variant="secondary" block icon={<Plus size={13} />} onClick={() => ctx.commit(d => insertAt(d, path, -1, { weight: 1, do: [] }))}>Add A List</Button>
-    </div>
-  );
+      );
+  const add = <Button key="add" size="sm" variant="secondary" block icon={<Plus size={13} />} onClick={() => { sk.add(); ctx.commit(d => insertAt(d, path, -1, { weight: 1, do: [] })); }}>Add A List</Button>;
+  return <div className="k-ev-list">{SMALL_FIX.R878 !== 0 ? steadyList(value.length, sk.keys, i => row(value[i], i), add) : <>{value.map(row)}{add}</>}</div>;
 };
 
-const StayStages: React.FC<{ value: { at: Num; steps: Row[] }[]; path: Path; ctx: EvCtx }> = ({ value, path, ctx }) => (
-  <div className="k-ev-list">
-    {value.map((s, i) => (
-      <div key={i} className="k-ev-nest">
+function useSteadyKeys(len: number): { keys: number[]; drop: (i: number) => void; add: () => void } {
+  const keys = useRef<number[]>([]);
+  const next = useRef(0);
+  if (keys.current.length !== len) keys.current = Array.from({ length: len }, () => next.current++);
+  return {
+    keys: keys.current,
+    drop: (i: number) => { keys.current = keys.current.filter((_, k) => k !== i); },
+    add: () => { keys.current = [...keys.current, next.current++]; },
+  };
+}
+
+function steadyList(n: number, keys: readonly number[], rowOf: (i: number) => React.ReactNode, add: React.ReactNode): React.ReactNode {
+  return <LongList gap={8} estimate={46} count={n + 1} rowKey={i => (i < n ? String(keys[i]) : 'add')} renderRow={i => (i < n ? rowOf(i) : add)} />;
+}
+
+const StayStages: React.FC<{ value: { at: Num; steps: Row[] }[]; path: Path; ctx: EvCtx }> = ({ value, path, ctx }) => {
+  const sk = useSteadyKeys(value.length);
+  const row = (s: { at: Num; steps: Row[] }, i: number) => (
+      <div key={SMALL_FIX.R878 !== 0 ? sk.keys[i] : i} className="k-ev-nest">
         <div className="k-ev-nest-head">
           <RowLabel label="After" help="How long a tank has stayed when these steps run." />
           <NumField value={s.at} unit="s" onChange={v => ctx.commit(d => setAt(d, [...path, i, 'at'], v))} />
-          <IconButton size="sm" label="Remove this stage" onClick={() => ctx.commit(d => removeAt(d, path, i))}><Trash2 size={13} /></IconButton>
+          <IconButton size="sm" label="Remove this stage" onClick={() => { sk.drop(i); ctx.commit(d => removeAt(d, path, i)); }}><Trash2 size={13} /></IconButton>
         </div>
         <RowList family="step" list={s.steps ?? []} path={[...path, i, 'steps']} ctx={ctx} addLabel="Add A Step" />
       </div>
-    ))}
-    <Button size="sm" variant="secondary" block icon={<Plus size={13} />} onClick={() => ctx.commit(d => insertAt(d, path, -1, { at: value.length ? 30 : 10, steps: [] }))}>Add A Stage</Button>
-  </div>
-);
+    );
+  const add = <Button key="add" size="sm" variant="secondary" block icon={<Plus size={13} />} onClick={() => { sk.add(); ctx.commit(d => insertAt(d, path, -1, { at: value.length ? 30 : 10, steps: [] })); }}>Add A Stage</Button>;
+  return <div className="k-ev-list">{SMALL_FIX.R878 !== 0 ? steadyList(value.length, sk.keys, i => row(value[i], i), add) : <>{value.map(row)}{add}</>}</div>;
+};
 
-const LinesField: React.FC<{ value: string[]; onChange: (v: string[]) => void }> = ({ value, onChange }) => (
-  <div className="k-ev-list">
-    {value.map((l, i) => (
-      <div key={i} className="k-ev-b-row">
+const LinesField: React.FC<{ value: string[]; onChange: (v: string[]) => void }> = ({ value, onChange }) => {
+  const sk = useSteadyKeys(value.length);
+  const row = (l: string, i: number) => (
+      <div key={SMALL_FIX.R878 !== 0 ? sk.keys[i] : i} className="k-ev-b-row">
         <TextField value={l} onChange={v => onChange(value.map((x, k) => (k === i ? v : x)))} />
-        <IconButton size="sm" label="Remove" onClick={() => onChange(value.filter((_, k) => k !== i))}><Trash2 size={13} /></IconButton>
+        <IconButton size="sm" label="Remove" onClick={() => { sk.drop(i); onChange(value.filter((_, k) => k !== i)); }}><Trash2 size={13} /></IconButton>
       </div>
-    ))}
-    <Button size="sm" variant="secondary" block icon={<Plus size={13} />} onClick={() => onChange([...value, ''])}>Add A Line</Button>
-  </div>
-);
+    );
+  const add = <Button key="add" size="sm" variant="secondary" block icon={<Plus size={13} />} onClick={() => { sk.add(); onChange([...value, '']); }}>Add A Line</Button>;
+  return <div className="k-ev-list">{SMALL_FIX.R878 !== 0 ? steadyList(value.length, sk.keys, i => row(value[i], i), add) : <>{value.map(row)}{add}</>}</div>;
+};
 
 function interestHides(a: Record<string, unknown>, k: string): boolean {
   const how = typeof a.do === 'string' ? a.do : 'stay';
@@ -686,9 +731,14 @@ export function groupsOfKinds(family: Family): SelectGroup[] {
 }
 
 const _openRows = new Set<number>();
+const OPEN_ROWS_MAX = 1000;
+function _keepOpen(id: number): void {
+  if (SMALL_FIX.G776 !== 0 && !_openRows.has(id) && _openRows.size >= OPEN_ROWS_MAX) { for (const k of _openRows) { _openRows.delete(k); break; } }
+  _openRows.add(id);
+}
 export function useKeptOpen(id: number, justAdded: () => boolean): [boolean, (v: boolean) => void] {
-  const [open, set] = useState(() => { if (justAdded()) _openRows.add(id); return _openRows.has(id); });
-  return [open, v => { if (v) _openRows.add(id); else _openRows.delete(id); set(v); }];
+  const [open, set] = useState(() => { if (justAdded()) _keepOpen(id); return _openRows.has(id); });
+  return [open, v => { if (v) _keepOpen(id); else _openRows.delete(id); set(v); }];
 }
 
 let _justAddedRow = -1;

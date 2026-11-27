@@ -13,6 +13,7 @@ import {
 import type { AreaBounds } from './MapSystem';
 import { GRID_SPACING, PORTAL_TILE_SIZE, PORTAL_EVENT_HORIZON, PORTAL_BODY_RADIUS, GEN_ROCK_SIZES } from './constants';
 import { SMALL_FIX } from './smallFixSwitch';
+import { ZONE_MORE_MAX } from './mapEvents/clamp';
 import { isPortalWorldAreaId } from './portalModes';
 
 export const MAP_EDIT_MAX_WALLS = 4000;
@@ -72,7 +73,10 @@ export function zoneGenWords(z: PlacedZone): unknown {
   if (z.shape) out.shape = z.shape;
   if (z.fill) out.fill = z.fill;
   const doors = (z.behaviors ?? []).filter(b => b.k === 'door');
-  if (doors.length > 0) out.doors = doors.map(b => (b.off ? 0 : 1));
+  if (doors.length > 0) {
+    out.doors = doors.map(b => (b.off ? 0 : 1));
+    if (SMALL_FIX.G988 !== 0) out.uid = z.uid;
+  }
   if ((z as { clearWalls?: boolean }).clearWalls) out.clearWalls = true;
   if (BASE_AREAS.ON !== 0) { const t = zoneBaseTeam(z); if (t >= 0) out.base = t; }
   return out;
@@ -1336,7 +1340,7 @@ export function opZoneRect(cfg: MapConfig, id: number, rect: number, gx: number,
 }
 export function opAddZoneRect(cfg: MapConfig, id: number, gx: number, gy: number, cw: number, ch: number): void {
   const c = zoneHome(cfg);
-  if (c) c.zones = c.zones.map(z => (z.id === id ? { ...z, more: [...(z.more ?? []), { gx, gy, cw, ch }] } : z));
+  if (c) c.zones = c.zones.map(z => (z.id === id && !(SMALL_FIX.R1025 !== 0 && (z.more?.length ?? 0) >= ZONE_MORE_MAX) ? { ...z, more: [...(z.more ?? []), { gx, gy, cw, ch }] } : z));
 }
 export function opRemoveZoneRect(cfg: MapConfig, id: number, rect: number): void {
   const c = zoneHome(cfg);

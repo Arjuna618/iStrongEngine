@@ -5,7 +5,8 @@ import { createPortal } from 'react-dom';
 import { ContentLibraryIcon, Search, SearchX, X, Upload, FolderOpen, Star, Check, ChevronDown, ArrowUpDown, Lock, PanelRightClose, MessageSquareWarning, EMPTY_LINE, SlidersHorizontal, Plus } from '../ui/icons';
 import type { GameLogic } from '../../game/GameLogic';
 import type { TankConfig, CustomProjectileDesign, OtherDesign, TurretPreset, SolidDesign } from '../../types';
-import { useEscapeOwner } from '../shared/escapeStack';
+import { useEscapeOwner, useSearchEscape } from '../shared/escapeStack';
+import { SMALL_FIX } from '../../game/smallFixSwitch';
 import { useBackdropClose } from '../shared/useBackdropClose';
 import { getMenuScale, usePortalMenuScale, useFitScale, PHONE_EDGE } from '../../utils/useMenuScale';
 import { isTouchScreen, isPhoneUi } from '../../utils/device';
@@ -570,7 +571,8 @@ export const ContentLibrary: React.FC<Props> = ({ logic, mode, onClose }) => {
   useEffect(() => { loop.request(); }, [dark, fit, loop, sections, selectedKey]);
 
   useEscapeOwner(close);
-  useEscapeOwner(() => setSelectedKey(null), selectedKey !== null && !summary);
+  const srch770 = useSearchEscape(summary ? '' : query, () => setQuery(''));
+  useEscapeOwner(() => setSelectedKey(null), selectedKey !== null && !summary && !srch770.active);
   useEscapeOwner(() => setSummary(null), summary !== null);
   const sumStage = useMenuStage<'sum'>(summary ? 'sum' : null);
   const heldSummary = useHeld(summary);
@@ -655,6 +657,7 @@ export const ContentLibrary: React.FC<Props> = ({ logic, mode, onClose }) => {
         maxLength={TEXT_LIMITS.SEARCH}
         autoFocus={!isTouchScreen()}
         onChange={e => setQuery(e.target.value)}
+        onFocus={srch770.onFocus} onBlur={srch770.onBlur}
         onKeyDown={e => { if (e.key === 'Escape' && query) { e.preventDefault(); e.stopPropagation(); setQuery(''); } }}
         placeholder={stackSearch ? 'Search' : `Search ${LIB_KIND_LABEL[kind].toLowerCase()}`}
         className={(touch ? 'k-text-in k-search-bar w-full h-9 pl-9 pr-9 rounded-lg' : 'k-text-in k-search-bar w-full h-9 pl-9 pr-16 rounded-lg') + ' text-[13px] bg-[var(--k-search-bg)] border border-[var(--alpha-card-border)] shadow-[var(--shadow-input)] text-[var(--text-primary)] placeholder:text-[var(--k-placeholder)] outline-none'}
@@ -1040,8 +1043,8 @@ const ImportSummarySheet: React.FC<{ sum: ImportSummary; onClose: () => void; le
     </div>
   );
   return (
-    <div ref={coverRef} className={`absolute inset-0 z-50 grid place-items-center animate-fadeIn ${leaving ? 'pointer-events-none' : ''}`} style={{ background: 'color-mix(in srgb, var(--k-content) 82%, transparent)' }} onClick={onClose}>
-      <div ref={sheetRef} className="w-[480px] max-h-[86%] overflow-y-auto popup-scrollbar rounded-[10px] border border-[var(--alpha-card-border)] bg-[var(--layer-2)] shadow-[var(--k-pop-shadow)] p-5 animate-scaleUp" onClick={e => e.stopPropagation()}>
+    <div ref={coverRef} className={`absolute inset-0 z-50 grid ${SMALL_FIX.G773 !== 0 ? 'grid-cols-[minmax(0,1fr)] ' : ''}place-items-center animate-fadeIn ${leaving ? 'pointer-events-none' : ''}`} style={{ background: 'color-mix(in srgb, var(--k-content) 82%, transparent)' }} onClick={onClose}>
+      <div ref={sheetRef} className={`${SMALL_FIX.G773 !== 0 ? 'max-w-full ' : ''}w-[480px] max-h-[86%] overflow-y-auto popup-scrollbar rounded-[10px] border border-[var(--alpha-card-border)] bg-[var(--layer-2)] shadow-[var(--k-pop-shadow)] p-5 animate-scaleUp`} onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h3 className="k-modal-title">Import finished</h3>
           <IconButton label="Close" onClick={onClose}><X size={16} /></IconButton>

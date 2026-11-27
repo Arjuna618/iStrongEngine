@@ -9,7 +9,7 @@ import { Reveal } from '../kit/Collapse';
 import { LongList } from '../kit/LongList';
 import { NumberBox } from '../kit/NumberBox';
 import { EvSelect } from './EvSelect';
-import { ChipsField, NumField, OrderField, RowFields, TankField, ThingField, TextWords, type EvCtx } from './fields';
+import { ChipsField, ListText, NumField, OrderField, RowFields, TankField, ThingField, TextWords, type EvCtx } from './fields';
 import { HelpTooltip } from '../shared/HelpTooltip';
 import { Plus, Trash2 } from '../ui/icons';
 import { MAP_TANK_HEAD } from '../../game/mapEvents/thingWord';
@@ -166,7 +166,7 @@ export const EntityTypePage: React.FC<{ type: EntityType; ti: number; ctx: EvCtx
         <SelectRow label="Mind" help="Thinks For Itself: as any bot. Follows Its Order: walks by How It Moves and shoots the nearest hostile in sight. None: it does nothing." value={type.brain ?? 'full'} options={[{ value: 'full', label: 'Thinks For Itself' }, { value: 'order', label: 'Follows Its Order' }, { value: 'none', label: 'None' }]} onChange={v => put('brain', v)} />
         <ToggleRow label="Counts As A Boss" help="In kill counts and in how others decide to hunt it." checked={!!type.bossTier} onChange={v => put('bossTier', v || undefined)} />
         <FieldRow stacked label="Names" help="One is drawn at its birth and kept through a Change Tank. Leave it empty: no name of its own.">
-          <TextField value={(type.names ?? []).join(', ')} onChange={v => { const l = v.split(',').map(s => s.trim()).filter(Boolean); put('names', l.length ? l : undefined); }} />
+          <ListText key={type.id} on={SMALL_FIX.G782 !== 0} canon={v => v.split(',').map(s => s.trim()).filter(Boolean).join(', ')} value={(type.names ?? []).join(', ')} onChange={v => { const l = v.split(',').map(s => s.trim()).filter(Boolean); put('names', l.length ? l : undefined); }} />
         </FieldRow>
         <FieldRow stacked label="Name Of Its Class" help="What the leaderboard calls it, beside its name: Celestial."><TextField value={type.classWord ?? ''} onChange={v => put('classWord', v || undefined)} /></FieldRow>
         <FieldRow stacked label="Note" help="A note for yourself. It changes nothing in play."><TextField value={type.note ?? ''} onChange={v => put('note', v || undefined)} /></FieldRow>
@@ -174,8 +174,8 @@ export const EntityTypePage: React.FC<{ type: EntityType; ti: number; ctx: EvCtx
         <Reveal when={shippedFormOf(ctx.doc, 'types', type.id, ctx.logic.state.gameModeConfig) !== undefined}><Button size="sm" variant="ghost" block title="This Entity Type as the mode ships it. Undo brings yours back." onClick={() => { const was = shippedFormOf(ctx.doc, 'types', type.id, ctx.logic.state.gameModeConfig); if (was !== undefined) ctx.commit(d => setAt(d, ['types', ti], was)); }}>Restore As Shipped</Button></Reveal>
       </Group>
       <Group title="Forms" count={type.forms.length} right={<IconButton size="sm" label="Add A Form" onClick={() => ctx.commit(d => addForm(d!, type.id, `Form ${type.forms.length + 1}`, tankWord(first) ?? 'basic').doc)}><Plus size={14} /></IconButton>}>
-        <ToggleRow label="Become Upon Death" help="At its death a new body stands on the very spot, at full health." checked={becomes} onChange={v => ctx.commit(d => setBecome(d!, type.id, v ? (typeof second?.tank === 'string' ? second.tank : 'basic') : null))} />
-        <Reveal when={becomes}><ToggleRow label="Works Both Ways" help="When that one dies, this one comes back." checked={bothWays} onChange={v => ctx.commit(d => setBecome(d!, type.id, typeof second?.tank === 'string' ? second.tank : 'basic', v))} /></Reveal>
+        <ToggleRow label="Become Upon Death" help="At its death a new body stands on the very spot, at full health." checked={becomes} onChange={v => ctx.commit(d => setBecome(d!, type.id, v ? (typeof second?.tank === 'string' ? second.tank : 'basic') : null, undefined, undefined, true))} />
+        <Reveal when={becomes}><ToggleRow label="Works Both Ways" help="When that one dies, this one comes back." checked={bothWays} onChange={v => ctx.commit(d => setBecome(d!, type.id, typeof second?.tank === 'string' ? second.tank : 'basic', v, undefined, true))} /></Reveal>
         <LongList estimate={120} count={type.forms.length} rowKey={i => String(type.forms[i].id)} renderRow={i => <FormCard type={type} ti={ti} fi={i} ctx={ctx} />} />
       </Group>
       <Group title="How It Acts" foldKey="type-acts" collapsible defaultOpen={false}>

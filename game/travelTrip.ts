@@ -49,9 +49,11 @@ function restorePlayer(g: any, k: Keep, forge: boolean): void {
   const tank = forge && !isDreadV2(g, k.tank) ? V2_DREADNOUGHT : k.tank;
   const lib = g.getTankLibraryMap();
   if (lib.has(tank)) g.evolveToTank(tank, false, false, true);
+  const lv0 = g.state.level;
   g.state.level = k.level;
   g.state.currentXp = k.xp;
   if (tank === k.tank) { g.state.upgrades = { ...k.upgrades }; g.state.skillPoints = k.skillPoints; }
+  if (SMALL_FIX.R1028 !== 0 && typeof g.refreshPlayerEvolutionsForLevel === 'function') g.refreshPlayerEvolutionsForLevel(lv0);
   g.state.playerGrowthScale = k.growth;
   g.state.tankCurrentHealth = g.state.tankHP * g.getStatMultiplier('maxHealth');
   if (typeof g._sizeSlideSync === 'function') g._sizeSlideSync();
@@ -87,7 +89,8 @@ export function* tripBuild(g: any, plan: TripPlan, rand: () => number): Generato
     const cfg = resolvePlayConfig(entry);
     if (plan.team >= 1 && plan.team <= (cfg.teams ?? 0)) cfg.playerTeam = plan.team;
     if (plan.key === 'nexus') {
-      const n = plan.record ? Math.max(0, plan.record.bots.length + plan.journeys.length) : 5 + Math.floor(rand() * 11);
+      const rec899 = plan.record ? (SMALL_FIX.G899 !== 0 && SMALL_FIX.G707 !== 0 ? plan.record.bots.filter((b: { name: string }) => !plan.journeys.some((j: { name: string }) => j.name === b.name)).length : plan.record.bots.length) : 0;
+      const n = plan.record ? Math.max(0, rec899 + plan.journeys.length) : 5 + Math.floor(rand() * 11);
       const t = cfg.teams || 4, per = [0, 0, 0, 0];
       for (let i = 0; i < n; i++) per[i % t]++;
       cfg.teamEnemyConfig = { ...cfg.teamEnemyConfig, team1: per[0], team2: per[1], team3: per[2], team4: per[3] };
@@ -157,7 +160,14 @@ function playersOf(key: string, g: any): number {
   const L = g && g.travel;
   if (L) {
     const rec = L.recall(key);
-    if (rec) { let n = rec.bots.length + 1; for (let i = 0; i < L.journeys.length; i++) if (L.journeys[i].at === key) n++; return n; }
+    if (rec) {
+      let n = rec.bots.length + 1;
+      for (let i = 0; i < L.journeys.length; i++) if (L.journeys[i].at === key) {
+        if (SMALL_FIX.G899 !== 0 && SMALL_FIX.G707 !== 0 && rec.bots.some((b: { name: string }) => b.name === L.journeys[i].name)) continue;
+        n++;
+      }
+      return n;
+    }
   }
   let n = _usualPlayers.get(key);
   if (n === undefined) {

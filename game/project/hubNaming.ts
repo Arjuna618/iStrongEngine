@@ -15,6 +15,10 @@ export function cutWhole(s: string, max: number): string {
   return s.slice(0, SMALL_FIX.R792 && c >= 0xd800 && c <= 0xdbff ? max - 1 : max);
 }
 
+export function cutName(s: string, max: number): string {
+  return SMALL_FIX.R1015 !== 0 ? cutWhole(s, max) : s.slice(0, max);
+}
+
 export function cleanName(raw: string, max = NAME_MAX): string {
   return cutWhole(raw.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim(), max).trim();
 }

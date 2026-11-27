@@ -38,7 +38,7 @@ export const PortalPanel: React.FC<Props> = ({ logic, config, updateConfig, acti
             <SelectRow label="Where It Appears"
               help="Fixed Here: always on its own cell. Anywhere On The Map: a place of its own on each new map, never on a wall, a rock, a base or another portal, and a new one after each hidden phase. In An Area: somewhere inside the area you pick, even at the start (its own cell does not count)."
               value={legacyMoving ? 'legacy' : appear}
-              options={[{ value: 'fixed', label: 'Fixed Here' }, { value: 'map', label: 'Anywhere On The Map' }, { value: 'area', label: 'In An Area' }, ...(legacyMoving ? [{ value: 'legacy', label: 'Here, Then Anywhere' }] : [])]}
+              options={[{ value: 'fixed', label: 'Fixed Here' }, { value: 'map', label: 'Anywhere On The Map' }, { value: 'area', label: 'In An Area', disabled: SMALL_FIX.G995 !== 0 && areaOptions.length === 0 }, ...(legacyMoving ? [{ value: 'legacy', label: 'Here, Then Anywhere' }] : [])]}
               onChange={v => { if (v === 'fixed' || v === 'map') apply(cfg => opPortalAppear(cfg, id, v)); else if (v === 'area' && areaOptions.length > 0) apply(cfg => opPortalAppear(cfg, id, 'area', typeof portal.inArea === 'number' ? portal.inArea : Number(areaOptions[0].value))); }} />
             <Reveal when={appear === 'area'}>{() => (
               <SelectRow label="Area" help="The Custom Area it appears in. Draw one with the Custom Area tool first."

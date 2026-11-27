@@ -18,7 +18,7 @@ import { usePanelMemory } from '../kit/panelMemory';
 import { useGameDark } from '../../utils/useGameTheme';
 import { windowSize } from '../library/ContentLibrary';
 import { ImportButton } from '../shared/ImportButton';
-import { useEscapeOwner } from '../shared/escapeStack';
+import { useEscapeOwner, useSearchEscape } from '../shared/escapeStack';
 import { useBackdropClose } from '../shared/useBackdropClose';
 import { usePortalMenuScale, useFitScale } from '../../utils/useMenuScale';
 import { getEffectiveDPR } from '../../utils/zoomCompensation';
@@ -321,6 +321,7 @@ export const CardsWindow: React.FC<CardsWindowProps> = (p) => {
   };
 
   const { cards: shown, query, setQuery, keyOf, ask, isOn, tipOf } = p;
+  const srch770 = useSearchEscape(query, () => setQuery(''));
   const picVer = useSyncExternalStore(mapPictures.subscribe, mapPictures.version, mapPictures.version);
   useEffect(() => () => releaseMapPictures(), []);
 
@@ -397,6 +398,7 @@ export const CardsWindow: React.FC<CardsWindowProps> = (p) => {
             <div className="k-search-host relative flex-1 max-w-[520px] mx-auto">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--k-search-icon)] pointer-events-none" />
               <input ref={searchRef} type="text" value={query} maxLength={TEXT_LIMITS.SEARCH} onChange={e => setQuery(e.target.value)} dir="auto" autoFocus={!isTouchScreen()}
+                onFocus={srch770.onFocus} onBlur={srch770.onBlur}
                 onKeyDown={e => { if (e.key === 'Escape' && query) { e.preventDefault(); e.stopPropagation(); setQuery(''); } }}
                 placeholder={p.searchLabel} aria-label={p.searchLabel}
                 className="k-text-in k-search-bar w-full h-9 pl-9 pr-16 rounded-lg text-[13px] bg-[var(--k-search-bg)] border border-[var(--alpha-card-border)] shadow-[var(--shadow-input)] text-[var(--text-primary)] placeholder:text-[var(--k-placeholder)] outline-none" />

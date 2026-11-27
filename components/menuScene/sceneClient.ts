@@ -59,7 +59,9 @@ let _list: DataPackList | null = null;
 const _packs = new Map<string, ArrayBuffer>();
 if (MENU_SCENES.ON && !MENU_SCENES_OLD && typeof window !== 'undefined' && !phoneLeftOut() && !window.location.search.includes('__harness')) {
   DataRegistry.packListTap = (l) => { _list = l; if (worker) post({ t: 'list', list: l }); };
+  DataRegistry.looseTap = () => { if (SMALL_FIX.G986 !== 0) fail(); };
   DataRegistry.packTap = (file, bytes) => {
+    if (SMALL_FIX.G985 !== 0 && !menuScenesSupported()) return;
     if (worker && !_parking) post({ t: 'pack', file, bytes }, [bytes]);
     else _packs.set(file, bytes);
   };
@@ -283,6 +285,7 @@ function change(): void {
   _swapping = true;
   glass(true, GLASS_IN_MS, () => {
     if (!host || !ready || !current) { _swapping = false; if (host && SMALL_FIX.R882 !== 0) glass(false, 0); return; }
+    if (SMALL_FIX.G811 !== 0 && !_attached) { _swapping = false; glass(false, GLASS_OUT_MS); return; }
     const old = current;
     const r = ready; ready = null;
     const el = layerOf(r);
@@ -300,6 +303,7 @@ function change(): void {
       arm();
       askScene();
       if (!_spareAsked) askSpare();
+      if (SMALL_FIX.G810 !== 0) checkTurn();
     };
   });
 }

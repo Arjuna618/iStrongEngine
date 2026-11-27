@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { SMALL_FIX } from '../../game/smallFixSwitch';
 
 interface EscapeOwner {
   token: symbol;
@@ -43,6 +44,20 @@ export function useEscapeOwner(handler: () => void, enabled: boolean = true): vo
       sync();
     };
   }, [enabled]);
+}
+
+export function useSearchEscape(query: string, clear: () => void): { onFocus: () => void; onBlur: () => void; active: boolean } {
+  const [focused, setFocused] = useState(false);
+  const active = SMALL_FIX.G770 !== 0 && focused && query !== '';
+  useEscapeOwner(clear, active);
+  return { onFocus: () => setFocused(true), onBlur: () => setFocused(false), active };
+}
+
+export function pressEscapeOwner(): boolean {
+  const top = stack[stack.length - 1];
+  if (!top) return false;
+  top.handler();
+  return true;
 }
 
 export function escapeIsOwned(): boolean {

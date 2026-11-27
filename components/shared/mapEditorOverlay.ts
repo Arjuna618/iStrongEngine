@@ -1,24 +1,52 @@
 import type { GameLogic } from '../../game/GameLogic';
 import { TEAM_COLORS_DARK, TEAM_COLORS_LIGHT } from '../../types';
-import { isCustomMap, editPortals, cellCenterLocal, rockShapeFor, portalExitExists, findPlacedZone, findPlacedEntity } from '../../game/MapEditor';
+import { isCustomMap, editPortals, cellCenterLocal, rockShapeFor, portalExitExists, findPlacedZone, findPlacedEntity, resolveEditArea } from '../../game/MapEditor';
 import type { MapEditorKind } from '../../game/MapEditor';
 import { selectionOutline, zoneDragRect, effectiveMapEditorTool, toolRockKind, dragHideInfo, areaRefById, toolDragBox, toolShapeOfBox, pickedShape, boxHandleAt, VTX_BOX, VTX_SIDE, VTX_MARQUEE } from '../../game/MapEditorInput';
 import { zoneShapeOf } from '../../game/mapEvents/doc';
 import { shapeBox, shapeCellPoints, tracePoly, type AreaShape } from '../../game/areaShape';
-import { wallDefault } from '../../utils/gameColors';
-import { getWallStroke, customAreaLook, customAreaFill, type CustomAreaLook } from '../../game/MapSystem';
-import type { PlacedZone, MapConfig } from '../../types';
+import { wallDefault, wallFill } from '../../utils/gameColors';
+import { getWallStroke, customAreaLook, customAreaFill, PAINT_DEFAULT_SLOT, type CustomAreaLook } from '../../game/MapSystem';
+import type { PlacedZone, MapConfig, MapPaint } from '../../types';
 import { darkenColor } from '../../utils/p5Utils';
 import { drawCanvasTooltip } from './canvasTooltip';
 import { PORTAL_BODY_RADIUS } from '../../game/constants';
 import { pumpkinTurn, rockTurn, type HalloweenLook } from '../../utils/halloween';
 import { halloweenLook, hwDrawPumpkinGhost, hwDrawWallGhostEye, hwPumpkinBodyPath } from './halloweenLook';
 import { BASE_AREAS, zoneBaseTeam } from '../../game/baseAreas';
+import { SMALL_FIX } from '../../game/smallFixSwitch';
 const INK_DARK = '#fcfcfd';
 const INK_LIGHT = '#171718';
 const MUTED_DARK = '#a1a1a2';
 const MUTED_LIGHT = '#737374';
 export const GHOST_ALPHA = 0.6;
+
+export const GHOST_PAINT = { hex: '', alpha: 1 };
+export function ghostPaintOf(logic: GameLogic, wall: boolean): boolean {
+  if (SMALL_FIX.G983 === 0) return false;
+  const me = logic.mapEditor;
+  if (me.dragActive) return false;
+  let p: MapPaint | null | undefined = wall ? me.wallPaint : me.rockPaint;
+  let asMap = false;
+  if (p === null || p === undefined) {
+    const ref = resolveEditArea(logic, me.ghostX, me.ghostY);
+    const cfg: MapConfig = ref !== null ? ref.cfg : logic.state.mapConfig;
+    p = wall ? cfg.wallPaint : cfg.rockPaint;
+    asMap = true;
+  }
+  if (p === null || p === undefined) return false;
+  const s = p.slot;
+  const slot = typeof s === 'number' && Number.isInteger(s) && s >= 0 && s < 20 ? s : -1;
+  const hx = p.hex;
+  const hexOk = slot < 0 && typeof hx === 'string' && /^#[0-9a-fA-F]{6}$/.test(hx);
+  if (slot < 0 && !hexOk) return false;
+  const o = p.opacity;
+  const op = typeof o === 'number' && Number.isFinite(o) && o < 1 ? Math.max(0.05, o) : 1;
+  if (asMap && slot === PAINT_DEFAULT_SLOT && op === 1) return false;
+  GHOST_PAINT.hex = slot >= 0 ? wallFill(slot) : (hx as string);
+  GHOST_PAINT.alpha = op;
+  return true;
+}
 
 let _gpuMarks = false;
 export function setMapEditorOverlayGpu(on: boolean): void { _gpuMarks = on; }
@@ -260,16 +288,16 @@ function drawZoneRectsAndHandles(ctx: CanvasRenderingContext2D, logic: GameLogic
 
 export function mapObjectLabels(logic: GameLogic, texts: string[], xs: number[], ys: number[], under: number): number {
   const me = logic.mapEditor;
-  let n = 0, firstKind = '', firstId = -1;
+  let n = 0, firstKind = '', firstId = -1, firstArea = '';
   const put = (kind: string, id: number, areaId: string, x: number, y: number, h: number, r: number): void => {
-    if (kind === firstKind && id === firstId) return;
+    if (kind === firstKind && id === firstId && (SMALL_FIX.G764 === 0 || areaId === firstArea)) return;
     const ref = areaRefById(logic, areaId);
     if (!ref) return;
     const name = kind === 'zone' ? findPlacedZone(ref.cfg, id)?.name : kind === 'entity' ? findPlacedEntity(ref.cfg, id)?.name : undefined;
     if (!name) return;
     texts[n] = name; xs[n] = x;
     ys[n] = kind === 'zone' ? y - h / 2 + under : y + r + under;
-    if (n === 0) { firstKind = kind; firstId = id; }
+    if (n === 0) { firstKind = kind; firstId = id; firstArea = areaId; }
     n++;
   };
   if (me.dragActive) return 0;
@@ -420,10 +448,11 @@ function drawGhost(
   if (_gpuMarks && (me.ghostKind === 'wall' || me.ghostKind === 'rock')) return;
 
   const valid = me.ghostValid;
-  const body = wallDefault();
+  const _own983 = valid && _hw === null && (me.ghostKind === 'wall' || me.ghostKind === 'rock') && ghostPaintOf(logic, me.ghostKind === 'wall');
+  const body = _own983 ? GHOST_PAINT.hex : wallDefault();
   const fill = valid ? body : muted;
   const stroke = valid ? getWallStroke(body) : darkenColor(muted, 0.598);
-  ctx.globalAlpha = GHOST_ALPHA;
+  ctx.globalAlpha = GHOST_ALPHA * (_own983 ? GHOST_PAINT.alpha : 1);
   GHOST_OF_KIND[me.ghostKind](ctx, logic, muted, teams, strokeWidth, isDark, valid, fill, stroke);
   ctx.globalAlpha = 1;
 }

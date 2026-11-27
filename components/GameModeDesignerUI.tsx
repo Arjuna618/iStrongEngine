@@ -3,6 +3,7 @@ import { pushUndoAction } from './shell/undoActions';
 import { GameLogic } from '../game/GameLogic';
 import { GameModeConfig, TEAM_NAMES, isManhuntMode, BOT_PORTAL_DEFAULTS, isPortalMode, SANDBOX_TEAMS } from '../types';
 import { SMALL_FIX } from '../game/smallFixSwitch';
+import { teamCountsOfWorld } from '../game/modeWorlds';
 import { LEVEL_LIMIT } from '../game/levelLimit';
 import { Joystick, ChevronRight, MevEvents, HdGame, HdActivityCircle, HdSettingDone01, HdAnalyticsUp, HdChart02, HdUserGroup03 } from './ui/icons';
 import { Reveal, SwapText } from './kit/Collapse';
@@ -113,6 +114,13 @@ const TEAM_COUNT_OPTIONS = [
   { value: '3', label: '3', title: '3 Teams' },
   { value: '4', label: '4', title: '4 Teams' },
 ];
+const _teamOptsOf: Map<string, typeof TEAM_COUNT_OPTIONS> = new Map();
+function teamCountOptionsOf(world: string | undefined): typeof TEAM_COUNT_OPTIONS {
+  const key = world ?? '';
+  let o = _teamOptsOf.get(key);
+  if (o === undefined) { const ok = teamCountsOfWorld(world); o = TEAM_COUNT_OPTIONS.filter((x) => ok.includes(Number(x.value))); _teamOptsOf.set(key, o); }
+  return o;
+}
 
 const ModeRulesCard: React.FC<{ logic: GameLogic; config: GameModeConfig; applyConfig: (patch: Partial<GameModeConfig>, full?: boolean) => void; onUpdate: () => void }> = ({ logic, config, applyConfig, onUpdate }) => {
   const scripted = config.mode === 'scripted';
@@ -186,7 +194,7 @@ export const GameModeDesignerUI: React.FC<Props> = ({ logic, onUpdate, className
         const _sgMac = logic.state.multiAreaConfig;
         const _sgMaze = logic.state.mapConfig.enableMaze ||
           (_sgMac.enableMultiArea && _sgMac.areas.some(a => a.mapConfig.enableMaze));
-        newConfig.smartGrowthCap = _sgMaze && newConfig.mode !== 'old-dreadnoughts';
+        newConfig.smartGrowthCap = _sgMaze && (newConfig.mode !== 'old-dreadnoughts' || SMALL_FIX.R1031 !== 0);
       }
     }
     if (partial.growthFixedSpRate === true) {
@@ -254,10 +262,11 @@ export const GameModeDesignerUI: React.FC<Props> = ({ logic, onUpdate, className
     (_mazeMac.enableMultiArea && _mazeMac.areas.some(a => a.mapConfig.enableMaze));
   const smartCapActive = !!config.smartGrowthCap && mazeEnabled;
   const isTDM = isTeamModeId(config.mode) && !config.preset;
-  const canPickTeamCount = supportsTeamCountChoice(config.mode) && !config.preset;
+  const canPickTeamCount = supportsTeamCountChoice(config.mode) && !config.preset && !(SMALL_FIX.G817 !== 0 && config.world === 'capture-the-flag');
   const isOD = config.mode === 'old-dreadnoughts';
   const isManhunt = isManhuntMode(config.mode);
-  const powerNoneStep = (config.growth ? 1000 : 200) + 1;
+  const _capNow832 = config.levelCap ?? 45;
+  const powerNoneStep = Math.max(config.growth ? 1000 : 200, SMALL_FIX.G832 !== 0 && _capNow832 < LEVEL_LIMIT ? Math.floor(_capNow832) : 0) + 1;
 
   const respawn = {
     percent: logic.state.respawnLevelPercent,
@@ -401,7 +410,7 @@ export const GameModeDesignerUI: React.FC<Props> = ({ logic, onUpdate, className
           <Reveal when={canPickTeamCount}>
             <FieldRow label="Number of Teams" help="How many teams the game has.">
               <Segmented value={String(config.teams)} onChange={v => pickTeams(Number(v))}
-                options={TEAM_COUNT_OPTIONS} />
+                options={SMALL_FIX.G971 !== 0 ? teamCountOptionsOf(config.world) : TEAM_COUNT_OPTIONS} />
             </FieldRow>
           </Reveal>
           <SelectRow label="Your Team" value={String(config.playerTeam)}

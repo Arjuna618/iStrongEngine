@@ -167,6 +167,24 @@ export function isWorldId(id: unknown): id is WorldId {
   return typeof id === 'string' && Object.prototype.hasOwnProperty.call(MODE_WORLDS, id);
 }
 
+const ALL_TEAM_COUNTS: readonly number[] = [2, 3, 4];
+const _teamCountsOf: Map<string, readonly number[]> = new Map();
+export function teamCountsOfWorld(world: string | null | undefined): readonly number[] {
+  if (SMALL_FIX.G971 === 0 || !isWorldId(world)) return ALL_TEAM_COUNTS;
+  let got = _teamCountsOf.get(world);
+  if (got === undefined) {
+    const w = MODE_WORLDS[world];
+    if (!w.overlay || w.teams === undefined) got = ALL_TEAM_COUNTS;
+    else {
+      const s = new Set<number>([w.teams]);
+      for (const k of Object.keys(w.teamTwins ?? {})) { const n = Number(k); if (n === 2 || n === 3 || n === 4) s.add(n); }
+      got = ALL_TEAM_COUNTS.filter((n) => s.has(n));
+    }
+    _teamCountsOf.set(world, got);
+  }
+  return got;
+}
+
 export function worldHasBosses(world: string | undefined): boolean {
   return !(isWorldId(world) && MODE_WORLDS[world].bosses === false);
 }
@@ -214,6 +232,14 @@ export function writeWorldMap(m: MapConfig, id: WorldId, growth: boolean, teams:
   writeWorldBases(m, id, teams);
 }
 
+export function writeWorldRocks(m: MapConfig, id: WorldId, growth: boolean): void {
+  const w = MODE_WORLDS[id];
+  if (!worldWritesMap(id)) return;
+  const rocks = worldRocks(w, growth);
+  m.enableRocks = rocks !== undefined;
+  if (rocks !== undefined) m.rockPattern = rocks;
+}
+
 export function writeWorldBases(m: MapConfig, id: WorldId, teams: number): void {
   const w = MODE_WORLDS[id];
   m.enableSpawnAreas = w.bases !== undefined;
@@ -250,7 +276,8 @@ export function shownModeTitle(title: string): string {
 }
 export function worldHudName(id: WorldId, growth: boolean, armsRace: boolean, overlay?: string): string {
   let t = MODE_WORLDS[id].title;
-  if (overlay && overlay !== id) t = `${overlay.charAt(0).toUpperCase()}${overlay.slice(1)} ${t}`;
+  const own814 = SMALL_FIX.G814 !== 0 && overlay !== undefined && MODE_WORLDS[id].overlay === overlay;
+  if (overlay && overlay !== id && !own814) t = `${overlay.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} ${t}`;
   if (t !== 'FFA' && t.endsWith(' FFA')) t = t.slice(0, -4);
   return `${growth ? 'Growth ' : ''}${armsRace ? 'Arms Race ' : ''}${t}`;
 }

@@ -678,8 +678,8 @@ export function resolvePlayConfig(entry: PlayModeEntry, settingValue?: number, t
     cfg.growthModel = 'rules';
     cfg.growthRules = growthModeRules();
   }
-  cfg.smartGrowthCap = cfg.growth && cfg.mode !== 'old-dreadnoughts'
-    && (modeUsesMaze(cfg.mode, cfg.teams, cfg.world) || (SMALL_FIX.CC040 !== 0 && cfg.mode === 'portal-maze-4tdm'));
+  cfg.smartGrowthCap = cfg.growth && (SMALL_FIX.R1031 !== 0 && cfg.mode === 'old-dreadnoughts' ? true : cfg.mode !== 'old-dreadnoughts'
+    && (modeUsesMaze(cfg.mode, cfg.teams, cfg.world) || (SMALL_FIX.CC040 !== 0 && cfg.mode === 'portal-maze-4tdm')));
 
   if (teamChoice && isTeamModeId(cfg.mode) && !entry.preset) {
     if (teamChoice.teams !== undefined && supportsTeamCountChoice(cfg.mode) && !entryTeamCountFixed(entry)) {

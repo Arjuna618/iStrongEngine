@@ -14,12 +14,13 @@ import { STARTING_SCORE_MAX } from '../vampirism';
 import { MAP_EDIT_WALL_MIN_CELLS, MAP_EDIT_WALL_MAX_CELLS } from '../MapEditor';
 import type { ExportFile, LibraryItem, CustomProjectileDesign, TurretPreset, TankConfig, FoodShapeDesign, OtherDesign } from '../../types';
 import type { EngineSnapshot, CanvasData, EnemyConfigData, LibraryData } from './snapshot';
-import { canonicalStringify } from './canonical';
+import { canonicalStringify, DEFAULT_PARSE_LIMITS } from './canonical';
 import FROZEN_V1 from './defaults.v1.json';
 import FROZEN_ENEMIES_V2 from './defaults.enemies.v2.json';
 import { ALL_MODES } from '../allModesSwitch';
 import { SHAPE_SPAWN_PLAN } from '../shapesSwitch';
 import { cleanMapPool } from '../mapPool';
+import { cutName } from './hubNaming';
 
 export type SectionId = 'canvas' | 'world' | 'mode' | 'enemies' | 'library' | 'editor' | 'panels';
 export const SECTION_IDS: readonly SectionId[] = ['canvas', 'world', 'mode', 'enemies', 'library', 'editor', 'panels'];
@@ -283,7 +284,7 @@ function readLibrary(d: unknown, blobs: ReadonlyMap<string, unknown>, pre?: Prec
   const items: LibraryItem[] = [];
   for (const it of Array.isArray(d.items) ? d.items : []) {
     if (!isObj(it) || typeof it.id !== 'string') throw new SectionError('A file of his is not readable');
-    const name = typeof it.name === 'string' ? it.name.slice(0, 200) : 'Imported';
+    const name = typeof it.name === 'string' ? cutName(it.name, 200) : 'Imported';
     const v = blob(it.file, `The file "${name}"`);
     const file = takeChecked(pre, 'item:' + it.file, () => wrapOf('item', v), `The file "${name}"`);
     items.push({ id: it.id, name, fileData: file, loadedAt: typeof it.loadedAt === 'number' ? it.loadedAt : 0, source: 'manual-import' });
@@ -371,6 +372,22 @@ export interface KeptExtras {
   tank: Record<string, unknown>;
   pick: Record<string, unknown>;
   mapEditor: Record<string, unknown>;
+  blobs?: Map<string, unknown>;
+}
+
+function keptBlobsOf(kept: KeptExtras, blobs: ReadonlyMap<string, unknown>): Map<string, unknown> {
+  const out = new Map<string, unknown>();
+  const maxDepth = SMALL_FIX.G960 !== 0 ? DEFAULT_PARSE_LIMITS.maxDepth + 1 : 64;
+  const walk = (v: unknown, depth: number): void => {
+    if (depth > maxDepth) return;
+    if (typeof v === 'string') { if (v.length === 64 && !out.has(v) && blobs.has(v)) out.set(v, blobs.get(v)); return; }
+    if (Array.isArray(v)) { for (const x of v) walk(x, depth + 1); return; }
+    if (v !== null && typeof v === 'object') for (const k of Object.keys(v)) walk((v as Record<string, unknown>)[k], depth + 1);
+  };
+  for (const r of Object.values(kept.sections)) walk(r.data, 0);
+  walk(kept.fields, 0);
+  if (SMALL_FIX.G960 !== 0) { walk(kept.tank, 0); walk(kept.pick, 0); walk(kept.mapEditor, 0); }
+  return out;
 }
 
 export interface ReadResult {
@@ -489,6 +506,11 @@ export function readSections(records: Record<string, { version: number; data: un
     } catch (e) {
       problems.push({ part: PART_WORD[sid], why: e instanceof Error ? e.message : 'It could not be read.' });
     }
+  }
+  if (SMALL_FIX.G857 !== 0 && blobs.size > 0 && (Object.keys(unknown).length > 0 || Object.keys(kept.fields).length > 0
+      || (SMALL_FIX.G960 !== 0 && (Object.keys(kept.tank).length > 0 || Object.keys(kept.pick).length > 0 || Object.keys(kept.mapEditor).length > 0)))) {
+    const kb = keptBlobsOf(kept, blobs);
+    if (kb.size > 0) kept.blobs = kb;
   }
   return { engine, panels, problems, readOnly, unknown, kept };
 }

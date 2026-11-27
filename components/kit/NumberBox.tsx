@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { textBoxToStart } from '../shell/textFade';
 import { TEXT_LIMITS } from './textLimits';
+import { SMALL_FIX } from '../../game/smallFixSwitch';
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ');
 
@@ -39,9 +40,14 @@ export function useSpin(stepBy: (dir: number) => void, off?: boolean): (e: React
     stop();
     live.current(dir);
     timer.current = window.setTimeout(() => { timer.current = window.setInterval(() => live.current(dir), SPIN_REPEAT_MS); }, SPIN_HOLD_MS);
-    const end = () => { stop(); window.removeEventListener('pointerup', end); window.removeEventListener('pointercancel', end); };
+    const onVis = () => { if (document.visibilityState === 'hidden') end(); };
+    const end = () => {
+      stop(); window.removeEventListener('pointerup', end); window.removeEventListener('pointercancel', end);
+      window.removeEventListener('blur', end); document.removeEventListener('visibilitychange', onVis);
+    };
     window.addEventListener('pointerup', end);
     window.addEventListener('pointercancel', end);
+    if (SMALL_FIX.R1022 !== 0) { window.addEventListener('blur', end); document.addEventListener('visibilitychange', onVis); }
   }, [off, stop]);
 }
 

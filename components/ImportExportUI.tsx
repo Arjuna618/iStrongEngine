@@ -6,7 +6,8 @@ import { importChangedNotice } from './shared/labels';
 import { Download, ExternalLink, ExportConfigIcon, HdFileAttachment, HdAiSwap } from './ui/icons';
 import { useToast } from './ui/Toast';
 import { ExportFile, TurretPreset, CustomProjectileDesign, LibraryItem, FoodShapeDesign } from '../types';
-import { makeUserShapeId } from '../game/ShapeRegistry';
+import { makeUserShapeId, savedShapeNameClash, savedLookNameClash, lookClashWords } from '../game/ShapeRegistry';
+import { SMALL_FIX } from '../game/smallFixSwitch';
 import { type SelectOption } from './shared/CustomSelect';
 import { Group, SelectRow, FieldRow, TextField, Button, headerIcon } from './kit/kit';
 import { Reveal, SwapInPlace, SwapText, revealFold, type FoldHandle } from './kit/Collapse';
@@ -191,6 +192,8 @@ export const ImportExportUI: React.FC<Props> = ({ logic, dataRegistry, className
           if (result === false) { fileInputRef.current?.click(); return; }
           if (result === 'cancelled' || result === 'routed') return;
           if (result === 'invalid') { showToast('error', rejectMessage()); return; }
+          if (SMALL_FIX.G852 !== 0 && savedShapeNameClash(logic.state.tankLibrary, result) !== null) { showToast('error', 'Another saved shape already uses this name. Pick a different name.'); return; }
+          if (savedLookNameClash(logic.state.solidLibrary, logic.state.otherLibrary, result) !== null) { showToast('error', lookClashWords(result.type)); return; }
           const newItem: LibraryItem = {
               id: DataRegistry.libraryIdFor(result),
               name: result.name || 'Imported',
@@ -227,6 +230,8 @@ export const ImportExportUI: React.FC<Props> = ({ logic, dataRegistry, className
                   showToast('error', rejectMessage());
                   return;
               }
+              if (SMALL_FIX.G852 !== 0 && savedShapeNameClash(logic.state.tankLibrary, validated) !== null) { showToast('error', 'Another saved shape already uses this name. Pick a different name.'); return; }
+              if (savedLookNameClash(logic.state.solidLibrary, logic.state.otherLibrary, validated) !== null) { showToast('error', lookClashWords(validated.type)); return; }
 
               const newItem: LibraryItem = {
                   id: DataRegistry.libraryIdFor(validated),

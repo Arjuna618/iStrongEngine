@@ -3,7 +3,7 @@ import { TileType, AI_CONSTANTS } from '@/types';
 import type { ExactNavGrid } from './NavExact';
 import { getExactGrid, exactCompNear, exactPumpNowMs, EXACT_IDLE_EVICT_MS } from './NavExact';
 import { SMALL_FIX } from './smallFixSwitch';
-import { wallSkips, wallSteerPad } from './wallTypes';
+import { wallSkips, wallSteerPad, wallSteerPadMax } from './wallTypes';
 import { MAGIC_MAZE } from './magicMaze';
 
 export interface NavigationState {
@@ -11,6 +11,7 @@ export interface NavigationState {
   flowDirY: Float32Array;
   flowDist: Uint16Array;
   flowVersion: number;
+  wallVer: number;
   lastTargetCellX: number;
   lastTargetCellY: number;
   flowMaskIsRockAware: boolean;
@@ -354,6 +355,7 @@ export function createNavigationState(mapState: MapState): NavigationState {
     flowDirY: new Float32Array(totalCells),
     flowDist: new Uint16Array(totalCells).fill(UNREACHABLE),
     flowVersion: 0,
+    wallVer: 0,
     lastTargetCellX: -1,
     lastTargetCellY: -1,
     flowMaskIsRockAware: false,
@@ -528,6 +530,7 @@ export function rebuildNavigation(nav: NavigationState, mapState: MapState): voi
   nav.lastTargetCellX = -1;
   nav.lastTargetCellY = -1;
   nav.flowVersion++;
+  nav.wallVer++;
 }
 
 function buildDeadEndMap(nav: NavigationState, mapState: MapState): void {
@@ -757,7 +760,7 @@ function buildRegionFields(
     }
   }
 
-  if (nav.navBlocked.length === total) nav.navBlocked.set(blocked.subarray(0, total));
+  if (nav.navBlocked.length === total) { nav.navBlocked.set(blocked.subarray(0, total)); nav.wallVer++; }
   if (_ow !== null) for (let i = 0; i < total; i++) if (_ow[i] !== 0) blocked[i] = 0;
   _labelComponents(nav, gc, blocked);
 
@@ -1641,6 +1644,7 @@ export function exactFieldView(nav: NavigationState, bodyR: number): NavigationS
     flowDirY: new Float32Array(0),
     flowDist: new Uint16Array(0),
     flowVersion: 0,
+    wallVer: 0,
     lastTargetCellX: -1,
     lastTargetCellY: -1,
     flowMaskIsRockAware: false,
@@ -2227,10 +2231,11 @@ function _discHitsWall(
   const mh = ms.mapHalf;
   const mhY = ms.mapHalfY;
   const wg = ms.wallGrid;
-  const minCX = Math.max(0, Math.floor((localX - bodyRadius + mh) / cs) - 1);
-  const maxCX = Math.min(gc - 1, Math.floor((localX + bodyRadius + mh) / cs) + 1);
-  const minCY = Math.max(0, Math.floor((localY - bodyRadius + mhY) / cs) - 1);
-  const maxCY = Math.min((SMALL_FIX.CH033 ? gcY : gc) - 1, Math.floor((localY + bodyRadius + mhY) / cs) + 1);
+  const _wr = bodyRadius + (SMALL_FIX.G905 !== 0 ? wallSteerPadMax() : 0);
+  const minCX = Math.max(0, Math.floor((localX - _wr + mh) / cs) - 1);
+  const maxCX = Math.min(gc - 1, Math.floor((localX + _wr + mh) / cs) + 1);
+  const minCY = Math.max(0, Math.floor((localY - _wr + mhY) / cs) - 1);
+  const maxCY = Math.min((SMALL_FIX.CH033 ? gcY : gc) - 1, Math.floor((localY + _wr + mhY) / cs) + 1);
   const wx = localX + offX;
   const wy = localY + offY;
   const r2 = bodyRadius * bodyRadius;

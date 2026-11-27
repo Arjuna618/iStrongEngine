@@ -21,7 +21,7 @@ import { EvEmpty, pressDoor } from './EvEmpty';
 import { EvSelect } from './EvSelect';
 import { toast } from '../ui/Toast';
 import { sameProjectUndo } from '../shared/sameProjectUndo';
-import { addFilledRow, ChipsField, choicesOf, Facts, factsFrom, groupsOfKinds, NumField, RefField, RowFields, RowList, TakeOffTags, TankField, thingNamer, ThingField, useKeptOpen, ZONES_KEY, type EvCtx } from './fields';
+import { addFilledRow, ChipsField, choicesOf, Facts, factsFrom, groupsOfKinds, ListText, NumField, RefField, RowFields, RowList, TakeOffTags, TankField, thingNamer, ThingField, useKeptOpen, ZONES_KEY, type EvCtx } from './fields';
 import { shownNameOfWord } from '../../game/tankByName';
 import { EntityTypePage } from './typePage';
 import { SMALL_FIX } from '../../game/smallFixSwitch';
@@ -236,6 +236,7 @@ export const EventsPage: React.FC<{ ctx: EvCtx; search: string; focus?: number |
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (SMALL_FIX.G772 !== 0 && door.current !== null && door.current.closest('[inert]') !== null) return;
       const { ctx: c, current: id, rules: list } = live.current;
       const i = id === null ? -1 : list.findIndex(r => r.id === id);
       const mod = e.ctrlKey || e.metaKey, key = shortcutKey(e).toLowerCase();
@@ -565,7 +566,7 @@ export const TimersPage: React.FC<{ ctx: EvCtx }> = ({ ctx }) => {
           <Group title="This Timer">
             <FieldRow stacked label="Name" help="What it is called in every list and menu of this map."><TextField maxLength={TEXT_LIMITS.NAME} value={list[i].name} onChange={x => put('name', x)} /></FieldRow>
             <FieldRow label="Lasts" help="How long it counts down."><NumField value={list[i].seconds} unit="s" onChange={x => put('seconds', x)} /></FieldRow>
-            <FieldRow stacked label="Tells At These Seconds Left" help="A Map Event can start at each of these seconds. Numbers with commas."><TextField value={(list[i].marks ?? []).join(', ')} placeholder="30, 10, 5" onChange={x => { const l = x.split(/[^0-9.]+/).filter(Boolean).map(Number); put('marks', l.length ? l : undefined); }} /></FieldRow>
+            <FieldRow stacked label="Tells At These Seconds Left" help="A Map Event can start at each of these seconds. Numbers with commas."><ListText on={SMALL_FIX.G771 !== 0} canon={x => x.split(/[^0-9.]+/).filter(Boolean).map(Number).join(', ')} value={(list[i].marks ?? []).join(', ')} placeholder="30, 10, 5" onChange={x => { const l = x.split(/[^0-9.]+/).filter(Boolean).map(Number); put('marks', l.length ? l : undefined); }} /></FieldRow>
             <ToggleRow label="Starts Over" help="At zero it starts again by itself." checked={!!list[i].repeat} onChange={x => put('repeat', x || undefined)} />
             <ToggleRow label="Shown On Screen" help="Its time stands in the stack above the minimap." checked={!!list[i].showOnHud} onChange={x => put('showOnHud', x || undefined)} />
             <FieldRow stacked label="Note" help="A note for yourself. It changes nothing in play."><TextField value={list[i].note ?? ''} onChange={x => put('note', x || undefined)} /></FieldRow>
@@ -604,9 +605,9 @@ export const NamesPage: React.FC<{ ctx: EvCtx }> = ({ ctx }) => {
   );
 };
 
-export const StatusesPage: React.FC<{ ctx: EvCtx }> = ({ ctx }) => {
+export const StatusesPage: React.FC<{ ctx: EvCtx; focus?: number | null }> = ({ ctx, focus = null }) => {
   const list = ctx.doc?.statuses ?? [];
-  const [picked, setPicked] = useState<number | null>(null);
+  const [picked, setPicked] = useState<number | null>(SMALL_FIX.G808 !== 0 ? focus : null);
   const current = picked !== null && list.some(v => v.id === picked) ? picked : (list[0]?.id ?? null);
   const i = current === null ? -1 : list.findIndex(v => v.id === current);
   const put = (k: keyof StatusDef, x: unknown) => ctx.commit(d => setAt(d, ['statuses', i, k], x));
@@ -817,7 +818,7 @@ export function pageOfProblem(doc: MapEventsDoc | undefined, zones: readonly Zon
     if (inList(doc.types) || some(doc.types ?? [])) { const t = (doc.types ?? []).find(x => x.id === id || deep(x)); return { page: 'types', focus: t!.id }; }
     if (inList(doc.plans) || some(doc.plans ?? [])) { const t = (doc.plans ?? []).find(x => x.id === id || deep(x)); return { page: 'waves', focus: t!.id }; }
     if (inList(doc.placed)) return { page: 'entities', focus: id };
-    if (inList(doc.statuses) || some(doc.statuses ?? [])) return { page: 'statuses', focus: id };
+    if (inList(doc.statuses) || some(doc.statuses ?? [])) { const st = SMALL_FIX.G808 !== 0 ? (doc.statuses ?? []).find(x => x.id === id || deep(x)) : undefined; return { page: 'statuses', focus: st ? st.id : id }; }
     if (inList(doc.areaGroups)) return { page: 'areas', focus: id };
   }
   const z = zones.find(x => x.uid === id || some(x.behaviors ?? []));

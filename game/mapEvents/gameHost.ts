@@ -43,8 +43,6 @@ export const MF_MM_ALL = 4194304;
 export const MF_NO_KILL = 8388608;
 export const MF_IN_WALLS = 16777216;
 export const MF_LEFT_ALONE = SMALL_FIX.R960 !== 0 ? 134217728 : 33554432;
-export function isStage(e: { _mevF?: number }): boolean { return ((e._mevF ?? 0) & MF_STAGE) !== 0; }
-
 export interface MevEngine {
   wornSlotOfTank(e: EnemyTank | null): number;
   wornSlotOfShape(p: FloatingPolygon): number;
@@ -101,7 +99,7 @@ export interface MevEngine {
   evolveToTank(fileName: string, isPlayerChoice?: boolean, announce?: boolean, spawn?: boolean): boolean;
   _areaIndexAtWorld(x: number, y: number): number;
   _hurtShapeShielded(p: FloatingPolygon, dmg: number, now: number): void;
-  _mevPlayerDies(): void;
+  _mevPlayerDies(byRule?: boolean): void;
   _mevSpotFree(x: number, y: number, req: SpawnReq, gap: number, keepFromDamaging: number, ownSpot?: boolean, except?: EnemyTank | null): boolean;
   _mevRoomAt(x: number, y: number, req: SpawnReq): number;
   _mevAwayFromPlayers(x: number, y: number, base: number, perSize: number): boolean;
@@ -444,7 +442,7 @@ export class GameMapEventsHost implements MapEventsHost {
   spawnShape(word: string, x: number, y: number, sizeFactor: number, areaIdx: number): MevBody | null { return this.g._mevSpawnShape(word, x, y, sizeFactor, areaIdx); }
 
   kill(b: MevBody, _credit = false, become = false): void {
-    if (b === this.player) { this.g._mevPlayerDies(); return; }
+    if (b === this.player) { this.g._mevPlayerDies(true); return; }
     const p = this.shape(b);
     if (p) { if (p.active && !p.fadingOut) { p.hp = 0; p.shield = 0; p.fadingOut = true; if (SMALL_FIX.GH375) p._mevDeath = become ? CAUSE_BECOME : CAUSE_RULE; } return; }
     const e = this.bot(b);

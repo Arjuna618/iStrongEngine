@@ -335,6 +335,7 @@ class NameAtlas {
     for (const n of names) if (!this.cells.has(n)) this.queue.push(n);
   }
   pending(): boolean { return this.qi < this.queue.length; }
+  allNames(): string[] { return [...this.cells.keys(), ...this.queue.slice(this.qi)]; }
   private font(): string { return `bold ${this.fontPx}px Ubuntu, Inter, sans-serif`; }
 
   build(untilMs: number): boolean {

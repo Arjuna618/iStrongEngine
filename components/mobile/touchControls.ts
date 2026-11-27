@@ -11,6 +11,8 @@ import { getEffectiveDPR } from '../../utils/zoomCompensation';
 import { safeInsets } from '../../utils/safeArea';
 import { MOBILE_ALT_SPLIT } from '../../game/mobileSwitch';
 import { armBack, setMatchBack } from '../../utils/leaveGuard';
+import { pressEscapeOwner } from '../shared/escapeStack';
+import { SMALL_FIX } from '../../game/smallFixSwitch';
 
 const _pt: MobXY = { x: 0, y: 0 };
 const _kn: MobXY = { x: 0, y: 0 };
@@ -156,6 +158,7 @@ export class TouchControls {
   private _onBack = (): boolean => {
     const logic = this._getLogic();
     if (!logic || !logic.state.isTestMode) return false;
+    if (SMALL_FIX.R1023 !== 0 && pressEscapeOwner()) { this.releaseAll(); return true; }
     logic.handleInput('keydown', 'Escape'); logic.handleInput('keyup', 'Escape');
     this.releaseAll();
     return true;

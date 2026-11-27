@@ -16,6 +16,7 @@ import {
 } from './Navigation';
 import { SMALL_FIX } from './smallFixSwitch';
 import { shouldSkipTeamCollision, bossCampMates } from './teamCollision';
+import { bossLeavesBody } from './fixedBodies';
 import { HEALTH_BASIS } from './healthBasisSwitch';
 import { btNoFear, btStandsStill } from './botTactics';
 const ROAM_EXPLORE_CHANCE = 0.50;
@@ -646,7 +647,7 @@ function planOk(enemy: EnemyTank): boolean {
 }
 function customWithPlan(enemy: EnemyTank): UpgradeStat | null {
   const pr = enemy.customUpgradePriorities;
-  if (pr && planOk(enemy) && pr.bulletPenetration > 0 && pr.bulletHealth > 0 && pr.bulletDamage > 0) {
+  if (pr && planOk(enemy) && pr.bulletPenetration > 0 && pr.bulletHealth > 0 && pr.bulletDamage > 0 && !(SMALL_FIX.G833 !== 0 && !(pr.movementSpeed > 0))) {
     const first = speedPlan(enemy), T = _spTrade;
     if (first >= 0 && (T[3] === 0 || pr.reload > 0)) {
       const up = enemy.upgrades, want = T[0] + T[1] + T[2] + T[3];
@@ -1186,7 +1187,7 @@ export function findBestEnemyTankTarget(
     }
 
     if (!mayAttackTank(enemy, target, isTeamBehavior)) continue;
-
+    if (bossLeavesBody(enemy, target)) continue;
     if (safeGround !== null && safeGround(enemy, target.position.x, target.position.y, isCurrentTarget)) continue;
     if (apart !== null && apart(enemy, target.position.x, target.position.y)) continue;
     if (spare !== null && spare(enemy, target, isCurrentTarget)) continue;
@@ -1403,6 +1404,7 @@ function _findCorneredTargets(
   for (let i = 0; i < allTanks.length; i++) {
     const t = allTanks[i];
     if (t.id === enemy.id || !t.active || t.isDying || t.isSpawning || t.graceActive || isUnseeableTank(t)) continue;
+    if (bossLeavesBody(enemy, t)) continue;
     if (t.invisEnabled && tankHiddenAt(enemy.position.x, enemy.position.y, enemy.size * 0.5, t,
         t.id === fleeSourceId || t.id === enemy.currentTargetId)
         && !(t.id === enemy.currentTargetId && HF_HOOK.keeps !== null && HF_HOOK.keeps(enemy, t))) continue;
@@ -1940,14 +1942,16 @@ export function determineAIStateInto(
     enemy.aiBehavior === 'Team3' || enemy.aiBehavior === 'Team4' || enemy.aiBehavior === 'Team5';
   if (hasShapesInFOV && _ffGateBehavior && !isProvoked(enemy, gameNow) && !(enemy.hf.rcUntil > gameNow)) {
     const _ffEngaged = enemy.aiState === 'attacking' || enemy.aiState === 'following';
-    if (shouldAttackPlayer &&
+    const _ffSide = (AI_CONSTANTS.TM_ALLIN !== 0 && enemy._thId !== '' && gameNow < enemy._thUntil) ||
+      (AI_CONSTANTS.HF_CORNERED !== 0 && enemy.hf.cnId !== '' && gameNow < enemy.hf.cnUntil);
+    if (shouldAttackPlayer && !_ffSide &&
         !(_ffEngaged && enemy.currentTargetType === 'player')) {
       const _ffPTier = powerCeiling > 0 ? tierOfLevel(playerLevel, powerCeiling) : -1;
       if (!huntDecision(enemy.dnaAggression, myTier, _ffPTier, false)) {
         shouldAttackPlayer = false;
       }
     }
-    if (tankTarget &&
+    if (tankTarget && !_ffSide &&
         !(_ffEngaged && enemy.currentTargetId === tankTarget.id)) {
       const _ffTTier = tankTarget.isBossTier ? 3 :
         (powerCeiling > 0 ? tierOfLevel(tankTarget.level, powerCeiling) : -1);
